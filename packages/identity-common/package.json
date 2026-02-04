@@ -1,0 +1,26 @@
+{
+  "name": "@owf/identity-common",
+  "version": "0.0.0",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "exports": "./src/index.ts",
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/identity-common",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/identity-common"
+  },
+  "publishConfig": {
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+  }
+}
