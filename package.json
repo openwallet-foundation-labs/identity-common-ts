@@ -21,7 +21,7 @@
     "@biomejs/biome": "2.3.14",
     "@changesets/cli": "^2.29.8",
     "@types/node": "^25.2.0",
-    "tsdown": "^0.20.1",
+    "tsdown": "^0.20.2",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",
     "@owf/identity-common": "workspace:*"
