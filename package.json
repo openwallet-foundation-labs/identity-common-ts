@@ -31,6 +31,6 @@
     "@owf/identity-common": "workspace:*"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   }
 }

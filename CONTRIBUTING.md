@@ -22,7 +22,7 @@ This project follows the [OpenWallet Foundation Code of Conduct](https://tac.ope
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) >= 22
+- [Node.js](https://nodejs.org/) >= 20
 - [pnpm](https://pnpm.io/) (version specified in `package.json` under `packageManager`)
 
 ### Installation

@@ -128,7 +128,7 @@ pnpm test
 
 This library is **platform agnostic** and supports:
 
-- ✅ **Node.js** (>=22)
+- ✅ **Node.js** (>=20)
 - ✅ **Browsers** (modern browsers with ES2020 support)
 - ✅ **React Native**
 

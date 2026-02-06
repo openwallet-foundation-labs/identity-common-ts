@@ -28,7 +28,7 @@ import { } from '@owf/identity-common'
 
 This library is **platform agnostic** and works in:
 
-- ✅ Node.js (>=22)
+- ✅ Node.js (>=20)
 - ✅ Browsers (modern browsers with ES2020 support)
 - ✅ React Native
 
