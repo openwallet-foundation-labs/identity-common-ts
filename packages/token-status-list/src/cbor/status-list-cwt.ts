@@ -106,7 +106,7 @@ export class StatusListCwt {
     return (await cwt.asSign1.sign(options, ctx)).encode()
   }
 
-  public async authenticateAndEncode(options: { key: Uint8Array }, ctx: Pick<Mac0Context, 'mac'>) {
+  public async authenticateAndEncode(options: { key: CoseKey }, ctx: Pick<Mac0Context, 'mac'>) {
     const cwt = new Cwt({
       protectedHeaders: this.protectedHeaders,
       unprotectedHeaders: this.unprotectedHeaders,

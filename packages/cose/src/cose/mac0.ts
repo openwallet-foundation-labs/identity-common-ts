@@ -21,6 +21,7 @@ import {
   UnprotectedHeaders,
   type UnprotectedHeadersStructure,
 } from './headers/unprotected-headers'
+import type { CoseKey } from './key'
 import { coseKeyToJwk } from './key/jwk'
 
 export const mac0EncodedSchema = z.tuple([
@@ -41,7 +42,7 @@ export type Mac0EncodedStructure = z.infer<typeof mac0EncodedSchema>
 export type Mac0DecodedStructure = z.infer<typeof mac0DecodedSchema>
 
 export type Mac0Context = {
-  mac: (options: { toBeAuthenticated: Uint8Array; key: Uint8Array }) => Promise<Uint8Array>
+  mac: (options: { toBeAuthenticated: Uint8Array; key: CoseKey | Uint8Array }) => Promise<Uint8Array>
 }
 
 export type Mac0Options = {
@@ -196,7 +197,7 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
 
   public async authenticate(
     options: {
-      key: Uint8Array
+      key: CoseKey | Uint8Array
     },
     ctx: Pick<Mac0Context, 'mac'>
   ) {

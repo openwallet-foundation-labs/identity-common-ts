@@ -1,4 +1,4 @@
-import { CoseKey, type Mac0Context, type Sign1, type Sign1Context, SignatureAlgorithm } from '@owf/cose'
+import { CoseKey, KeyType, type Mac0Context, type Sign1, type Sign1Context, SignatureAlgorithm } from '@owf/cose'
 import { expect, suite, test } from 'vitest'
 import { StatusListCbor } from '../../cbor/status-list-cbor'
 import { StatusListCwt, StatusListCwtHeaderKey } from '../../cbor/status-list-cwt'
@@ -21,7 +21,7 @@ const sign1Context: Sign1Context = {
 }
 
 const mac0Context: Mac0Context = {
-  mac: async (_options: { toBeAuthenticated: Uint8Array; key: Uint8Array }): Promise<Uint8Array> =>
+  mac: async (_options: { toBeAuthenticated: Uint8Array; key: CoseKey | Uint8Array }): Promise<Uint8Array> =>
     new Uint8Array([4, 5, 6]),
 }
 
@@ -300,7 +300,10 @@ suite('StatusListCwt', () => {
         'did:you'
       )
 
-      const token = await statusListCwt.authenticateAndEncode({ key: new Uint8Array([1, 2, 3]) }, mac0Context)
+      const token = await statusListCwt.authenticateAndEncode(
+        { key: CoseKey.create({ keyType: KeyType.Ec }) },
+        mac0Context
+      )
 
       const decodedStatusListCwt = StatusListCwt.fromToken(token)
       expect(decodedStatusListCwt).toMatchObject(statusListCwt)
@@ -318,7 +321,10 @@ suite('StatusListCwt', () => {
         unprotectedHeaders,
       })
 
-      const token = await statusListCwt.authenticateAndEncode({ key: new Uint8Array([1, 2, 3]) }, mac0Context)
+      const token = await statusListCwt.authenticateAndEncode(
+        { key: CoseKey.create({ keyType: KeyType.Ec }) },
+        mac0Context
+      )
 
       const decodedStatusListCwt = StatusListCwt.fromToken(token)
       expect(decodedStatusListCwt.protectedHeaders?.headers.get(1)).toBe(123)
@@ -345,7 +351,7 @@ suite('StatusListCwt', () => {
         { statusList: [1, 0, 1], bitsPerStatus: 1 },
         'did:issuer'
       )
-      const token = await original.authenticateAndEncode({ key: new Uint8Array([1, 2, 3]) }, mac0Context)
+      const token = await original.authenticateAndEncode({ key: CoseKey.create({ keyType: KeyType.Ec }) }, mac0Context)
 
       const decoded = StatusListCwt.fromToken(token)
       const result = decoded.payload.statusList.statusList.slice(0, 3)

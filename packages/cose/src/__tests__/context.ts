@@ -15,6 +15,6 @@ export const sign1Context: Sign1Context = {
 }
 
 export const mac0Context: Mac0Context = {
-  mac: async (_options: { toBeAuthenticated: Uint8Array; key: Uint8Array }): Promise<Uint8Array> =>
+  mac: async (_options: { toBeAuthenticated: Uint8Array; key: CoseKey | Uint8Array }): Promise<Uint8Array> =>
     new Uint8Array([4, 5, 6]),
 }
