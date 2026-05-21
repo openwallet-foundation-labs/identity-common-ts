@@ -1,6 +1,6 @@
+import { hex } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
-import { Mac0 } from '../../src/cose/mac0'
-import { hex } from './utils'
+import { Mac0 } from '../../src'
 
 const cbor =
   'd18441a0a1010554546869732069732074686520636f6e74656e742e5820176dce14c1e57430c13658233f41dc89aa4fa0ff9b8783f23b0ef51ca6b026bc'

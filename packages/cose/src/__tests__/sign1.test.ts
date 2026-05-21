@@ -1,10 +1,15 @@
+import { hex } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
-import { RegisteredCwtHeaderClaimKey, SignatureAlgorithm } from '../../src/cose/headers/defaults'
-import { Sign1 } from '../../src/cose/sign1'
-import { cborDecode } from '../cbor'
-import { CoseKey, ProtectedHeaders, UnprotectedHeaders } from '../cose'
+import {
+  CoseKey,
+  cborDecode,
+  ProtectedHeaders,
+  RegisteredCwtHeaderClaimKey,
+  Sign1,
+  SignatureAlgorithm,
+  UnprotectedHeaders,
+} from '../../src'
 import { sign1Context } from './context'
-import { hex } from './utils'
 import { sign1TestVector01, sign1TestVector02 } from './vectors'
 
 const cbor = hex.decode(

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hex, hexDecode, hexEncode } from '../hex'
-import { IdentityCommonException } from '../identity-common-exception'
+import { hex, hexDecode, hexEncode, IdentityCommonException } from '../../src'
 
 describe('hex', () => {
   it('should encode and decode Uint8Array', () => {

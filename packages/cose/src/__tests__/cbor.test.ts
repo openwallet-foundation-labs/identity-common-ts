@@ -1,7 +1,6 @@
-import { compareBytes } from '@owf/identity-common'
+import { compareBytes, hex } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import { cborDecode, cborEncode, DataItem } from '../cbor'
-import { hex } from './utils'
 
 describe('cbor', () => {
   it('should properly decode a nested map and unwrap a data item', () => {
