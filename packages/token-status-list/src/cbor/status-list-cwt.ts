@@ -4,13 +4,15 @@ import {
   Cwt,
   type ProtectedHeaderOptions,
   ProtectedHeaders,
+  RegisteredCwtClaimKey,
   type Sign1Context,
   type SignatureAlgorithm,
   type UnprotectedHeaderOptions,
   UnprotectedHeaders,
 } from '@owf/cose'
 import { StatusList } from '../status-list'
-import { type BitsPerStatus, MediaTypes } from '../types'
+import { SLException } from '../status-list-exception'
+import { type BitsPerStatus, MediaTypes, StatusType } from '../types'
 import { StatusListCbor } from './status-list-cbor'
 import { type CreateStatusListCwtPayloadOptions, StatusListCwtPayload } from './status-list-cwt-payload'
 
@@ -42,7 +44,7 @@ export class StatusListCwt {
         : UnprotectedHeaders.create({ unprotectedHeaders: options.unprotectedHeaders })
 
     if (this.protectedHeaders.headers.get(StatusListCwtHeaderKey.Typ) === undefined) {
-      this.protectedHeaders.headers.set(StatusListCwtHeaderKey.Typ, MediaTypes.STATUS_LIST_CWT)
+      this.protectedHeaders.headers.set(StatusListCwtHeaderKey.Typ, MediaTypes.StatusListCwt)
     }
   }
 
@@ -113,5 +115,41 @@ export class StatusListCwt {
       payload: this.payload.encode(),
     })
     return (await cwt.asMac0.authenticate(options, ctx)).encode()
+  }
+
+  /**
+   * @todo add check for `ttl` claim
+   */
+  public verifyStatus({
+    idx,
+    uri,
+    checkFreshness = true,
+    now = new Date(),
+  }: {
+    idx: number
+    uri: string
+    checkFreshness?: boolean
+    now?: Date
+  }) {
+    if (this.payload.expirationTime && this.payload.expirationTime < now) {
+      throw new SLException(
+        `The expiration claim (${RegisteredCwtClaimKey.ExpirationTime}) '${this.payload.expirationTime}' is in the past (compared to '${now}'), and therefore not valid`
+      )
+    }
+    if (this.payload.subject !== uri) {
+      throw new SLException(
+        `The subject claim (${RegisteredCwtClaimKey.Subject}) '${this.payload.subject}' must be equal to the uri '${uri}'`
+      )
+    }
+    if (checkFreshness && this.payload.issuedAt > now) {
+      throw new SLException(
+        `The issued at claim (${RegisteredCwtClaimKey.IssuedAt}) '${this.payload.issuedAt}' is in the future (compared to '${now}'), and therefore not valid`
+      )
+    }
+    if (this.payload.statusList.getStatus(idx) !== StatusType.Valid) {
+      throw new SLException(
+        `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${this.payload.statusList.getStatus(idx)}'`
+      )
+    }
   }
 }

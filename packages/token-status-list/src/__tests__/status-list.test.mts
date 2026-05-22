@@ -2,7 +2,7 @@ import { describe, expect, it, test } from 'vitest'
 import { StatusList } from '../status-list'
 import { SLException } from '../status-list-exception'
 import type { BitsPerStatus } from '../types'
-import { StatusTypes } from '../types'
+import { StatusType } from '../types'
 
 describe('StatusList', () => {
   const listLength = 10000
@@ -159,7 +159,7 @@ describe('StatusList', () => {
       ])('throws an error for invalid bitsPerStatus value (%i)', (bps) => {
         expect(() => {
           new StatusList([], bps as BitsPerStatus)
-        }).toThrowError('bitsPerStatus must be 1, 2, 4, or 8')
+        }).toThrow('bitsPerStatus must be 1, 2, 4, or 8')
       })
 
       test.each<[BitsPerStatus]>([
@@ -170,7 +170,7 @@ describe('StatusList', () => {
       ])('does not throw an error for valid bitsPerStatus value (%i)', (bps) => {
         expect(() => {
           new StatusList([], bps)
-        }).not.toThrowError()
+        }).not.toThrow()
       })
     })
   })
@@ -191,10 +191,10 @@ describe('StatusList', () => {
 
   describe('StatusTypes', () => {
     it('should have correct status type values per spec', () => {
-      expect(StatusTypes.VALID).toBe(0x00)
-      expect(StatusTypes.INVALID).toBe(0x01)
-      expect(StatusTypes.SUSPENDED).toBe(0x02)
-      expect(StatusTypes.APPLICATION_SPECIFIC_3).toBe(0x03)
+      expect(StatusType.Valid).toBe(0x00)
+      expect(StatusType.Invalid).toBe(0x01)
+      expect(StatusType.Suspended).toBe(0x02)
+      expect(StatusType.ApplicationSpecific3).toBe(0x03)
     })
   })
 

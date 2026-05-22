@@ -4,7 +4,7 @@ import { StatusListCbor } from '../../cbor/status-list-cbor'
 import { StatusListCwt, StatusListCwtHeaderKey } from '../../cbor/status-list-cwt'
 import { StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
-import { StatusTypes } from '../../types'
+import { StatusType } from '../../types'
 
 const sign1Context: Sign1Context = {
   sign: async (_options: {
@@ -171,7 +171,7 @@ suite('StatusListCwt', () => {
 
     test('encode/decode with different status values', async () => {
       const statusListCwt = StatusListCwt.createFromStatusListAndSubject(
-        { statusList: [StatusTypes.VALID, StatusTypes.INVALID, StatusTypes.SUSPENDED], bitsPerStatus: 2 },
+        { statusList: [StatusType.Valid, StatusType.Invalid, StatusType.Suspended], bitsPerStatus: 2 },
         'did:you'
       )
 
@@ -182,7 +182,7 @@ suite('StatusListCwt', () => {
 
       const decodedStatusListCwt = StatusListCwt.fromToken(token)
       const result = decodedStatusListCwt.payload.statusList.statusList.slice(0, 3)
-      expect(result).toEqual([StatusTypes.VALID, StatusTypes.INVALID, StatusTypes.SUSPENDED])
+      expect(result).toEqual([StatusType.Valid, StatusType.Invalid, StatusType.Suspended])
     })
 
     test('encode/decode with bitsPerStatus=4', async () => {
@@ -388,7 +388,7 @@ suite('StatusListCwt', () => {
     })
 
     test('encode/decode with large status list (1000 entries)', async () => {
-      const statusList = Array(1000).fill(StatusTypes.VALID)
+      const statusList = Array(1000).fill(StatusType.Valid)
       const statusListCwt = StatusListCwt.createFromStatusListAndSubject({ statusList, bitsPerStatus: 2 }, 'did:you')
 
       const token = await statusListCwt.signAndEncode(
@@ -398,7 +398,7 @@ suite('StatusListCwt', () => {
 
       const decodedStatusListCwt = StatusListCwt.fromToken(token)
       expect(decodedStatusListCwt.payload.statusList.statusList.length).toBeGreaterThanOrEqual(1000)
-      expect(decodedStatusListCwt.payload.statusList.statusList[0]).toBe(StatusTypes.VALID)
+      expect(decodedStatusListCwt.payload.statusList.statusList[0]).toBe(StatusType.Valid)
     })
   })
 
