@@ -59,6 +59,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "nock": "^14.0.13"
+    "nock": "^14.0.15"
   }
 }
