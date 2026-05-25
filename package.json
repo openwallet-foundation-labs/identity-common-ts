@@ -9,7 +9,7 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "pretypes:check": "pnpm -r build",
+    "pretypes:check": "turbo run build",
     "types:check": "tsc --noEmit",
     "style:check": "biome check --unsafe",
     "style:fix": "biome check --write --unsafe",
@@ -17,9 +17,8 @@
     "md:fix": "markdownlint-cli2 --fix \"**/*.md\" \"#**/node_modules\"",
     "packages:check": "node scripts/check-package-entrypoints.mjs",
     "esm:check": "node scripts/check-package-esm-imports.mjs",
-    "build": "pnpm -r build",
-    "pretest": "pnpm -r build",
-    "test": "vitest",
+    "build": "turbo run build",
+    "test": "turbo run test",
     "create-package": "node scripts/create-package.mjs",
     "release": "pnpm packages:check && pnpm types:check && pnpm build && pnpm esm:check && pnpm changeset publish --no-git-tag 2>&1 | tee changeset-publish.log",
     "changeset-version": "pnpm changeset version && pnpm style:fix",
@@ -36,9 +35,10 @@
     "lint-staged": "^16.4.0",
     "markdownlint-cli2": "^0.22.0",
     "tsdown": "0.21.9",
+    "tsx": "^4.21.0",
+    "turbo": "^2.9.14",
     "typescript": "catalog:",
-    "vitest": "^4.1.4",
-    "tsx": "^4.21.0"
+    "vitest": "^4.1.4"
   },
   "engines": {
     "node": ">=20"

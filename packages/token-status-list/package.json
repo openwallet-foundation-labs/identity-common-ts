@@ -39,7 +39,8 @@
     }
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
   },
   "dependencies": {
     "@owf/cose": "workspace:*",
@@ -49,6 +50,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/pako": "^2.0.4"
+    "@types/pako": "^2.0.4",
+    "vitest": "catalog:"
   }
 }

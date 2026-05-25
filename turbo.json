@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["tsconfig.json", "vite.config.js"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "package.json", "tsconfig.json"],
+      "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "package.json"],
+      "outputs": []
+    },
+    "types:check": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "esm:check": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "lint": {
+      "inputs": ["src/**", "package.json"],
+      "outputs": []
+    }
+  }
+}

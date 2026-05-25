@@ -39,10 +39,14 @@
     }
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
   },
   "dependencies": {
     "@noble/hashes": "^2.2.0",
     "@owf/identity-common": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
   }
 }

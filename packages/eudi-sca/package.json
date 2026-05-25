@@ -46,7 +46,8 @@
     "wallet"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
   },
   "dependencies": {
     "@openid4vc/openid4vci": "0.5.0-alpha-20260415063740",
@@ -59,6 +60,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "nock": "^14.0.13"
+    "nock": "^14.0.13",
+    "vitest": "catalog:"
   }
 }

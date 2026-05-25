@@ -39,6 +39,10 @@
     }
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
   }
 }

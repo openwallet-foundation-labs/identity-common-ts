@@ -83,9 +83,12 @@ const packageJson = {
   },
   scripts: {
     build: 'tsdown src/index.ts --format esm,cjs --dts --sourcemap',
+    test: 'vitest run',
   },
   dependencies: {},
-  devDependencies: {},
+  devDependencies: {
+    vitest: 'catalog:',
+  },
 }
 
 // tsconfig.json template
@@ -189,8 +192,8 @@ async function main() {
     console.log(`  2. Add your code to packages/${packageName}/src/index.ts`)
     console.log(`  3. Add tests to packages/${packageName}/src/__tests__/`)
     console.log('  4. Run: pnpm install')
-    console.log('  5. Run: pnpm build')
-    console.log('  6. Run: pnpm test')
+    console.log('  5. Run: pnpm build  (or: turbo run build)')
+    console.log('  6. Run: pnpm test   (or: turbo run test)')
     console.log('')
   } catch (error) {
     console.error('Error creating package:', error)

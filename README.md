@@ -164,7 +164,7 @@ yarn add @owf/identity-common
 
 ### Development Setup
 
-To contribute or develop locally:
+This monorepo uses [pnpm](https://pnpm.io) for package management and [Turborepo](https://turbo.build/repo) for task orchestration.
 
 ```bash
 # Clone the repository
@@ -177,9 +177,46 @@ pnpm install
 # Build all packages
 pnpm build
 
-# Run tests
+# Run all tests
 pnpm test
 ```
+
+### Turborepo
+
+All build and test tasks run through **Turborepo**, which provides:
+
+- **Caching** — tasks whose inputs haven't changed are skipped entirely (a cached full run completes in ~15ms)
+- **Parallelism** — independent packages build and test concurrently
+- **Correct ordering** — packages are always built before the packages that depend on them
+
+#### Task pipeline
+
+| Task | Depends on | What it does |
+|------|-----------|--------------|
+| `build` | upstream `build` | Compiles each package with `tsdown` (ESM + CJS + `.d.ts`) |
+| `test` | upstream `build` | Runs `vitest` tests for each package |
+| `types:check` | upstream `build` | Type-checks the workspace with `tsc --noEmit` |
+| `esm:check` | local `build` | Validates ESM import paths |
+| `lint` | — | Linting (no build prerequisite) |
+
+Run any task across all packages:
+
+```bash
+pnpm build          # turbo run build
+pnpm test           # turbo run test
+
+# Scope to a single package
+npx turbo run build --filter=@owf/identity-common
+npx turbo run test  --filter=@owf/crypto
+```
+
+The first run executes everything. Subsequent runs that find no changed inputs print `FULL TURBO` and finish instantly.
+
+#### Cache details
+
+Turbo computes a hash for each task from its **input files** (`src/**`, `package.json`, `tsconfig.json`), the global config (`tsconfig.json`, `vite.config.js`), and the pnpm lockfile. If the hash matches a previously-stored result the task is restored from `.turbo/cache/` without re-running.
+
+The `.turbo/` directory is intentionally **not committed** (`.gitignore`) — every developer gets their own local cache.
 
 ---
 
@@ -242,7 +279,14 @@ Please read our [Contributing Guide](./CONTRIBUTING.md) to get started.
 
 ### Adding a New Package
 
-Want to add a new package to the monorepo? Check out our [guide for adding packages](./CONTRIBUTING.md#adding-a-new-package).
+A script is provided to scaffold a new package with the correct structure, build config, and Turborepo wiring already in place:
+
+```bash
+pnpm create-package <name>           # e.g. jose
+pnpm create-package <name> --eudi   # prefixes with eudi-
+```
+
+See the [guide for adding packages](./CONTRIBUTING.md#adding-a-new-package) for details.
 
 ---
 

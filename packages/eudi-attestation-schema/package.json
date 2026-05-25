@@ -51,11 +51,15 @@
     "ts11"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
   },
   "dependencies": {
     "@owf/crypto": "workspace:*",
     "@owf/identity-common": "workspace:*",
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
   }
 }

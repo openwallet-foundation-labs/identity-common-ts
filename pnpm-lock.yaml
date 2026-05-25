@@ -9,6 +9,9 @@ catalogs:
     typescript:
       specifier: ~6.0.2
       version: 6.0.3
+    vitest:
+      specifier: ^4.1.4
+      version: 4.1.5
     zod:
       specifier: ^4.4.3
       version: 4.4.3
@@ -50,6 +53,9 @@ importers:
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
+      turbo:
+        specifier: ^2.9.14
+        version: 2.9.14
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -87,6 +93,9 @@ importers:
       jose:
         specifier: ^6.1.0
         version: 6.2.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/crypto:
     dependencies:
@@ -96,6 +105,10 @@ importers:
       '@owf/identity-common':
         specifier: workspace:*
         version: link:../identity-common
+    devDependencies:
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/eudi-attestation-schema:
     dependencies:
@@ -108,6 +121,10 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.4.3
+    devDependencies:
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/eudi-lote:
     dependencies:
@@ -120,6 +137,10 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.4.3
+    devDependencies:
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/eudi-sca:
     dependencies:
@@ -151,6 +172,9 @@ importers:
       nock:
         specifier: ^14.0.13
         version: 14.0.13
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/eudi-wrprc:
     dependencies:
@@ -163,8 +187,16 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.4.3
+    devDependencies:
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
 
-  packages/identity-common: {}
+  packages/identity-common:
+    devDependencies:
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/token-status-list:
     dependencies:
@@ -187,6 +219,9 @@ importers:
       '@types/pako':
         specifier: ^2.0.4
         version: 2.0.4
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
 
 packages:
 
@@ -868,6 +903,36 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@turbo/darwin-64@2.9.14':
+    resolution: {integrity: sha512-t7QiPflaEyBE4oayeZtSmu4mEfjgIrcNlNNl1z1dmIVPqEdtA7+CfTf8d7KXsOGPh6aNgWjKxyvQg9uGfDQF+A==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@turbo/darwin-arm64@2.9.14':
+    resolution: {integrity: sha512-d23147mC9BsCPA9mJ0h/ubcpbRgcJBXbcG3+Vq7YLhjz3IXuvQsJ1UXH8f4MD76ZjJ4m/E4aRdJV+MW88CDfbw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@turbo/linux-64@2.9.14':
+    resolution: {integrity: sha512-P3ZKB5tuUDdDQWuAsACGUR1qv9W7BNWxdxqVJ0kZNuNNPRaVYTPPikLcp79+GiEcW3npsR+KyP38lnQiBc5aSA==}
+    cpu: [x64]
+    os: [linux]
+
+  '@turbo/linux-arm64@2.9.14':
+    resolution: {integrity: sha512-ZRTlzcUMrrPv9ZuDzRF9n60Ym13bKeG9jDB8WjxyLhWNzV+AJQN+zdpIk3NJYf2zQsGUm1mNar2P0elRzLw25g==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@turbo/windows-64@2.9.14':
+    resolution: {integrity: sha512-exanwN6sIduZwykYeiTQj8kCmOhazP5WOz3bvXMcYtjhL6Z3iRWLewKrXCBq0bqwSP3iBMb/AerRCnHI4lx46A==}
+    cpu: [x64]
+    os: [win32]
+
+  '@turbo/windows-arm64@2.9.14':
+    resolution: {integrity: sha512-fVdCsnmYoKICsycbWuuGp6Jvi51/3G/UluFWuAUCvR8PIW5IJkAk5BM9UF8PSm0Q2IphWHFZjYEgjHsh3B9y/g==}
+    cpu: [arm64]
+    os: [win32]
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -1856,6 +1921,10 @@ packages:
     resolution: {integrity: sha512-axr3IdNuVIxnaK5XGEUFTu3YmAQ6lllgrvqfEoR16g/HGnYY/6We4oWENtAnzK6/LpJ2ur9PAb80RBt7/U4ugw==}
     engines: {node: '>= 6.0.0'}
 
+  turbo@2.9.14:
+    resolution: {integrity: sha512-BQqXRr4UoWI3UPFrtznCLykYHxwxWh53iCB57x092jPMjIlW1wnm3N895g5irpiXmnxUhREBB0n6+y8BHhs4nw==}
+    hasBin: true
+
   typescript@6.0.3:
     resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
@@ -2684,6 +2753,24 @@ snapshots:
   '@sindresorhus/merge-streams@4.0.0': {}
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@turbo/darwin-64@2.9.14':
+    optional: true
+
+  '@turbo/darwin-arm64@2.9.14':
+    optional: true
+
+  '@turbo/linux-64@2.9.14':
+    optional: true
+
+  '@turbo/linux-arm64@2.9.14':
+    optional: true
+
+  '@turbo/windows-64@2.9.14':
+    optional: true
+
+  '@turbo/windows-arm64@2.9.14':
+    optional: true
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
@@ -3729,6 +3816,15 @@ snapshots:
   tsyringe@4.10.0:
     dependencies:
       tslib: 1.14.1
+
+  turbo@2.9.14:
+    optionalDependencies:
+      '@turbo/darwin-64': 2.9.14
+      '@turbo/darwin-arm64': 2.9.14
+      '@turbo/linux-64': 2.9.14
+      '@turbo/linux-arm64': 2.9.14
+      '@turbo/windows-64': 2.9.14
+      '@turbo/windows-arm64': 2.9.14
 
   typescript@6.0.3: {}
 
