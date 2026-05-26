@@ -38,7 +38,7 @@
     "tsx": "^4.21.0",
     "turbo": "^2.9.14",
     "typescript": "catalog:",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.7"
   },
   "engines": {
     "node": ">=20"
