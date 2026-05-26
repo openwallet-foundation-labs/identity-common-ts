@@ -4,7 +4,7 @@ import { MediaTypes } from './types'
 export const fetchStatusList = async ({
   uri,
   customFetcher = fetch,
-  preferredFormat,
+  acceptedFormats = ['jwt', 'cwt'],
 }: {
   uri: string
   /**
@@ -12,16 +12,21 @@ export const fetchStatusList = async ({
    * If none is supplied either can be returned
    *
    */
-  preferredFormat?: 'cwt' | 'jwt'
+  acceptedFormats?: Array<'cwt' | 'jwt'>
   customFetcher?: typeof fetch
 }): Promise<string | Uint8Array> => {
   try {
+    if (acceptedFormats.length === 0) {
+      throw new SLException(`At least one accepted format (cwt, jwt) needs to be provided`)
+    }
+
+    const acceptHeaders = acceptedFormats.map((format) =>
+      format === 'jwt' ? MediaTypes.StatusListJwt : MediaTypes.StatusListCwt
+    )
+
     const response = await customFetcher(uri, {
       headers: {
-        Accept:
-          preferredFormat === 'jwt'
-            ? `${MediaTypes.StatusListJwt}, ${MediaTypes.StatusListCwt}`
-            : `${MediaTypes.StatusListCwt}, ${MediaTypes.StatusListJwt}`,
+        Accept: acceptHeaders.join(','),
       },
     })
 
@@ -38,6 +43,6 @@ export const fetchStatusList = async ({
 
     throw new SLException('Content type was either not provided in the response or invalid.')
   } catch (e) {
-    throw new Error(`Could not fetch either a JWT or CWT as status list. ${(e as Error).message}`)
+    throw new SLException(`Could not fetch either a JWT or CWT as status list. ${(e as Error).message}`)
   }
 }
