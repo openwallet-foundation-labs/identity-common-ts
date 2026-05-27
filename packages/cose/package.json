@@ -39,7 +39,8 @@
     }
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
   },
   "dependencies": {
     "@owf/identity-common": "workspace:*",
@@ -52,6 +53,7 @@
     "@noble/hashes": "^2.0.1",
     "@panva/hkdf": "^1.2.1",
     "@peculiar/x509": "^1.14.3",
-    "jose": "^6.1.0"
+    "jose": "^6.1.0",
+    "vitest": "catalog:"
   }
 }

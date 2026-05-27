@@ -21,10 +21,31 @@ jobs:
 
       - uses: pnpm/action-setup@v6
       - name: Setup NodeJS
+        id: setup-node
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: "pnpm"
+
+      # See https://github.com/actions/setup-node/issues/641#issuecomment-1358859686
+      - name: pnpm cache path
+        id: pnpm-cache-path
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: pnpm cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.pnpm-cache-path.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Turbo cache
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-validate-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-validate-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -36,10 +57,11 @@ jobs:
         run: pnpm md:check
 
       - name: Check Types
+        # pretypes:check runs `turbo run build` automatically; no separate build step needed
         run: pnpm types:check
-
-      - name: Compile
-        run: pnpm build
+        env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
 
   tests:
     runs-on: ubuntu-24.04
@@ -65,8 +87,7 @@ jobs:
       # See https://github.com/actions/setup-node/issues/641#issuecomment-1358859686
       - name: pnpm cache path
         id: pnpm-cache-path
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
       - name: pnpm cache
         uses: actions/cache@v5
@@ -76,8 +97,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ steps.setup-node.outputs.node-version }}-pnpm-store-
 
+      - name: Turbo cache
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-${{ steps.setup-node.outputs.node-version }}-turbo-test-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ steps.setup-node.outputs.node-version }}-turbo-test-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
         run: pnpm test
+        env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
