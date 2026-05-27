@@ -25,12 +25,7 @@ export class Cwt {
   }
 
   public get payload() {
-    const payload = this.options.payload ?? this.options.detachedPayload
-    if (!payload) {
-      throw new Error('Neither `payload`, nor `detachedPayload` is defined')
-    }
-
-    return payload
+    return this.options.payload
   }
 
   public get protectedHeaders() {
