@@ -84,6 +84,10 @@ export class StatusListCwt {
 
   public static fromToken(token: Uint8Array) {
     const cwt = Cwt.fromToken(token)
+
+    if (!cwt.payload) {
+      throw new SLException('Cwt does not contain payload, detached payload is not supported for status list CWT')
+    }
     const payload = StatusListCwtPayload.decode(cwt.payload)
 
     return new StatusListCwt({
