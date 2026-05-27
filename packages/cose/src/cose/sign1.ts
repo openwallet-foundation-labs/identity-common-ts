@@ -45,7 +45,7 @@ export type Sign1DecodedStructure = z.infer<typeof sign1DecodedSchema>
 
 export type Sign1Context = {
   sign: (options: { toBeSigned: Uint8Array; key: CoseKey; algorithm: SignatureAlgorithm }) => Promise<Uint8Array>
-  verify: (options: { sign1: Sign1; key: Uint8Array | CoseKey }) => Promise<boolean>
+  verify: (options: { sign1: Sign1; key: CoseKey }) => Promise<boolean>
   x509: {
     getIssuerNameField: (options: { certificate: Uint8Array; field: string }) => string[]
     getPublicKey: (options: { certificate: Uint8Array; alg: string }) => Promise<CoseKey>
