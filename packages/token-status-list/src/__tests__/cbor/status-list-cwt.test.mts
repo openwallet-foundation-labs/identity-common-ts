@@ -1,4 +1,4 @@
-import { CoseKey, KeyType, type Mac0Context, type Sign1, type Sign1Context, SignatureAlgorithm } from '@owf/cose'
+import { CoseKey, KeyType, type Mac0Context, type Sign1Context, SignatureAlgorithm } from '@owf/cose'
 import { expect, suite, test } from 'vitest'
 import { StatusListCbor } from '../../cbor/status-list-cbor'
 import { StatusListCwt, StatusListCwtHeaderKey } from '../../cbor/status-list-cwt'
@@ -7,22 +7,17 @@ import { StatusList } from '../../status-list'
 import { StatusType } from '../../types'
 
 const sign1Context: Sign1Context = {
-  sign: async (_options: {
-    toBeSigned: Uint8Array
-    key: CoseKey
-    algorithm: SignatureAlgorithm
-  }): Promise<Uint8Array> => new Uint8Array([1, 2, 3]),
-  verify: async (_options: { sign1: Sign1; key: Uint8Array | CoseKey }): Promise<boolean> => true,
+  sign: async () => new Uint8Array([1, 2, 3]),
+  verify: async () => true,
   x509: {
-    getIssuerNameField: (_options: { certificate: Uint8Array | Uint8Array[]; field: string }): string[] => ['a', 'v'],
-    getPublicKey: async (_options: { certificate: Uint8Array | Uint8Array[]; alg: string }): Promise<Uint8Array> =>
-      new Uint8Array([7, 8, 9]),
+    getIssuerNameField: () => ['a', 'v'],
+    getPublicKey: async () => new Uint8Array([7, 8, 9]),
   },
 }
 
 const mac0Context: Mac0Context = {
-  mac: async (_options: { toBeAuthenticated: Uint8Array; key: CoseKey | Uint8Array }): Promise<Uint8Array> =>
-    new Uint8Array([4, 5, 6]),
+  authenticate: async () => new Uint8Array([4, 5, 6]),
+  verify: async () => true,
 }
 
 const key = CoseKey.fromJwk({

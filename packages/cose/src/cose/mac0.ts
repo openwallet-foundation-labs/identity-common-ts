@@ -42,7 +42,8 @@ export type Mac0EncodedStructure = z.infer<typeof mac0EncodedSchema>
 export type Mac0DecodedStructure = z.infer<typeof mac0DecodedSchema>
 
 export type Mac0Context = {
-  mac: (options: { toBeAuthenticated: Uint8Array; key: CoseKey | Uint8Array }) => Promise<Uint8Array>
+  authenticate: (options: { toBeAuthenticated: Uint8Array; key: CoseKey | Uint8Array }) => Promise<Uint8Array>
+  verify: (options: { mac0: Mac0; key: CoseKey | Uint8Array }) => Promise<boolean>
 }
 
 export type Mac0Options = {
@@ -199,14 +200,14 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
     options: {
       key: CoseKey | Uint8Array
     },
-    ctx: Pick<Mac0Context, 'mac'>
+    ctx: Pick<Mac0Context, 'authenticate'>
   ) {
     const payload = this.payload ?? this.detachedPayload
     if (!payload) {
       throw new CosePayloadMustBeDefinedError()
     }
 
-    this.structure.tag = await ctx.mac({
+    this.structure.tag = await ctx.authenticate({
       toBeAuthenticated: Mac0.toBeAuthenticated({
         payload,
         protectedHeaders: this.protectedHeaders,

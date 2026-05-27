@@ -1,7 +1,7 @@
-import type { Mac0Context } from '@owf/cose'
 import {
   type CoseKey,
   Cwt,
+  type Mac0Context,
   type ProtectedHeaderOptions,
   ProtectedHeaders,
   RegisteredCwtClaimKey,
@@ -108,7 +108,7 @@ export class StatusListCwt {
     return (await cwt.asSign1.sign(options, ctx)).encode()
   }
 
-  public async authenticateAndEncode(options: { key: CoseKey }, ctx: Pick<Mac0Context, 'mac'>) {
+  public async authenticateAndEncode(options: { key: CoseKey }, ctx: Pick<Mac0Context, 'authenticate'>) {
     const cwt = new Cwt({
       protectedHeaders: this.protectedHeaders,
       unprotectedHeaders: this.unprotectedHeaders,
