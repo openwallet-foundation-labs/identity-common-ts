@@ -43,7 +43,7 @@ describe('sign1', () => {
 
       sign1.externalAad = hex.decode(testVector['sign1::sign'].external)
 
-      const tbsHex = hex.encode(sign1.toBeSigned)
+      const tbsHex = hex.encode(sign1.toBeSigned())
 
       expect(tbsHex).toStrictEqual(testVector['sign1::sign'].tbsHex.cborHex)
 

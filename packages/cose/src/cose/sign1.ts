@@ -45,7 +45,7 @@ export type Sign1DecodedStructure = z.infer<typeof sign1DecodedSchema>
 
 export type Sign1Context = {
   sign: (options: { toBeSigned: Uint8Array; key: CoseKey; algorithm: SignatureAlgorithm }) => Promise<Uint8Array>
-  verify: (options: { sign1: Sign1; key: CoseKey }) => Promise<boolean>
+  verify: (options: { toBeSigned: Uint8Array; signature: Uint8Array; key: CoseKey }) => Promise<boolean>
   x509: {
     getIssuerNameField: (options: { certificate: Uint8Array; field: string }) => string[]
     getPublicKey: (options: { certificate: Uint8Array; alg: string }) => Promise<CoseKey>
@@ -57,8 +57,12 @@ export type Sign1Options = {
   unprotectedHeaders?: UnprotectedHeaders | UnprotectedHeaderOptions['unprotectedHeaders']
   externalAad?: Uint8Array
 
-  payload?: Uint8Array | null
-  detachedPayload?: Uint8Array
+  /**
+   * The embedded payload. Pass `null` to explicitly signal a detached payload
+   * (the encoded structure will contain null, and you must supply the payload
+   * via `detachedPayload` when calling `sign()` / `verifySignature()` / `toBeSigned()`).
+   */
+  payload: Uint8Array | null
 }
 
 export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStructure> {
@@ -88,7 +92,6 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     })
   }
 
-  public detachedPayload?: Uint8Array
   public externalAad?: Uint8Array
 
   public get protectedHeaders() {
@@ -139,8 +142,22 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     return stateOrProvince
   }
 
-  public get toBeSigned() {
-    const payload = this.payload ?? this.detachedPayload
+  /**
+   * Returns the Sig_Structure bytes that are signed/verified.
+   *
+   * @param options.detachedPayload - The detached payload to use. Must be provided when
+   *   the Sign1 was created with a detached payload (i.e. `payload` field is null).
+   *   Cannot be provided when the Sign1 already contains an embedded payload.
+   */
+  public toBeSigned(options?: { detachedPayload?: Uint8Array }): Uint8Array {
+    const embeddedPayload = this.payload
+    const detachedPayload = options?.detachedPayload
+
+    if (embeddedPayload && detachedPayload) {
+      throw new Error('Cannot provide detachedPayload when the Sign1 already contains an embedded payload')
+    }
+
+    const payload = embeddedPayload ?? detachedPayload
 
     if (!payload) {
       throw new CosePayloadMustBeDefinedError()
@@ -224,7 +241,17 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     return Array.isArray(x5chain) ? x5chain : [x5chain]
   }
 
-  public async verifySignature(options: { key?: CoseKey }, ctx: Pick<Sign1Context, 'verify' | 'x509'>) {
+  public async verifySignature(
+    options: { key?: CoseKey; detachedPayload?: Uint8Array },
+    ctx: Pick<Sign1Context, 'verify' | 'x509'>
+  ) {
+    const embeddedPayload = this.payload
+    const { detachedPayload } = options
+
+    if (embeddedPayload && detachedPayload) {
+      throw new Error('Cannot provide detachedPayload when the Sign1 already contains an embedded payload')
+    }
+
     const publicKey =
       options.key ??
       (this.certificate
@@ -239,17 +266,13 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     }
 
     return await ctx.verify({
-      sign1: this,
+      toBeSigned: this.toBeSigned({ detachedPayload }),
+      signature: this.signature,
       key: publicKey,
     })
   }
 
   public static create(options: Sign1Options) {
-    const payload = options.payload ?? options.detachedPayload
-    if (!payload) {
-      throw new CosePayloadMustBeDefinedError()
-    }
-
     const protectedHeaders =
       options.protectedHeaders instanceof ProtectedHeaders
         ? options.protectedHeaders
@@ -268,12 +291,11 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     const sign1 = new this({
       protectedHeaders,
       unprotectedHeaders,
-      payload,
+      payload: options.payload,
       signature: new Uint8Array(),
     })
 
     sign1.externalAad = options.externalAad
-    sign1.detachedPayload = options.detachedPayload
 
     return sign1
   }
@@ -287,10 +309,18 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     },
     ctx: Pick<Sign1Context, 'sign'>
   ) {
-    const payload = this.payload ?? options.detachedPayload
+    const embeddedPayload = this.payload
+    const { detachedPayload } = options
+
+    if (embeddedPayload && detachedPayload) {
+      throw new Error('Cannot provide detachedPayload when the Sign1 already contains an embedded payload')
+    }
+
+    const payload = embeddedPayload ?? detachedPayload
     if (!payload) {
       throw new CosePayloadMustBeDefinedError()
     }
+
     const signatureAlgorithm = options.algorithm ?? options.signingKey.algorithm
 
     if (!signatureAlgorithm) {

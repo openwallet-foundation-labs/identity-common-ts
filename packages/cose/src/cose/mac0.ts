@@ -43,7 +43,7 @@ export type Mac0DecodedStructure = z.infer<typeof mac0DecodedSchema>
 
 export type Mac0Context = {
   authenticate: (options: { toBeAuthenticated: Uint8Array; key: CoseKey | Uint8Array }) => Promise<Uint8Array>
-  verify: (options: { mac0: Mac0; key: CoseKey | Uint8Array }) => Promise<boolean>
+  verify: (options: { toBeAuthenticated: Uint8Array; tag: Uint8Array; key: CoseKey | Uint8Array }) => Promise<boolean>
 }
 
 export type Mac0Options = {
@@ -51,8 +51,12 @@ export type Mac0Options = {
   unprotectedHeaders?: UnprotectedHeaders | UnprotectedHeaderOptions['unprotectedHeaders']
   externalAad?: Uint8Array
 
-  payload?: Uint8Array | null
-  detachedPayload?: Uint8Array
+  /**
+   * The embedded payload. Pass `null` to explicitly signal a detached payload
+   * (the encoded structure will contain null, and you must supply the payload
+   * via `detachedPayload` when calling `authenticate()` / `toBeAuthenticated()`).
+   */
+  payload: Uint8Array | null
 }
 
 export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructure> {
@@ -86,7 +90,6 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
   }
 
   public externalAad?: Uint8Array
-  public detachedPayload?: Uint8Array
 
   public get protectedHeaders() {
     return this.structure.protectedHeaders
@@ -104,9 +107,22 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
     return this.structure.tag
   }
 
-  public get toBeAuthenticated() {
-    const payload = this.payload ?? this.detachedPayload
+  /**
+   * Returns the MAC_Structure bytes that are authenticated/verified.
+   *
+   * @param options.detachedPayload - The detached payload to use. Must be provided when
+   *   the Mac0 was created with a detached payload (i.e. `payload` field is null).
+   *   Cannot be provided when the Mac0 already contains an embedded payload.
+   */
+  public toBeAuthenticated(options?: { detachedPayload?: Uint8Array }): Uint8Array {
+    const embeddedPayload = this.payload
+    const detachedPayload = options?.detachedPayload
 
+    if (embeddedPayload && detachedPayload) {
+      throw new Error('Cannot provide detachedPayload when the Mac0 already contains an embedded payload')
+    }
+
+    const payload = embeddedPayload ?? detachedPayload
     if (!payload) {
       throw new CosePayloadMustBeDefinedError()
     }
@@ -119,7 +135,7 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
   }
 
   /**
-   * Decodes CBOR bytes into a Sign1 instance.
+   * Decodes CBOR bytes into a Mac0 instance.
    * Uses the encodingSchema's decode() method to validate and transform the decoded data.
    */
   public static decode<T extends AnyCborStructure>(this: CborStructureStaticThis<T>, bytes: Uint8Array): T {
@@ -177,21 +193,15 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
         ? options.unprotectedHeaders
         : UnprotectedHeaders.create({ unprotectedHeaders: options.unprotectedHeaders })
 
-    const payload = options.payload ?? options.detachedPayload
-    if (!payload) {
-      throw new CosePayloadMustBeDefinedError()
-    }
-
     // biome-ignore lint/complexity/noThisInStatic: this.create is intentional for subclass support
     const mac0 = new this({
       protectedHeaders,
       unprotectedHeaders,
-      payload: options.payload ?? null,
+      payload: options.payload,
       tag: new Uint8Array(),
     })
 
     mac0.externalAad = options.externalAad
-    mac0.detachedPayload = options.detachedPayload
 
     return mac0
   }
@@ -199,10 +209,18 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
   public async authenticate(
     options: {
       key: CoseKey | Uint8Array
+      detachedPayload?: Uint8Array
     },
     ctx: Pick<Mac0Context, 'authenticate'>
   ) {
-    const payload = this.payload ?? this.detachedPayload
+    const embeddedPayload = this.payload
+    const { detachedPayload } = options
+
+    if (embeddedPayload && detachedPayload) {
+      throw new Error('Cannot provide detachedPayload when the Mac0 already contains an embedded payload')
+    }
+
+    const payload = embeddedPayload ?? detachedPayload
     if (!payload) {
       throw new CosePayloadMustBeDefinedError()
     }
