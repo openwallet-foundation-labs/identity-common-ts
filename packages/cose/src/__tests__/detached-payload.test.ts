@@ -103,12 +103,12 @@ describe('Sign1 - detached payload', () => {
     })
 
     test('ctx.verify receives the correct pre-computed toBeSigned bytes for detached payload', async () => {
-      let capturedToBeSigned: Uint8Array | undefined
+      let capturedToBeVerified: Uint8Array | undefined
 
       const trackingContext = {
         ...sign1Context,
         verify: async (options: Parameters<typeof sign1Context.verify>[0]) => {
-          capturedToBeSigned = options.toBeSigned
+          capturedToBeVerified = options.toBeVerified
           return true
         },
       }
@@ -117,8 +117,8 @@ describe('Sign1 - detached payload', () => {
       await sign1.sign({ signingKey: key, algorithm: SignatureAlgorithm.ES256, detachedPayload }, sign1Context)
       await sign1.verifySignature({ key, detachedPayload }, trackingContext)
 
-      // The TBS bytes passed to ctx.verify must match what toBeSigned() produces directly
-      expect(capturedToBeSigned).toEqual(sign1.toBeSigned({ detachedPayload }))
+      // The bytes passed to ctx.verify must match what toBeSigned() produces directly
+      expect(capturedToBeVerified).toEqual(sign1.toBeSigned({ detachedPayload }))
     })
 
     test('throws when Sign1 has embedded payload and detachedPayload is passed to verifySignature()', async () => {

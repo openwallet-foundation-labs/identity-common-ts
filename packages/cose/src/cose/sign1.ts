@@ -45,7 +45,7 @@ export type Sign1DecodedStructure = z.infer<typeof sign1DecodedSchema>
 
 export type Sign1Context = {
   sign: (options: { toBeSigned: Uint8Array; key: CoseKey; algorithm: SignatureAlgorithm }) => Promise<Uint8Array>
-  verify: (options: { toBeSigned: Uint8Array; signature: Uint8Array; key: CoseKey }) => Promise<boolean>
+  verify: (options: { toBeVerified: Uint8Array; signature: Uint8Array; key: CoseKey }) => Promise<boolean>
   x509: {
     getIssuerNameField: (options: { certificate: Uint8Array; field: string }) => string[]
     getPublicKey: (options: { certificate: Uint8Array; alg: string }) => Promise<CoseKey>
@@ -266,7 +266,7 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     }
 
     return await ctx.verify({
-      toBeSigned: this.toBeSigned({ detachedPayload }),
+      toBeVerified: this.toBeSigned({ detachedPayload }),
       signature: this.signature,
       key: publicKey,
     })
