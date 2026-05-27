@@ -48,7 +48,7 @@ export type Sign1Context = {
   verify: (options: { sign1: Sign1; key: Uint8Array | CoseKey }) => Promise<boolean>
   x509: {
     getIssuerNameField: (options: { certificate: Uint8Array; field: string }) => string[]
-    getPublicKey: (options: { certificate: Uint8Array; alg: string }) => Promise<Uint8Array>
+    getPublicKey: (options: { certificate: Uint8Array; alg: string }) => Promise<CoseKey>
   }
 }
 
