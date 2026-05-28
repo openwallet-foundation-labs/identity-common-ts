@@ -45,10 +45,15 @@ export type Sign1DecodedStructure = z.infer<typeof sign1DecodedSchema>
 
 export type Sign1Context = {
   sign: (options: { toBeSigned: Uint8Array; key: CoseKey; algorithm: SignatureAlgorithm }) => Promise<Uint8Array>
-  verify: (options: { toBeVerified: Uint8Array; signature: Uint8Array; key: CoseKey }) => Promise<boolean>
+  verify: (options: {
+    toBeVerified: Uint8Array
+    signature: Uint8Array
+    key: CoseKey
+    algorithm?: SignatureAlgorithm
+  }) => Promise<boolean>
   x509: {
     getIssuerNameField: (options: { certificate: Uint8Array; field: string }) => string[]
-    getPublicKey: (options: { certificate: Uint8Array; alg: string }) => Promise<CoseKey>
+    getPublicKey: (options: { certificate: Uint8Array; algorithm?: SignatureAlgorithm }) => Promise<CoseKey>
   }
 }
 
@@ -204,21 +209,22 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     return cborEncode(toBeSigned)
   }
 
-  public get signatureAlgorithmName(): string {
-    // FIXME: why are we looking at the unprotected header for the alg?
-    const algorithm = (this.protectedHeaders.headers?.get(RegisteredCwtHeaderClaimKey.Algorithm) ??
-      this.unprotectedHeaders.headers?.get(RegisteredCwtHeaderClaimKey.Algorithm)) as SignatureAlgorithm | undefined
+  public get algorithm(): SignatureAlgorithm | undefined {
+    const algorithm = this.protectedHeaders.headers?.get(RegisteredCwtHeaderClaimKey.Algorithm)
 
-    if (!algorithm) {
-      throw new CoseInvalidAlgorithmError()
+    return algorithm as SignatureAlgorithm | undefined
+  }
+
+  public get jwaAlgorithm(): keyof typeof SignatureAlgorithm | undefined {
+    const alg = this.algorithm
+    if (!alg) return undefined
+
+    const jwaAlg = coseKeyToJwkClaim.algorithm(alg)
+    if (!jwaAlg) {
+      throw new CoseInvalidAlgorithmError(`Cose algorithm ${alg} does not have a corresponding JWA alg`)
     }
 
-    const algorithmName = coseKeyToJwkClaim.algorithm(algorithm)
-    if (!algorithmName) {
-      throw new CoseInvalidAlgorithmError()
-    }
-
-    return algorithmName
+    return jwaAlg
   }
 
   public get x5chain() {
@@ -257,7 +263,7 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
       (this.certificate
         ? await ctx.x509.getPublicKey({
             certificate: this.certificate,
-            alg: this.signatureAlgorithmName,
+            algorithm: this.algorithm,
           })
         : undefined)
 
@@ -269,6 +275,7 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
       toBeVerified: this.toBeSigned({ detachedPayload }),
       signature: this.signature,
       key: publicKey,
+      algorithm: this.algorithm,
     })
   }
 

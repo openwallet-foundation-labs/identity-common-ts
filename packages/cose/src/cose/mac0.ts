@@ -43,7 +43,12 @@ export type Mac0DecodedStructure = z.infer<typeof mac0DecodedSchema>
 
 export type Mac0Context = {
   authenticate: (options: { toBeAuthenticated: Uint8Array; key: CoseKey | Uint8Array }) => Promise<Uint8Array>
-  verify: (options: { toBeAuthenticated: Uint8Array; tag: Uint8Array; key: CoseKey | Uint8Array }) => Promise<boolean>
+  verify: (options: {
+    toBeAuthenticated: Uint8Array
+    tag: Uint8Array
+    key: CoseKey | Uint8Array
+    algorithm?: MacAlgorithm
+  }) => Promise<boolean>
 }
 
 export type Mac0Options = {
@@ -165,21 +170,21 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
     return cborEncode(toBeAuthenticated)
   }
 
-  public get signatureAlgorithmName(): MacAlgorithm {
-    const algorithm = (this.protectedHeaders.headers?.get(RegisteredCwtHeaderClaimKey.Algorithm) ??
-      this.unprotectedHeaders.headers?.get(RegisteredCwtHeaderClaimKey.Algorithm)) as MacAlgorithm | undefined
+  public get algorithm(): MacAlgorithm | undefined {
+    const algorithm = this.protectedHeaders.headers?.get(RegisteredCwtHeaderClaimKey.Algorithm)
 
-    if (!algorithm) {
-      throw new CoseInvalidAlgorithmError()
+    return algorithm as MacAlgorithm | undefined
+  }
+
+  public get jwaAlgorithm(): keyof typeof MacAlgorithm {
+    const alg = this.algorithm
+
+    const jwaAlg = coseKeyToJwkClaim.algorithm(alg)
+    if (!jwaAlg) {
+      throw new CoseInvalidAlgorithmError(`Cose algorithm ${alg} does not have a corresponding JWA alg`)
     }
 
-    const algorithmName = coseKeyToJwkClaim.algorithm(algorithm)
-
-    if (!algorithmName) {
-      throw new CoseInvalidAlgorithmError()
-    }
-
-    return algorithmName
+    return jwaAlg
   }
 
   public static create(options: Mac0Options): Mac0 {
