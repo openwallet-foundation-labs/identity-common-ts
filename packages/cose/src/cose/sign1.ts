@@ -248,16 +248,12 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     const protectedHeaders =
       options.protectedHeaders instanceof ProtectedHeaders
         ? options.protectedHeaders
-        : options.protectedHeaders
-          ? ProtectedHeaders.fromDecodedStructure(options.protectedHeaders)
-          : ProtectedHeaders.create({})
+        : ProtectedHeaders.create({ protectedHeaders: options.protectedHeaders })
 
     const unprotectedHeaders =
       options.unprotectedHeaders instanceof UnprotectedHeaders
         ? options.unprotectedHeaders
-        : options.unprotectedHeaders
-          ? UnprotectedHeaders.fromDecodedStructure(options.unprotectedHeaders)
-          : UnprotectedHeaders.create({})
+        : UnprotectedHeaders.create({ unprotectedHeaders: options.unprotectedHeaders })
 
     // biome-ignore lint/complexity/noThisInStatic: this.create is intentional for subclass support
     const sign1 = new this({

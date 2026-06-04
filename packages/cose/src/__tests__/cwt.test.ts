@@ -34,9 +34,9 @@ describe('Cwt', () => {
       const payload = hex.decode('a10150636f61703a2f2f61732e6578616d706c65') // {"1":"coap://as.example"}
 
       const sign1 = Sign1.create({
-        protectedHeaders: ProtectedHeaders.fromDecodedStructure(
-          new Map([[RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256]])
-        ),
+        protectedHeaders: ProtectedHeaders.create({
+          protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256]]),
+        }),
         unprotectedHeaders: new Map(),
         payload,
       })
@@ -55,9 +55,9 @@ describe('Cwt', () => {
       const payload = hex.decode('a10150636f61703a2f2f61732e6578616d706c65')
 
       const sign1 = Sign1.create({
-        protectedHeaders: ProtectedHeaders.fromDecodedStructure(
-          new Map([[RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256]])
-        ),
+        protectedHeaders: ProtectedHeaders.create({
+          protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256]]),
+        }),
         unprotectedHeaders: new Map(),
         payload,
       })
@@ -95,9 +95,9 @@ describe('Cwt', () => {
       const payload = hex.decode('a10150636f61703a2f2f61732e6578616d706c65')
 
       const mac0 = Mac0.create({
-        protectedHeaders: ProtectedHeaders.fromDecodedStructure(
-          new Map([[RegisteredCwtHeaderClaimKey.Algorithm, MacAlgorithm.HS256]])
-        ),
+        protectedHeaders: ProtectedHeaders.create({
+          protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, MacAlgorithm.HS256]]),
+        }),
         unprotectedHeaders: new Map(),
         payload,
       })
@@ -116,9 +116,9 @@ describe('Cwt', () => {
       const payload = hex.decode('a10150636f61703a2f2f61732e6578616d706c65')
 
       const mac0 = Mac0.create({
-        protectedHeaders: ProtectedHeaders.fromDecodedStructure(
-          new Map([[RegisteredCwtHeaderClaimKey.Algorithm, MacAlgorithm.HS256]])
-        ),
+        protectedHeaders: ProtectedHeaders.create({
+          protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, MacAlgorithm.HS256]]),
+        }),
         unprotectedHeaders: new Map(),
         payload,
       })

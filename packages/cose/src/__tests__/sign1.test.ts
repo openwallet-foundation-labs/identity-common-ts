@@ -33,9 +33,11 @@ describe('sign1', () => {
       const key = CoseKey.fromJwk(testVector.key)
 
       const sign1 = Sign1.fromDecodedStructure({
-        protectedHeaders: ProtectedHeaders.fromDecodedStructure(
-          cborDecode(hex.decode(testVector['sign1::sign'].protectedHeaders.cborHex))
-        ),
+        protectedHeaders: ProtectedHeaders.create({
+          protectedHeaders: cborDecode<Map<number, unknown>>(
+            hex.decode(testVector['sign1::sign'].protectedHeaders.cborHex)
+          ),
+        }),
         unprotectedHeaders: UnprotectedHeaders.decode(hex.decode(testVector['sign1::sign'].unprotectedHeaders.cborHex)),
         payload: hex.decode(testVector['sign1::sign'].payload),
         signature: cborDecode<Sign1>(hex.decode(testVector['sign1::sign'].expectedOutput.cborHex)).signature,
