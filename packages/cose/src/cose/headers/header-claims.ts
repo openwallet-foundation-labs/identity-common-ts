@@ -3,47 +3,46 @@ import { type TypedMap, typedMap } from '../../utils/typed-map.js'
 import { zUint8Array } from '../../utils/zod.js'
 import { RegisteredCwtHeaderClaimKey } from './defaults.js'
 
-/**
- * Schema for the known COSE header claims (RFC 9052 Section 3.1 / the IANA COSE Header Parameters
- * registry). Shared by the protected and unprotected header structures.
- *
- * `kid` (4) is typed as a bstr (`Uint8Array`): a header carrying a `kid` whose value is not a bstr
- * (e.g. a malformed `{ 4: undefined }`) is rejected at decode for every Sign1-derived structure.
- *
- * The other registered labels are enumerated as known keys but left permissively typed (`unknown`)
- * so that valid-but-variably-shaped encodings are not rejected. Additional (unregistered or
- * private-use) labels are allowed through (`allowAdditionalKeys`).
- */
-// Any defined (non-`undefined`) value. Apart from `kid`, the registered labels are enumerated as
-// known keys but not constrained to a specific value type (their CBOR shapes vary and we do not want
-// to reject valid encodings). Rejecting `undefined` both keeps a malformed `{ <label>: undefined }`
-// out and lets `.exactOptional()` correctly mark the key as optional.
-const zDefinedValue = z.unknown().refine((value) => value !== undefined)
+// A COSE label is an integer (registry) or a text string (private use).
+const zCoseLabel = z.union([z.number(), z.string()])
+// COSE_X509: a single certificate (bstr) or a chain (array of bstr). Used by x5bag/x5chain.
+const zCertOrChain = z.union([zUint8Array, z.array(zUint8Array)])
 
+/**
+ * Schema for the known COSE header claims (RFC 9052 Section 3.1 / RFC 9360 / the IANA COSE Header
+ * Parameters registry). Shared by the protected and unprotected header structures.
+ *
+ * Each registered label is typed to its CBOR shape; in particular `kid` (4) is a bstr (`Uint8Array`),
+ * so a header carrying a `kid` whose value is not a bstr (e.g. a malformed `{ 4: undefined }`) is
+ * rejected at decode for every Sign1-derived structure. Additional (unregistered or private-use)
+ * labels are allowed through (`allowAdditionalKeys`).
+ */
 export const coseHeaderClaimsSchema = typedMap(
   [
-    [RegisteredCwtHeaderClaimKey.Algorithm, zDefinedValue.exactOptional()],
-    [RegisteredCwtHeaderClaimKey.Critical, zDefinedValue.exactOptional()],
-    [RegisteredCwtHeaderClaimKey.ContentType, zDefinedValue.exactOptional()],
+    [RegisteredCwtHeaderClaimKey.Algorithm, zCoseLabel.exactOptional()],
+    [RegisteredCwtHeaderClaimKey.Critical, z.array(zCoseLabel).exactOptional()],
+    [RegisteredCwtHeaderClaimKey.ContentType, zCoseLabel.exactOptional()],
     [RegisteredCwtHeaderClaimKey.KeyId, zUint8Array.exactOptional()],
-    [RegisteredCwtHeaderClaimKey.Iv, zDefinedValue.exactOptional()],
-    [RegisteredCwtHeaderClaimKey.PartialIv, zDefinedValue.exactOptional()],
-    [RegisteredCwtHeaderClaimKey.X5Bag, zDefinedValue.exactOptional()],
-    [RegisteredCwtHeaderClaimKey.X5Chain, zDefinedValue.exactOptional()],
-    [RegisteredCwtHeaderClaimKey.X5T, zDefinedValue.exactOptional()],
-    [RegisteredCwtHeaderClaimKey.X5U, zDefinedValue.exactOptional()],
+    [RegisteredCwtHeaderClaimKey.Iv, zUint8Array.exactOptional()],
+    [RegisteredCwtHeaderClaimKey.PartialIv, zUint8Array.exactOptional()],
+    [RegisteredCwtHeaderClaimKey.X5Bag, zCertOrChain.exactOptional()],
+    [RegisteredCwtHeaderClaimKey.X5Chain, zCertOrChain.exactOptional()],
+    [RegisteredCwtHeaderClaimKey.X5T, z.array(z.unknown()).exactOptional()],
+    [RegisteredCwtHeaderClaimKey.X5U, z.string().exactOptional()],
   ] as const,
   { allowAdditionalKeys: true }
 )
 
 export type CoseHeaderClaims = z.infer<typeof coseHeaderClaimsSchema>
 
+// Widen a typed-map type to also allow access to any other integer label.
+type OpenIntegerKeys<T> =
+  T extends TypedMap<infer Schema, infer Optional> ? TypedMap<Schema & Record<number, unknown>, Optional> : never
+
 /**
- * Read/write view over a COSE header map. `kid` (4) is typed as a bstr, while any other integer label
- * remains accessible because COSE headers are open-ended (RFC 9052 / private-use range). The `kid`
- * type is enforced at decode by `coseHeaderClaimsSchema`; this view only governs typed access.
+ * Read/write view over a COSE header map: the typed claims above plus open access to any other
+ * integer label, because COSE headers are open-ended (unregistered and private-use labels are valid,
+ * e.g. a status list's `typ`). The typed claims are still validated at decode by
+ * `coseHeaderClaimsSchema`; this view only governs typed access.
  */
-export type CoseHeaders = TypedMap<
-  { [RegisteredCwtHeaderClaimKey.KeyId]: Uint8Array } & Record<number, unknown>,
-  RegisteredCwtHeaderClaimKey.KeyId
->
+export type CoseHeaders = OpenIntegerKeys<CoseHeaderClaims>
