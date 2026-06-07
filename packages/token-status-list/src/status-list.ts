@@ -8,7 +8,7 @@ import type { BitsPerStatus, StatusType } from './types'
 export class StatusList {
   private _statusList: Array<StatusType | number>
   private bitsPerStatus: BitsPerStatus
-  private totalStatuses: number
+  public readonly totalStatuses: number
   public aggregationUri?: string
 
   constructor(statusList: number[], bitsPerStatus: BitsPerStatus, aggregationUri?: string) {
