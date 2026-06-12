@@ -1,6 +1,6 @@
 {
   "name": "@owf/eudi-lote",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SDK for creating, signing, and validating Lists of Trusted Entities (LoTE) per ETSI TS 119 602",
   "files": [
     "dist"

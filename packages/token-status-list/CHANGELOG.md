@@ -1,5 +1,31 @@
 # @owf/token-status-list
 
+## 0.3.0
+
+### Minor Changes
+
+- eff25c4: remove export from dependencies
+- dad635c: refactor: only allow CoseKey as return value for getPublicKey in x509 context
+- dad635c: refactor: only allow CosKey for sign1.verify
+
+### Patch Changes
+
+- 353df0c: feat: add status list info objects for referenced status list token
+- 9451711: Add a way for a CWT status list to add additional claims
+- 4928369: feat: make totalStatuses public readonly in StatusList class
+- Updated dependencies [4bd7eb7]
+- Updated dependencies [f1f42db]
+- Updated dependencies [dad635c]
+- Updated dependencies [6309c48]
+- Updated dependencies [353df0c]
+- Updated dependencies [dad635c]
+- Updated dependencies [353df0c]
+- Updated dependencies [353df0c]
+- Updated dependencies [353df0c]
+- Updated dependencies [2b0eeaf]
+  - @owf/cose@0.3.0
+  - @owf/identity-common@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

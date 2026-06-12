@@ -1,5 +1,13 @@
 # @owf/eudi-attestation-schema
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [353df0c]
+  - @owf/identity-common@0.3.0
+  - @owf/crypto@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

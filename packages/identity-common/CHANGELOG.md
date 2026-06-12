@@ -1,5 +1,11 @@
 # @owf/identity-common
 
+## 0.3.0
+
+### Patch Changes
+
+- 353df0c: feat: add hex parser
+
 ## 0.2.0
 
 ### Minor Changes
