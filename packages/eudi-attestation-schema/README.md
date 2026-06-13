@@ -128,6 +128,95 @@ console.log(payload.version); // '1.0.0'
 console.log(header.kid);      // 'catalog-signer-2025'
 ```
 
+### Verify, Resolve Referenced Schemas, and Build DCQL
+
+```typescript
+import { ES256 } from '@owf/crypto';
+import {
+  verifyResolveAndBuildDcql,
+} from '@owf/eudi-attestation-schema';
+
+const verifier = await ES256.getVerifier(publicKey);
+
+const result = await verifyResolveAndBuildDcql({
+  jws: signed.jws,
+  verifier,
+  selectedFormats: ['dc+sd-jwt', 'mso_mdoc'],
+  resolve: async (uri) => {
+    const response = await fetch(uri);
+    const content = await response.text();
+    return { content, contentType: response.headers.get('content-type') ?? undefined };
+  },
+  verifyIntegrity: true,
+  includeTrustedAuthorities: true,
+  idPrefix: 'credential',
+});
+
+console.log(result.verified.payload.version);
+console.log(result.resolvedReferences.length);
+console.log(result.dcql.credentials);
+```
+
+Integrity notes:
+
+- `verifyIntegrity` supports SRI digests with `sha256`, `sha384`, and `sha512`.
+- Integrity validation hashes UTF-8 bytes of the resolver content.
+- If resolver content is an object (not a string), integrity is computed over `JSON.stringify(content)`.
+
+### DCQL claims from referenced JSON Schemas
+
+When a resolved schema document contains a JSON Schema with a `properties` object, `verifyResolveAndBuildDcql` (and `buildDcqlFromSchemaMeta` when `resolvedReferences` are provided) automatically populates the `claims` array of each DCQL credential with a path entry for every defined property.
+
+Given a referenced schema document such as:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "given_name": { "type": "string" },
+    "family_name": { "type": "string" },
+    "address": {
+      "type": "object",
+      "properties": {
+        "street_address": { "type": "string" },
+        "country": { "type": "string" }
+      }
+    },
+    "nationalities": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
+```
+
+The resulting DCQL credential will contain:
+
+```json
+{
+  "id": "credential-1",
+  "format": "dc+sd-jwt",
+  "meta": { "vct_values": ["eu.europa.ec.eudi.pid.1"] },
+  "claims": [
+    { "path": ["given_name"] },
+    { "path": ["family_name"] },
+    { "path": ["address", "street_address"] },
+    { "path": ["address", "country"] },
+    { "path": ["nationalities"] }
+  ]
+}
+```
+
+Claim extraction rules:
+
+- **Primitive properties** (`string`, `number`, `boolean`, …) produce a single-element path.
+- **Nested object properties** are recursed into; each leaf produces a multi-element path.
+- **Array properties with primitive items** produce a single path entry for the array field itself.
+- **Array properties with object or array items** are recursed into with a `null` wildcard appended to the path per the DCQL spec.
+- Combinator keywords (`allOf`, `anyOf`, `oneOf`) are merged transparently.
+- Duplicate paths across combinators are deduplicated deterministically.
+- If no `parsedSchema` is available for a resolved reference, no `claims` key is added to the credential.
+
 ## Data Model
 
 ### SchemaMeta (Main Class)
