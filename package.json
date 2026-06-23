@@ -32,7 +32,7 @@
     "@owf/token-status-list": "workspace:*",
     "@types/node": "^25.9.2",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.0.8",
     "markdownlint-cli2": "^0.22.0",
     "tsdown": "0.22.3",
     "tsx": "^4.22.4",
