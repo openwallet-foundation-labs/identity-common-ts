@@ -30,7 +30,7 @@
     "@owf/crypto": "workspace:*",
     "@owf/identity-common": "workspace:*",
     "@owf/token-status-list": "workspace:*",
-    "@types/node": "^25.9.2",
+    "@types/node": "^26.0.1",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
     "markdownlint-cli2": "^0.22.0",
