@@ -32,7 +32,7 @@ jobs:
         run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
       - name: pnpm cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.pnpm-cache-path.outputs.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -40,7 +40,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Turbo cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-validate-${{ github.sha }}
@@ -90,7 +90,7 @@ jobs:
         run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
       - name: pnpm cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.pnpm-cache-path.outputs.STORE_PATH }}
           key: ${{ runner.os }}-${{ steps.setup-node.outputs.node-version }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -98,7 +98,7 @@ jobs:
             ${{ runner.os }}-${{ steps.setup-node.outputs.node-version }}-pnpm-store-
 
       - name: Turbo cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: ${{ runner.os }}-${{ steps.setup-node.outputs.node-version }}-turbo-test-${{ github.sha }}
