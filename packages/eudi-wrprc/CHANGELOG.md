@@ -1,5 +1,12 @@
 # @owf/eudi-wrprc
 
+## 0.3.1
+
+### Patch Changes
+
+- @owf/crypto@0.3.1
+- @owf/identity-common@0.3.1
+
 ## 0.3.0
 
 ### Patch Changes

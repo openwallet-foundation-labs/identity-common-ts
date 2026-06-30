@@ -1,5 +1,13 @@
 # @owf/eudi-lote
 
+## 0.3.1
+
+### Patch Changes
+
+- 541992b: Improve the error detail with profile information when validating a LoTE against a union of profiles.
+  - @owf/crypto@0.3.1
+  - @owf/identity-common@0.3.1
+
 ## 0.3.0
 
 ### Patch Changes
