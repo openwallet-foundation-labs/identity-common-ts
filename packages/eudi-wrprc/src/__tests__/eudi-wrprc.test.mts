@@ -49,6 +49,7 @@ const validJWTHeader = {
   typ: 'rc-wrp+jwt' as const,
   alg: 'ES256' as const,
   x5c: ['MIIBkDCB...'],
+  iat: Math.floor(Date.now() / 1000),
 }
 
 // ============================================================================
@@ -398,7 +399,6 @@ describe('Factory Functions', () => {
 
       expect(payload.name).toBe('Test Service')
       expect(payload.sub_ln).toBe('Test Inc.')
-      expect(payload.iat).toBeDefined()
     })
   })
 
