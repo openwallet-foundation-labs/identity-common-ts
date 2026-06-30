@@ -141,9 +141,6 @@ export const WRPRCPayloadSchema = z.object({
   /** URL to the certificate policy and practice statement */
   certificate_policy: z.url().optional(),
 
-  /** Unix timestamp indicating when the WRPRC was issued */
-  iat: z.number().int().positive(),
-
   /** Status list for WRPRC validity */
   status: StatusSchema.optional(),
 
@@ -176,6 +173,8 @@ export const WRPRCJWTHeaderSchema = z.object({
   x5c: z.array(z.string()).min(1),
   /** Key ID */
   kid: z.string().optional(),
+  /** Unix timestamp indicating when the WRPRC was issued */
+  iat: z.number().int().positive(),
 })
 
 /**
@@ -188,6 +187,8 @@ export const WRPRCCWTHeaderSchema = z.object({
   alg: z.number().int(),
   /** Certificate chain to verify the CWT per RFC 9360 */
   x5chain: z.array(z.instanceof(Uint8Array)).min(1),
+  /** Unix timestamp indicating when the WRPRC was issued */
+  iat: z.number().int().positive(),
 })
 
 // ============================================================================
