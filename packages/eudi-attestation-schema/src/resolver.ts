@@ -1,4 +1,5 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
+import { hasher } from '@owf/crypto'
+import { base64, compareBytes } from '@owf/identity-common'
 import { SchemaMetaException } from './schema-meta-exception'
 import type { ResolvedSchemaReference, ResolveSchemaReferencesOptions } from './types'
 
@@ -6,7 +7,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function parseSri(integrity: string): { algorithm: string; digest: Buffer } {
+function parseSri(integrity: string): { algorithm: 'sha256' | 'sha384' | 'sha512'; digest: Uint8Array } {
   const token = integrity.trim().split(/\s+/)[0]
   const separatorIndex = token.indexOf('-')
 
@@ -21,9 +22,9 @@ function parseSri(integrity: string): { algorithm: string; digest: Buffer } {
     throw new SchemaMetaException(`integrity unsupported algorithm '${algorithm}'`)
   }
 
-  let digest: Buffer
+  let digest: Uint8Array
   try {
-    digest = Buffer.from(digestValue, 'base64')
+    digest = base64.decode(digestValue)
   } catch {
     throw new SchemaMetaException(`integrity invalid base64 digest`)
   }
@@ -38,9 +39,9 @@ function parseSri(integrity: string): { algorithm: string; digest: Buffer } {
 function verifySriIntegrity(content: string | object, integrity: string): void {
   const { algorithm, digest } = parseSri(integrity)
   const normalized = typeof content === 'string' ? content : JSON.stringify(content)
-  const actual = createHash(algorithm).update(Buffer.from(normalized, 'utf8')).digest()
+  const actual = hasher(normalized, algorithm)
 
-  if (actual.length !== digest.length || !timingSafeEqual(actual, digest)) {
+  if (!compareBytes(actual, digest)) {
     throw new SchemaMetaException('integrity mismatch')
   }
 }
