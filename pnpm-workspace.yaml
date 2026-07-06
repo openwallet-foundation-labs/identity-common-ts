@@ -5,4 +5,4 @@ packages:
 catalog:
   zod: ^4.4.3
   typescript: ~6.0.2
-  vitest: ^4.1.9
+  vitest: ^4.1.10

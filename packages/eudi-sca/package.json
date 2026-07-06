@@ -50,7 +50,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@openid4vc/openid4vci": "^0.5.1",
+    "@openid4vc/openid4vci": "^0.5.4",
     "@owf/crypto": "workspace:",
     "@owf/identity-common": "workspace:",
     "@owf/mdoc": "^0.7.0",

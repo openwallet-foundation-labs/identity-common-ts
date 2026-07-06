@@ -36,9 +36,9 @@
     "markdownlint-cli2": "^0.22.0",
     "tsdown": "0.22.3",
     "tsx": "^4.22.4",
-    "turbo": "^2.10.0",
+    "turbo": "^2.10.3",
     "typescript": "catalog:",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=20"
