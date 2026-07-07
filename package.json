@@ -17,6 +17,7 @@
     "md:fix": "markdownlint-cli2 --fix \"**/*.md\" \"#**/node_modules\"",
     "packages:check": "node scripts/check-package-entrypoints.mjs",
     "esm:check": "node scripts/check-package-esm-imports.mjs",
+    "ci:check": "pnpm style:check && pnpm md:check && pnpm types:check && pnpm test",
     "build": "turbo run build",
     "test": "turbo run test",
     "create-package": "node scripts/create-package.mjs",

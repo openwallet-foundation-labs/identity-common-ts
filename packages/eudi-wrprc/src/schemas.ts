@@ -151,11 +151,27 @@ export const WRPRCPayloadSchema = z.object({
   credentials: z.array(CredentialSchema).optional(),
 
   /** Set of credentials issued by the WRP (for attestation providers) */
-  provides_attestations: z.array(CredentialSchema).optional(),
+  provides_attestations: z.union([z.array(CredentialSchema), z.array(z.string())]).optional(),
 
   /** Intermediary information when WRP acts through an intermediary */
   intermediary: IntermediarySchema.optional(),
 })
+
+/**
+ * Generate JSON Schema for WRPRC payload.
+ *
+ * Useful for publishing schema artifacts in specifications and external documentation.
+ */
+export function getWRPRCPayloadJSONSchema(): Record<string, unknown> {
+  return z.toJSONSchema(WRPRCPayloadSchema) as Record<string, unknown>
+}
+
+/**
+ * Generate a JSON string for the WRPRC payload JSON Schema.
+ */
+export function getWRPRCPayloadJSONSchemaString(space = 2): string {
+  return JSON.stringify(getWRPRCPayloadJSONSchema(), null, space)
+}
 
 // ============================================================================
 // WRPRC Header Schemas

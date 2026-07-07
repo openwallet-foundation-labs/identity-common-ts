@@ -6,6 +6,7 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
+import type { z } from 'zod'
 import { ENTITLEMENT_SERVICE_PROVIDER, type WRP_ENTITLEMENTS } from './entitlements'
 import { WRPRCPayloadSchema } from './schemas'
 import type {
@@ -25,31 +26,8 @@ import { WRPRCException } from './wrprc-exception'
 // Partial Payload Type
 // ============================================================================
 
-/**
- * A partial WRPRC payload used during building
- */
-interface PartialWRPRCPayload {
-  name?: string
-  sub_ln?: string
-  sub_gn?: string
-  sub_fn?: string
-  sub?: string
-  country?: string
-  registry_uri?: string
-  srv_description?: MultiLangString[][]
-  entitlements?: string[]
-  privacy_policy?: string
-  info_uri?: string
-  support_uri?: string
-  supervisory_authority?: SupervisoryAuthority
-  policy_id?: string[]
-  certificate_policy?: string
+type PartialWRPRCPayload = Partial<z.input<typeof WRPRCPayloadSchema>> & {
   iat?: number
-  status?: Status
-  purpose?: MultiLangString[]
-  credentials?: Credential[]
-  provides_attestations?: string[]
-  intermediary?: Intermediary
 }
 
 // ============================================================================
@@ -259,11 +237,35 @@ export class WRPRCBuilder {
   }
 
   /**
-   * Add a schema metadata that the WRP provides (for attestation providers)
+   * Add a provided attestation as either a credential object or schema metadata string.
+   *
+   * The final payload must use one format consistently: all credentials or all strings.
    */
-  addProvidedAttestation(schemaMetadata: string): this {
-    this.payload.provides_attestations = this.payload.provides_attestations ?? []
-    this.payload.provides_attestations.push(schemaMetadata)
+  addProvidedAttestation(attestation: Credential | string): this {
+    const existing = this.payload.provides_attestations
+
+    if (!existing) {
+      if (typeof attestation === 'string') {
+        this.payload.provides_attestations = [attestation] as string[]
+      } else {
+        this.payload.provides_attestations = [attestation] as Credential[]
+      }
+      return this
+    }
+
+    if (typeof attestation === 'string') {
+      if (existing.length > 0 && typeof existing[0] !== 'string') {
+        throw new WRPRCException('provides_attestations must be either an array of credentials or an array of strings')
+      }
+      ;(existing as string[]).push(attestation)
+      return this
+    }
+
+    if (existing.length > 0 && typeof existing[0] === 'string') {
+      throw new WRPRCException('provides_attestations must be either an array of credentials or an array of strings')
+    }
+
+    ;(existing as Credential[]).push(attestation)
     return this
   }
 

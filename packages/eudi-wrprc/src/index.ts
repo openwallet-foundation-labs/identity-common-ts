@@ -31,6 +31,8 @@ export {
 export {
   ClaimSchema,
   CredentialSchema,
+  getWRPRCPayloadJSONSchema,
+  getWRPRCPayloadJSONSchemaString,
   IntermediarySchema,
   LegalPersonSubjectSchema,
   MultiLangStringSchema,
