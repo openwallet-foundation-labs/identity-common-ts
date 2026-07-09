@@ -3,8 +3,6 @@ import {
   createLegalPersonWRPRC,
   createNaturalPersonWRPRC,
   credential,
-  getWRPRCPayloadJSONSchema,
-  getWRPRCPayloadJSONSchemaString,
   hasAttestationProviderEntitlement,
   isLegalPersonWRPRC,
   isNaturalPersonWRPRC,
@@ -95,20 +93,6 @@ describe('WRPRCPayloadSchema', () => {
     }
     const result = WRPRCPayloadSchema.safeParse(payload)
     expect(result.success).toBe(true)
-  })
-
-  it('should generate JSON Schema from WRPRCPayloadSchema', () => {
-    const jsonSchema = getWRPRCPayloadJSONSchema()
-    expect(jsonSchema).toBeTypeOf('object')
-    expect(jsonSchema).toHaveProperty('type', 'object')
-    expect(jsonSchema).toHaveProperty('properties')
-  })
-
-  it('should generate JSON Schema string from WRPRCPayloadSchema', () => {
-    const jsonSchemaString = getWRPRCPayloadJSONSchemaString()
-    const parsed = JSON.parse(jsonSchemaString)
-    expect(parsed).toHaveProperty('type', 'object')
-    expect(parsed).toHaveProperty('properties')
   })
 })
 

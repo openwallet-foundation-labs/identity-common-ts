@@ -108,9 +108,9 @@ export class WRPRCBuilder {
     // Each service description is an array of localized strings
     const existing = this.payload.srv_description.find((group) => group.some((d) => d.lang === lang))
     if (existing) {
-      existing.push({ lang, content: description })
+      existing.push({ lang, value: description })
     } else {
-      this.payload.srv_description.push([{ lang, content: description }])
+      this.payload.srv_description.push([{ lang, value: description }])
     }
     return this
   }
@@ -215,7 +215,7 @@ export class WRPRCBuilder {
    */
   addPurpose(description: string, lang = 'en'): this {
     this.payload.purpose = this.payload.purpose ?? []
-    this.payload.purpose.push({ lang, content: description })
+    this.payload.purpose.push({ lang, value: description })
     return this
   }
 

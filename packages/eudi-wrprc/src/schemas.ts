@@ -20,7 +20,7 @@ export const MultiLangStringSchema = z.object({
   /** Language code per BCP47/RFC 5646 */
   lang: z.string().min(2),
   /** Localized string value */
-  content: z.string().min(1),
+  value: z.string().min(1),
 })
 
 // ============================================================================
@@ -156,22 +156,6 @@ export const WRPRCPayloadSchema = z.object({
   /** Intermediary information when WRP acts through an intermediary */
   intermediary: IntermediarySchema.optional(),
 })
-
-/**
- * Generate JSON Schema for WRPRC payload.
- *
- * Useful for publishing schema artifacts in specifications and external documentation.
- */
-export function getWRPRCPayloadJSONSchema(): Record<string, unknown> {
-  return z.toJSONSchema(WRPRCPayloadSchema) as Record<string, unknown>
-}
-
-/**
- * Generate a JSON string for the WRPRC payload JSON Schema.
- */
-export function getWRPRCPayloadJSONSchemaString(space = 2): string {
-  return JSON.stringify(getWRPRCPayloadJSONSchema(), null, space)
-}
 
 // ============================================================================
 // WRPRC Header Schemas
