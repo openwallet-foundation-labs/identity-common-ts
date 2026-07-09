@@ -53,6 +53,7 @@ const meta = schemaMeta()
     schemaURI()
       .format('dc+sd-jwt')
       .uri('https://example.com/schemas/gym-membership.dc+sd-jwt.json')
+      .meta({ vct: 'eu.example.gym-membership.1' })
       .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')
       .build()
   )
@@ -96,6 +97,7 @@ const meta = schemaMeta()
     schemaURI()
       .format('dc+sd-jwt')
       .uri('https://example.com/schema.json')
+      .meta({ vct: 'eu.example.gym-membership.1' })
       .build()
   )
   .build();
@@ -217,6 +219,45 @@ Claim extraction rules:
 - Duplicate paths across combinators are deduplicated deterministically.
 - If no `parsedSchema` is available for a resolved reference, no `claims` key is added to the credential.
 
+## SchemaURI `meta` Requirements
+
+`SchemaURI` uses `formatIdentifier` as a discriminator, and the `meta` object is validated per format.
+
+| `formatIdentifier` | Required `meta` shape | Notes |
+|---|---|---|
+| `dc+sd-jwt` | `{ vct: string }` | `vct` is required and must be a non-empty string |
+| `mso_mdoc` | `{ doctype_value: string }` | `doctype_value` is required and must be a non-empty string |
+| `jwt_vc_json` | `{}` | No format-specific fields are currently required |
+| `jwt_vc_json-ld` | `{}` | No format-specific fields are currently required |
+| `ldp_vc` | `{}` | No format-specific fields are currently required |
+
+Example with multiple formats:
+
+```typescript
+import { schemaMeta, schemaURI } from '@owf/eudi-attestation-schema';
+
+const meta = schemaMeta()
+  .version('1.0.0')
+  .rulebookURI('https://example.com/rulebook.md')
+  .attestationLoS('iso_18045_basic')
+  .bindingType('key')
+  .addSchemaURI(
+    schemaURI()
+      .format('dc+sd-jwt')
+      .uri('https://example.com/schemas/pid.sd-jwt.json')
+      .meta({ vct: 'eu.europa.ec.eudi.pid.1' })
+      .build()
+  )
+  .addSchemaURI(
+    schemaURI()
+      .format('mso_mdoc')
+      .uri('https://example.com/schemas/pid.mdoc.json')
+      .meta({ doctype_value: 'org.iso.18013.5.1.mDL' })
+      .build()
+  )
+  .build();
+```
+
 ## Data Model
 
 ### SchemaMeta (Main Class)
@@ -224,6 +265,7 @@ Claim extraction rules:
 | Field | Required | Type | Description |
 |---|---|---|---|
 | `id` | No | `string` | Unique identifier for the attestation schema |
+| `iat` | No | `number` | Issued-at timestamp (epoch seconds), typically set when signing |
 | `version` | Yes | `string` | Schema version (SemVer) |
 | `rulebookURI` | Yes | `string` (URL) | URI of the Attestation Rulebook |
 | `rulebookIntegrity` | No | `string` | W3C SRI integrity metadata for the rulebook |
@@ -231,6 +273,15 @@ Claim extraction rules:
 | `attestationLoS` | Yes | `AttestationLoS` | Level of security |
 | `bindingType` | Yes | `BindingType` | Cryptographic binding type |
 | `schemaURIs` | Yes | `SchemaURI[]` | Schema URIs per format |
+
+### SchemaURI
+
+| Field | Required | Type | Description |
+|---|---|---|---|
+| `formatIdentifier` | Yes | `AttestationFormat` | Format discriminator (`dc+sd-jwt`, `mso_mdoc`, `jwt_vc_json`, `jwt_vc_json-ld`, `ldp_vc`) |
+| `uri` | Yes | `string` (URL) | URI of the format-specific schema |
+| `integrity` | No | `string` | W3C SRI integrity metadata for the referenced schema |
+| `meta` | Yes | format-specific object | Credential-type metadata required by the selected format |
 
 ### Enumerations
 
