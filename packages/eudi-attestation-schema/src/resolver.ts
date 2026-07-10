@@ -7,7 +7,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function parseSri(integrity: string): { algorithm: 'sha256' | 'sha384' | 'sha512'; digest: Uint8Array } {
+function parseSri(integrity: string): { algorithm: 'sha256'; digest: Uint8Array } {
   const token = integrity.trim().split(/\s+/)[0]
   const separatorIndex = token.indexOf('-')
 
@@ -18,7 +18,7 @@ function parseSri(integrity: string): { algorithm: 'sha256' | 'sha384' | 'sha512
   const algorithm = token.slice(0, separatorIndex)
   const digestValue = token.slice(separatorIndex + 1)
 
-  if (algorithm !== 'sha256' && algorithm !== 'sha384' && algorithm !== 'sha512') {
+  if (algorithm !== 'sha256') {
     throw new SchemaMetaException(`integrity unsupported algorithm '${algorithm}'`)
   }
 

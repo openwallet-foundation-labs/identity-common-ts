@@ -15,7 +15,6 @@ import type {
   AttestationLoSSchema,
   BindingTypeSchema,
   FrameworkTypeSchema,
-  GenericMetaSchema,
   MsoMdocMetaSchema,
   SchemaMetaSchema,
   SchemaURISchema,
@@ -39,8 +38,7 @@ export type FrameworkType = z.infer<typeof FrameworkTypeSchema>
 export type TrustAuthority = z.infer<typeof TrustAuthoritySchema>
 export type SdJwtMeta = z.infer<typeof SdJwtMetaSchema>
 export type MsoMdocMeta = z.infer<typeof MsoMdocMetaSchema>
-export type GenericMeta = z.infer<typeof GenericMetaSchema>
-export type SchemaURIMeta = SdJwtMeta | MsoMdocMeta | GenericMeta
+export type SchemaURIMeta = SdJwtMeta | MsoMdocMeta
 export type SchemaURI = z.infer<typeof SchemaURISchema>
 export type SchemaMeta = z.infer<typeof SchemaMetaSchema>
 
@@ -95,7 +93,7 @@ export interface VerifiedSchemaMeta {
 export interface ResolvedSchemaReference {
   format: AttestationFormat
   uri: string
-  integrity?: string
+  integrity: string
   meta?: SchemaURIMeta
   rawSchema: unknown
   parsedSchema?: Record<string, unknown>
@@ -109,7 +107,7 @@ export interface ResolveSchemaReferencesOptions {
 }
 
 export interface DcqlTrustedAuthority {
-  type: 'aki' | 'etsi_tl'
+  type: 'etsi_tl'
   values: string[]
 }
 

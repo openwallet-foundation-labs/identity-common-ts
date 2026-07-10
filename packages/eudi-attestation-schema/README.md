@@ -44,7 +44,6 @@ const meta = schemaMeta()
     trustAuthority()
       .frameworkType('etsi_tl')
       .value('https://example.com/trust-lists/gym-members.jws')
-      .isLoTE(true)
       .build()
   )
   .attestationLoS('iso_18045_basic')
@@ -89,14 +88,17 @@ const { privateKey } = await ES256.generateKeyPair();
 const signer = await ES256.getSigner(privateKey);
 
 const meta = schemaMeta()
+  .id('https://example.com/attestations/gym-membership-card')
   .version('1.0.0')
   .rulebookURI('https://example.com/rulebook.md')
+  .rulebookIntegrity('sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw=')
   .attestationLoS('iso_18045_basic')
   .bindingType('key')
   .addSchemaURI(
     schemaURI()
       .format('dc+sd-jwt')
       .uri('https://example.com/schema.json')
+      .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')
       .meta({ vct: 'eu.example.gym-membership.1' })
       .build()
   )
@@ -161,7 +163,7 @@ console.log(result.dcql.credentials);
 
 Integrity notes:
 
-- `verifyIntegrity` supports SRI digests with `sha256`, `sha384`, and `sha512`.
+- `verifyIntegrity` supports SRI digests with `sha256`.
 - Integrity validation hashes UTF-8 bytes of the resolver content.
 - If resolver content is an object (not a string), integrity is computed over `JSON.stringify(content)`.
 
@@ -227,9 +229,6 @@ Claim extraction rules:
 |---|---|---|
 | `dc+sd-jwt` | `{ vct: string }` | `vct` is required and must be a non-empty string |
 | `mso_mdoc` | `{ doctype_value: string }` | `doctype_value` is required and must be a non-empty string |
-| `jwt_vc_json` | `{}` | No format-specific fields are currently required |
-| `jwt_vc_json-ld` | `{}` | No format-specific fields are currently required |
-| `ldp_vc` | `{}` | No format-specific fields are currently required |
 
 Example with multiple formats:
 
@@ -237,14 +236,17 @@ Example with multiple formats:
 import { schemaMeta, schemaURI } from '@owf/eudi-attestation-schema';
 
 const meta = schemaMeta()
+  .id('https://example.com/attestations/pid')
   .version('1.0.0')
   .rulebookURI('https://example.com/rulebook.md')
+  .rulebookIntegrity('sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw=')
   .attestationLoS('iso_18045_basic')
   .bindingType('key')
   .addSchemaURI(
     schemaURI()
       .format('dc+sd-jwt')
       .uri('https://example.com/schemas/pid.sd-jwt.json')
+      .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')
       .meta({ vct: 'eu.europa.ec.eudi.pid.1' })
       .build()
   )
@@ -252,6 +254,7 @@ const meta = schemaMeta()
     schemaURI()
       .format('mso_mdoc')
       .uri('https://example.com/schemas/pid.mdoc.json')
+      .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')
       .meta({ doctype_value: 'org.iso.18013.5.1.mDL' })
       .build()
   )
@@ -264,11 +267,11 @@ const meta = schemaMeta()
 
 | Field | Required | Type | Description |
 |---|---|---|---|
-| `id` | No | `string` | Unique identifier for the attestation schema |
-| `iat` | No | `number` | Issued-at timestamp (epoch seconds), typically set when signing |
+| `id` | Yes | `string` (URL) | Unique identifier for the attestation schema |
+| `iat` | No | `number` (integer) | JWT NumericDate (epoch seconds), typically set when signing |
 | `version` | Yes | `string` | Schema version (SemVer) |
 | `rulebookURI` | Yes | `string` (URL) | URI of the Attestation Rulebook |
-| `rulebookIntegrity` | No | `string` | W3C SRI integrity metadata for the rulebook |
+| `rulebookIntegrity` | Yes | `string` | Required W3C SRI sha256 integrity metadata for the rulebook |
 | `trustedAuthorities` | No | `TrustAuthority[]` | Trust anchors for attestation issuers |
 | `attestationLoS` | Yes | `AttestationLoS` | Level of security |
 | `bindingType` | Yes | `BindingType` | Cryptographic binding type |
@@ -278,20 +281,20 @@ const meta = schemaMeta()
 
 | Field | Required | Type | Description |
 |---|---|---|---|
-| `formatIdentifier` | Yes | `AttestationFormat` | Format discriminator (`dc+sd-jwt`, `mso_mdoc`, `jwt_vc_json`, `jwt_vc_json-ld`, `ldp_vc`) |
+| `formatIdentifier` | Yes | `AttestationFormat` | Format discriminator (`dc+sd-jwt`, `mso_mdoc`) |
 | `uri` | Yes | `string` (URL) | URI of the format-specific schema |
-| `integrity` | No | `string` | W3C SRI integrity metadata for the referenced schema |
+| `integrity` | Yes | `string` | Required W3C SRI sha256 integrity metadata for the referenced schema |
 | `meta` | Yes | format-specific object | Credential-type metadata required by the selected format |
 
 ### Enumerations
 
-**AttestationFormat**: `dc+sd-jwt`, `mso_mdoc`, `jwt_vc_json`, `jwt_vc_json-ld`, `ldp_vc`
+**AttestationFormat**: `dc+sd-jwt`, `mso_mdoc`
 
 **AttestationLoS**: `iso_18045_high`, `iso_18045_moderate`, `iso_18045_enhanced-basic`, `iso_18045_basic`
 
 **BindingType**: `claim`, `key`, `biometric`, `none`
 
-**FrameworkType**: `aki`, `etsi_tl`, `openid_federation`
+**FrameworkType**: `etsi_tl`
 
 ## License
 

@@ -164,10 +164,10 @@ function getClaimsFromSchema(schemaRef?: ResolvedSchemaReference): DcqlClaim[] {
 }
 
 export function toDcqlTrustedAuthorities(schemaMeta: SchemaMeta): DcqlTrustedAuthority[] {
-  const valuesByType = new Map<'aki' | 'etsi_tl', string[]>()
+  const valuesByType = new Map<'etsi_tl', string[]>()
 
   for (const authority of schemaMeta.trustedAuthorities ?? []) {
-    if (authority.frameworkType !== 'aki' && authority.frameworkType !== 'etsi_tl') {
+    if (authority.frameworkType !== 'etsi_tl') {
       continue
     }
 

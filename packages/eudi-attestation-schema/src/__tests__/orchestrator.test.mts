@@ -31,21 +31,20 @@ const TEST_PUBLIC_KEY = {
 }
 
 function buildMetaWithIntegrity(integrity?: string) {
+  const schemaIntegrity = integrity ?? 'sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw='
   const builder = schemaMeta()
     .id('https://example.com/attestation/pid')
     .version('1.0.0')
     .rulebookURI('https://example.com/rulebook.md')
+    .rulebookIntegrity('sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw=')
     .attestationLoS('iso_18045_basic')
     .bindingType('key')
 
   const schemaBuilder = schemaURI()
     .format('dc+sd-jwt')
     .uri('https://example.com/pid.json')
+    .integrity(schemaIntegrity)
     .meta({ vct: 'eu.example.pid.1' })
-
-  if (integrity) {
-    schemaBuilder.integrity(integrity)
-  }
 
   return builder.addSchemaURI(schemaBuilder.build()).build()
 }

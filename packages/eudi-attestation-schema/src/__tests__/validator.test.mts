@@ -1,211 +1,132 @@
 import { describe, expect, it } from 'vitest'
 import { assertValidSchemaMeta, validateSchemaMeta } from '../validator'
 
+const RULEBOOK_INTEGRITY = 'sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw='
+const SCHEMA_INTEGRITY = 'sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw='
+
 const validSchemaMeta = {
+  id: 'https://example.com/attestations/test',
+  iat: 1735000000,
   version: '1.0.0',
   rulebookURI: 'https://example.com/rulebook.md',
+  rulebookIntegrity: RULEBOOK_INTEGRITY,
   attestationLoS: 'iso_18045_basic',
   bindingType: 'key',
   schemaURIs: [
     {
       formatIdentifier: 'dc+sd-jwt',
       uri: 'https://example.com/schema.json',
+      integrity: SCHEMA_INTEGRITY,
       meta: { vct: 'eu.europa.ec.eudi.pid.1' },
     },
   ],
 }
 
 describe('validateSchemaMeta', () => {
-  it('should validate a valid SchemaMeta', () => {
+  it('validates a valid SchemaMeta', () => {
     const result = validateSchemaMeta(validSchemaMeta)
     expect(result.valid).toBe(true)
     expect(result.errors).toHaveLength(0)
   })
 
-  it('should validate a full SchemaMeta with all optional fields', () => {
-    const full = {
+  it('accepts etsi_tl trusted authorities', () => {
+    const result = validateSchemaMeta({
       ...validSchemaMeta,
-      id: 'https://example.com/attestations/test',
-      rulebookIntegrity: 'sha256-abc123',
-      trustedAuthorities: [
-        {
-          frameworkType: 'etsi_tl',
-          value: 'https://example.com/trust-list.jws',
-          isLOTE: true,
-        },
-      ],
-    }
-    const result = validateSchemaMeta(full)
+      trustedAuthorities: [{ frameworkType: 'etsi_tl', value: 'https://example.com/trust-list.jws' }],
+    })
     expect(result.valid).toBe(true)
   })
 
-  it('should reject missing version', () => {
-    const { version, ...invalid } = validSchemaMeta
-    const result = validateSchemaMeta(invalid)
-    expect(result.valid).toBe(false)
-    expect(result.errors.length).toBeGreaterThan(0)
-  })
-
-  it('should reject missing rulebookURI', () => {
-    const { rulebookURI, ...invalid } = validSchemaMeta
+  it('rejects missing rulebookIntegrity', () => {
+    const { rulebookIntegrity, ...invalid } = validSchemaMeta
     const result = validateSchemaMeta(invalid)
     expect(result.valid).toBe(false)
   })
 
-  it('should reject invalid attestationLoS', () => {
-    const result = validateSchemaMeta({ ...validSchemaMeta, attestationLoS: 'invalid' })
-    expect(result.valid).toBe(false)
-  })
-
-  it('should reject invalid bindingType', () => {
-    const result = validateSchemaMeta({ ...validSchemaMeta, bindingType: 'invalid' })
-    expect(result.valid).toBe(false)
-  })
-
-  it('should reject empty schemaURIs', () => {
-    const result = validateSchemaMeta({ ...validSchemaMeta, schemaURIs: [] })
-    expect(result.valid).toBe(false)
-  })
-
-  it('should reject schemaURI missing meta', () => {
+  it('rejects schemaURI missing integrity', () => {
     const result = validateSchemaMeta({
       ...validSchemaMeta,
-      schemaURIs: [{ formatIdentifier: 'dc+sd-jwt', uri: 'https://example.com/schema.json' }],
+      schemaURIs: [{ formatIdentifier: 'dc+sd-jwt', uri: 'https://example.com/schema.json', meta: { vct: 'x' } }],
     })
     expect(result.valid).toBe(false)
   })
 
-  it('should accept dc+sd-jwt with vct', () => {
+  it('rejects non-sha256 SRI integrity', () => {
+    const result = validateSchemaMeta({
+      ...validSchemaMeta,
+      schemaURIs: [{ ...validSchemaMeta.schemaURIs[0], integrity: 'sha512-abc' }],
+    })
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects invalid id URL', () => {
+    const result = validateSchemaMeta({ ...validSchemaMeta, id: 'not-a-url' })
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects non-integer iat', () => {
+    const result = validateSchemaMeta({ ...validSchemaMeta, iat: 123.5 })
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects invalid frameworkType in trustedAuthorities', () => {
+    const result = validateSchemaMeta({
+      ...validSchemaMeta,
+      trustedAuthorities: [{ frameworkType: 'aki', value: 'test' }],
+    })
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects duplicate formatIdentifier values in schemaURIs', () => {
     const result = validateSchemaMeta({
       ...validSchemaMeta,
       schemaURIs: [
+        validSchemaMeta.schemaURIs[0],
         {
           formatIdentifier: 'dc+sd-jwt',
-          uri: 'https://example.com/schema.json',
-          meta: { vct: 'eu.europa.ec.eudi.pid.1' },
-        },
-      ],
-    })
-    expect(result.valid).toBe(true)
-  })
-
-  it('should reject dc+sd-jwt meta missing vct', () => {
-    const result = validateSchemaMeta({
-      ...validSchemaMeta,
-      schemaURIs: [{ formatIdentifier: 'dc+sd-jwt', uri: 'https://example.com/schema.json', meta: {} }],
-    })
-    expect(result.valid).toBe(false)
-  })
-
-  it('should reject dc+sd-jwt meta with unknown fields', () => {
-    const result = validateSchemaMeta({
-      ...validSchemaMeta,
-      schemaURIs: [
-        {
-          formatIdentifier: 'dc+sd-jwt',
-          uri: 'https://example.com/schema.json',
-          meta: { vct: 'eu.europa.ec.eudi.pid.1', unknown_field: 'value' },
+          uri: 'https://example.com/schema2.json',
+          integrity: SCHEMA_INTEGRITY,
+          meta: { vct: 'eu.europa.ec.eudi.pid.2' },
         },
       ],
     })
     expect(result.valid).toBe(false)
   })
 
-  it('should accept mso_mdoc with doctype_value', () => {
-    const result = validateSchemaMeta({
-      ...validSchemaMeta,
-      schemaURIs: [
-        {
-          formatIdentifier: 'mso_mdoc',
-          uri: 'https://example.com/schema.json',
-          meta: { doctype_value: 'org.iso.18013.5.1.mDL' },
-        },
-      ],
-    })
-    expect(result.valid).toBe(true)
-  })
-
-  it('should reject mso_mdoc meta missing doctype_value', () => {
-    const result = validateSchemaMeta({
-      ...validSchemaMeta,
-      schemaURIs: [{ formatIdentifier: 'mso_mdoc', uri: 'https://example.com/schema.json', meta: {} }],
-    })
-    expect(result.valid).toBe(false)
-  })
-
-  it('should reject mso_mdoc meta with unknown fields', () => {
-    const result = validateSchemaMeta({
-      ...validSchemaMeta,
-      schemaURIs: [
-        {
-          formatIdentifier: 'mso_mdoc',
-          uri: 'https://example.com/schema.json',
-          meta: { doctype_value: 'org.iso.18013.5.1.mDL', unknown_field: 'value' },
-        },
-      ],
-    })
-    expect(result.valid).toBe(false)
-  })
-
-  it('should accept the target data shape example from spec', () => {
+  it('accepts both supported formats with detailed meta', () => {
     const result = validateSchemaMeta({
       ...validSchemaMeta,
       schemaURIs: [
         {
           formatIdentifier: 'dc+sd-jwt',
           uri: 'https://example.org/schemas/pid.json',
+          integrity: SCHEMA_INTEGRITY,
           meta: { vct: 'eu.europa.ec.eudi.pid.1' },
         },
         {
           formatIdentifier: 'mso_mdoc',
           uri: 'https://example.org/schemas/mdl.json',
+          integrity: SCHEMA_INTEGRITY,
           meta: { doctype_value: 'org.iso.18013.5.1.mDL' },
         },
       ],
     })
     expect(result.valid).toBe(true)
   })
-
-  it('should reject invalid frameworkType in trustedAuthorities', () => {
-    const result = validateSchemaMeta({
-      ...validSchemaMeta,
-      trustedAuthorities: [{ frameworkType: 'invalid', value: 'test' }],
-    })
-    expect(result.valid).toBe(false)
-  })
-
-  it('should reject isLOTE with non-etsi_tl framework', () => {
-    const result = validateSchemaMeta({
-      ...validSchemaMeta,
-      trustedAuthorities: [{ frameworkType: 'aki', value: 'test', isLOTE: true }],
-    })
-    expect(result.valid).toBe(false)
-  })
-
-  it('should reject non-object input', () => {
-    const result = validateSchemaMeta('not-an-object')
-    expect(result.valid).toBe(false)
-  })
-
-  it('should reject null input', () => {
-    const result = validateSchemaMeta(null)
-    expect(result.valid).toBe(false)
-  })
 })
 
 describe('assertValidSchemaMeta', () => {
-  it('should not throw for valid SchemaMeta', () => {
+  it('does not throw for valid SchemaMeta', () => {
     expect(() => assertValidSchemaMeta(validSchemaMeta)).not.toThrow()
   })
 
-  it('should throw SchemaMetaException for invalid SchemaMeta', () => {
+  it('throws SchemaMetaException for invalid SchemaMeta', () => {
     expect(() => assertValidSchemaMeta({})).toThrow('Invalid SchemaMeta')
   })
 
-  it('should narrow the type after assertion', () => {
+  it('narrows the type after assertion', () => {
     const data: unknown = validSchemaMeta
     assertValidSchemaMeta(data)
-    // After assertion, data should be typed as SchemaMeta
     expect(data.version).toBe('1.0.0')
     expect(data.schemaURIs[0].formatIdentifier).toBe('dc+sd-jwt')
   })

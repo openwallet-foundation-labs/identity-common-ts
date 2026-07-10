@@ -26,18 +26,10 @@ export class TrustAuthorityBuilder {
   }
 
   /**
-   * Set the trust authority value (base64url for AKI, URI for etsi_tl/openid_federation)
+   * Set the trust authority value (URI for etsi_tl)
    */
   value(value: string): this {
     this.data.value = value
-    return this
-  }
-
-  /**
-   * Mark as a List of Trusted Entities (only for etsi_tl framework type)
-   */
-  isLoTE(value = true): this {
-    this.data.isLOTE = value
     return this
   }
 
@@ -79,7 +71,7 @@ export class SchemaURIBuilder {
   }
 
   /**
-   * Set the integrity metadata (W3C SRI format, e.g. "sha256-...")
+   * Set required schema integrity metadata (W3C SRI sha256 format, e.g. "sha256-...")
    */
   integrity(integrity: string): this {
     this.data.integrity = integrity
@@ -143,7 +135,7 @@ export class SchemaMetaBuilder {
   }
 
   /**
-   * Set the integrity metadata for the Attestation Rulebook (W3C SRI format)
+   * Set required integrity metadata for the Attestation Rulebook (W3C SRI sha256 format)
    */
   rulebookIntegrity(integrity: string): this {
     this.data.rulebookIntegrity = integrity
