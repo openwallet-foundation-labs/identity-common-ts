@@ -21,6 +21,7 @@ export type StatusListCwtOptions = {
   protectedHeaders?: ProtectedHeaders | ProtectedHeaderOptions['protectedHeaders']
   unprotectedHeaders?: UnprotectedHeaders | UnprotectedHeaderOptions['unprotectedHeaders']
   signatureOrTag?: Uint8Array
+  originalPayloadBytes?: Uint8Array
 }
 
 export enum StatusListCwtHeaderKey {
@@ -32,6 +33,7 @@ export class StatusListCwt {
   public protectedHeaders?: ProtectedHeaders
   public unprotectedHeaders?: UnprotectedHeaders
   private signatureOrTag?: Uint8Array
+  private originalPayloadBytes?: Uint8Array
 
   public constructor(options: StatusListCwtOptions) {
     this.payload =
@@ -46,6 +48,7 @@ export class StatusListCwt {
         : UnprotectedHeaders.create({ unprotectedHeaders: options.unprotectedHeaders })
 
     this.signatureOrTag = options.signatureOrTag
+    this.originalPayloadBytes = options.originalPayloadBytes
 
     if (this.protectedHeaders.headers.get(StatusListCwtHeaderKey.Typ) === undefined) {
       this.protectedHeaders.headers.set(StatusListCwtHeaderKey.Typ, MediaTypes.StatusListCwt)
@@ -54,10 +57,12 @@ export class StatusListCwt {
 
   public setStatusList(statusList: StatusList | StatusListCbor) {
     this.payload.setStatusList(statusList)
+    this.originalPayloadBytes = undefined
   }
 
   public updateStatusList(index: number, value: number) {
     this.payload.statusList.setStatus(index, value)
+    this.originalPayloadBytes = undefined
   }
 
   /**
@@ -99,6 +104,7 @@ export class StatusListCwt {
       protectedHeaders: cwt.protectedHeaders,
       unprotectedHeaders: cwt.unprotectedHeaders,
       signatureOrTag: cwt.signatureOrTag,
+      originalPayloadBytes: new Uint8Array(cwt.payload),
     })
   }
 
@@ -166,7 +172,7 @@ export class StatusListCwt {
     const cwt = new Cwt({
       protectedHeaders: this.protectedHeaders,
       unprotectedHeaders: this.unprotectedHeaders,
-      payload: this.payload.encode(),
+      payload: this.originalPayloadBytes ?? this.payload.encode(),
       signature: this.signatureOrTag,
     })
 
@@ -177,7 +183,7 @@ export class StatusListCwt {
     const cwt = new Cwt({
       protectedHeaders: this.protectedHeaders,
       unprotectedHeaders: this.unprotectedHeaders,
-      payload: this.payload.encode(),
+      payload: this.originalPayloadBytes ?? this.payload.encode(),
       tag: this.signatureOrTag,
     })
 

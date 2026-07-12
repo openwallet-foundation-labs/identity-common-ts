@@ -454,6 +454,30 @@ suite('StatusListCwt', () => {
       const result = await decodedStatusListCwt.verifySignature({ key: wrongKey }, sign1Context)
       expect(result).toBe(false)
     })
+
+    test('should verify against original token payload bytes instead of re-encoded payload bytes', async () => {
+      const statusListCwt = StatusListCwt.createFromStatusListAndSubject(
+        { statusList: [0, 1, 0], bitsPerStatus: 1 },
+        'did:test'
+      )
+
+      const token = await statusListCwt.signAndEncode(
+        { signingKey: signKey, algorithm: SignatureAlgorithm.ES256 },
+        sign1Context
+      )
+
+      const decodedStatusListCwt = StatusListCwt.fromToken(token)
+      const originalEncode = decodedStatusListCwt.payload.encode.bind(decodedStatusListCwt.payload)
+      ;(decodedStatusListCwt.payload as unknown as { encode: () => Uint8Array }).encode = () => {
+        const payload = originalEncode()
+        const tampered = new Uint8Array(payload)
+        tampered[tampered.length - 1] ^= 0x01
+        return tampered
+      }
+
+      const result = await decodedStatusListCwt.verifySignature({ key: signKey }, sign1Context)
+      expect(result).toBe(true)
+    })
   })
 
   suite('verifyAuthenticationCode', () => {
@@ -482,6 +506,27 @@ suite('StatusListCwt', () => {
       const wrongKey = CoseKey.create({ keyType: KeyType.Oct, k: new TextEncoder().encode('wrong-key') })
       const result = await decodedStatusListCwt.verifyAuthenticationCode({ key: wrongKey }, mac0Context)
       expect(result).toBe(false)
+    })
+
+    test('should verify MAC against original token payload bytes instead of re-encoded payload bytes', async () => {
+      const statusListCwt = StatusListCwt.createFromStatusListAndSubject(
+        { statusList: [0, 1, 0], bitsPerStatus: 1 },
+        'did:test'
+      )
+
+      const token = await statusListCwt.authenticateAndEncode({ key: macKey }, mac0Context)
+
+      const decodedStatusListCwt = StatusListCwt.fromToken(token)
+      const originalEncode = decodedStatusListCwt.payload.encode.bind(decodedStatusListCwt.payload)
+      ;(decodedStatusListCwt.payload as unknown as { encode: () => Uint8Array }).encode = () => {
+        const payload = originalEncode()
+        const tampered = new Uint8Array(payload)
+        tampered[tampered.length - 1] ^= 0x01
+        return tampered
+      }
+
+      const result = await decodedStatusListCwt.verifyAuthenticationCode({ key: macKey }, mac0Context)
+      expect(result).toBe(true)
     })
   })
 })
