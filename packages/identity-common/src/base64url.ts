@@ -144,6 +144,22 @@ export const bytesToString = (bytes: Uint8Array): string => {
   return result
 }
 
+export const concatBytes = (...byteArrays: Array<Uint8Array>) => {
+  const result = new Uint8Array(byteArrays.reduce((n, a) => n + a.byteLength, 0))
+  let offset = 0
+  for (const entry of byteArrays) {
+    result.set(entry, offset)
+    offset += entry.byteLength
+  }
+  return result
+}
+
+export const compareBytes = (lhs: Uint8Array, rhs: Uint8Array) => {
+  if (lhs === rhs) return true
+  if (lhs.byteLength !== rhs.byteLength) return false
+  return lhs.every((b, i) => b === rhs[i])
+}
+
 // Public API - keeping backward compatible names
 export const base64urlEncode = (input: string): string => bytesToBase64Url(stringToBytes(input))
 

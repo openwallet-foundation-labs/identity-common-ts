@@ -20,7 +20,7 @@ export const MultiLangStringSchema = z.object({
   /** Language code per BCP47/RFC 5646 */
   lang: z.string().min(2),
   /** Localized string value */
-  content: z.string().min(1),
+  value: z.string().min(1),
 })
 
 // ============================================================================
@@ -32,11 +32,11 @@ export const MultiLangStringSchema = z.object({
  */
 export const SupervisoryAuthoritySchema = z.object({
   /** Email address of the Data Protection Authority */
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   /** Telephone number of the Data Protection Authority */
   phone: z.string().optional(),
   /** URL of web form provided by the Data Protection Authority */
-  uri: z.string().url().optional(),
+  uri: z.url().optional(),
 })
 
 /**
@@ -56,7 +56,7 @@ export const CredentialSchema = z.object({
   /** Format of the attestation (e.g., "dc+sd-jwt", "mso_mdoc") */
   format: z.string().min(1),
   /** Object defining additional properties per Credential Format */
-  meta: z.record(z.unknown()),
+  meta: z.record(z.string(), z.unknown()),
   /** Array of claim objects specifying requestable attributes */
   claim: z.array(ClaimSchema).optional(),
 })
@@ -68,7 +68,7 @@ export const StatusListSchema = z.object({
   /** Index in the status list */
   idx: z.number().int().nonnegative(),
   /** URI to the status list */
-  uri: z.string().url(),
+  uri: z.url(),
 })
 
 /**
@@ -115,22 +115,22 @@ export const WRPRCPayloadSchema = z.object({
   country: z.string().length(2),
 
   /** URL pointing to the national registry API endpoint */
-  registry_uri: z.string().url(),
+  registry_uri: z.url(),
 
   /** Descriptions of the services provided by the WRP */
   srv_description: z.array(z.array(MultiLangStringSchema)).optional(),
 
   /** List of entitlements assigned to the WRP */
-  entitlements: z.array(z.string().url()).min(1),
+  entitlements: z.array(z.url()).min(1),
 
   /** URL to the WRP's privacy policy */
-  privacy_policy: z.string().url().optional(),
+  privacy_policy: z.url().optional(),
 
   /** URL general-purpose web address */
-  info_uri: z.string().url().optional(),
+  info_uri: z.url().optional(),
 
   /** URL or email for data deletion/portability requests */
-  support_uri: z.string().url().optional(),
+  support_uri: z.url().or(z.email()).optional(),
 
   /** Data Protection Authority supervising the WRP */
   supervisory_authority: SupervisoryAuthoritySchema.optional(),
@@ -139,10 +139,7 @@ export const WRPRCPayloadSchema = z.object({
   policy_id: z.array(z.string()).optional(),
 
   /** URL to the certificate policy and practice statement */
-  certificate_policy: z.string().url().optional(),
-
-  /** Unix timestamp indicating when the WRPRC was issued */
-  iat: z.number().int().positive(),
+  certificate_policy: z.url().optional(),
 
   /** Status list for WRPRC validity */
   status: StatusSchema.optional(),
@@ -154,7 +151,7 @@ export const WRPRCPayloadSchema = z.object({
   credentials: z.array(CredentialSchema).optional(),
 
   /** Set of credentials issued by the WRP (for attestation providers) */
-  provides_attestations: z.array(CredentialSchema).optional(),
+  provides_attestations: z.union([z.array(CredentialSchema), z.array(z.string())]).optional(),
 
   /** Intermediary information when WRP acts through an intermediary */
   intermediary: IntermediarySchema.optional(),
@@ -176,6 +173,8 @@ export const WRPRCJWTHeaderSchema = z.object({
   x5c: z.array(z.string()).min(1),
   /** Key ID */
   kid: z.string().optional(),
+  /** Unix timestamp indicating when the WRPRC was issued */
+  iat: z.number().int().positive(),
 })
 
 /**
@@ -188,6 +187,8 @@ export const WRPRCCWTHeaderSchema = z.object({
   alg: z.number().int(),
   /** Certificate chain to verify the CWT per RFC 9360 */
   x5chain: z.array(z.instanceof(Uint8Array)).min(1),
+  /** Unix timestamp indicating when the WRPRC was issued */
+  iat: z.number().int().positive(),
 })
 
 // ============================================================================

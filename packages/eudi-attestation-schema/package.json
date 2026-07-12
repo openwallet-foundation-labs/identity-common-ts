@@ -1,13 +1,24 @@
 {
   "name": "@owf/eudi-attestation-schema",
-  "version": "0.1.0",
+  "version": "0.3.1",
   "description": "SDK for creating, signing, and validating attestation schema metadata (SchemaMeta) per EUDI TS11 Catalogue of Attestations",
   "experimental": true,
   "files": [
     "dist"
   ],
   "license": "Apache-2.0",
-  "exports": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
   "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-attestation-schema",
   "repository": {
     "type": "git",
@@ -16,10 +27,16 @@
   },
   "publishConfig": {
     "access": "public",
+    "main": "./dist/index.cjs",
     "module": "./dist/index.mjs",
     "types": "./dist/index.d.mts",
     "exports": {
-      ".": "./dist/index.mjs",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs",
+        "default": "./dist/index.mjs"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -34,11 +51,15 @@
     "ts11"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
   },
   "dependencies": {
     "@owf/crypto": "workspace:*",
     "@owf/identity-common": "workspace:*",
-    "zod": "^4.3.6"
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
   }
 }

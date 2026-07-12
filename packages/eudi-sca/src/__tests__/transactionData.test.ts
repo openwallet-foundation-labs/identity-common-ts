@@ -90,4 +90,50 @@ suite('transaction data', () => {
     invalidCm.transaction_data_types['urn:eudi:sca:com.example.pay:transaction:2'].claims[0].display = undefined
     expect(() => matchTransactionDataToTransactionDataType([TRANSACTION_DATA[0]], invalidCm)).toThrow()
   })
+
+  test('match transaction data with credential metadata using preferred locale', () => {
+    const parsed = matchTransactionDataToTransactionDataType([TRANSACTION_DATA[0]], credential_metadata, 'de')
+
+    expect(parsed).toMatchObject({
+      'urn:eudi:sca:com.example.pay:transaction:2': {
+        transaction_id: { value: 'ab9c4d5e-6f78-9012-3456-789abcdef012' },
+        amount: {
+          valueType: 'iso_currency_amount',
+          value: '49.99 EUR',
+          display: [{ locale: 'de', name: 'betrag' }],
+        },
+        name: {
+          value: 'Example Shop',
+          display: [{ locale: 'de', name: 'empfänger' }],
+        },
+        id: { value: 'DE98ZZZ09999999999' },
+      },
+    })
+  })
+
+  test('match transaction data with credential metadata using non-existent locale', () => {
+    const parsed = matchTransactionDataToTransactionDataType([TRANSACTION_DATA[0]], credential_metadata, 'fr')
+
+    expect(parsed).toMatchObject({
+      'urn:eudi:sca:com.example.pay:transaction:2': {
+        transaction_id: { value: 'ab9c4d5e-6f78-9012-3456-789abcdef012' },
+        amount: {
+          valueType: 'iso_currency_amount',
+          value: '49.99 EUR',
+          display: [
+            { locale: 'en', name: 'amount' },
+            { locale: 'de', name: 'betrag' },
+          ],
+        },
+        name: {
+          value: 'Example Shop',
+          display: [
+            { locale: 'en', name: 'payee' },
+            { locale: 'de', name: 'empfänger' },
+          ],
+        },
+        id: { value: 'DE98ZZZ09999999999' },
+      },
+    })
+  })
 })

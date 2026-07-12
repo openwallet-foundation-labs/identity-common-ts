@@ -1,10 +1,10 @@
 import type { JwtPayload } from '@owf/identity-common'
-import { base64UrlToUint8Array, base64urlDecode, uint8ArrayToBase64Url } from '@owf/identity-common'
+import { base64url, bytesToString } from '@owf/identity-common'
 import type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
 import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
 import { SLException } from './status-list-exception'
-import type { StatusListEntry } from './types'
+import { type StatusListEntry, StatusType } from './types'
 
 /**
  * Decode a JWT and return the payload.
@@ -12,7 +12,7 @@ import type { StatusListEntry } from './types'
  */
 function decodeJwtPayload<T>(jwt: string): T {
   const parts = jwt.split('.')
-  return JSON.parse(base64urlDecode(parts[1]))
+  return JSON.parse(bytesToString(base64url.decode(parts[1])))
 }
 
 /**
@@ -29,7 +29,7 @@ export function createHeaderAndPayload(list: StatusList, payload: JwtPayload, he
   header.typ = JWT_STATUS_LIST_TYPE
   payload.status_list = {
     bits: list.getBitsPerStatus(),
-    lst: uint8ArrayToBase64Url(list.compressStatusListToBytes()),
+    lst: base64url.encode(list.compressStatusListToBytes()),
   }
   return { header, payload }
 }
@@ -40,7 +40,7 @@ export function createHeaderAndPayload(list: StatusList, payload: JwtPayload, he
 export function getListFromStatusListJWT(jwt: string): StatusList {
   const payload = decodeJwtPayload<StatusListJWTPayload>(jwt)
   const statusList = payload.status_list
-  const compressed = base64UrlToUint8Array(statusList.lst)
+  const compressed = base64url.decode(statusList.lst)
   return StatusList.decompressStatusListFromBytes(compressed, statusList.bits)
 }
 
@@ -50,4 +50,46 @@ export function getListFromStatusListJWT(jwt: string): StatusList {
 export function getStatusListFromJWT(jwt: string): StatusListEntry {
   const payload = decodeJwtPayload<JWTwithStatusListPayload>(jwt)
   return payload.status.status_list
+}
+
+/**
+ * Verify the status of an `idx` in a `token`
+ *
+ * @todo properly validate the JWT with zod + signature
+ */
+export function verifyStatus({
+  uri,
+  idx,
+  token,
+  checkFreshness = true,
+  now = new Date(),
+}: {
+  token: string
+  idx: number
+  uri: string
+  checkFreshness?: boolean
+  now?: Date
+}) {
+  const payload = decodeJwtPayload<StatusListJWTPayload>(token)
+  const compressed = base64url.decode(payload.status_list.lst)
+  const statusList = StatusList.decompressStatusListFromBytes(compressed, payload.status_list.bits)
+  if (payload.subject !== uri) {
+    throw new SLException(`The subject claim '${payload.subject}' must be equal to the uri '${uri}'`)
+  }
+  if (checkFreshness && payload.iat && payload.iat > Math.floor(now.getTime() / 1000)) {
+    throw new SLException(
+      `The issued at claim '${payload.issuedAt}' is in the future (compared to '${now}'), and therefore not valid`
+    )
+  }
+  if (payload.exp && payload.exp < Math.floor(now.getTime() / 1000)) {
+    throw new SLException(
+      `The expiry claim '${payload.exp}' is in the past (compared to '${now}'), and therefore not valid`
+    )
+  }
+  if (statusList.getStatus(idx) !== StatusType.Valid) {
+    throw new SLException(
+      `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${statusList.getStatus(idx)}'`
+    )
+  }
+  return true
 }

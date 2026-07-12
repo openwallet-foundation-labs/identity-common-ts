@@ -7,6 +7,7 @@ import type {
   FrameworkType,
   SchemaMeta,
   SchemaURI,
+  SchemaURIMeta,
   TrustAuthority,
 } from './types'
 
@@ -25,18 +26,10 @@ export class TrustAuthorityBuilder {
   }
 
   /**
-   * Set the trust authority value (base64url for AKI, URI for etsi_tl/openid_federation)
+   * Set the trust authority value (URI for etsi_tl)
    */
   value(value: string): this {
     this.data.value = value
-    return this
-  }
-
-  /**
-   * Mark as a List of Trusted Entities (only for etsi_tl framework type)
-   */
-  isLoTE(value = true): this {
-    this.data.isLOTE = value
     return this
   }
 
@@ -59,7 +52,7 @@ export class TrustAuthorityBuilder {
  * Builder for creating SchemaURI objects with a fluent API
  */
 export class SchemaURIBuilder {
-  private data: Partial<SchemaURI> = {}
+  private data: Record<string, unknown> = {}
 
   /**
    * Set the format identifier
@@ -78,10 +71,21 @@ export class SchemaURIBuilder {
   }
 
   /**
-   * Set the integrity metadata (W3C SRI format, e.g. "sha256-...")
+   * Set required schema integrity metadata (W3C SRI sha256 format, e.g. "sha256-...")
    */
   integrity(integrity: string): this {
     this.data.integrity = integrity
+    return this
+  }
+
+  /**
+   * Set the format-specific credential metadata.
+   * - dc+sd-jwt: provide { vct }
+   * - mso_mdoc: provide { doctype_value }
+   * - other formats: provide {}
+   */
+  meta(meta: SchemaURIMeta): this {
+    this.data.meta = meta
     return this
   }
 
@@ -131,7 +135,7 @@ export class SchemaMetaBuilder {
   }
 
   /**
-   * Set the integrity metadata for the Attestation Rulebook (W3C SRI format)
+   * Set required integrity metadata for the Attestation Rulebook (W3C SRI sha256 format)
    */
   rulebookIntegrity(integrity: string): this {
     this.data.rulebookIntegrity = integrity
@@ -160,17 +164,6 @@ export class SchemaMetaBuilder {
    */
   bindingType(type: BindingType): this {
     this.data.bindingType = type
-    return this
-  }
-
-  /**
-   * Add a supported attestation format
-   */
-  addFormat(format: AttestationFormat): this {
-    this.data.supportedFormats = this.data.supportedFormats ?? []
-    if (!this.data.supportedFormats.includes(format)) {
-      this.data.supportedFormats.push(format)
-    }
     return this
   }
 

@@ -21,7 +21,7 @@ jobs:
       published: ${{ steps.changesets.outputs.published }}
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
 
@@ -70,7 +70,7 @@ jobs:
       id-token: write # Needed for npm trusted publishing
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
 
@@ -101,7 +101,9 @@ jobs:
 
           pnpm changeset version --snapshot alpha
           pnpm style:fix
+          pnpm types:check
           pnpm build
+          pnpm esm:check
           pnpm changeset publish --tag alpha
 
           CURRENT_PACKAGE_VERSION=$(node -p "require('./packages/identity-common/package.json').version")

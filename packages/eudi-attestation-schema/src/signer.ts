@@ -21,7 +21,6 @@ import type { SignedSchemaMeta, SignOptions } from './types'
  *   .rulebookURI('https://example.com/rulebook.md')
  *   .attestationLoS('iso_18045_basic')
  *   .bindingType('key')
- *   .addFormat('dc+sd-jwt')
  *   .addSchemaURI(schemaURI().format('dc+sd-jwt').uri('https://example.com/schema.json').build())
  *   .build()
  *

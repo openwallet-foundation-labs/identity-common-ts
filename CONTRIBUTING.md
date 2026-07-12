@@ -100,7 +100,6 @@ From the root of the repository:
 | `pnpm md:check` | Check markdown files |
 | `pnpm md:fix` | Fix markdown issues |
 | `pnpm create-package <name> [--eudi]` | Scaffold a new package |
-| `pnpm npm:trust:bootstrap` | Configure npm trusted publishing for existing packages |
 
 ### Working on a Package
 
@@ -404,18 +403,25 @@ When adding a new package to the monorepo:
 
 3. **Configure trusted publishing once:**
 
-   Preferred: run the repository bootstrap script from the repo root:
+   Run this command for each package:
 
    ```bash
-   pnpm npm:trust:bootstrap
+   npm trust github @owf/my-package --repo openwallet-foundation-labs/identity-common-ts --file release.yml --yes
    ```
 
-   This configures each published workspace package to trust the GitHub Actions release workflow (`release.yml`).
+   Replace `@owf/my-package` with the actual package name.
 
-   Alternatively, you can configure the package manually on npmjs.com:
+   This requires npm >= 11.13 and 2FA enabled on your npm account.
 
-   - Go to `https://www.npmjs.com/package/@owf/your-new-package/access`
-   - In the "Trusted Publisher" section, configure:
+   **Manual configuration (if npm trust is not available):**
+
+   For each published package, visit:
+
+   ```string
+   https://www.npmjs.com/package/@owf/<package-name>/settings/access
+   ```
+
+   Then in the "Trusted Publishers" section, add:
      - **Organization**: `openwallet-foundation-labs`
      - **Repository**: `identity-common-ts`
      - **Workflow filename**: `release.yml`

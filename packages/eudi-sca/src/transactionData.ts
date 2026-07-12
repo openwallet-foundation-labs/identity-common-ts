@@ -35,7 +35,8 @@ export type PayloadWithDisplayInfo = Record<
 
 const __matchTransactionDataToTransactionDataType = (
   transactionData: Array<TransactionData>,
-  credentialMetadata: CredentialMetadata
+  credentialMetadata: CredentialMetadata,
+  preferredLocale?: string
 ): Record<string, PayloadWithDisplayInfo> => {
   const transactionDataTypes = Object.entries(credentialMetadata.transaction_data_types).reduce<
     CredentialMetadata['transaction_data_types']
@@ -66,10 +67,14 @@ const __matchTransactionDataToTransactionDataType = (
         const shouldBeAdded = mandatory ? mandatory === isValid : isValid
 
         if (shouldBeAdded) {
+          const preferredDisplay = preferredLocale
+            ? display?.find(({ locale }) => locale === preferredLocale)
+            : undefined
+
           prev[jsonPathValueAndKey.key] = {
             valueType: value_type,
             value: jsonPathValueAndKey.value,
-            display,
+            display: preferredDisplay ? [preferredDisplay] : display,
           }
         }
         return prev
@@ -110,7 +115,8 @@ const __matchTransactionDataToTransactionDataType = (
 
 export const matchTransactionDataToTransactionDataType = (
   transactionData: Array<string>,
-  credentialMetadata: Record<string, unknown>
+  credentialMetadata: Record<string, unknown>,
+  preferredLocale?: string
 ) => {
   const parsedTransactionData = transactionData
     .map((td) => {
@@ -122,7 +128,7 @@ export const matchTransactionDataToTransactionDataType = (
     })
     .filter((td) => td !== undefined)
   const parsedCredentialMetadata = parseCredentialMetadata(credentialMetadata)
-  return __matchTransactionDataToTransactionDataType(parsedTransactionData, parsedCredentialMetadata)
+  return __matchTransactionDataToTransactionDataType(parsedTransactionData, parsedCredentialMetadata, preferredLocale)
 }
 
 const matchValueTypeToValue = (valueType: ValueType | string, value: unknown) => {

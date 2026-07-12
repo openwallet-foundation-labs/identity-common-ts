@@ -7,10 +7,14 @@ export {
   TrustAuthorityBuilder,
   trustAuthority,
 } from './builders'
-
+// DCQL
+export { buildDcqlFromSchemaMeta, toDcqlCredentialInput, toDcqlTrustedAuthorities } from './dcql'
+// Orchestrator
+export { verifyResolveAndBuildDcql } from './orchestrator'
+// Resolver
+export { resolveSchemaReferences } from './resolver'
 // Exception
 export { SchemaMetaException } from './schema-meta-exception'
-
 // Schemas
 export {
   AttestationFormatSchema,
@@ -21,11 +25,12 @@ export {
   BindingTypeValues,
   FrameworkTypeSchema,
   FrameworkTypeValues,
+  MsoMdocMetaSchema,
   SchemaMetaSchema,
   SchemaURISchema,
+  SdJwtMetaSchema,
   TrustAuthoritySchema,
 } from './schemas'
-
 // Signer
 export { signSchemaMeta } from './signer'
 
@@ -34,9 +39,17 @@ export type {
   AttestationFormat,
   AttestationLoS,
   BindingType,
+  BuildDcqlFromSchemaMetaOptions,
+  BuildDcqlFromSchemaMetaResult,
+  DcqlTrustedAuthority,
   FrameworkType,
+  MsoMdocMeta,
+  ResolvedSchemaReference,
+  ResolveSchemaReferencesOptions,
   SchemaMeta,
   SchemaURI,
+  SchemaURIMeta,
+  SdJwtMeta,
   SignedSchemaMeta,
   SignOptions,
   TrustAuthority,

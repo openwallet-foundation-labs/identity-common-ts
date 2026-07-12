@@ -6,6 +6,7 @@
     "declaration": true,
     "sourceMap": true,
     "strict": true,
+    "isolatedModules": true,
     "skipLibCheck": true,
     "noEmitOnError": true,
     "lib": ["ES2020", "DOM.Iterable", "DOM"],

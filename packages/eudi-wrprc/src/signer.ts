@@ -46,6 +46,7 @@ export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
     typ: 'rc-wrp+jwt',
     alg: algorithm,
     x5c,
+    iat: Math.floor(Date.now() / 1000),
     ...(keyId && { kid: keyId }),
   }
 
@@ -122,13 +123,8 @@ export function parseWRPRC(jws: string): { header: unknown; payload: unknown; si
  * @param payload - Partial payload (iat will be set automatically if not provided)
  * @returns Complete payload with timestamp
  */
-export function createWRPRCPayload(payload: Omit<WRPRCPayload, 'iat'> & { iat?: number }): WRPRCPayload {
-  const completePayload: WRPRCPayload = {
-    ...payload,
-    iat: payload.iat ?? Math.floor(Date.now() / 1000),
-  }
+export function createWRPRCPayload(payload: WRPRCPayload): WRPRCPayload {
+  assertValidWRPRCPayload(payload)
 
-  assertValidWRPRCPayload(completePayload)
-
-  return completePayload
+  return payload
 }

@@ -37,10 +37,17 @@ describe('signSchemaMeta', () => {
       .id('https://example.com/schema/123')
       .version('1.0.0')
       .rulebookURI('https://example.com/rulebook.md')
+      .rulebookIntegrity('sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw=')
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addFormat('dc+sd-jwt')
-      .addSchemaURI(schemaURI().format('dc+sd-jwt').uri('https://example.com/schema.json').build())
+      .addSchemaURI(
+        schemaURI()
+          .format('dc+sd-jwt')
+          .uri('https://example.com/schema.json')
+          .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')
+          .meta({ vct: 'eu.example.test.1' })
+          .build()
+      )
       .build()
 
   it('should produce a valid compact JWS', async () => {
@@ -94,7 +101,6 @@ describe('signSchemaMeta', () => {
     expect(decoded.version).toBe('1.0.0')
     expect(decoded.rulebookURI).toBe('https://example.com/rulebook.md')
     expect(decoded.attestationLoS).toBe('iso_18045_basic')
-    expect(decoded.supportedFormats).toEqual(['dc+sd-jwt'])
     expect(decoded.iat).toBeTypeOf('number')
   })
 

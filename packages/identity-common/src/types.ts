@@ -31,6 +31,7 @@ export interface JwtPayload {
     jwk: JsonWebKey
   }
   exp?: number
+  iat?: number
   [key: string]: unknown
 }
 

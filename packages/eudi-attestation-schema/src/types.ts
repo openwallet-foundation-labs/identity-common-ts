@@ -15,8 +15,10 @@ import type {
   AttestationLoSSchema,
   BindingTypeSchema,
   FrameworkTypeSchema,
+  MsoMdocMetaSchema,
   SchemaMetaSchema,
   SchemaURISchema,
+  SdJwtMetaSchema,
   TrustAuthoritySchema,
 } from './schemas'
 
@@ -34,6 +36,9 @@ export type FrameworkType = z.infer<typeof FrameworkTypeSchema>
 // ============================================================================
 
 export type TrustAuthority = z.infer<typeof TrustAuthoritySchema>
+export type SdJwtMeta = z.infer<typeof SdJwtMetaSchema>
+export type MsoMdocMeta = z.infer<typeof MsoMdocMetaSchema>
+export type SchemaURIMeta = SdJwtMeta | MsoMdocMeta
 export type SchemaURI = z.infer<typeof SchemaURISchema>
 export type SchemaMeta = z.infer<typeof SchemaMetaSchema>
 
@@ -79,4 +84,41 @@ export interface VerifiedSchemaMeta {
   }
   payload: SchemaMeta
   iat: number
+}
+
+// ============================================================================
+// Resolver and DCQL Types
+// ============================================================================
+
+export interface ResolvedSchemaReference {
+  format: AttestationFormat
+  uri: string
+  integrity: string
+  meta?: SchemaURIMeta
+  rawSchema: unknown
+  parsedSchema?: Record<string, unknown>
+}
+
+export interface ResolveSchemaReferencesOptions {
+  schemaMeta: SchemaMeta
+  selectedFormats?: AttestationFormat[]
+  resolve: (uri: string) => Promise<{ content: string | object; contentType?: string }>
+  verifyIntegrity?: boolean
+}
+
+export interface DcqlTrustedAuthority {
+  type: 'etsi_tl'
+  values: string[]
+}
+
+export interface BuildDcqlFromSchemaMetaOptions {
+  schemaMeta: SchemaMeta
+  selectedFormats: AttestationFormat[]
+  resolvedReferences?: ResolvedSchemaReference[]
+  includeTrustedAuthorities?: boolean
+  idPrefix?: string
+}
+
+export interface BuildDcqlFromSchemaMetaResult {
+  credentials: Array<Record<string, unknown>>
 }

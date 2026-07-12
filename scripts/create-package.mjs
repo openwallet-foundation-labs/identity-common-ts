@@ -48,7 +48,18 @@ const packageJson = {
   description: `TODO: Add description for ${fullPackageName}`,
   files: ['dist'],
   license: 'Apache-2.0',
-  exports: './src/index.ts',
+  main: './dist/index.cjs',
+  module: './dist/index.mjs',
+  types: './dist/index.d.mts',
+  exports: {
+    '.': {
+      types: './dist/index.d.mts',
+      import: './dist/index.mjs',
+      require: './dist/index.cjs',
+      default: './dist/index.mjs',
+    },
+    './package.json': './package.json',
+  },
   homepage: `https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/${packageName}`,
   repository: {
     type: 'git',
@@ -57,18 +68,27 @@ const packageJson = {
   },
   publishConfig: {
     access: 'public',
+    main: './dist/index.cjs',
     module: './dist/index.mjs',
     types: './dist/index.d.mts',
     exports: {
-      '.': './dist/index.mjs',
+      '.': {
+        types: './dist/index.d.mts',
+        import: './dist/index.mjs',
+        require: './dist/index.cjs',
+        default: './dist/index.mjs',
+      },
       './package.json': './package.json',
     },
   },
   scripts: {
-    build: 'tsdown src/index.ts --format esm --dts --sourcemap',
+    build: 'tsdown src/index.ts --format esm,cjs --dts --sourcemap',
+    test: 'vitest run',
   },
   dependencies: {},
-  devDependencies: {},
+  devDependencies: {
+    vitest: 'catalog:',
+  },
 }
 
 // tsconfig.json template
@@ -172,8 +192,8 @@ async function main() {
     console.log(`  2. Add your code to packages/${packageName}/src/index.ts`)
     console.log(`  3. Add tests to packages/${packageName}/src/__tests__/`)
     console.log('  4. Run: pnpm install')
-    console.log('  5. Run: pnpm build')
-    console.log('  6. Run: pnpm test')
+    console.log('  5. Run: pnpm build  (or: turbo run build)')
+    console.log('  6. Run: pnpm test   (or: turbo run test)')
     console.log('')
   } catch (error) {
     console.error('Error creating package:', error)

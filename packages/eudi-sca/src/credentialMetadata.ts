@@ -126,7 +126,7 @@ const validateJwt = async (jwt: string, credentialMetadataUri: string, verifier:
         return data.credential_metadata_uri === credentialMetadataUri
       },
       {
-        message: `credential_metadata_uri  must match source '${credentialMetadataUri}'`,
+        message: `credential_metadata_uri '${p.credential_metadata_uri}'  must match source '${credentialMetadataUri}'`,
         path: ['credential_metadata_uri'],
       }
     )

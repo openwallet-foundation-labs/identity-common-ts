@@ -1,38 +1,20 @@
-// CWT transport
+export type { CreateStatusListCborOptions, StatusListCborWithStatusListOptions } from './cbor/status-list-cbor'
+export { StatusListCbor } from './cbor/status-list-cbor'
+export type { StatusListCwtOptions } from './cbor/status-list-cwt'
+export { StatusListCwt, StatusListCwtHeaderKey } from './cbor/status-list-cwt'
+export type { CreateStatusListCwtPayloadOptions } from './cbor/status-list-cwt-payload'
+export { StatusListCwtClaimKey, StatusListCwtPayload } from './cbor/status-list-cwt-payload'
 export type {
-  CWTwithStatusListPayload,
-  StatusListCBOR,
-  StatusListCWTHeader,
-  StatusListCWTPayload,
-} from './cwt-types'
-export {
-  COSEHeaderKeys,
-  CWT_STATUS_LIST_CONTENT_FORMAT_ID,
-  CWT_STATUS_LIST_TYPE,
-  CWTClaimKeys,
-  CWTStatusListInfoKeys,
-  CWTStatusListKeys,
-} from './cwt-types'
-// JWT transport
+  StatusListInfoDecodedStructure,
+  StatusListInfoEncodedStructure,
+  StatusListInfoOptions,
+} from './cbor/status-list-info'
+export { StatusListInfo } from './cbor/status-list-info'
+export { fetchStatusList } from './fetch-status-list'
 export type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
 export { JWT_STATUS_LIST_TYPE, JWTClaimNames } from './jwt-types'
 export { StatusList } from './status-list'
-export type { COSEAlgorithm, CWTHeaderKeyOptions } from './status-list-cwt'
-export {
-  COSEAlgorithms,
-  createCWTStatusClaim,
-  createStatusListCWTHeader,
-  createStatusListCWTPayload,
-  decodeCWTPayload,
-  decodeCWTStatusClaim,
-  decodeStatusListFromCBOR,
-  encodeCWTPayload,
-  encodeCWTStatusClaim,
-  encodeStatusListToCBOR,
-  getListFromStatusListCWT,
-  getStatusListFromCWT,
-} from './status-list-cwt'
 export { SLException } from './status-list-exception'
-export { createHeaderAndPayload, getListFromStatusListJWT, getStatusListFromJWT } from './status-list-jwt'
-export type { BitsPerStatus, StatusListEntry, StatusType } from './types'
-export { MediaTypes, StatusTypes } from './types'
+export { createHeaderAndPayload, getListFromStatusListJWT, getStatusListFromJWT, verifyStatus } from './status-list-jwt'
+export type { BitsPerStatus, StatusListEntry } from './types'
+export { MediaTypes, StatusType } from './types'

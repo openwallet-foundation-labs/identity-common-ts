@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.8/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.13/schema.json",
   "files": {
     "maxSize": 10000000
   },
@@ -26,12 +26,27 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "style": {
+        "useImportType": "error"
+      },
       "correctness": {
         "recommended": true,
         "noUnusedImports": "error"
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["**/__tests__/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ],
   "vcs": {
     "useIgnoreFile": true,
     "clientKind": "git",

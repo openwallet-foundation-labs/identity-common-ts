@@ -1,12 +1,23 @@
 {
   "name": "@owf/eudi-sca",
-  "version": "0.0.0",
+  "version": "0.3.1",
   "description": "Tools and utilities for EUDI Strong Customer Authentication per TS12",
   "files": [
     "dist"
   ],
   "license": "Apache-2.0",
-  "exports": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
   "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-sca",
   "repository": {
     "type": "git",
@@ -15,10 +26,16 @@
   },
   "publishConfig": {
     "access": "public",
+    "main": "./dist/index.cjs",
     "module": "./dist/index.mjs",
     "types": "./dist/index.d.mts",
     "exports": {
-      ".": "./dist/index.mjs",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs",
+        "default": "./dist/index.mjs"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -29,17 +46,20 @@
     "wallet"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@openid4vc/openid4vci": "0.5.0-alpha-20260415063740",
+    "@openid4vc/openid4vci": "^0.5.4",
     "@owf/crypto": "workspace:",
     "@owf/identity-common": "workspace:",
-    "@owf/mdoc": "^0.6.0",
-    "@sd-jwt/core": "^0.19.0",
-    "zod": "^4.3.6"
+    "@owf/mdoc": "^0.7.0",
+    "@sd-jwt/core": "^0.20.0",
+    "@sd-jwt/types": "^0.19.0",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "nock": "^14.0.13"
+    "nock": "^14.0.16",
+    "vitest": "catalog:"
   }
 }
