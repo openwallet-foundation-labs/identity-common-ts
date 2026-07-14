@@ -11,6 +11,16 @@ import type { LoTEDocument } from './types'
 
 const SIX_MONTHS_IN_MS = 6 * 31 * 24 * 60 * 60 * 1000
 
+export const LOTE_TYPES = {
+  EUPIDProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUPIDProvidersList',
+  EUWalletProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUWalletProvidersList',
+  EUWRPACProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUWRPACProvidersList',
+  EUWRPRCProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUWRPRCProvidersList',
+  EUEAAProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUEAAProvidersList',
+  EUPubEAAProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUPubEAAProvidersList',
+  mDLProvidersList: 'http://trust.ec.europa.eu/lists/mDL/mDLProvidersListType',
+} as const
+
 type ListAndSchemeInformationRefinementOptions = {
   loTEType: string
   loTEVersionIdentifier: number
@@ -197,7 +207,7 @@ const trustedEntitiesListRefinement =
 // ETSI TS 119 602 D
 export const EUPIDProvidersListSchema = LoTEDocumentSchema.superRefine(
   listAndSchemeInformationRefinement({
-    loTEType: 'http://uri.etsi.org/19602/LoTEType/EUPIDProvidersList',
+    loTEType: LOTE_TYPES.EUPIDProvidersList,
     loTEVersionIdentifier: 1,
     statusDeterminationApproach: 'http://uri.etsi.org/19602/PIDProvidersList/StatusDetn/EU',
     schemeTerritory: 'EU',
@@ -217,7 +227,7 @@ export const EUPIDProvidersListSchema = LoTEDocumentSchema.superRefine(
 // ETSI TS 119 602 E
 export const EUWalletProvidersListSchema = LoTEDocumentSchema.superRefine(
   listAndSchemeInformationRefinement({
-    loTEType: 'http://uri.etsi.org/19602/LoTEType/EUWalletProvidersList',
+    loTEType: LOTE_TYPES.EUWalletProvidersList,
     loTEVersionIdentifier: 1,
     statusDeterminationApproach: 'http://uri.etsi.org/19602/WalletProvidersList/StatusDetn/EU',
     schemeTerritory: 'EU',
@@ -237,7 +247,7 @@ export const EUWalletProvidersListSchema = LoTEDocumentSchema.superRefine(
 // ETSI TS 119 602 F
 export const EUWRPACProvidersListSchema = LoTEDocumentSchema.superRefine(
   listAndSchemeInformationRefinement({
-    loTEType: 'http://uri.etsi.org/19602/LoTEType/EUWRPACProvidersList',
+    loTEType: LOTE_TYPES.EUWRPACProvidersList,
     loTEVersionIdentifier: 1,
     statusDeterminationApproach: 'http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
     schemeTerritory: 'EU',
@@ -257,7 +267,7 @@ export const EUWRPACProvidersListSchema = LoTEDocumentSchema.superRefine(
 // ETSI TS 119 602 G
 export const EUWRPRCProvidersListSchema = LoTEDocumentSchema.superRefine(
   listAndSchemeInformationRefinement({
-    loTEType: 'http://uri.etsi.org/19602/LoTEType/EUWRPRCProvidersList',
+    loTEType: LOTE_TYPES.EUWRPRCProvidersList,
     loTEVersionIdentifier: 1,
     statusDeterminationApproach: 'http://uri.etsi.org/19602/WRPRCrovidersList/StatusDetn/EU',
     schemeTerritory: 'EU',
@@ -276,7 +286,7 @@ export const EUWRPRCProvidersListSchema = LoTEDocumentSchema.superRefine(
 
 export const EUEAAProvidersListSchema = LoTEDocumentSchema.superRefine(
   listAndSchemeInformationRefinement({
-    loTEType: 'http://uri.etsi.org/19602/LoTEType/EUEAAProvidersList',
+    loTEType: LOTE_TYPES.EUEAAProvidersList,
     loTEVersionIdentifier: 1,
     statusDeterminationApproach: 'http://uri.etsi.org/19602/EAAProvidersList/StatusDetn/EU"',
     schemeTerritory: 'EU',
@@ -296,7 +306,7 @@ export const EUEAAProvidersListSchema = LoTEDocumentSchema.superRefine(
 // ETSI TS 119 602 H
 export const EUPubEAAProvidersListSchema = LoTEDocumentSchema.superRefine(
   listAndSchemeInformationRefinement({
-    loTEType: 'http://uri.etsi.org/19602/LoTEType/EUPubEAAProvidersList',
+    loTEType: LOTE_TYPES.EUPubEAAProvidersList,
     loTEVersionIdentifier: 1,
     statusDeterminationApproach: 'http://uri.etsi.org/19602/PubEAAProvidersList/StatusDetn/EU"',
     schemeTerritory: 'EU',
@@ -317,7 +327,7 @@ export const EUPubEAAProvidersListSchema = LoTEDocumentSchema.superRefine(
 // mDL Providers List
 export const mDLProvidersListSchema = LoTEDocumentSchema.superRefine(
   listAndSchemeInformationRefinement({
-    loTEType: 'http://trust.ec.europa.eu/lists/mDL/mDLProvidersListType',
+    loTEType: LOTE_TYPES.mDLProvidersList,
     loTEVersionIdentifier: 1,
     statusDeterminationApproach: 'http://trust.ec.europa.eu/lists/mDL/mDLProvidersListStatusDetn',
     schemeTerritory: 'EU',
