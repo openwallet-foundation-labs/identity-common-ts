@@ -1,5 +1,14 @@
 # @owf/eudi-attestation-schema
 
+## 0.3.2
+
+### Patch Changes
+
+- 6aa8acc: update readme
+- a7eb841: remove node api usage
+  - @owf/crypto@0.3.2
+  - @owf/identity-common@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @owf/eudi-sca
 
+## 0.3.2
+
+### Patch Changes
+
+- @owf/crypto@0.3.2
+- @owf/identity-common@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes
