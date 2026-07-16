@@ -1,5 +1,7 @@
 export { addExtension } from 'cbor-x'
 export * from './cbor-structure'
 export * from './data-item'
+export * from './describe'
+export * from './error'
 export * from './models'
 export * from './parser'

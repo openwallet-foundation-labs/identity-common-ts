@@ -2,6 +2,7 @@
 class CoseError extends Error {
   constructor(message: string = new.target.name) {
     super(message)
+    this.name = new.target.name
   }
 }
 

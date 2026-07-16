@@ -91,13 +91,38 @@ export class StatusListCwt {
     return new StatusListCwt({ payload: StatusListCwtPayload.create({ statusList: cborStatusList, subject }) })
   }
 
+  /**
+   * Decodes a status list CWT from a tagged COSE_Sign1 (tag 18) or COSE_Mac0 (tag 17) token.
+   *
+   * @throws SLException if the token is not a COSE token, has a detached payload, or the
+   *   payload is not a valid status list CWT payload. The underlying error is available on
+   *   the `details` property.
+   */
   public static fromToken(token: Uint8Array) {
-    const cwt = Cwt.fromToken(token)
+    let cwt: Cwt
+    try {
+      cwt = Cwt.fromToken(token)
+    } catch (error) {
+      throw new SLException(
+        `Unable to decode status list CWT: ${error instanceof Error ? error.message : String(error)}`,
+        error
+      )
+    }
 
+    // A COSE token carries `null` for a detached payload, which we cannot resolve here.
     if (!cwt.payload) {
       throw new SLException('Cwt does not contain payload, detached payload is not supported for status list CWT')
     }
-    const payload = StatusListCwtPayload.decode(cwt.payload)
+
+    let payload: StatusListCwtPayload
+    try {
+      payload = StatusListCwtPayload.decode(cwt.payload)
+    } catch (error) {
+      throw new SLException(
+        `Unable to decode status list CWT payload: ${error instanceof Error ? error.message : String(error)}`,
+        error
+      )
+    }
 
     return new StatusListCwt({
       payload,

@@ -1,7 +1,9 @@
 import { hex } from '@owf/identity-common'
+import { Tag } from 'cbor-x'
 import { describe, expect, test } from 'vitest'
-import { cborEncode } from '../cbor'
+import { CborDecodeError, cborEncode } from '../cbor'
 import {
+  CosePayloadInvalidStructureError,
   Cwt,
   Mac0,
   MacAlgorithm,
@@ -133,6 +135,38 @@ describe('Cwt', () => {
       expect(cwt.unprotectedHeaders).toBeDefined()
       expect(cwt.signatureOrTag).toBeDefined()
       expect(cwt.signatureOrTag).toStrictEqual(authenticated.tag)
+    })
+  })
+
+  describe('fromToken with malformed input', () => {
+    test('should throw a CborDecodeError describing the input when it is not valid cbor', () => {
+      // Trailing bytes after a complete cbor value
+      const token = new Uint8Array([0x0f, 0x74, 0xa1])
+
+      expect(() => Cwt.fromToken(token)).toThrow(CborDecodeError)
+      expect(() => Cwt.fromToken(token)).toThrow(/Unable to decode 3 bytes as CBOR/)
+    })
+
+    test.each([
+      ['a number', cborEncode(15), /decoded the number value '15'/],
+      ['a text string', cborEncode('hello'), /decoded the text string 'hello'/],
+      ['a byte string', cborEncode(new Uint8Array([1, 2, 3])), /decoded a byte string of 3 bytes/],
+      ['a map', cborEncode(new Map([['a', 1]])), /decoded an untagged map with 1 entry/],
+      ['null', cborEncode(null), /decoded null/],
+      [
+        'an untagged cose array',
+        cborEncode([new Uint8Array([0xa0]), new Map(), new Uint8Array([1, 2]), new Uint8Array([3, 4])]),
+        /decoded an untagged array with 4 elements/,
+      ],
+      ['a value with an unrelated tag', cborEncode(new Tag([1, 2], 999)), /decoded a CBOR value tagged with tag 999/],
+      [
+        'a cwt tagged (tag 61) value',
+        cborEncode(new Tag([1, 2], 61)),
+        /decoded a CBOR value tagged with tag 61 \(the CWT tag, which must be unwrapped first\)/,
+      ],
+    ])('should reject %s that is valid cbor but not a cose token', (_name, token, expected) => {
+      expect(() => Cwt.fromToken(token)).toThrow(CosePayloadInvalidStructureError)
+      expect(() => Cwt.fromToken(token)).toThrow(expected)
     })
   })
 })

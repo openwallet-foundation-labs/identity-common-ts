@@ -1,9 +1,11 @@
-import { CoseKey, KeyType, SignatureAlgorithm } from '@owf/cose'
+import { CoseKey, cborEncode, KeyType, Sign1, SignatureAlgorithm } from '@owf/cose'
+import { Tag } from 'cbor-x'
 import { expect, suite, test } from 'vitest'
 import { StatusListCbor } from '../../cbor/status-list-cbor'
 import { StatusListCwt, StatusListCwtHeaderKey } from '../../cbor/status-list-cwt'
 import { StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
+import { SLException } from '../../status-list-exception'
 import { StatusType } from '../../types'
 import { mac0Context, macKey, sign1Context, signKey } from '../context'
 
@@ -342,6 +344,60 @@ suite('StatusListCwt', () => {
 
       const decoded = StatusListCwt.fromToken(token)
       expect(decoded.protectedHeaders?.headers.get(StatusListCwtHeaderKey.Typ)).toBe('application/statuslist+cwt')
+    })
+  })
+
+  suite('fromToken with malformed input', () => {
+    test('should report that the token is not valid cbor', () => {
+      // Trailing bytes after a complete cbor value, e.g. a wrongly encoded or truncated token
+      const token = new Uint8Array([0x0f, 0x74, 0xa1])
+
+      expect(() => StatusListCwt.fromToken(token)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(token)).toThrow(/Unable to decode status list CWT.*as CBOR/s)
+    })
+
+    test.each([
+      ['a cbor number', cborEncode(15), /decoded the number value '15'/],
+      ['a cbor text string', cborEncode('hello'), /decoded the text string 'hello'/],
+      ['a cbor map', cborEncode(new Map([['a', 1]])), /decoded an untagged map with 1 entry/],
+      [
+        'an untagged sign1 array',
+        cborEncode([new Uint8Array([0xa0]), new Map(), new Uint8Array([1, 2]), new Uint8Array([3, 4])]),
+        /decoded an untagged array with 4 elements/,
+      ],
+    ])('should report that %s is not a cose token, rather than a missing payload', (_name, token, expected) => {
+      expect(() => StatusListCwt.fromToken(token)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(token)).toThrow(expected)
+      // The old behaviour blamed a detached payload for any non-cose input
+      expect(() => StatusListCwt.fromToken(token)).not.toThrow(/detached payload/)
+    })
+
+    test('should report which claims are wrong when the payload is not a status list payload', async () => {
+      const cwt = new StatusListCwt({
+        payload: { subject: 'did:test', statusList: new StatusList([0, 1, 0], 1) },
+      })
+      const token = await cwt.signAndEncode({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)
+
+      // Rebuild the same sign1 over a payload that is valid cbor but not a status list payload
+      const [protectedHeaders, unprotectedHeaders, , signature] = Sign1.decode(token).encodedStructure
+      const notAPayload = cborEncode(new Map([[1, 'not-a-status-list']]))
+      const retagged = cborEncode(new Tag([protectedHeaders, unprotectedHeaders, notAPayload, signature], Sign1.tag))
+
+      expect(() => StatusListCwt.fromToken(retagged)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(retagged)).toThrow(/Unable to decode status list CWT payload/)
+    })
+
+    test('should still report a genuinely detached payload', async () => {
+      const cwt = new StatusListCwt({
+        payload: { subject: 'did:test', statusList: new StatusList([0, 1, 0], 1) },
+      })
+      const token = await cwt.signAndEncode({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)
+
+      // Rebuild the same sign1 with a null (detached) payload
+      const [protectedHeaders, unprotectedHeaders, , signature] = Sign1.decode(token).encodedStructure
+      const detached = cborEncode(new Tag([protectedHeaders, unprotectedHeaders, null, signature], Sign1.tag))
+
+      expect(() => StatusListCwt.fromToken(detached)).toThrow(/detached payload is not supported/)
     })
   })
 
