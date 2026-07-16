@@ -10,6 +10,7 @@ export class StatusList {
   private bitsPerStatus: BitsPerStatus
   public readonly totalStatuses: number
   public aggregationUri?: string
+  #isModified = false
 
   constructor(statusList: number[], bitsPerStatus: BitsPerStatus, aggregationUri?: string) {
     if (![1, 2, 4, 8].includes(bitsPerStatus)) {
@@ -36,6 +37,15 @@ export class StatusList {
     return this.bitsPerStatus
   }
 
+  /**
+   * Whether the list has been modified since it was created. Holders of a compressed encoding of
+   * this list use it to tell whether their bytes still represent it, without having to compress it
+   * again to find out.
+   */
+  get isModified(): boolean {
+    return this.#isModified
+  }
+
   /** Get the status at a specific index. */
   getStatus(index: number): StatusType {
     if (index < 0 || index >= this.totalStatuses) {
@@ -50,6 +60,7 @@ export class StatusList {
       throw new Error('Index out of bounds')
     }
     this._statusList[index] = value
+    this.#isModified = true
   }
 
   /** Compress the status list and return as raw bytes. */

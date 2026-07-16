@@ -1,12 +1,21 @@
-import { CoseKey, cborEncode, KeyType, Sign1, SignatureAlgorithm } from '@owf/cose'
+import {
+  CoseKey,
+  cborEncode,
+  KeyType,
+  RegisteredCwtClaimKey,
+  RegisteredCwtHeaderClaimKey,
+  Sign1,
+  SignatureAlgorithm,
+} from '@owf/cose'
 import { Tag } from 'cbor-x'
+import { deflate } from 'pako'
 import { expect, suite, test } from 'vitest'
 import { StatusListCbor } from '../../cbor/status-list-cbor'
 import { StatusListCwt, StatusListCwtHeaderKey } from '../../cbor/status-list-cwt'
-import { StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
+import { StatusListCwtClaimKey, StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
 import { SLException } from '../../status-list-exception'
-import { StatusType } from '../../types'
+import { MediaTypes, StatusType } from '../../types'
 import { mac0Context, macKey, sign1Context, signKey } from '../context'
 
 suite('StatusListCwt', () => {
@@ -509,6 +518,48 @@ suite('StatusListCwt', () => {
 
       const result = await decodedStatusListCwt.verifySignature({ key: wrongKey }, sign1Context)
       expect(result).toBe(false)
+    })
+
+    test('should verify a status list whose lst was not compressed at the level this library uses', async () => {
+      // The reported bug: an issuer compressed `lst` at the zlib default level (`78 9c`) and signed
+      // over those bytes, while we re-compressed at level 9 (`78 da`) before verifying. Build the
+      // token straight from the COSE primitives, so none of the status list classes get a chance to
+      // normalise the compression on the way in.
+      const foreignLst = deflate(new StatusList([0, 1, 0, 0, 0, 0, 0, 0], 1).encodeStatusListIntoByteArray())
+      expect(Buffer.from(foreignLst.slice(0, 2)).toString('hex')).toBe('789c')
+
+      const foreignPayload = cborEncode(
+        new Map<number, unknown>([
+          [RegisteredCwtClaimKey.Subject, 'did:test'],
+          [RegisteredCwtClaimKey.IssuedAt, Math.floor(Date.now() / 1000)],
+          [
+            StatusListCwtClaimKey.StatusList,
+            new Map<string, unknown>([
+              ['bits', 1],
+              ['lst', foreignLst],
+            ]),
+          ],
+        ])
+      )
+
+      const token = (
+        await Sign1.create({
+          protectedHeaders: new Map<number, unknown>([
+            [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+            [StatusListCwtHeaderKey.Typ, MediaTypes.StatusListCwt],
+          ]),
+          payload: foreignPayload,
+        }).sign({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)
+      ).encode()
+
+      const decodedStatusListCwt = StatusListCwt.fromToken(token)
+      expect(await decodedStatusListCwt.verifySignature({ key: signKey }, sign1Context)).toBe(true)
+      expect(decodedStatusListCwt.payload.statusList.getStatus(1)).toBe(1)
+
+      // Not merely retained: the decoded payload also re-encodes to the issuer's exact bytes.
+      expect(Buffer.from(decodedStatusListCwt.payload.encode()).toString('hex')).toBe(
+        Buffer.from(foreignPayload).toString('hex')
+      )
     })
 
     test('should verify against original token payload bytes instead of re-encoded payload bytes', async () => {
