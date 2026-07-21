@@ -33,6 +33,17 @@ export class StatusListCwt {
   public protectedHeaders?: ProtectedHeaders
   public unprotectedHeaders?: UnprotectedHeaders
   private signatureOrTag?: Uint8Array
+
+  /**
+   * The payload bytes as received in the COSE message, kept so that verification can use them
+   * directly. RFC 9052 puts the payload into `Sig_structure`/`MAC_structure` as an opaque `bstr`, so
+   * what was signed is the exact bytes the issuer sent, not whatever we would encode the decoded
+   * payload back into. Cleared as soon as the payload is modified, since the signature over it no
+   * longer means anything at that point.
+   *
+   * @see https://datatracker.ietf.org/doc/rfc9052/#section-4.4
+   * @see https://datatracker.ietf.org/doc/rfc9052/#section-6
+   */
   private originalPayloadBytes?: Uint8Array
 
   public constructor(options: StatusListCwtOptions) {
