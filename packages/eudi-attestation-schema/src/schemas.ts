@@ -35,6 +35,21 @@ export const FrameworkTypeValues = ['etsi_tl'] as const
 
 export const FrameworkTypeSchema = z.enum(FrameworkTypeValues)
 
+export const VerificationMethodTypeValues = ['X509Certificate'] as const
+
+export const VerificationMethodTypeSchema = z.enum(VerificationMethodTypeValues)
+
+const Base64DerCertificateSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'x509Certificate must be a base64-encoded DER certificate')
+
+const X509CertificateVerificationMethodSchema = z
+  .object({
+    type: z.literal('X509Certificate'),
+    x509Certificate: Base64DerCertificateSchema,
+  })
+  .strict()
+
 // ============================================================================
 // TrustAuthority Sub-class (Section 4.3.3)
 // ============================================================================
@@ -43,6 +58,7 @@ export const TrustAuthoritySchema = z
   .object({
     frameworkType: FrameworkTypeSchema,
     value: z.string().min(1),
+    verificationMethod: X509CertificateVerificationMethodSchema,
   })
   .strict()
 

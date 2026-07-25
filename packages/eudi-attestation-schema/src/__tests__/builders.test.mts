@@ -3,13 +3,31 @@ import { schemaMeta, schemaURI, trustAuthority } from '../builders'
 
 const RULEBOOK_INTEGRITY = 'sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw='
 const SCHEMA_INTEGRITY = 'sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw='
+const VERIFICATION_METHOD = {
+  type: 'X509Certificate' as const,
+  x509Certificate: 'MIIBczCCARmgAwIBAgIUZt2jkmAgIIiw/wpvJU/4yL7ek/YwCgYIKoZIzj0EAwIw',
+}
 
 describe('TrustAuthorityBuilder', () => {
   it('should create a trust authority with etsi_tl framework', () => {
-    const ta = trustAuthority().frameworkType('etsi_tl').value('https://example.com/trust-list.jws').build()
+    const ta = trustAuthority()
+      .frameworkType('etsi_tl')
+      .value('https://example.com/trust-list.jws')
+      .verificationMethod(VERIFICATION_METHOD)
+      .build()
 
     expect(ta.frameworkType).toBe('etsi_tl')
     expect(ta.value).toBe('https://example.com/trust-list.jws')
+  })
+
+  it('should create a trust authority with an X509 certificate verification method', () => {
+    const ta = trustAuthority()
+      .frameworkType('etsi_tl')
+      .value('https://example.com/trust-list.jws')
+      .verificationMethod(VERIFICATION_METHOD)
+      .build()
+
+    expect(ta.verificationMethod.type).toBe('X509Certificate')
   })
 
   it('should throw when frameworkType is missing', () => {
@@ -20,7 +38,13 @@ describe('TrustAuthorityBuilder', () => {
 
   it('should throw when value is missing', () => {
     expect(() => {
-      trustAuthority().frameworkType('etsi_tl').build()
+      trustAuthority().frameworkType('etsi_tl').verificationMethod(VERIFICATION_METHOD).build()
+    }).toThrow('Invalid TrustAuthority')
+  })
+
+  it('should throw when verificationMethod is missing', () => {
+    expect(() => {
+      trustAuthority().frameworkType('etsi_tl').value('https://example.com/trust-list.jws').build()
     }).toThrow('Invalid TrustAuthority')
   })
 })
@@ -103,7 +127,13 @@ describe('SchemaMetaBuilder', () => {
       .version('1.0.0')
       .rulebookURI('https://example.com/rulebook.md')
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
-      .addTrustAuthority(trustAuthority().frameworkType('etsi_tl').value('https://example.com/trust-list.jws').build())
+      .addTrustAuthority(
+        trustAuthority()
+          .frameworkType('etsi_tl')
+          .value('https://example.com/trust-list.jws')
+          .verificationMethod(VERIFICATION_METHOD)
+          .build()
+      )
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
       .addSchemaURI(
