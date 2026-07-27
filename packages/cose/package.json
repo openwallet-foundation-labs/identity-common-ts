@@ -53,7 +53,7 @@
     "@noble/hashes": "^2.0.1",
     "@panva/hkdf": "^1.2.1",
     "@peculiar/x509": "^2.0.0",
-    "jose": "^6.1.0",
+    "jose": "^6.2.4",
     "vitest": "catalog:"
   }
 }
