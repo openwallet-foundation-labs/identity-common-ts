@@ -10,6 +10,7 @@ import type { z } from 'zod'
 import { ENTITLEMENT_SERVICE_PROVIDER, type WRP_ENTITLEMENTS } from './entitlements'
 import { WRPRCPayloadSchema } from './schemas'
 import type {
+  Act,
   Claim,
   Credential,
   Intermediary,
@@ -26,9 +27,7 @@ import { WRPRCException } from './wrprc-exception'
 // Partial Payload Type
 // ============================================================================
 
-type PartialWRPRCPayload = Partial<z.input<typeof WRPRCPayloadSchema>> & {
-  iat?: number
-}
+type PartialWRPRCPayload = Partial<z.input<typeof WRPRCPayloadSchema>>
 
 // ============================================================================
 // WRPRC Payload Builder
@@ -274,6 +273,38 @@ export class WRPRCBuilder {
    */
   intermediary(intermediary: Intermediary): this {
     this.payload.intermediary = intermediary
+    return this
+  }
+
+  /**
+   * Set the actor claim under intermediation (Table 10, GEN-5.2.4-09)
+   */
+  act(act: Act): this {
+    this.payload.act = act
+    return this
+  }
+
+  /**
+   * Mark the WRP as a public sector body (Table 10)
+   */
+  publicBody(value: boolean): this {
+    this.payload.public_body = value
+    return this
+  }
+
+  /**
+   * Set the expiry timestamp (Table 10); must be at most 12 months after iat
+   */
+  expiresAt(timestamp: number | Date): this {
+    this.payload.exp = typeof timestamp === 'number' ? timestamp : Math.floor(timestamp.getTime() / 1000)
+    return this
+  }
+
+  /**
+   * Set the intended-use identifier, used to fetch the intended use from the registry (Table 9)
+   */
+  intendedUseId(id: string): this {
+    this.payload.intended_use_id = id
     return this
   }
 

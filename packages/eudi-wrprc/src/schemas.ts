@@ -79,13 +79,23 @@ export const StatusSchema = z.object({
 })
 
 /**
- * Intermediary information when WRP acts through an intermediary
+ * Intermediary information when WRP acts through an intermediary (Table 10).
+ * The intermediary's semantic identifier comes from its own WRPAC.
  */
 export const IntermediarySchema = z.object({
-  /** Identifier of the intermediary */
+  /** Semantic identifier of the intermediary (from the intermediary's WRPAC) */
   sub: z.string().min(1),
-  /** Name of the intermediary */
-  name: z.string().min(1),
+  /** Common name of the intermediary */
+  sname: z.string().min(1),
+})
+
+/**
+ * The "actor" claim (Table 10, GEN-5.2.4-09): under intermediation, identifies
+ * the intermediary acting on behalf of the subject. `act.sub` matches `intermediary.sub`.
+ */
+export const ActSchema = z.object({
+  /** Semantic identifier of the acting intermediary */
+  sub: z.string().min(1),
 })
 
 // ============================================================================
@@ -117,11 +127,11 @@ export const WRPRCPayloadSchema = z.object({
   /** URL pointing to the national registry API endpoint */
   registry_uri: z.url(),
 
-  /** Descriptions of the services provided by the WRP */
+  /** Descriptions of the services provided by the WRP (array of arrays of localized values) */
   srv_description: z.array(z.array(MultiLangStringSchema)).optional(),
 
-  /** List of entitlements assigned to the WRP */
-  entitlements: z.array(z.url()).min(1),
+  /** List of entitlements assigned to the WRP (Annex A.2 URI or OID form) */
+  entitlements: z.array(z.string().min(1)).min(1),
 
   /** URL to the WRP's privacy policy */
   privacy_policy: z.url().optional(),
@@ -141,10 +151,13 @@ export const WRPRCPayloadSchema = z.object({
   /** URL to the certificate policy and practice statement */
   certificate_policy: z.url().optional(),
 
+  /** Issuance time as a Unix timestamp (Table 7) */
+  iat: z.number().int().positive(),
+
   /** Status list for WRPRC validity */
   status: StatusSchema.optional(),
 
-  /** Purpose of the intended data processing */
+  /** Purpose of the intended data processing (localized values) */
   purpose: z.array(MultiLangStringSchema).optional(),
 
   /** Set of credentials intended to be requested by the WRP */
@@ -153,8 +166,20 @@ export const WRPRCPayloadSchema = z.object({
   /** Set of credentials issued by the WRP (for attestation providers) */
   provides_attestations: z.union([z.array(CredentialSchema), z.array(z.string())]).optional(),
 
-  /** Intermediary information when WRP acts through an intermediary */
+  /** Intermediary information when WRP acts through an intermediary (Table 10) */
   intermediary: IntermediarySchema.optional(),
+
+  /** Actor claim under intermediation (Table 10, GEN-5.2.4-09) */
+  act: ActSchema.optional(),
+
+  /** Whether the WRP is a public sector body (Table 10) */
+  public_body: z.boolean().optional(),
+
+  /** Expiry as a Unix timestamp; at most 12 months after `iat` (Table 10, GEN-5.2.4-08) */
+  exp: z.number().int().positive().optional(),
+
+  /** Identifier of the intended use, present only if provided by the registry (Table 9) */
+  intended_use_id: z.string().min(1).optional(),
 })
 
 // ============================================================================

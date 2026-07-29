@@ -131,6 +131,43 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
     })
   }
 
+  // GEN-5.2.4-08: exp must be at most 12 months after iat
+  if (typeof validPayload.exp === 'number') {
+    const maxExp = new Date(validPayload.iat * 1000)
+    maxExp.setUTCFullYear(maxExp.getUTCFullYear() + 1)
+    if (validPayload.exp * 1000 > maxExp.getTime()) {
+      errors.push({
+        path: ['exp'],
+        message: 'exp must be at most 12 months after iat (GEN-5.2.4-08)',
+        code: 'exp_too_late',
+      })
+    }
+    if (validPayload.exp <= validPayload.iat) {
+      errors.push({
+        path: ['exp'],
+        message: 'exp must be after iat',
+        code: 'exp_before_iat',
+      })
+    }
+  }
+
+  // GEN-5.2.4-09: under intermediation, act.sub must match intermediary.sub
+  if (validPayload.intermediary) {
+    if (!validPayload.act) {
+      errors.push({
+        path: ['act'],
+        message: 'act claim is required when an intermediary is present (GEN-5.2.4-09)',
+        code: 'missing_act',
+      })
+    } else if (validPayload.act.sub !== validPayload.intermediary.sub) {
+      errors.push({
+        path: ['act', 'sub'],
+        message: 'act.sub must match intermediary.sub (GEN-5.2.4-09)',
+        code: 'act_intermediary_mismatch',
+      })
+    }
+  }
+
   return { valid: errors.length === 0, errors, warnings }
 }
 
