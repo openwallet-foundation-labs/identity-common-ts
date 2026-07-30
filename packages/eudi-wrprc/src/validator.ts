@@ -6,6 +6,7 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
+import { secondsToDate } from '@owf/identity-common'
 import { ALL_ENTITLEMENTS, ALL_PSP_SUB_ENTITLEMENTS, ATTESTATION_PROVIDER_ENTITLEMENTS } from './entitlements'
 import {
   LegalPersonSubjectSchema,
@@ -21,6 +22,39 @@ import { WRPRCException } from './wrprc-exception'
 // ============================================================================
 
 /**
+ * Codes for the semantic checks this validator performs, beyond schema parsing.
+ *
+ * Exposed so a calling application can branch on a specific failure rather than
+ * matching on message text. Requirement identifiers from ETSI TS 119 475 v1.2.1
+ * are given where a code maps to one.
+ */
+export const WRPRC_VALIDATION_CODES = {
+  /** No entitlement present (GEN-5.2.4-03) */
+  MISSING_ENTITLEMENT: 'missing_entitlement',
+  /** Sub-entitlement present without its base entitlement (GEN-5.2.4-04) */
+  MISSING_BASE_ENTITLEMENT: 'missing_base_entitlement',
+  /** Entitlement outside Annex A, which may be a national or EU extension */
+  UNKNOWN_ENTITLEMENT: 'unknown_entitlement',
+  /** Attestation provider without provides_attestations (GEN-5.2.4-05) */
+  MISSING_PROVIDES_ATTESTATIONS: 'missing_provides_attestations',
+  /** sub does not follow the semantic identifier format of clause 5.1 */
+  INVALID_SEMANTIC_IDENTIFIER: 'invalid_semantic_identifier',
+  /** sub parses but deviates from the expected identifier shape */
+  IDENTIFIER_FORMAT_WARNING: 'identifier_format_warning',
+  /** exp more than 12 months after iat (GEN-5.2.4-08) */
+  EXP_TOO_LATE: 'exp_too_late',
+  /** exp at or before iat */
+  EXP_BEFORE_IAT: 'exp_before_iat',
+  /** intermediary present without act (GEN-5.2.4-09) */
+  MISSING_ACT: 'missing_act',
+  /** act.sub does not match intermediary.sub (GEN-5.2.4-09) */
+  ACT_INTERMEDIARY_MISMATCH: 'act_intermediary_mismatch',
+} as const
+
+/** A semantic validation code emitted by this validator */
+export type WRPRCValidationCode = (typeof WRPRC_VALIDATION_CODES)[keyof typeof WRPRC_VALIDATION_CODES]
+
+/**
  * A single validation error
  */
 export interface ValidationError {
@@ -28,8 +62,11 @@ export interface ValidationError {
   path: string[]
   /** Error message */
   message: string
-  /** Error code */
-  code: string
+  /**
+   * Error code. Either a `WRPRCValidationCode` from the semantic checks, or a zod issue
+   * code forwarded from schema parsing, so the string stays open for the latter.
+   */
+  code: WRPRCValidationCode | (string & {})
 }
 
 /**
@@ -78,7 +115,7 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
         warnings.push({
           path: ['entitlements'],
           message: `Unknown entitlement URI: ${entitlement}. This may be a national or EU-defined extension.`,
-          code: 'unknown_entitlement',
+          code: WRPRC_VALIDATION_CODES.UNKNOWN_ENTITLEMENT,
         })
       }
     }
@@ -89,7 +126,7 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
     errors.push({
       path: ['entitlements'],
       message: 'At least one entitlement must be specified (GEN-5.2.4-03)',
-      code: 'missing_entitlement',
+      code: WRPRC_VALIDATION_CODES.MISSING_ENTITLEMENT,
     })
   }
 
@@ -104,7 +141,7 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
     errors.push({
       path: ['entitlements'],
       message: 'Service provider sub-entitlements require Service_Provider entitlement (GEN-5.2.4-04)',
-      code: 'missing_base_entitlement',
+      code: WRPRC_VALIDATION_CODES.MISSING_BASE_ENTITLEMENT,
     })
   }
 
@@ -117,7 +154,7 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
       path: ['provides_attestations'],
       message:
         'Attestation providers should include provides_attestations field (GEN-5.2.4-05). This is recommended but not required.',
-      code: 'missing_provides_attestations',
+      code: WRPRC_VALIDATION_CODES.MISSING_PROVIDES_ATTESTATIONS,
     })
   }
 
@@ -127,26 +164,26 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
     errors.push({
       path: ['sub'],
       message: subResult.message,
-      code: 'invalid_semantic_identifier',
+      code: WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER,
     })
   }
 
   // GEN-5.2.4-08: exp must be at most 12 months after iat
   if (typeof validPayload.exp === 'number') {
-    const maxExp = new Date(validPayload.iat * 1000)
+    const maxExp = secondsToDate(validPayload.iat)
     maxExp.setUTCFullYear(maxExp.getUTCFullYear() + 1)
-    if (validPayload.exp * 1000 > maxExp.getTime()) {
+    if (secondsToDate(validPayload.exp) > maxExp) {
       errors.push({
         path: ['exp'],
         message: 'exp must be at most 12 months after iat (GEN-5.2.4-08)',
-        code: 'exp_too_late',
+        code: WRPRC_VALIDATION_CODES.EXP_TOO_LATE,
       })
     }
     if (validPayload.exp <= validPayload.iat) {
       errors.push({
         path: ['exp'],
         message: 'exp must be after iat',
-        code: 'exp_before_iat',
+        code: WRPRC_VALIDATION_CODES.EXP_BEFORE_IAT,
       })
     }
   }
@@ -157,13 +194,13 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
       errors.push({
         path: ['act'],
         message: 'act claim is required when an intermediary is present (GEN-5.2.4-09)',
-        code: 'missing_act',
+        code: WRPRC_VALIDATION_CODES.MISSING_ACT,
       })
     } else if (validPayload.act.sub !== validPayload.intermediary.sub) {
       errors.push({
         path: ['act', 'sub'],
         message: 'act.sub must match intermediary.sub (GEN-5.2.4-09)',
-        code: 'act_intermediary_mismatch',
+        code: WRPRC_VALIDATION_CODES.ACT_INTERMEDIARY_MISMATCH,
       })
     }
   }
@@ -263,7 +300,7 @@ export function validateLegalPersonWRPRC(payload: unknown): ValidationResult {
         path: ['sub'],
         message:
           'Legal person identifier should follow format: PREFIX + COUNTRY + "-" + ID (e.g., "LEIXG-529900T8BM49AURSDO55")',
-        code: 'identifier_format_warning',
+        code: WRPRC_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
       })
     }
   }
@@ -299,7 +336,7 @@ export function validateNaturalPersonWRPRC(payload: unknown): ValidationResult {
         path: ['sub'],
         message:
           'Natural person identifier should follow format: PREFIX + COUNTRY + "-" + ID (e.g., "TINIT-RSSMRA85T10A562S")',
-        code: 'identifier_format_warning',
+        code: WRPRC_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
       })
     }
   }

@@ -6,6 +6,7 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
+import { dateToSeconds, nowInSeconds } from '@owf/identity-common'
 import type { z } from 'zod'
 import { ENTITLEMENT_SERVICE_PROVIDER, type WRP_ENTITLEMENTS } from './entitlements'
 import { WRPRCPayloadSchema } from './schemas'
@@ -197,7 +198,7 @@ export class WRPRCBuilder {
    * If not set, will default to current time when building
    */
   issuedAt(timestamp: number | Date): this {
-    this.payload.iat = typeof timestamp === 'number' ? timestamp : Math.floor(timestamp.getTime() / 1000)
+    this.payload.iat = typeof timestamp === 'number' ? timestamp : dateToSeconds(timestamp)
     return this
   }
 
@@ -296,7 +297,7 @@ export class WRPRCBuilder {
    * Set the expiry timestamp (Table 10); must be at most 12 months after iat
    */
   expiresAt(timestamp: number | Date): this {
-    this.payload.exp = typeof timestamp === 'number' ? timestamp : Math.floor(timestamp.getTime() / 1000)
+    this.payload.exp = typeof timestamp === 'number' ? timestamp : dateToSeconds(timestamp)
     return this
   }
 
@@ -316,7 +317,7 @@ export class WRPRCBuilder {
   build(): WRPRCPayload {
     // Set default iat if not provided
     if (!this.payload.iat) {
-      this.payload.iat = Math.floor(Date.now() / 1000)
+      this.payload.iat = nowInSeconds()
     }
 
     const result = WRPRCPayloadSchema.safeParse(this.payload)

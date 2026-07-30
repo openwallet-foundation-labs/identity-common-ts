@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { validateWRPRCPayload, WRP_ENTITLEMENTS, wrprc } from '../index'
+import { validateWRPRCPayload, WRP_ENTITLEMENTS, WRPRC_VALIDATION_CODES, wrprc } from '../index'
 
 const base = () =>
   wrprc()
@@ -71,5 +71,17 @@ describe('Table 10 fields', () => {
     const payload = base().publicBody(true).intendedUseId('use-123').build()
     expect(payload.public_body).toBe(true)
     expect(payload.intended_use_id).toBe('use-123')
+  })
+})
+
+describe('validation codes', () => {
+  it('exposes codes a calling application can branch on', () => {
+    const result = validateWRPRCPayload(
+      base()
+        .expiresAt(1_700_000_000 + 400 * 24 * 3600)
+        .build()
+    )
+
+    expect(result.errors.map((e) => e.code)).toContain(WRPRC_VALIDATION_CODES.EXP_TOO_LATE)
   })
 })
