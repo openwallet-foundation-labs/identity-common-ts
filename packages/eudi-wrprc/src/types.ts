@@ -10,6 +10,7 @@
 import type { Signer } from '@owf/crypto'
 import type { z } from 'zod'
 import type {
+  ActSchema,
   ClaimSchema,
   CredentialSchema,
   IntermediarySchema,
@@ -54,6 +55,9 @@ export type Status = z.infer<typeof StatusSchema>
 
 /** Intermediary information */
 export type Intermediary = z.infer<typeof IntermediarySchema>
+
+/** Actor claim under intermediation (Table 10) */
+export type Act = z.infer<typeof ActSchema>
 
 // ============================================================================
 // WRPRC Document Types
