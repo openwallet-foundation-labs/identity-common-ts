@@ -17,6 +17,7 @@ export {
   parseTrustedList,
   type TrustAnchorFilter,
 } from './parse'
+export { TrustedListProfiles } from './profiles'
 export {
   TrustedListException,
   TrustedListParseException,

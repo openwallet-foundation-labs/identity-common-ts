@@ -50,6 +50,12 @@ export const ServiceType = {
   TSA_QTST: 'http://uri.etsi.org/TrstSvc/Svctype/TSA/QTST',
   /** Qualified electronic delivery service. */
   EDS_Q: 'http://uri.etsi.org/TrstSvc/Svctype/EDS/Q',
+  /** Qualified registered electronic mail delivery service. */
+  EDS_REM_Q: 'http://uri.etsi.org/TrstSvc/Svctype/EDS/REM/Q',
+  /** Qualified preservation service for electronic signatures/seals. */
+  PSES_Q: 'http://uri.etsi.org/TrstSvc/Svctype/PSES/Q',
+  /** Qualified validation service for qualified electronic signatures. */
+  QESValidation_Q: 'http://uri.etsi.org/TrstSvc/Svctype/QESValidation/Q',
   /** OCSP responder for qualified certificates. */
   OCSP_QC: 'http://uri.etsi.org/TrstSvc/Svctype/Certstatus/OCSP/QC',
 } as const

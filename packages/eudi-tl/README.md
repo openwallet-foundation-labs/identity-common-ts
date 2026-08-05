@@ -87,11 +87,23 @@ Without `trustAnchors`, only the cryptographic validity of the enveloped
 signature is checked — that proves integrity, not trust. Production callers
 should always pin the scheme operator certificate(s).
 
+Verification uses the global Web Crypto API by default. To run it through a
+reviewed or policy-constrained engine ("bring your own crypto"), pass a
+`crypto` implementation:
+
+```typescript
+await verifyTrustedListSignature(xml, { crypto: myWebCrypto });
+```
+
+xadesjs exposes a single process-wide crypto engine, so this is applied by
+(re)setting that global engine before verification, not as an isolated per-call
+context.
+
 ### Validating against a profile
 
 Profiled ecosystems constrain the `TSLType` and the service type / status URIs
-a list may use. Supply those constraints as a `ProfileRule` (the library ships
-none, staying profile-agnostic):
+a list may use. The engine stays profile-agnostic — supply the constraints as a
+`ProfileRule`:
 
 ```typescript
 import { validateTrustedListProfile } from '@owf/eudi-tl';
@@ -104,6 +116,23 @@ const result = validateTrustedListProfile(trustedList, {
 });
 ```
 
+For common ecosystems, ready-made rules ship as `TrustedListProfiles` so you
+don't have to hand-write the URIs:
+
+```typescript
+import { TrustedListProfiles, validateTrustedListProfile } from '@owf/eudi-tl';
+
+// EU LOTL, generic eIDAS national list, or EU Age Verification.
+validateTrustedListProfile(trustedList, TrustedListProfiles.ageVerification);
+```
+
+A profile is an allowlist (matched after the structural schema): the `TSLType`
+must match and every service type / status must be permitted. That fits curated,
+homogeneous lists (e.g. Age Verification) directly; `euGeneric` therefore permits
+all standard ETSI statuses and qualified service types — including the
+withdrawn/ceased entries national lists retain — rather than narrowing to active
+CAs. Narrow further with your own `ProfileRule` when you need to.
+
 ## Error Handling
 
 All failures throw a subclass of `TrustedListException`:
@@ -111,6 +140,9 @@ All failures throw a subclass of `TrustedListException`:
 - `TrustedListParseException` — the XML is not a well-formed TS 119 612 list
 - `TrustedListSignatureException` — the signature is missing, invalid, or not
   signed by a pinned trust anchor. Treat this as fail-closed.
+
+When a failure wraps an underlying error (e.g. a crypto error during
+verification), it is preserved on the exception's `cause`.
 
 ## Test Fixtures
 

@@ -39,6 +39,14 @@ describe('verifyTrustedListSignature', () => {
   it('rejects a list without a signature', async () => {
     await expect(verifyTrustedListSignature(UNSIGNED_TSL_XML)).rejects.toThrow(TrustedListSignatureException)
   })
+
+  it('verifies through a caller-supplied ("bring your own crypto") engine', async () => {
+    const result = await verifyTrustedListSignature(SIGNED_TSL_XML, { crypto: globalThis.crypto })
+    expect(result.signerCertificateBase64).toBe(SIGNER_CERT_BASE64)
+    // Falls back to the global engine on the next call without an override.
+    const fallback = await verifyTrustedListSignature(SIGNED_TSL_XML)
+    expect(fallback.signerCertificateBase64).toBe(SIGNER_CERT_BASE64)
+  })
 })
 
 describe('loadTrustedList', () => {
