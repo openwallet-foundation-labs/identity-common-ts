@@ -61,6 +61,61 @@ for (const anchor of anchors) {
 }
 ```
 
+### Following the EU hierarchy (LOTL → national lists)
+
+The EU **List of Trusted Lists** is the root of the eIDAS hierarchy: it points
+to every national list and publishes, for each one, the certificate(s) that list
+is signed with. So only the LOTL's own signers have to be pinned — the anchors
+of the national lists come from the LOTL itself:
+
+```typescript
+import {
+  getEuLotlTrustAnchors,
+  getPointerSigningCertificates,
+  loadEuLotl,
+  loadTrustedList,
+} from '@owf/eudi-tl';
+
+// Verified against the LOTL signing certificates shipped with this package.
+const lotl = await loadEuLotl(lotlXml);
+
+// The Spanish list's anchors, as published by the LOTL.
+const anchors = getPointerSigningCertificates(lotl, { schemeTerritory: 'ES' });
+const esList = await loadTrustedList(esXml, { trustAnchors: anchors });
+```
+
+`loadEuLotl` verifies the signature against `getEuLotlTrustAnchors()` and checks
+the `TrustedListProfiles.euLotl` profile. Pass your own `trustAnchors` to
+override the shipped set.
+
+#### Why the LOTL signers are pinned, and how to update them
+
+The shipped set (`EU_LOTL_SIGNING_CERTIFICATES`, with its
+`EU_LOTL_ANCHORS_PROVENANCE`) is the one out-of-band anchor the hierarchy needs:
+it cannot be bootstrapped from the LOTL itself, since a forged list would carry
+a forged self-pointer. The European Commission publishes it in the Official
+Journal, which the provenance record links.
+
+Those certificates rotate, so a deployment can stay current without waiting for
+a release of this package:
+
+1. pass your own `trustAnchors`, e.g. from configuration;
+2. read the currently published set from a verified LOTL's self-pointer and
+   persist it — a rotation is always announced in a list that is still signed by
+   the previous generation of keys:
+
+   ```typescript
+   const current = getPointerSigningCertificates(lotl, {
+     tslType: TSLType.EUlistofthelists,
+   });
+   ```
+
+3. if the pinned set has fallen behind entirely, follow the pivot LOTLs
+   advertised in the list's `SchemeInformationURI`.
+
+`scripts/refresh-lotl-anchors.mts` regenerates the shipped constant from the
+live LOTL, verifying it against the currently pinned set first.
+
 ### Parsing without signature verification
 
 `parseTrustedList` performs no signature check — use it for lists whose

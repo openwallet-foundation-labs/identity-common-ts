@@ -63,7 +63,12 @@ async function createSelfSigned(subject: string): Promise<TestIdentity> {
   }
 }
 
-function unsignedTsl(caCert: TestIdentity, tsaCert: TestIdentity): string {
+function unsignedTsl(
+  caCert: TestIdentity,
+  tsaCert: TestIdentity,
+  lotlPointerCert: TestIdentity,
+  nationalPointerCert: TestIdentity
+): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <tsl:TrustServiceStatusList xmlns:tsl="http://uri.etsi.org/02231/v2#" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" TSLTag="http://uri.etsi.org/19612/TSLTag" Id="TrustServiceStatusList">
   <tsl:SchemeInformation>
@@ -81,7 +86,13 @@ function unsignedTsl(caCert: TestIdentity, tsaCert: TestIdentity): string {
     </tsl:NextUpdate>
     <tsl:PointersToOtherTSL>
       <tsl:OtherTSLPointer>
-        <tsl:ServiceDigitalIdentities/>
+        <tsl:ServiceDigitalIdentities>
+          <tsl:ServiceDigitalIdentity>
+            <tsl:DigitalId>
+              <tsl:X509Certificate>${lotlPointerCert.certificateBase64}</tsl:X509Certificate>
+            </tsl:DigitalId>
+          </tsl:ServiceDigitalIdentity>
+        </tsl:ServiceDigitalIdentities>
         <tsl:TSLLocation>https://ec.europa.eu/tools/lotl/eu-lotl.xml</tsl:TSLLocation>
         <tsl:AdditionalInformation>
           <tsl:OtherInformation>
@@ -89,6 +100,24 @@ function unsignedTsl(caCert: TestIdentity, tsaCert: TestIdentity): string {
           </tsl:OtherInformation>
           <tsl:OtherInformation>
             <tsl:SchemeTerritory>EU</tsl:SchemeTerritory>
+          </tsl:OtherInformation>
+        </tsl:AdditionalInformation>
+      </tsl:OtherTSLPointer>
+      <tsl:OtherTSLPointer>
+        <tsl:ServiceDigitalIdentities>
+          <tsl:ServiceDigitalIdentity>
+            <tsl:DigitalId>
+              <tsl:X509Certificate>${nationalPointerCert.certificateBase64}</tsl:X509Certificate>
+            </tsl:DigitalId>
+          </tsl:ServiceDigitalIdentity>
+        </tsl:ServiceDigitalIdentities>
+        <tsl:TSLLocation>https://example.test/tsl-de.xml</tsl:TSLLocation>
+        <tsl:AdditionalInformation>
+          <tsl:OtherInformation>
+            <tsl:TSLType>http://uri.etsi.org/TrstSvc/TrustedList/TSLType/EUgeneric</tsl:TSLType>
+          </tsl:OtherInformation>
+          <tsl:OtherInformation>
+            <tsl:SchemeTerritory>DE</tsl:SchemeTerritory>
           </tsl:OtherInformation>
         </tsl:AdditionalInformation>
       </tsl:OtherTSLPointer>
@@ -254,8 +283,10 @@ async function signTsl(xml: string, signer: TestIdentity): Promise<string> {
 const caCert = await createSelfSigned('CN=Test QC CA, O=Test Qualified CA S.A., C=ES')
 const tsaCert = await createSelfSigned('CN=Test Qualified Timestamping Unit, O=Test Timestamping Provider, C=ES')
 const signerCert = await createSelfSigned('CN=Test Scheme Operator, O=Test Scheme Operator, C=ES')
+const lotlPointerCert = await createSelfSigned('CN=Test LOTL Scheme Operator, O=Test LOTL Scheme Operator, C=EU')
+const nationalPointerCert = await createSelfSigned('CN=Test DE Scheme Operator, O=Test DE Scheme Operator, C=DE')
 
-const unsignedXml = unsignedTsl(caCert, tsaCert)
+const unsignedXml = unsignedTsl(caCert, tsaCert, lotlPointerCert, nationalPointerCert)
 const signedXml = await signTsl(signableTsl(caCert), signerCert)
 
 // Sanity check: the generated sample must verify with this package before it
@@ -283,6 +314,12 @@ export const SIGNED_TSL_XML = \`${signedXml}\`
 
 /** base64 DER of the certificate that signed SIGNED_TSL_XML. */
 export const SIGNER_CERT_BASE64 = '${signerCert.certificateBase64}'
+
+/** base64 DER published by the LOTL pointer of UNSIGNED_TSL_XML. */
+export const LOTL_POINTER_CERT_BASE64 = '${lotlPointerCert.certificateBase64}'
+
+/** base64 DER published by the national (DE) pointer of UNSIGNED_TSL_XML. */
+export const NATIONAL_POINTER_CERT_BASE64 = '${nationalPointerCert.certificateBase64}'
 `
 
 const outPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', '__tests__', 'fixtures.mts')

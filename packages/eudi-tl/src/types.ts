@@ -63,6 +63,14 @@ export const TrustedListPointerSchema = z.object({
   tslType: z.string().optional(),
   /** `SchemeTerritory` (country code), when advertised. */
   schemeTerritory: z.string().optional(),
+  /**
+   * The pointer's `ServiceDigitalIdentities`: the certificates with which the
+   * pointed-to list is signed. This is how a list distributes the trust anchors
+   * of the lists it points to — the EU LOTL carries, for every national list,
+   * the certificate(s) of its scheme operator, so a verifier that trusts the
+   * LOTL does not need to pin each national list separately.
+   */
+  digitalIdentities: z.array(DigitalIdentitySchema).default([]),
 })
 export type TrustedListPointer = z.infer<typeof TrustedListPointerSchema>
 

@@ -65,7 +65,12 @@ export interface ProfileRule {
   serviceStatuses: string[]
 }
 
-const stripScheme = (uri: string | undefined): string => (uri ?? '').replace(/^https?:\/\//, '')
+/**
+ * Compare ETSI URIs scheme-insensitively: deployed lists have published the
+ * same URI over both `http` and `https`. Internal helper, not part of the
+ * package's public API.
+ */
+export const stripScheme = (uri: string | undefined): string => (uri ?? '').replace(/^https?:\/\//, '')
 
 function profileErrors(trustedList: TrustedList, rule: ProfileRule): ValidationError[] {
   const label = rule.name ?? 'profile'

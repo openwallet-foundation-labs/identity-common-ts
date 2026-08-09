@@ -11,7 +11,7 @@ import type {
   TrustedListService,
   TrustServiceProvider,
 } from './types'
-import { assertValidTrustedList } from './validate'
+import { assertValidTrustedList, stripScheme } from './validate'
 
 const TSL_NS = 'http://uri.etsi.org/02231/v2#'
 const SIE_NS = 'http://uri.etsi.org/TrstSvc/SvcInfoExt/eSigDir-1999-93-EC-TrustedList/#'
@@ -115,6 +115,9 @@ function parsePointers(schemeInfo: Element): TrustedListPointer[] | undefined {
       location,
       tslType: textOf(firstDescendant(pointer, 'TSLType')),
       schemeTerritory: textOf(firstDescendant(pointer, 'SchemeTerritory')),
+      // The pointer's own ServiceDigitalIdentities: the certificate(s) the
+      // pointed-to list is signed with.
+      digitalIdentities: parseDigitalIdentities(pointer),
     })
   }
   return pointers.length > 0 ? pointers : undefined
@@ -171,6 +174,57 @@ export function parseTrustedList(xml: string): TrustedList {
     providers,
     pointersToOtherLists: schemeInfo ? parsePointers(schemeInfo) : undefined,
   })
+}
+
+/** Selects `PointersToOtherTSL` entries in {@link getPointerSigningCertificates}. */
+export interface TrustedListPointerFilter {
+  /** `SchemeTerritory` of the pointed-to list (e.g. `ES`), case-insensitive. */
+  schemeTerritory?: string
+  /** `TSLType` of the pointed-to list, compared scheme-insensitively. */
+  tslType?: string
+  /** Exact `TSLLocation` URL of the pointed-to list. */
+  location?: string
+}
+
+/**
+ * The DER-encoded certificates a list publishes for the lists it points to —
+ * i.e. the trust anchors with which those lists are signed, ready to be passed
+ * as `trustAnchors` to `verifyTrustedListSignature`.
+ *
+ * This is the mechanism by which a trusted list distributes trust downwards: a
+ * verifier that has established trust in one list (for the EU LOTL, by pinning
+ * its signing certificates out of band) obtains the anchors of every list it
+ * points to without pinning them individually.
+ *
+ * ```ts
+ * const lotl = await loadTrustedList(lotlXml, { trustAnchors: getEuLotlTrustAnchors() })
+ * const esAnchors = getPointerSigningCertificates(lotl, { schemeTerritory: 'ES' })
+ * const esList = await loadTrustedList(esXml, { trustAnchors: esAnchors })
+ * ```
+ *
+ * Passing `{ tslType: TSLType.EUlistofthelists }` returns the LOTL's own
+ * currently published signing certificates (from its self-pointer), which is
+ * how a deployment refreshes its pinned set as the scheme operator rotates keys.
+ */
+export function getPointerSigningCertificates(
+  trustedList: TrustedList,
+  filter: TrustedListPointerFilter = {}
+): Uint8Array[] {
+  const certificates: Uint8Array[] = []
+  const seen = new Set<string>()
+  for (const pointer of trustedList.pointersToOtherLists ?? []) {
+    if (filter.location && pointer.location !== filter.location) continue
+    if (filter.schemeTerritory && pointer.schemeTerritory?.toUpperCase() !== filter.schemeTerritory.toUpperCase()) {
+      continue
+    }
+    if (filter.tslType && stripScheme(pointer.tslType) !== stripScheme(filter.tslType)) continue
+    for (const identity of pointer.digitalIdentities) {
+      if (!identity.certificate || seen.has(identity.certificate)) continue
+      seen.add(identity.certificate)
+      certificates.push(base64.decode(identity.certificate))
+    }
+  }
+  return certificates
 }
 
 export interface TrustAnchorFilter {

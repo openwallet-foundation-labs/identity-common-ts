@@ -13,9 +13,21 @@ export {
   TSLType,
 } from './constants'
 export {
+  getEuLotlTrustAnchors,
+  loadEuLotl,
+  verifyEuLotlSignature,
+} from './eu-lotl'
+export {
+  EU_LOTL_ANCHORS_PROVENANCE,
+  EU_LOTL_SIGNING_CERTIFICATES,
+  type EuLotlSigningCertificate,
+} from './eu-lotl-anchors'
+export {
+  getPointerSigningCertificates,
   getTrustAnchors,
   parseTrustedList,
   type TrustAnchorFilter,
+  type TrustedListPointerFilter,
 } from './parse'
 export { TrustedListProfiles } from './profiles'
 export {
