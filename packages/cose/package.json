@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "@owf/identity-common": "workspace:*",
-    "cbor-x": "^1.6.4",
+    "cbor-x": "^1.6.5",
     "zod": "catalog:",
     "zod-validation-error": "^5.0.0"
   },
@@ -53,7 +53,7 @@
     "@noble/hashes": "^2.0.1",
     "@panva/hkdf": "^1.2.1",
     "@peculiar/x509": "^2.0.0",
-    "jose": "^6.1.0",
+    "jose": "^6.2.8",
     "vitest": "catalog:"
   }
 }
