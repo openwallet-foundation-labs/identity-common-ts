@@ -194,6 +194,17 @@ export class WRPRCBuilder {
   }
 
   /**
+   * Set the unique identifier of the certificate (`jti`)
+   * If not set, the payload carries no identifier
+   *
+   * @param id - Identifier from the issuing registry's own scheme.
+   */
+  certificateId(id: string): this {
+    this.payload.jti = id
+    return this
+  }
+
+  /**
    * Set the issued-at timestamp (Unix timestamp)
    * If not set, will default to current time when building
    */
