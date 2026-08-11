@@ -151,6 +151,14 @@ export const WRPRCPayloadSchema = z.object({
   /** URL to the certificate policy and practice statement */
   certificate_policy: z.url().optional(),
 
+  /**
+   * Unique identifier of this WRPRC (RFC 7519 `jti`).
+   *
+   * Not listed in ETSI TS 119 475, which leaves the certificate without an identifier
+   * to reference it by. Optional so that WRPRCs issued without one still validate.
+   */
+  jti: z.string().min(1).optional(),
+
   /** Issuance time as a Unix timestamp (Table 7) */
   iat: z.number().int().positive(),
 

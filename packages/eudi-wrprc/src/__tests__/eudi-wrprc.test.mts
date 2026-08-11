@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createLegalPersonWRPRC,
   createNaturalPersonWRPRC,
+  createWRPRCPayload,
   credential,
   hasAttestationProviderEntitlement,
   isLegalPersonWRPRC,
@@ -93,6 +94,28 @@ describe('WRPRCPayloadSchema', () => {
     }
     const result = WRPRCPayloadSchema.safeParse(payload)
     expect(result.success).toBe(true)
+  })
+
+  it('should accept a payload with a jti', () => {
+    const jti_uuid = '0c1f7a2e-3d4b-4c5a-8e9f-1a2b3c4d5e6f'
+    const payload = { ...validLegalPersonPayload, jti: jti_uuid }
+    const result = WRPRCPayloadSchema.safeParse(payload)
+
+    expect(result.success).toBe(true)
+    expect(result.data?.jti).toBe(jti_uuid)
+  })
+
+  it('should accept a payload without a jti', () => {
+    const result = WRPRCPayloadSchema.safeParse(validLegalPersonPayload)
+
+    expect(result.success).toBe(true)
+    expect(result.data?.jti).toBeUndefined()
+  })
+
+  it('should reject an empty jti', () => {
+    const payload = { ...validLegalPersonPayload, jti: '' }
+    const result = WRPRCPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(false)
   })
 })
 
@@ -283,6 +306,34 @@ describe('WRPRCBuilder', () => {
     expect(payload.sub_fn).toBe('Rossi')
   })
 
+  it('should omit jti when no certificate id is set', () => {
+    const payload = wrprc()
+      .name('Test Service')
+      .legalName('Test Inc.')
+      .identifier('LEIXG-529900T8BM49AURSDO55')
+      .country('DE')
+      .registryUri('https://registry.example.com/api')
+      .addEntitlement(WRP_ENTITLEMENTS.SERVICE_PROVIDER)
+      .build()
+
+    expect(payload.jti).toBeUndefined()
+  })
+
+  it('should preserve an explicitly set certificate id', () => {
+    const jti_uuid = 'urn:uuid:0c1f7a2e-3d4b-4c5a-8e9f-1a2b3c4d5e6f'
+    const payload = wrprc()
+      .name('Test Service')
+      .legalName('Test Inc.')
+      .identifier('LEIXG-529900T8BM49AURSDO55')
+      .country('DE')
+      .registryUri('https://registry.example.com/api')
+      .addEntitlement(WRP_ENTITLEMENTS.SERVICE_PROVIDER)
+      .certificateId(jti_uuid)
+      .build()
+
+    expect(payload.jti).toBe(jti_uuid)
+  })
+
   it('should add multiple entitlements', () => {
     const payload = wrprc()
       .name('Test')
@@ -416,6 +467,18 @@ describe('Factory Functions', () => {
 
       expect(payload.sub_gn).toBe('Maria')
       expect(payload.sub_fn).toBe('Rossi')
+    })
+  })
+
+  describe('createWRPRCPayload', () => {
+    it('should carry a provided jti through', () => {
+      const jti_uuid = 'urn:uuid:0c1f7a2e-3d4b-4c5a-8e9f-1a2b3c4d5e6f'
+      const payload = createWRPRCPayload({
+        ...validLegalPersonPayload,
+        jti: jti_uuid,
+      })
+
+      expect(payload.jti).toBe(jti_uuid)
     })
   })
 })
