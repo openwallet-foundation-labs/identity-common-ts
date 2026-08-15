@@ -143,16 +143,22 @@ signature is checked — that proves integrity, not trust. Production callers
 should always pin the scheme operator certificate(s).
 
 Verification uses the global Web Crypto API by default. To run it through a
-reviewed or policy-constrained engine ("bring your own crypto"), pass a
-`crypto` implementation:
+reviewed or policy-constrained engine ("bring your own crypto"), install your
+implementation once during start-up:
 
 ```typescript
-await verifyTrustedListSignature(xml, { crypto: myWebCrypto });
+import { setTrustedListCrypto } from '@owf/eudi-tl';
+
+setTrustedListCrypto(myWebCrypto);
 ```
 
-xadesjs exposes a single process-wide crypto engine, so this is applied by
-(re)setting that global engine before verification, not as an isolated per-call
-context.
+The engine is process-wide by necessity, not by design: xadesjs exposes a
+single global crypto engine rather than a per-call context
+([xmldsigjs#119](https://github.com/PeculiarVentures/xmldsigjs/issues/119)).
+A per-verification option would look isolated while still swapping that global,
+so concurrent verifications with different engines would race — hence the
+explicit setter. Once installed, an engine is never silently replaced by the
+global one.
 
 ### Validating against a profile
 

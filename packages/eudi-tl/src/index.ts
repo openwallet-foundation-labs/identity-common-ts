@@ -60,6 +60,7 @@ export {
   validateTrustedListProfile,
 } from './validate'
 export {
+  setTrustedListCrypto,
   type VerifyTrustedListOptions,
   type VerifyTrustedListResult,
   verifyTrustedListSignature,

@@ -7,31 +7,48 @@ import { TrustedListSignatureException } from './trusted-list-exception'
 const XMLDSIG_NS = 'http://www.w3.org/2000/09/xmldsig#'
 
 let nodeDependenciesInitialized = false
-let activeCrypto: Crypto | undefined
+let installedCrypto: Crypto | undefined
 
 /**
- * xadesjs needs a WebCrypto engine and, outside the browser, DOM/XPath
- * implementations (xml-core resolves them via `setNodeDependencies`). Both are
- * set lazily, so importing this package has no side effects until a signature
- * is actually processed.
- *
- * The DOM/XPath dependencies are process-wide and set once. The crypto engine
- * defaults to the global Web Crypto API (`globalThis.crypto`, available in
- * Node >= 20 and browsers) but a caller can supply its own ("bring your own
- * crypto"); the engine is (re)set whenever the requested implementation differs
- * from the one currently installed. Note that xadesjs keeps a single global
- * engine, so this injects crypto by swapping that global — not as an isolated
- * per-call context.
+ * Outside the browser, xml-core resolves DOM/XPath implementations through
+ * `setNodeDependencies`. Set lazily and once, so importing this package has no
+ * side effects until a signature is actually processed.
  */
-export function ensureXmlSignatureEngine(crypto: Crypto = globalThis.crypto): void {
-  if (!nodeDependenciesInitialized) {
-    xadesjs.setNodeDependencies({ DOMParser, XMLSerializer, xpath })
-    nodeDependenciesInitialized = true
-  }
-  if (activeCrypto !== crypto) {
-    xadesjs.Application.setEngine('eudi-tl', crypto)
-    activeCrypto = crypto
-  }
+function ensureNodeDependencies(): void {
+  if (nodeDependenciesInitialized) return
+  xadesjs.setNodeDependencies({ DOMParser, XMLSerializer, xpath })
+  nodeDependenciesInitialized = true
+}
+
+/**
+ * Install the WebCrypto implementation used to verify trusted list signatures
+ * ("bring your own crypto"), for callers that must route verification through a
+ * reviewed or policy-constrained engine. Call it once during start-up, before
+ * verifying; without it, the global Web Crypto API (`globalThis.crypto`,
+ * available in Node >= 20 and browsers) is used.
+ *
+ * Process-wide by necessity, not by design: xadesjs exposes a single global
+ * crypto engine rather than a per-call context
+ * (see {@link https://github.com/PeculiarVentures/xmldsigjs/issues/119}).
+ * A per-invocation option would look isolated while still swapping that global,
+ * so concurrent verifications with different engines would race; it is
+ * deliberately not offered. Should upstream gain per-call crypto, accepting it
+ * as a verification option is an additive, non-breaking change.
+ */
+export function setTrustedListCrypto(crypto: Crypto): void {
+  ensureNodeDependencies()
+  xadesjs.Application.setEngine('eudi-tl', crypto)
+  installedCrypto = crypto
+}
+
+/**
+ * Make sure a crypto engine is installed before verifying. A caller-installed
+ * engine is never replaced — falling back to `globalThis.crypto` on every call
+ * that does not opt in would silently undo {@link setTrustedListCrypto}.
+ */
+function ensureXmlSignatureEngine(): void {
+  ensureNodeDependencies()
+  if (!installedCrypto) setTrustedListCrypto(globalThis.crypto)
 }
 
 export interface VerifyTrustedListOptions {
@@ -46,18 +63,6 @@ export interface VerifyTrustedListOptions {
    * always pin the scheme operator certificate(s).
    */
   trustAnchors?: Uint8Array[]
-
-  /**
-   * WebCrypto implementation used to verify the signature ("bring your own
-   * crypto"), for callers that must run verification through a reviewed or
-   * policy-constrained engine. Defaults to the global Web Crypto API
-   * (`globalThis.crypto`).
-   *
-   * Because xadesjs exposes a single process-wide crypto engine, this is
-   * applied by (re)setting that global engine before verification, not as an
-   * isolated per-call context.
-   */
-  crypto?: Crypto
 }
 
 export interface VerifyTrustedListResult {
@@ -73,12 +78,15 @@ export interface VerifyTrustedListResult {
  *
  * Verified against a standard eIDAS national trusted list (RSA-SHA512,
  * exclusive C14N, XAdES SignedProperties).
+ *
+ * Verification runs on the global Web Crypto API unless another implementation
+ * was installed with {@link setTrustedListCrypto}.
  */
 export async function verifyTrustedListSignature(
   xml: string,
   options: VerifyTrustedListOptions = {}
 ): Promise<VerifyTrustedListResult> {
-  ensureXmlSignatureEngine(options.crypto)
+  ensureXmlSignatureEngine()
 
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   const signatures = doc.getElementsByTagNameNS(XMLDSIG_NS, 'Signature')

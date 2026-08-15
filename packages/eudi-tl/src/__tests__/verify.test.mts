@@ -1,6 +1,11 @@
 import { base64 } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
-import { loadTrustedList, TrustedListSignatureException, verifyTrustedListSignature } from '../index'
+import {
+  loadTrustedList,
+  setTrustedListCrypto,
+  TrustedListSignatureException,
+  verifyTrustedListSignature,
+} from '../index'
 import { SIGNED_TSL_XML, SIGNER_CERT_BASE64, UNSIGNED_TSL_XML } from './fixtures.mjs'
 
 /**
@@ -40,12 +45,39 @@ describe('verifyTrustedListSignature', () => {
     await expect(verifyTrustedListSignature(UNSIGNED_TSL_XML)).rejects.toThrow(TrustedListSignatureException)
   })
 
-  it('verifies through a caller-supplied ("bring your own crypto") engine', async () => {
-    const result = await verifyTrustedListSignature(SIGNED_TSL_XML, { crypto: globalThis.crypto })
-    expect(result.signerCertificateBase64).toBe(SIGNER_CERT_BASE64)
-    // Falls back to the global engine on the next call without an override.
-    const fallback = await verifyTrustedListSignature(SIGNED_TSL_XML)
-    expect(fallback.signerCertificateBase64).toBe(SIGNER_CERT_BASE64)
+  it('verifies through a caller-installed ("bring your own crypto") engine', async () => {
+    // A thin recording wrapper around the global engine: it must be the one
+    // actually doing the work, not `globalThis.crypto`.
+    const calls: string[] = []
+    const subtle = new Proxy(globalThis.crypto.subtle, {
+      get(target, property, receiver) {
+        calls.push(String(property))
+        const value = Reflect.get(target, property, receiver)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+    const byoc = new Proxy(globalThis.crypto, {
+      get(target, property, receiver) {
+        if (property === 'subtle') return subtle
+        const value = Reflect.get(target, property, receiver)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    }) as Crypto
+
+    setTrustedListCrypto(byoc)
+    try {
+      const result = await verifyTrustedListSignature(SIGNED_TSL_XML)
+      expect(result.signerCertificateBase64).toBe(SIGNER_CERT_BASE64)
+      expect(calls).not.toHaveLength(0)
+
+      // The installed engine stays installed: a later call must not silently
+      // fall back to the global Web Crypto API.
+      calls.length = 0
+      await verifyTrustedListSignature(SIGNED_TSL_XML)
+      expect(calls).not.toHaveLength(0)
+    } finally {
+      setTrustedListCrypto(globalThis.crypto)
+    }
   })
 })
 
