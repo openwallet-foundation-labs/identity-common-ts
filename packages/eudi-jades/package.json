@@ -1,0 +1,63 @@
+{
+  "name": "@owf/eudi-jades",
+  "version": "0.1.0",
+  "description": "JAdES (JSON Advanced Electronic Signatures) implementation based on ETSI TS 119 182-1 standard",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-jades",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/eudi-jades"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs",
+        "default": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "keywords": [
+    "jades",
+    "etsi",
+    "electronic-signature",
+    "jws",
+    "jwt",
+    "eudi",
+    "ts-119-182"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@owf/crypto": "workspace:*",
+    "@owf/identity-common": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}
