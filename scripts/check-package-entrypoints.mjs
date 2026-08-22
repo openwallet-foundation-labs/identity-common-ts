@@ -82,7 +82,7 @@ async function main() {
       )
     }
 
-    if (!packageJson.publishConfig || packageJson.publishConfig.access !== 'public') {
+    if (packageJson.publishConfig?.access !== 'public') {
       packageFailures.push('  - publishConfig.access: expected "public"')
     }
 
