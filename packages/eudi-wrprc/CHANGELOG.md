@@ -1,5 +1,16 @@
 # @owf/eudi-wrprc
 
+## 0.3.2
+
+### Patch Changes
+
+- d0c90bd: add json schema generator
+- be9f7cf: Rename content to value field to align with spec
+- 06f362e: move iat to header for jwt and cwt
+- 9806aba: provides attestation is a list of strings
+  - @owf/crypto@0.3.2
+  - @owf/identity-common@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes

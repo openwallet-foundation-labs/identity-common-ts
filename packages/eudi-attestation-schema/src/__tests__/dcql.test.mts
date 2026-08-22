@@ -4,6 +4,10 @@ import { buildDcqlFromSchemaMeta, toDcqlCredentialInput, toDcqlTrustedAuthoritie
 
 const RULEBOOK_INTEGRITY = 'sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw='
 const SCHEMA_INTEGRITY = 'sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw='
+const VERIFICATION_METHOD = {
+  type: 'X509Certificate' as const,
+  x509Certificate: 'MIIBczCCARmgAwIBAgIUZt2jkmAgIIiw/wpvJU/4yL7ek/YwCgYIKoZIzj0EAwIw',
+}
 
 describe('toDcqlTrustedAuthorities', () => {
   it('groups and deduplicates etsi_tl trusted authorities', () => {
@@ -22,8 +26,20 @@ describe('toDcqlTrustedAuthorities', () => {
           .meta({ vct: 'eu.example.1' })
           .build()
       )
-      .addTrustAuthority(trustAuthority().frameworkType('etsi_tl').value('https://example.com/tl-1').build())
-      .addTrustAuthority(trustAuthority().frameworkType('etsi_tl').value('https://example.com/tl-1').build())
+      .addTrustAuthority(
+        trustAuthority()
+          .frameworkType('etsi_tl')
+          .value('https://example.com/tl-1')
+          .verificationMethod(VERIFICATION_METHOD)
+          .build()
+      )
+      .addTrustAuthority(
+        trustAuthority()
+          .frameworkType('etsi_tl')
+          .value('https://example.com/tl-1')
+          .verificationMethod(VERIFICATION_METHOD)
+          .build()
+      )
       .build()
 
     const trustedAuthorities = toDcqlTrustedAuthorities(meta)
@@ -113,7 +129,13 @@ describe('buildDcqlFromSchemaMeta', () => {
           .meta({ doctype_value: 'org.iso.18013.5.1.mDL' })
           .build()
       )
-      .addTrustAuthority(trustAuthority().frameworkType('etsi_tl').value('https://example.com/tl-1').build())
+      .addTrustAuthority(
+        trustAuthority()
+          .frameworkType('etsi_tl')
+          .value('https://example.com/tl-1')
+          .verificationMethod(VERIFICATION_METHOD)
+          .build()
+      )
       .build()
 
     const result = buildDcqlFromSchemaMeta({

@@ -468,5 +468,56 @@ describe('LoTE Validator', () => {
 
       expect(result.valid).toBe(true)
     })
+
+    it('short-circuit errors when validating against wrong profile', () => {
+      const { payload: lote } = decodeJwt(WRPACProvidersJWT)
+      const result = validateLoTEProfile(lote, [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUWalletProvidersList])
+
+      expect(result.valid).toBe(false)
+      expect(result.errors).toEqual([
+        {
+          message: 'Document does not match any of the specified profiles: EUPIDProvidersList, EUWalletProvidersList',
+          path: 'LoTEType',
+        },
+        {
+          message: 'Profile EUPIDProvidersList: LoTEType must be http://uri.etsi.org/19602/LoTEType/EUPIDProvidersList',
+          path: 'LoTE.ListAndSchemeInformation.LoTEType',
+        },
+        {
+          message:
+            'Profile EUWalletProvidersList: LoTEType must be http://uri.etsi.org/19602/LoTEType/EUWalletProvidersList',
+          path: 'LoTE.ListAndSchemeInformation.LoTEType',
+        },
+      ])
+    })
+
+    it('only includes errors for matched LoTEProfile', () => {
+      const { payload: lote } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
+
+      lote.LoTE.ListAndSchemeInformation.StatusDeterminationApproach = 'invalid'
+
+      const result = validateLoTEProfile(lote, [
+        LoTEProfile.EUPIDProvidersList,
+        LoTEProfile.EUWalletProvidersList,
+        LoTEProfile.EUWRPACProvidersList,
+      ])
+
+      expect(result.valid).toBe(false)
+      expect(result.errors).toEqual([
+        {
+          message: 'Document does not match profile EUWRPACProvidersList',
+          path: 'LoTEType',
+        },
+        {
+          message: 'Profile EUWRPACProvidersList: Invalid URL',
+          path: 'LoTE.ListAndSchemeInformation.StatusDeterminationApproach',
+        },
+        {
+          message:
+            'Profile EUWRPACProvidersList: StatusDeterminationApproach must be http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
+          path: 'LoTE.ListAndSchemeInformation.StatusDeterminationApproach',
+        },
+      ])
+    })
   })
 })

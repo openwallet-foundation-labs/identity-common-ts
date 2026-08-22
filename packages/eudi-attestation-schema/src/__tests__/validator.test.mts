@@ -3,6 +3,10 @@ import { assertValidSchemaMeta, validateSchemaMeta } from '../validator'
 
 const RULEBOOK_INTEGRITY = 'sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw='
 const SCHEMA_INTEGRITY = 'sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw='
+const VERIFICATION_METHOD = {
+  type: 'X509Certificate' as const,
+  x509Certificate: 'MIIBczCCARmgAwIBAgIUZt2jkmAgIIiw/wpvJU/4yL7ek/YwCgYIKoZIzj0EAwIw',
+}
 
 const validSchemaMeta = {
   id: 'https://example.com/attestations/test',
@@ -32,7 +36,13 @@ describe('validateSchemaMeta', () => {
   it('accepts etsi_tl trusted authorities', () => {
     const result = validateSchemaMeta({
       ...validSchemaMeta,
-      trustedAuthorities: [{ frameworkType: 'etsi_tl', value: 'https://example.com/trust-list.jws' }],
+      trustedAuthorities: [
+        {
+          frameworkType: 'etsi_tl',
+          value: 'https://example.com/trust-list.jws',
+          verificationMethod: VERIFICATION_METHOD,
+        },
+      ],
     })
     expect(result.valid).toBe(true)
   })
@@ -72,7 +82,15 @@ describe('validateSchemaMeta', () => {
   it('rejects invalid frameworkType in trustedAuthorities', () => {
     const result = validateSchemaMeta({
       ...validSchemaMeta,
-      trustedAuthorities: [{ frameworkType: 'aki', value: 'test' }],
+      trustedAuthorities: [{ frameworkType: 'aki', value: 'test', verificationMethod: VERIFICATION_METHOD }],
+    })
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects trustedAuthorities entries without verificationMethod', () => {
+    const result = validateSchemaMeta({
+      ...validSchemaMeta,
+      trustedAuthorities: [{ frameworkType: 'etsi_tl', value: 'https://example.com/trust-list.jws' }],
     })
     expect(result.valid).toBe(false)
   })

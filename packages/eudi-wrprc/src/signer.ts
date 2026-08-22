@@ -7,7 +7,7 @@
  */
 
 import { pemToDer } from '@owf/crypto'
-import { base64urlEncode, decodeJwt } from '@owf/identity-common'
+import { base64urlEncode, decodeJwt, nowInSeconds } from '@owf/identity-common'
 import type { SignedWRPRC, SignOptions, WRPRCJWTHeader, WRPRCPayload } from './types'
 import { assertValidWRPRCPayload } from './validator'
 import { WRPRCException } from './wrprc-exception'
@@ -46,7 +46,7 @@ export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
     typ: 'rc-wrp+jwt',
     alg: algorithm,
     x5c,
-    iat: Math.floor(Date.now() / 1000),
+    iat: nowInSeconds(),
     ...(keyId && { kid: keyId }),
   }
 

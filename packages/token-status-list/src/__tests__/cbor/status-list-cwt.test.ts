@@ -1,10 +1,21 @@
-import { CoseKey, KeyType, SignatureAlgorithm } from '@owf/cose'
+import {
+  CoseKey,
+  cborEncode,
+  KeyType,
+  RegisteredCwtClaimKey,
+  RegisteredCwtHeaderClaimKey,
+  Sign1,
+  SignatureAlgorithm,
+} from '@owf/cose'
+import { Tag } from 'cbor-x'
+import { deflate } from 'pako'
 import { expect, suite, test } from 'vitest'
 import { StatusListCbor } from '../../cbor/status-list-cbor'
 import { StatusListCwt, StatusListCwtHeaderKey } from '../../cbor/status-list-cwt'
-import { StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
+import { StatusListCwtClaimKey, StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
-import { StatusType } from '../../types'
+import { SLException } from '../../status-list-exception'
+import { MediaTypes, StatusType } from '../../types'
 import { mac0Context, macKey, sign1Context, signKey } from '../context'
 
 suite('StatusListCwt', () => {
@@ -345,6 +356,60 @@ suite('StatusListCwt', () => {
     })
   })
 
+  suite('fromToken with malformed input', () => {
+    test('should report that the token is not valid cbor', () => {
+      // Trailing bytes after a complete cbor value, e.g. a wrongly encoded or truncated token
+      const token = new Uint8Array([0x0f, 0x74, 0xa1])
+
+      expect(() => StatusListCwt.fromToken(token)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(token)).toThrow(/Unable to decode status list CWT.*as CBOR/s)
+    })
+
+    test.each([
+      ['a cbor number', cborEncode(15), /decoded the number value '15'/],
+      ['a cbor text string', cborEncode('hello'), /decoded the text string 'hello'/],
+      ['a cbor map', cborEncode(new Map([['a', 1]])), /decoded an untagged map with 1 entry/],
+      [
+        'an untagged sign1 array',
+        cborEncode([new Uint8Array([0xa0]), new Map(), new Uint8Array([1, 2]), new Uint8Array([3, 4])]),
+        /decoded an untagged array with 4 elements/,
+      ],
+    ])('should report that %s is not a cose token, rather than a missing payload', (_name, token, expected) => {
+      expect(() => StatusListCwt.fromToken(token)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(token)).toThrow(expected)
+      // The old behaviour blamed a detached payload for any non-cose input
+      expect(() => StatusListCwt.fromToken(token)).not.toThrow(/detached payload/)
+    })
+
+    test('should report which claims are wrong when the payload is not a status list payload', async () => {
+      const cwt = new StatusListCwt({
+        payload: { subject: 'did:test', statusList: new StatusList([0, 1, 0], 1) },
+      })
+      const token = await cwt.signAndEncode({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)
+
+      // Rebuild the same sign1 over a payload that is valid cbor but not a status list payload
+      const [protectedHeaders, unprotectedHeaders, , signature] = Sign1.decode(token).encodedStructure
+      const notAPayload = cborEncode(new Map([[1, 'not-a-status-list']]))
+      const retagged = cborEncode(new Tag([protectedHeaders, unprotectedHeaders, notAPayload, signature], Sign1.tag))
+
+      expect(() => StatusListCwt.fromToken(retagged)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(retagged)).toThrow(/Unable to decode status list CWT payload/)
+    })
+
+    test('should still report a genuinely detached payload', async () => {
+      const cwt = new StatusListCwt({
+        payload: { subject: 'did:test', statusList: new StatusList([0, 1, 0], 1) },
+      })
+      const token = await cwt.signAndEncode({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)
+
+      // Rebuild the same sign1 with a null (detached) payload
+      const [protectedHeaders, unprotectedHeaders, , signature] = Sign1.decode(token).encodedStructure
+      const detached = cborEncode(new Tag([protectedHeaders, unprotectedHeaders, null, signature], Sign1.tag))
+
+      expect(() => StatusListCwt.fromToken(detached)).toThrow(/detached payload is not supported/)
+    })
+  })
+
   suite('large status lists', () => {
     test('encode/decode with large status list (100 entries)', async () => {
       const statusList = Array(100)
@@ -454,6 +519,72 @@ suite('StatusListCwt', () => {
       const result = await decodedStatusListCwt.verifySignature({ key: wrongKey }, sign1Context)
       expect(result).toBe(false)
     })
+
+    test('should verify a status list whose lst was not compressed at the level this library uses', async () => {
+      // The reported bug: an issuer compressed `lst` at the zlib default level (`78 9c`) and signed
+      // over those bytes, while we re-compressed at level 9 (`78 da`) before verifying. Build the
+      // token straight from the COSE primitives, so none of the status list classes get a chance to
+      // normalise the compression on the way in.
+      const foreignLst = deflate(new StatusList([0, 1, 0, 0, 0, 0, 0, 0], 1).encodeStatusListIntoByteArray())
+      expect(Buffer.from(foreignLst.slice(0, 2)).toString('hex')).toBe('789c')
+
+      const foreignPayload = cborEncode(
+        new Map<number, unknown>([
+          [RegisteredCwtClaimKey.Subject, 'did:test'],
+          [RegisteredCwtClaimKey.IssuedAt, Math.floor(Date.now() / 1000)],
+          [
+            StatusListCwtClaimKey.StatusList,
+            new Map<string, unknown>([
+              ['bits', 1],
+              ['lst', foreignLst],
+            ]),
+          ],
+        ])
+      )
+
+      const token = (
+        await Sign1.create({
+          protectedHeaders: new Map<number, unknown>([
+            [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+            [StatusListCwtHeaderKey.Typ, MediaTypes.StatusListCwt],
+          ]),
+          payload: foreignPayload,
+        }).sign({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)
+      ).encode()
+
+      const decodedStatusListCwt = StatusListCwt.fromToken(token)
+      expect(await decodedStatusListCwt.verifySignature({ key: signKey }, sign1Context)).toBe(true)
+      expect(decodedStatusListCwt.payload.statusList.getStatus(1)).toBe(1)
+
+      // Not merely retained: the decoded payload also re-encodes to the issuer's exact bytes.
+      expect(Buffer.from(decodedStatusListCwt.payload.encode()).toString('hex')).toBe(
+        Buffer.from(foreignPayload).toString('hex')
+      )
+    })
+
+    test('should verify against original token payload bytes instead of re-encoded payload bytes', async () => {
+      const statusListCwt = StatusListCwt.createFromStatusListAndSubject(
+        { statusList: [0, 1, 0], bitsPerStatus: 1 },
+        'did:test'
+      )
+
+      const token = await statusListCwt.signAndEncode(
+        { signingKey: signKey, algorithm: SignatureAlgorithm.ES256 },
+        sign1Context
+      )
+
+      const decodedStatusListCwt = StatusListCwt.fromToken(token)
+      const originalEncode = decodedStatusListCwt.payload.encode.bind(decodedStatusListCwt.payload)
+      ;(decodedStatusListCwt.payload as unknown as { encode: () => Uint8Array }).encode = () => {
+        const payload = originalEncode()
+        const tampered = new Uint8Array(payload)
+        tampered[tampered.length - 1] ^= 0x01
+        return tampered
+      }
+
+      const result = await decodedStatusListCwt.verifySignature({ key: signKey }, sign1Context)
+      expect(result).toBe(true)
+    })
   })
 
   suite('verifyAuthenticationCode', () => {
@@ -482,6 +613,27 @@ suite('StatusListCwt', () => {
       const wrongKey = CoseKey.create({ keyType: KeyType.Oct, k: new TextEncoder().encode('wrong-key') })
       const result = await decodedStatusListCwt.verifyAuthenticationCode({ key: wrongKey }, mac0Context)
       expect(result).toBe(false)
+    })
+
+    test('should verify MAC against original token payload bytes instead of re-encoded payload bytes', async () => {
+      const statusListCwt = StatusListCwt.createFromStatusListAndSubject(
+        { statusList: [0, 1, 0], bitsPerStatus: 1 },
+        'did:test'
+      )
+
+      const token = await statusListCwt.authenticateAndEncode({ key: macKey }, mac0Context)
+
+      const decodedStatusListCwt = StatusListCwt.fromToken(token)
+      const originalEncode = decodedStatusListCwt.payload.encode.bind(decodedStatusListCwt.payload)
+      ;(decodedStatusListCwt.payload as unknown as { encode: () => Uint8Array }).encode = () => {
+        const payload = originalEncode()
+        const tampered = new Uint8Array(payload)
+        tampered[tampered.length - 1] ^= 0x01
+        return tampered
+      }
+
+      const result = await decodedStatusListCwt.verifyAuthenticationCode({ key: macKey }, mac0Context)
+      expect(result).toBe(true)
     })
   })
 })

@@ -21,6 +21,7 @@ export type StatusListCwtOptions = {
   protectedHeaders?: ProtectedHeaders | ProtectedHeaderOptions['protectedHeaders']
   unprotectedHeaders?: UnprotectedHeaders | UnprotectedHeaderOptions['unprotectedHeaders']
   signatureOrTag?: Uint8Array
+  originalPayloadBytes?: Uint8Array
 }
 
 export enum StatusListCwtHeaderKey {
@@ -32,6 +33,18 @@ export class StatusListCwt {
   public protectedHeaders?: ProtectedHeaders
   public unprotectedHeaders?: UnprotectedHeaders
   private signatureOrTag?: Uint8Array
+
+  /**
+   * The payload bytes as received in the COSE message, kept so that verification can use them
+   * directly. RFC 9052 puts the payload into `Sig_structure`/`MAC_structure` as an opaque `bstr`, so
+   * what was signed is the exact bytes the issuer sent, not whatever we would encode the decoded
+   * payload back into. Cleared as soon as the payload is modified, since the signature over it no
+   * longer means anything at that point.
+   *
+   * @see https://datatracker.ietf.org/doc/rfc9052/#section-4.4
+   * @see https://datatracker.ietf.org/doc/rfc9052/#section-6
+   */
+  private originalPayloadBytes?: Uint8Array
 
   public constructor(options: StatusListCwtOptions) {
     this.payload =
@@ -46,6 +59,7 @@ export class StatusListCwt {
         : UnprotectedHeaders.create({ unprotectedHeaders: options.unprotectedHeaders })
 
     this.signatureOrTag = options.signatureOrTag
+    this.originalPayloadBytes = options.originalPayloadBytes
 
     if (this.protectedHeaders.headers.get(StatusListCwtHeaderKey.Typ) === undefined) {
       this.protectedHeaders.headers.set(StatusListCwtHeaderKey.Typ, MediaTypes.StatusListCwt)
@@ -54,10 +68,12 @@ export class StatusListCwt {
 
   public setStatusList(statusList: StatusList | StatusListCbor) {
     this.payload.setStatusList(statusList)
+    this.originalPayloadBytes = undefined
   }
 
   public updateStatusList(index: number, value: number) {
     this.payload.statusList.setStatus(index, value)
+    this.originalPayloadBytes = undefined
   }
 
   /**
@@ -86,19 +102,45 @@ export class StatusListCwt {
     return new StatusListCwt({ payload: StatusListCwtPayload.create({ statusList: cborStatusList, subject }) })
   }
 
+  /**
+   * Decodes a status list CWT from a tagged COSE_Sign1 (tag 18) or COSE_Mac0 (tag 17) token.
+   *
+   * @throws SLException if the token is not a COSE token, has a detached payload, or the
+   *   payload is not a valid status list CWT payload. The underlying error is available on
+   *   the `details` property.
+   */
   public static fromToken(token: Uint8Array) {
-    const cwt = Cwt.fromToken(token)
+    let cwt: Cwt
+    try {
+      cwt = Cwt.fromToken(token)
+    } catch (error) {
+      throw new SLException(
+        `Unable to decode status list CWT: ${error instanceof Error ? error.message : String(error)}`,
+        error
+      )
+    }
 
+    // A COSE token carries `null` for a detached payload, which we cannot resolve here.
     if (!cwt.payload) {
       throw new SLException('Cwt does not contain payload, detached payload is not supported for status list CWT')
     }
-    const payload = StatusListCwtPayload.decode(cwt.payload)
+
+    let payload: StatusListCwtPayload
+    try {
+      payload = StatusListCwtPayload.decode(cwt.payload)
+    } catch (error) {
+      throw new SLException(
+        `Unable to decode status list CWT payload: ${error instanceof Error ? error.message : String(error)}`,
+        error
+      )
+    }
 
     return new StatusListCwt({
       payload,
       protectedHeaders: cwt.protectedHeaders,
       unprotectedHeaders: cwt.unprotectedHeaders,
       signatureOrTag: cwt.signatureOrTag,
+      originalPayloadBytes: new Uint8Array(cwt.payload),
     })
   }
 
@@ -166,7 +208,7 @@ export class StatusListCwt {
     const cwt = new Cwt({
       protectedHeaders: this.protectedHeaders,
       unprotectedHeaders: this.unprotectedHeaders,
-      payload: this.payload.encode(),
+      payload: this.originalPayloadBytes ?? this.payload.encode(),
       signature: this.signatureOrTag,
     })
 
@@ -177,7 +219,7 @@ export class StatusListCwt {
     const cwt = new Cwt({
       protectedHeaders: this.protectedHeaders,
       unprotectedHeaders: this.unprotectedHeaders,
-      payload: this.payload.encode(),
+      payload: this.originalPayloadBytes ?? this.payload.encode(),
       tag: this.signatureOrTag,
     })
 
