@@ -60,6 +60,7 @@ Tools specific to the [European Digital Identity (EUDI) Wallet](https://ec.europ
 | Package | Description | Status |
 |---------|-------------|--------|
 | [`@owf/eudi-lote`](./packages/eudi-lote) | ETSI TS 119 602 Lists of Trusted Entities (LoTE) | ✅ Available |
+| [`@owf/eudi-tl`](./packages/eudi-tl) | ETSI TS 119 612 XML Trusted Lists parsing and verification | ✅ Available |
 | [`@owf/eudi-wrprc`](./packages/eudi-wrprc) | ETSI TS 119 475 Wallet-Relying Party Registration Certificates | ✅ Available |
 | [`@owf/eudi-attestation-schema`](./packages/eudi-attestation-schema) | TS11 Catalogue of Attestations SchemaMeta | ✅ Available |
 | `@owf/eudi-certificates` | Registration and access certificate verification | 📋 Planned |
@@ -118,6 +119,18 @@ npm install @owf/eudi-lote
 ```
 
 📖 [View package documentation](./packages/eudi-lote/README.md)
+
+### @owf/eudi-tl
+
+[![@owf/eudi-tl version](https://img.shields.io/npm/v/@owf/eudi-tl)](https://npmjs.com/package/@owf/eudi-tl)
+
+Parsing, validation, and XAdES signature verification for ETSI TS 119 612 XML Trusted Lists, exposing normalized trust anchors. The XML counterpart of `@owf/eudi-lote`.
+
+```bash
+npm install @owf/eudi-tl
+```
+
+📖 [View package documentation](./packages/eudi-tl/README.md)
 
 ### @owf/eudi-wrprc
 
