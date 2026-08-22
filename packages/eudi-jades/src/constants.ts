@@ -9,17 +9,17 @@
  */
 export enum CommitmentOIDs {
   /** Proof of origin */
-  proofOfOrigin = '1.2.840.113549.1.9.16.6.1',
+  proofOfOrigin = 'urn:oid:1.2.840.113549.1.9.16.6.1',
   /** Proof of receipt */
-  proofOfReceipt = '1.2.840.113549.1.9.16.6.2',
+  proofOfReceipt = 'urn:oid:1.2.840.113549.1.9.16.6.2',
   /** Proof of delivery */
-  proofOfDelivery = '1.2.840.113549.1.9.16.6.3',
+  proofOfDelivery = 'urn:oid:1.2.840.113549.1.9.16.6.3',
   /** Proof of sender */
-  proofOfSender = '1.2.840.113549.1.9.16.6.4',
+  proofOfSender = 'urn:oid:1.2.840.113549.1.9.16.6.4',
   /** Proof of approval */
-  proofOfApproval = '1.2.840.113549.1.9.16.6.5',
+  proofOfApproval = 'urn:oid:1.2.840.113549.1.9.16.6.5',
   /** Proof of creation */
-  proofOfCreation = '1.2.840.113549.1.9.16.6.6',
+  proofOfCreation = 'urn:oid:1.2.840.113549.1.9.16.6.6',
 }
 
 /**
@@ -42,7 +42,11 @@ export enum JAdESProfile {
 export const DETACHED_MECHANISM_IDS = {
   /** HTTP Headers mechanism */
   httpHeaders: 'http://uri.etsi.org/19182/HttpHeaders',
-  /** Object digest mechanism */
+  /** URI dereferencing mechanism */
+  objectByUri: 'http://uri.etsi.org/19182/ObjectIdByURI',
+  /** URI digest mechanism */
+  objectByUriHash: 'http://uri.etsi.org/19182/ObjectIdByURIHash',
+  /** @deprecated Use objectByUriHash. */
   objectDigest: 'http://uri.etsi.org/19182/ObjectIdByURIHash',
 } as const
 
@@ -50,15 +54,4 @@ export const DETACHED_MECHANISM_IDS = {
  * Critical header parameters that must be understood.
  * ETSI TS 119 182-1 specifies these parameters as critical.
  */
-export const CRITICAL_PARAMETERS = [
-  'x5t#o',
-  'sigX5ts',
-  'sigT',
-  'sigD',
-  'sigPl',
-  'sigPId',
-  'srCms',
-  'srAts',
-  'adoTst',
-  'b64',
-] as const
+export const CRITICAL_PARAMETERS = ['sigD', 'b64'] as const

@@ -1,128 +1,68 @@
-/**
- * JAdES Type Definitions
- *
- * Types derived from Zod schemas as per ETSI TS 119 182-1 standard.
- * @see schemas.ts for schema definitions
- */
-
+/** Types derived from the ETSI TS 119 182-1 V1.2.1 runtime schemas. */
 import type { z } from 'zod'
-import type { CommitmentOIDs } from './constants'
 import type {
-  ArcTstSchema,
-  CompactJWSSchema,
+  AdoTstSchema,
+  CertIdSchema,
+  CommitmentReferenceSchema,
+  EtsiUClearInstanceSchema,
   EtsiUSchema,
+  FlattenedJWSSchema,
   GeneralJWSSchema,
+  OIdSchema,
+  PkiObjectSchema,
+  ProtectedHeaderParamsSchema,
   ProtectedHeaderSchema,
+  RRefsSchema,
   RValsSchema,
   SigDSchema,
   SignAlgSchema,
   SignaturePolicySchema,
-  SignerIdentifierSchema,
+  SignatureProductionPlaceSchema,
+  SignerAttributesSchema,
   SignOptionsSchema,
   SigTstSchema,
+  TstContainerSchema,
+  TstTokenSchema,
   TstTokensSchema,
   UnprotectedHeaderSchema,
+  ValidationValuesSchema,
+  VerifyOptionsSchema,
   X5tOSchema,
+  XRefsSchema,
   XValsSchema,
 } from './schemas'
 
-/**
- * Supported signature algorithms.
- */
 export type SignAlg = z.infer<typeof SignAlgSchema>
-
-/**
- * X.509 Certificate Thumbprint with algorithm specification.
- */
-export type X5tO = z.infer<typeof X5tOSchema>
-
-/**
- * Commitment reference as per ETSI TS 119 182-1 Section 5.2.5.
- */
-export interface CommitmentReference {
-  /** Commitment type identifier (OID or URI) */
-  commId: string | CommitmentOIDs
-  /** Commitment qualifiers */
-  commQuals?: object[]
-}
-
-/**
- * Signature policy descriptor.
- */
-export type SignaturePolicy = z.infer<typeof SignaturePolicySchema>
-
-/**
- * Signer identifier.
- */
-export type SignerIdentifier = z.infer<typeof SignerIdentifierSchema>
-
-/**
- * Detached signature descriptor - ETSI TS 119 182-1 Section 5.2.8.
- */
-export type SigD = z.infer<typeof SigDSchema>
-
-/**
- * JAdES Protected Header parameters as per ETSI TS 119 182-1.
- */
-export type ProtectedHeaderParams = z.infer<typeof ProtectedHeaderSchema>
-
-/**
- * JAdES Unprotected Header parameters.
- */
-export type UnprotectedHeaderParams = z.infer<typeof UnprotectedHeaderSchema>
-
-/**
- * ETSI Unsigned properties for different JAdES profiles.
- */
-export type EtsiU = z.infer<typeof EtsiUSchema>
-
-/**
- * Signature timestamp container.
- */
-export type SigTst = z.infer<typeof SigTstSchema>
-
-/**
- * Timestamp tokens container.
- */
+export type OId = z.infer<typeof OIdSchema>
+export type PkiObject = z.infer<typeof PkiObjectSchema>
+export type TstToken = z.infer<typeof TstTokenSchema>
+export type TstContainer = z.infer<typeof TstContainerSchema>
 export type TstTokens = z.infer<typeof TstTokensSchema>
-
-/**
- * X.509 certificate values for B-LT profile.
- */
+export type X5tO = z.infer<typeof X5tOSchema>
+export type CommitmentReference = z.infer<typeof CommitmentReferenceSchema>
+export type SignatureProductionPlace = z.infer<typeof SignatureProductionPlaceSchema>
+export type SignerAttributes = z.infer<typeof SignerAttributesSchema>
+export type SignaturePolicy = z.infer<typeof SignaturePolicySchema>
+export type SigD = z.infer<typeof SigDSchema>
+export type ProtectedHeaderParams = z.infer<typeof ProtectedHeaderParamsSchema>
+export type ProtectedHeader = z.infer<typeof ProtectedHeaderSchema>
+export type UnprotectedHeaderParams = z.infer<typeof UnprotectedHeaderSchema>
+export type EtsiU = z.infer<typeof EtsiUSchema>
+export type EtsiUClearInstance = z.infer<typeof EtsiUClearInstanceSchema>
+export type SigTst = z.infer<typeof SigTstSchema>
+export type AdoTst = z.infer<typeof AdoTstSchema>
 export type XVals = z.infer<typeof XValsSchema>
-
-/**
- * Revocation values (CRL and OCSP) for B-LT profile.
- */
 export type RVals = z.infer<typeof RValsSchema>
-
-/**
- * Archive timestamp for B-LTA profile.
- */
-export type ArcTst = z.infer<typeof ArcTstSchema>
-
-/**
- * General JWS structure with multiple signatures.
- */
+export type ValidationValues = z.infer<typeof ValidationValuesSchema>
+export type CertId = z.infer<typeof CertIdSchema>
+export type XRefs = z.infer<typeof XRefsSchema>
+export type RRefs = z.infer<typeof RRefsSchema>
+export type ArcTst = TstContainer
 export type GeneralJWS = z.infer<typeof GeneralJWSSchema>
+export type FlattenedJWS = z.infer<typeof FlattenedJWSSchema>
+export type CompactJWS = string
 
-/**
- * Compact JWS representation.
- */
-export type CompactJWS = z.infer<typeof CompactJWSSchema>
-
-/**
- * Sign options for JAdES signing.
- */
 export type SignOptions = z.infer<typeof SignOptionsSchema> & {
-  /** Signer function */
   signer: (data: string) => Promise<string>
 }
-
-/**
- * Verify options for JAdES verification.
- */
-export interface VerifyOptions {
-  /** Verifier function */
-  verifier: (data: string, signature: string) => Promise<boolean>
-}
+export type VerifyOptions = z.infer<typeof VerifyOptionsSchema>

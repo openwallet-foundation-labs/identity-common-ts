@@ -18,50 +18,80 @@ export { CommitmentOIDs, CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS, JAdESProfi
 // Exception
 export { JAdESException } from './jades-exception'
 // Profile validation
-export type { ProfileValidationResult } from './profile'
+export type { ProfileValidationOptions, ProfileValidationResult } from './profile'
 export { detectProfiles, validateProfile } from './profile'
 // Zod Schemas
 export {
+  AdoTstSchema,
   ArcTstSchema,
+  CertIdSchema,
+  ClaimedSigningTimeSchema,
+  CommitmentReferenceSchema,
   CompactJWSSchema,
+  EtsiUClearInstanceSchema,
   EtsiUSchema,
   FlattenedJWSSchema,
   GeneralJWSSchema,
+  OIdSchema,
+  PkiObjectSchema,
   ProtectedHeaderForSigningSchema,
+  ProtectedHeaderParamsSchema,
   ProtectedHeaderSchema,
+  RRefsSchema,
   RValsSchema,
   SigDSchema,
   SignAlgSchema,
+  SignaturePolicyQualifierSchema,
   SignaturePolicySchema,
-  SignerIdentifierSchema,
+  SignaturePolicyStoreSchema,
+  SignatureProductionPlaceSchema,
+  SignerAttributesSchema,
   SignOptionsSchema,
   SigTstSchema,
+  TstContainerSchema,
+  TstTokenSchema,
   TstTokensSchema,
   UnprotectedHeaderSchema,
+  ValidationValuesSchema,
+  VerifyOptionsSchema,
   X5tOSchema,
+  XRefsSchema,
   XValsSchema,
 } from './schemas'
 // Main Token class
 export { Token } from './token'
 // Types
 export type {
+  AdoTst,
   ArcTst,
+  CertId,
   CommitmentReference,
   CompactJWS,
   EtsiU,
+  EtsiUClearInstance,
+  FlattenedJWS,
   GeneralJWS,
+  OId,
+  PkiObject,
+  ProtectedHeader,
   ProtectedHeaderParams,
+  RRefs,
   RVals,
   SigD,
   SignAlg,
   SignaturePolicy,
-  SignerIdentifier,
+  SignatureProductionPlace,
+  SignerAttributes,
   SignOptions,
   SigTst,
+  TstContainer,
+  TstToken,
   TstTokens,
   UnprotectedHeaderParams,
+  ValidationValues,
   VerifyOptions,
   X5tO,
+  XRefs,
   XVals,
 } from './types'
 // Utility functions
@@ -70,8 +100,9 @@ export {
   generateX5c,
   generateX5tO,
   generateX5tS256,
+  getLegacySigningTime,
   getSigningTime,
 } from './utils'
 export type { VerifyResult } from './verifier'
 // Verifier functions
-export { decode, verify, verifyCompact, verifyGeneral } from './verifier'
+export { decode, verify, verifyCompact, verifyFlattened, verifyGeneral } from './verifier'

@@ -1,367 +1,399 @@
-/**
- * JAdES Zod Schemas
- *
- * Zod schemas for JAdES (JSON Advanced Electronic Signatures) as per ETSI TS 119 182-1.
- * Types are derived from these schemas via z.infer<>.
- *
- * @see https://www.etsi.org/deliver/etsi_ts/119100_119199/11918201/01.02.01_60/ts_11918201v010201p.pdf
- */
+/** Runtime schemas for ETSI TS 119 182-1 V1.2.1 JAdES components. */
 
+import { base64urlDecode } from '@owf/identity-common'
 import { z } from 'zod'
+import { DETACHED_MECHANISM_IDS } from './constants'
 
-// ============================================================================
-// Algorithm Schema
-// ============================================================================
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+const BASE64URL = /^[A-Za-z0-9_-]+$/
+const UTC_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/
+const text = z.string().min(1)
+const digestAlgorithm = text.refine((value) => value.toLowerCase() !== 'md5', 'MD5 is prohibited by clause 6.2.1')
+const b64 = text.regex(BASE64, 'Expected a base64-encoded string')
+const b64u = text.regex(BASE64URL, 'Expected an unpadded base64url-encoded string')
+const uri = text.refine((value) => {
+  try {
+    return Boolean(new URL(value).protocol)
+  } catch {
+    return false
+  }
+}, 'Expected an absolute URI')
+const uriReference = text.refine((value) => !/\s/.test(value), 'Expected a URI reference')
+const dateTime = text.refine((value) => !Number.isNaN(Date.parse(value)), 'Expected an RFC 3339 date-time')
 
-/**
- * Supported signature algorithms.
- */
-export const SignAlgSchema = z.enum(['ES256', 'ES384', 'ES512', 'RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512'])
+export const ClaimedSigningTimeSchema = z
+  .string()
+  .regex(UTC_SECONDS, 'Expected an RFC 3339 UTC timestamp without fractional seconds')
+  .refine((value) => !Number.isNaN(Date.parse(value)), 'Expected a valid date-time')
 
-// ============================================================================
-// X.509 Certificate Schemas
-// ============================================================================
+/** JWS algorithm identifier from the IANA JOSE registry. */
+export const SignAlgSchema = text.refine((value) => value.toLowerCase() !== 'none', 'alg must identify a signature')
 
-/**
- * X.509 Certificate Thumbprint with algorithm specification.
- * ETSI TS 119 182-1 Section 5.2.2.2
- */
-export const X5tOSchema = z.object({
-  /** Digest algorithm identifier (e.g., 'S384', 'S512') */
-  digAlg: z.string().min(1),
-  /** Base64url-encoded digest value */
-  digVal: z.string().min(1),
-})
+export const OIdSchema = z
+  .object({ id: uri, desc: z.string().optional(), docRefs: z.array(uri).min(1).optional() })
+  .strict()
 
-// ============================================================================
-// Commitment Reference Schema
-// ============================================================================
+export const PkiObjectSchema = z.object({ encoding: uri.optional(), specRef: z.string().optional(), val: b64 }).strict()
 
-/**
- * Commitment reference as per ETSI TS 119 182-1 Section 5.2.5.
- */
-export const CommitmentReferenceSchema = z.object({
-  /** Commitment type identifier (OID or URI) */
-  commId: z.string().min(1),
-  /** Commitment qualifiers */
-  commQuals: z.array(z.object({}).passthrough()).optional(),
-})
+export const TstTokenSchema = z
+  .object({ type: z.string().optional(), encoding: uri.optional(), specRef: z.string().optional(), val: b64 })
+  .strict()
+export const TstTokensSchema = z.array(TstTokenSchema).min(1)
+export const TstContainerSchema = z.object({ canonAlg: uri.optional(), tstTokens: TstTokensSchema }).strict()
+export const ArcTstSchema = TstContainerSchema
+/** sigTst and adoTst shall not contain canonAlg. */
+export const SigTstSchema = z.object({ tstTokens: TstTokensSchema }).strict()
+export const AdoTstSchema = SigTstSchema
 
-// ============================================================================
-// Signature Policy Schema
-// ============================================================================
-
-/**
- * Signature policy hash.
- */
-export const SignaturePolicyHashSchema = z.object({
-  hashAlgo: z.string().min(1),
-  hashVal: z.string().min(1),
-})
-
-/**
- * Signature policy descriptor.
- * ETSI TS 119 182-1 Section 5.2.4
- */
-export const SignaturePolicySchema = z.object({
-  /** Policy identifier */
-  sigPolicyId: z.string().optional(),
-  /** Policy hash */
-  sigPolicyHash: SignaturePolicyHashSchema.optional(),
-  /** Policy qualifiers */
-  sigPolicyQualifiers: z.array(z.object({}).passthrough()).optional(),
-})
-
-// ============================================================================
-// Signer Identifier Schema
-// ============================================================================
-
-/**
- * Issuer and serial number for signer identification.
- */
-export const IssuerSerialSchema = z.object({
-  issuer: z.string().min(1),
-  serialNumber: z.string().min(1),
-})
-
-/**
- * Signer identifier.
- * ETSI TS 119 182-1 Section 5.2.3
- */
-export const SignerIdentifierSchema = z.object({
-  /** Issuer and serial number */
-  issuerSerial: IssuerSerialSchema.optional(),
-  /** Subject key identifier */
-  subjectKeyIdentifier: z.string().optional(),
-})
-
-// ============================================================================
-// Detached Signature Descriptor Schema
-// ============================================================================
-
-/**
- * Detached signature descriptor.
- * ETSI TS 119 182-1 Section 5.2.8
- */
-export const SigDSchema = z.object({
-  /** Mechanism identifier */
-  mId: z.string().min(1),
-  /** Parameters (tuple of 2 strings) */
-  pars: z.tuple([z.string(), z.string()]),
-  /** Hash algorithm */
-  hashM: z.string().optional(),
-  /** Canonicalization algorithm */
-  ctM: z.string().optional(),
-})
-
-// ============================================================================
-// Timestamp Schemas (for B-T, B-LT, B-LTA profiles)
-// ============================================================================
-
-/**
- * Timestamp token value.
- */
-export const TstTokenValueSchema = z.object({
-  val: z.string().min(1),
-})
-
-/**
- * Timestamp tokens container.
- */
-export const TstTokensSchema = z.object({
-  tstTokens: z.array(TstTokenValueSchema).min(1),
-})
-
-/**
- * Signature timestamp container (for B-T profile).
- */
-export const SigTstSchema = z.object({
-  sigTst: TstTokensSchema,
-})
-
-/**
- * X.509 certificate values (for B-LT profile).
- */
-export const XValsSchema = z.object({
-  xVals: z.array(
-    z.object({
-      x509Cert: z.string().min(1),
+const CertificateDigestSchema = z.object({ digAlg: digestAlgorithm, digVal: b64u }).strict()
+export const X5tOSchema = CertificateDigestSchema.superRefine((value, context) => {
+  if (value.digAlg.toLowerCase() === 'sha-256') {
+    context.addIssue({
+      code: 'custom',
+      path: ['digAlg'],
+      message: 'x5t#o cannot use sha-256; use x5t#S256',
     })
-  ),
+  }
 })
 
-/**
- * Revocation values (for B-LT profile).
- */
-export const RValsSchema = z.object({
-  rVals: z.object({
-    crlVals: z.array(z.string()),
-    ocspVals: z.array(z.string()),
-  }),
-})
+export const CommitmentReferenceSchema = z
+  .object({
+    commId: OIdSchema,
+    commQuals: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
+  })
+  .strict()
 
-/**
- * Archive timestamp (for B-LTA profile).
- */
-export const ArcTstSchema = z.object({
-  arcTst: TstTokensSchema.extend({
-    canonAlg: z.string().optional(),
-  }),
-})
+export const SignatureProductionPlaceSchema = z
+  .object({
+    addressCountry: z.string().optional(),
+    addressLocality: z.string().optional(),
+    addressRegion: z.string().optional(),
+    postOfficeBoxNumber: z.string().optional(),
+    postalCode: z.string().optional(),
+    streetAddress: z.string().optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, 'sigPl must not be empty')
 
-/**
- * ETSI Unsigned properties for different JAdES profiles.
- */
-export const EtsiUSchema = z.union([
-  // B-T: Just timestamp
-  z.array(SigTstSchema),
-  // B-LT: timestamp + validation data
-  z.tuple([SigTstSchema, XValsSchema, RValsSchema]),
-  // B-LTA: timestamp + validation data + archive timestamp
-  z.tuple([SigTstSchema, XValsSchema, RValsSchema, ArcTstSchema]),
+export const QualifiedArraySchema = z
+  .array(z.object({ mediaType: text, encoding: text, qVals: z.array(z.unknown()).min(1) }).strict())
+  .min(1)
+
+export const CertifiedAttributeSchema = z.union([
+  z.object({ x509AttrCert: PkiObjectSchema }).strict(),
+  z.object({ otherAttrCert: PkiObjectSchema }).strict(),
+])
+export const SignerAttributesSchema = z
+  .object({
+    certified: z.array(CertifiedAttributeSchema).min(1).optional(),
+    claimed: QualifiedArraySchema.optional(),
+    signedAssertions: QualifiedArraySchema.optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, 'srAts must not be empty')
+
+const UserNoticeSchema = z
+  .object({
+    noticeRef: z
+      .object({ organization: z.string(), noticeNumbers: z.array(z.number().int()).min(1) })
+      .strict()
+      .optional(),
+    explText: z.string().optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, 'spUserNotice must not be empty')
+
+export const SignaturePolicyQualifierSchema = z.union([
+  z.object({ spURI: uri }).strict(),
+  z.object({ spUserNotice: UserNoticeSchema }).strict(),
+  z.object({ spDSpec: OIdSchema }).strict(),
 ])
 
-// ============================================================================
-// Protected Header Schema
-// ============================================================================
-
-/**
- * JAdES Protected Header parameters as per ETSI TS 119 182-1.
- */
-export const ProtectedHeaderSchema = z
+export const SignaturePolicySchema = z
   .object({
-    /** Signature algorithm (required for signing) */
-    alg: SignAlgSchema.optional(),
-
-    /** Content type */
-    cty: z.string().optional(),
-
-    /** Key ID - ETSI TS 119 182-1 Section 5.1.4 */
-    kid: z.string().optional(),
-
-    /** X.509 URL - ETSI TS 119 182-1 Section 5.1.5 */
-    x5u: z.string().url().optional(),
-
-    /** X.509 Certificate Chain - ETSI TS 119 182-1 Section 5.1.8 */
-    x5c: z.array(z.string().min(1)).min(1).optional(),
-
-    /** X.509 Certificate SHA-256 Thumbprint - ETSI TS 119 182-1 Section 5.1.7 */
-    'x5t#S256': z.string().min(1).optional(),
-
-    /** X.509 Certificate Thumbprint with Other Algorithm - ETSI TS 119 182-1 Section 5.2.2.2 */
-    'x5t#o': X5tOSchema.optional(),
-
-    /** X.509 Certificate Thumbprints for Chain - ETSI TS 119 182-1 Section 5.2.2.3 */
-    sigX5ts: z.array(X5tOSchema).min(2).optional(),
-
-    /** Signer's commitment reference - ETSI TS 119 182-1 Section 5.2.5 */
-    srCms: z.array(CommitmentReferenceSchema).optional(),
-
-    /** Signer's attributes reference */
-    srAts: z.array(z.object({}).passthrough()).optional(),
-
-    /** Signature policy - ETSI TS 119 182-1 Section 5.2.4 */
-    sigPl: SignaturePolicySchema.optional(),
-
-    /** Signer identifier */
-    sigPId: SignerIdentifierSchema.optional(),
-
-    /** Signing time - ETSI TS 119 182-1 Section 5.2.1 (ISO 8601) */
-    sigT: z.string().optional(),
-
-    /** Detached signature descriptor - ETSI TS 119 182-1 Section 5.2.8 */
-    sigD: SigDSchema.optional(),
-
-    /** Base64url encoding flag - RFC 7797 Section 3 */
-    b64: z.literal(false).optional(),
-
-    /** Critical headers */
-    crit: z.array(z.string()).optional(),
-
-    /** Issued at timestamp (Unix seconds) */
-    iat: z.number().int().positive().optional(),
-
-    /** Signed at timestamp (Unix seconds) */
-    signedAt: z.number().int().positive().optional(),
-
-    /** JWT ID */
-    jti: z.string().optional(),
-
-    /** Token type */
-    typ: z.string().optional(),
-
-    /** ADO timestamps */
-    adoTst: z.array(z.object({}).passthrough()).optional(),
+    id: OIdSchema,
+    digAlg: digestAlgorithm.optional(),
+    digVal: b64u.optional(),
+    digPSp: z.boolean().optional(),
+    sigPQuals: z.array(SignaturePolicyQualifierSchema).min(1).optional(),
   })
-  .passthrough()
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.digAlg === undefined) !== (value.digVal === undefined)) {
+      context.addIssue({ code: 'custom', message: 'sigPId digAlg and digVal must be present together' })
+    }
+    if (value.digPSp === true && !value.sigPQuals?.some((qualifier) => 'spDSpec' in qualifier)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sigPQuals'],
+        message: 'sigPId with digPSp=true requires an spDSpec qualifier',
+      })
+    }
+  })
 
-/**
- * Protected header schema for signing (alg required).
- */
-export const ProtectedHeaderForSigningSchema = ProtectedHeaderSchema.extend({
-  alg: SignAlgSchema,
-}).refine(
-  (header) => {
-    // At least one certificate header must be present
-    return !!(header['x5t#S256'] || header.x5c || header['x5t#o'] || header.sigX5ts)
-  },
-  {
-    message: 'JAdES signature requires at least one certificate header: x5t#S256, x5c, x5t#o, or sigX5ts',
+export const SigDSchema = z
+  .object({
+    mId: uri,
+    pars: z.array(z.string()).min(1),
+    hashM: digestAlgorithm.optional(),
+    hashV: z.array(b64u).min(1).optional(),
+    ctys: z.array(z.string()).min(1).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.hashM === undefined) !== (value.hashV === undefined)) {
+      context.addIssue({ code: 'custom', message: 'sigD hashM and hashV must be present together' })
+    }
+    if (value.hashV && value.hashV.length !== value.pars.length) {
+      context.addIssue({ code: 'custom', path: ['hashV'], message: 'hashV and pars must have equal length' })
+    }
+    if (value.ctys && value.ctys.length !== value.pars.length) {
+      context.addIssue({ code: 'custom', path: ['ctys'], message: 'ctys and pars must have equal length' })
+    }
+    if (value.mId === DETACHED_MECHANISM_IDS.httpHeaders) {
+      if (value.hashM || value.hashV || value.ctys) {
+        context.addIssue({ code: 'custom', message: 'HttpHeaders must not contain hashM, hashV, or ctys' })
+      }
+      if (value.pars.some((parameter) => parameter !== parameter.toLowerCase())) {
+        context.addIssue({ code: 'custom', path: ['pars'], message: 'HTTP header names must be lower-case' })
+      }
+    } else if (value.mId === DETACHED_MECHANISM_IDS.objectByUri) {
+      if (value.hashM || value.hashV) {
+        context.addIssue({ code: 'custom', message: 'ObjectIdByURI must not contain hashM or hashV' })
+      }
+    } else if (value.mId === DETACHED_MECHANISM_IDS.objectByUriHash && (!value.hashM || !value.hashV)) {
+      context.addIssue({ code: 'custom', message: 'ObjectIdByURIHash requires hashM and hashV' })
+    }
+  })
+
+export const SignaturePolicyStoreSchema = z.union([
+  z.object({ sigPolDoc: b64u, spDSpec: OIdSchema.optional() }).strict(),
+  z.object({ sigPolLocalURI: uriReference, spDSpec: OIdSchema.optional() }).strict(),
+])
+export const CertificateValueSchema = z.union([
+  z.object({ x509Cert: PkiObjectSchema }).strict(),
+  z.object({ otherCert: PkiObjectSchema }).strict(),
+])
+export const XValsSchema = z.array(CertificateValueSchema).min(1)
+export const RValsSchema = z
+  .object({
+    crlVals: z.array(PkiObjectSchema).min(1).optional(),
+    ocspVals: z.array(PkiObjectSchema).min(1).optional(),
+    otherVals: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, 'rVals must not be empty')
+export const ValidationValuesSchema = z
+  .object({ xVals: XValsSchema.optional(), rVals: RValsSchema.optional() })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, 'Validation values must not be empty')
+
+export const CertIdSchema = z
+  .object({ digAlg: digestAlgorithm, digVal: b64u, kid: b64.optional(), x5u: uriReference.optional() })
+  .strict()
+export const XRefsSchema = z.array(CertIdSchema).min(1)
+const CRLReferenceSchema = z
+  .object({
+    digAlg: digestAlgorithm,
+    digVal: b64u,
+    crlId: z
+      .object({
+        issuer: b64,
+        issueTime: dateTime,
+        number: z.number().optional(),
+        uri: uriReference.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+const OCSPReferenceSchema = z
+  .object({
+    ocspId: z
+      .object({
+        responderId: z.union([z.object({ byName: b64 }).strict(), z.object({ byKey: b64 }).strict()]),
+        producedAt: dateTime,
+        uri: uriReference.optional(),
+      })
+      .strict(),
+    digAlg: digestAlgorithm,
+    digVal: b64u,
+  })
+  .strict()
+export const RRefsSchema = z
+  .object({
+    crlRefs: z.array(CRLReferenceSchema).min(1).optional(),
+    ocspRefs: z.array(OCSPReferenceSchema).min(1).optional(),
+    otherRefs: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, 'rRefs must not be empty')
+
+export const JWSSignatureSchema = z
+  .object({
+    protected: b64u.optional(),
+    header: z.record(z.string(), z.unknown()).optional(),
+    signature: b64u,
+  })
+  .strict()
+export const GeneralJWSSchema = z
+  .object({ payload: z.string().optional(), signatures: z.array(JWSSignatureSchema).min(1) })
+  .strict()
+export const FlattenedJWSSchema = z
+  .object({
+    protected: b64u.optional(),
+    header: z.record(z.string(), z.unknown()).optional(),
+    payload: z.string().optional(),
+    signature: b64u,
+  })
+  .strict()
+export const CompactJWSSchema = z.object({ protected: b64u, payload: z.string(), signature: b64u }).strict()
+
+const CanonicalizedTstContainerSchema = TstContainerSchema.extend({ canonAlg: uri })
+const NoCanonTstContainerSchema = z.object({ canonAlg: z.never().optional(), tstTokens: TstTokensSchema }).strict()
+const sharedEtsiUInstances = [
+  z.object({ sigPSt: SignaturePolicyStoreSchema }).strict(),
+  z.object({ sigTst: SigTstSchema }).strict(),
+  z.object({ xVals: XValsSchema }).strict(),
+  z.object({ rVals: RValsSchema }).strict(),
+  z.object({ axVals: XValsSchema }).strict(),
+  z.object({ arVals: RValsSchema }).strict(),
+  z.object({ anyValData: ValidationValuesSchema }).strict(),
+  z.object({ tstVD: ValidationValuesSchema }).strict(),
+  z.object({ xRefs: XRefsSchema }).strict(),
+  z.object({ rRefs: RRefsSchema }).strict(),
+  z.object({ axRefs: XRefsSchema }).strict(),
+  z.object({ arRefs: RRefsSchema }).strict(),
+  z.object({ cSig: z.union([GeneralJWSSchema, FlattenedJWSSchema, z.string()]) }).strict(),
+] as const
+export const EtsiUClearInstanceSchema = z.union([
+  ...sharedEtsiUInstances,
+  z.object({ arcTst: CanonicalizedTstContainerSchema }).strict(),
+  z.object({ sigRTst: CanonicalizedTstContainerSchema }).strict(),
+  z.object({ rfsTst: CanonicalizedTstContainerSchema }).strict(),
+])
+const EncodedEtsiUInstanceSchema = z.union([
+  ...sharedEtsiUInstances,
+  z.object({ arcTst: NoCanonTstContainerSchema }).strict(),
+  z.object({ sigRTst: NoCanonTstContainerSchema }).strict(),
+  z.object({ rfsTst: NoCanonTstContainerSchema }).strict(),
+])
+const EncodedEtsiUSchema = z
+  .array(b64u)
+  .min(1)
+  .superRefine((items, context) => {
+    items.forEach((item, index) => {
+      try {
+        const result = EncodedEtsiUInstanceSchema.safeParse(JSON.parse(base64urlDecode(item)))
+        if (!result.success) context.addIssue({ code: 'custom', path: [index], message: 'Invalid encoded etsiU value' })
+      } catch {
+        context.addIssue({ code: 'custom', path: [index], message: 'Invalid encoded etsiU JSON value' })
+      }
+    })
+  })
+export const EtsiUSchema = z.union([z.array(EtsiUClearInstanceSchema).min(1), EncodedEtsiUSchema])
+export const UnprotectedHeaderSchema = z.object({ etsiU: EtsiUSchema }).strict()
+
+const protectedHeaderShape = {
+  alg: SignAlgSchema.optional(),
+  cty: z.string().optional(),
+  kid: z.string().optional(),
+  jku: uri.optional(),
+  jwk: z.record(z.string(), z.unknown()).optional(),
+  x5u: uri.optional(),
+  x5c: z.array(b64).min(1).optional(),
+  x5t: z.never().optional(),
+  'x5t#S256': b64u.optional(),
+  typ: z.string().optional(),
+  crit: z.array(text).min(1).optional(),
+  b64: z.boolean().optional(),
+  iat: z.number().int().optional(),
+  sigT: ClaimedSigningTimeSchema.optional(),
+  'x5t#o': X5tOSchema.optional(),
+  sigX5ts: z.array(CertificateDigestSchema).min(2).optional(),
+  srCms: z.array(CommitmentReferenceSchema).min(1).optional(),
+  sigPl: SignatureProductionPlaceSchema.optional(),
+  srAts: SignerAttributesSchema.optional(),
+  adoTst: AdoTstSchema.optional(),
+  sigPId: SignaturePolicySchema.optional(),
+  sigD: SigDSchema.optional(),
+  etsiU: z.never().optional(),
+}
+export const ProtectedHeaderParamsSchema = z.object(protectedHeaderShape).passthrough()
+
+function refineProtected(
+  header: z.infer<typeof ProtectedHeaderParamsSchema>,
+  context: z.RefinementCtx,
+  currentGeneration: boolean
+): void {
+  if (!header.alg) context.addIssue({ code: 'custom', path: ['alg'], message: 'alg is required' })
+  if (!(header['x5t#S256'] || header.x5c || header['x5t#o'] || header.sigX5ts)) {
+    context.addIssue({ code: 'custom', message: 'One certificate reference or x5c is required' })
   }
+  if (currentGeneration) {
+    if (header.iat === undefined) {
+      context.addIssue({ code: 'custom', path: ['iat'], message: 'iat is required for signatures generated now' })
+    }
+    if (header.sigT !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sigT'],
+        message: 'sigT is prohibited for signatures generated on or after 2025-07-15',
+      })
+    }
+  } else if ((header.iat === undefined) === (header.sigT === undefined)) {
+    context.addIssue({ code: 'custom', message: 'Exactly one of iat or sigT is required' })
+  }
+  if (header.crit && new Set(header.crit).size !== header.crit.length) {
+    context.addIssue({ code: 'custom', path: ['crit'], message: 'crit entries must be unique' })
+  }
+  const registeredJwsNames = new Set([
+    'alg',
+    'jku',
+    'jwk',
+    'kid',
+    'x5u',
+    'x5c',
+    'x5t',
+    'x5t#S256',
+    'typ',
+    'cty',
+    'crit',
+  ])
+  for (const parameter of header.crit ?? []) {
+    if (registeredJwsNames.has(parameter) || !(parameter in header)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['crit'],
+        message: `crit entry ${parameter} must name a present extension header parameter`,
+      })
+    }
+  }
+  if (header.b64 !== undefined && !header.crit?.includes('b64')) {
+    context.addIssue({ code: 'custom', path: ['crit'], message: 'crit must contain b64' })
+  }
+  if (header.sigD && !header.crit?.includes('sigD')) {
+    context.addIssue({ code: 'custom', path: ['crit'], message: 'crit must contain sigD' })
+  }
+  if (header.sigD?.mId === DETACHED_MECHANISM_IDS.httpHeaders && header.b64 !== false) {
+    context.addIssue({ code: 'custom', path: ['b64'], message: 'HttpHeaders requires b64=false' })
+  }
+}
+
+export const ProtectedHeaderSchema = ProtectedHeaderParamsSchema.superRefine((header, context) =>
+  refineProtected(header, context, false)
+)
+export const ProtectedHeaderForSigningSchema = ProtectedHeaderParamsSchema.superRefine((header, context) =>
+  refineProtected(header, context, true)
 )
 
-// ============================================================================
-// Unprotected Header Schema
-// ============================================================================
-
-/**
- * JAdES Unprotected Header parameters.
- */
-export const UnprotectedHeaderSchema = z
-  .object({
-    /** ETSI unsigned properties */
-    etsiU: EtsiUSchema.optional(),
-    /** Disclosures (for SD-JWT) */
-    disclosures: z.array(z.string()).optional(),
-    /** Key ID */
-    kid: z.string().optional(),
-    /** Key binding JWT */
-    kb_jwt: z.string().optional(),
-  })
-  .passthrough()
-
-// ============================================================================
-// JWS Serialization Schemas
-// ============================================================================
-
-/**
- * Signature entry in General JWS.
- */
-export const JWSSignatureSchema = z.object({
-  /** Base64url-encoded protected header */
-  protected: z.string().min(1),
-  /** Base64url-encoded signature */
-  signature: z.string().min(1),
-  /** Unprotected header */
-  header: UnprotectedHeaderSchema.optional(),
-})
-
-/**
- * General JWS structure with multiple signatures.
- */
-export const GeneralJWSSchema = z.object({
-  /** Base64url-encoded payload */
-  payload: z.string(),
-  /** Array of signature objects */
-  signatures: z.array(JWSSignatureSchema).min(1),
-})
-
-/**
- * Flattened JWS structure (single signature).
- */
-export const FlattenedJWSSchema = z.object({
-  /** Base64url-encoded protected header */
-  protected: z.string().min(1),
-  /** Base64url-encoded payload */
-  payload: z.string(),
-  /** Base64url-encoded signature */
-  signature: z.string().min(1),
-  /** Unprotected header */
-  header: UnprotectedHeaderSchema.optional(),
-})
-
-/**
- * Compact JWS representation.
- */
-export const CompactJWSSchema = z.object({
-  /** Base64url-encoded protected header */
-  protected: z.string().min(1),
-  /** Base64url-encoded payload */
-  payload: z.string(),
-  /** Base64url-encoded signature */
-  signature: z.string().min(1),
-})
-
-// ============================================================================
-// Sign/Verify Options Schemas
-// ============================================================================
-
-/**
- * Sign options for JAdES signing.
- */
 export const SignOptionsSchema = z.object({
-  /** Signature algorithm */
   alg: SignAlgSchema,
-  /** Key ID */
   kid: z.string().optional(),
-  /** X.509 certificates (PEM or base64 DER) */
   certificates: z.array(z.string()).optional(),
 })
-
-/**
- * Verify options for JAdES verification.
- */
 export const VerifyOptionsSchema = z.object({
-  /** Whether to skip signature validation (decode only) */
-  skipSignatureValidation: z.boolean().optional(),
+  detachedPayload: z.union([z.string(), z.instanceof(Uint8Array)]).optional(),
+  signatureIndex: z.number().int().nonnegative().optional(),
+  understoodCriticalParameters: z.array(text).optional(),
 })

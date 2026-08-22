@@ -1,222 +1,185 @@
-/**
- * JAdES Profile Validation
- *
- * Utilities for validating JAdES signatures against baseline profiles
- * as per ETSI TS 119 182-1.
- */
-
+/** Structural baseline-profile checks from ETSI TS 119 182-1 V1.2.1 clause 6.3. */
+import { base64urlDecode } from '@owf/identity-common'
 import { JAdESProfile } from './constants'
+import { ProtectedHeaderSchema, UnprotectedHeaderSchema } from './schemas'
 import type { ProtectedHeaderParams, UnprotectedHeaderParams } from './types'
 
-/**
- * Result of profile validation.
- */
+export interface ProfileValidationOptions {
+  /** Validation data is embedded in containers this package cannot inspect (for example RFC 3161 tokens). */
+  signatureValidationDataAvailable?: boolean
+  /** Time-stamp validation data is embedded in the time-stamps themselves. */
+  timestampValidationDataAvailable?: boolean
+}
+
 export interface ProfileValidationResult {
-  /** Whether the signature satisfies the profile requirements */
   valid: boolean
-  /** Missing requirements if validation failed */
   missing?: string[]
 }
 
-/**
- * Check if an etsiU array contains an element with the specified key.
- */
-function hasEtsiUElement(etsiU: unknown[] | undefined, key: 'sigTst' | 'xVals' | 'rVals' | 'arcTst'): boolean {
-  if (!etsiU || !Array.isArray(etsiU)) return false
-  return etsiU.some((item) => typeof item === 'object' && item !== null && key in item)
+type EtsiUItem = Record<string, unknown>
+
+function decodeEtsiU(header?: UnprotectedHeaderParams): EtsiUItem[] {
+  if (!header) return []
+  return header.etsiU.flatMap((item) => {
+    if (typeof item !== 'string') return [item as EtsiUItem]
+    try {
+      const decoded = JSON.parse(base64urlDecode(item))
+      return typeof decoded === 'object' && decoded !== null ? [decoded as EtsiUItem] : []
+    } catch {
+      return []
+    }
+  })
 }
 
-/**
- * Validate B-B (Basic - Baseline) profile requirements.
- *
- * Requirements:
- * - alg (signature algorithm) present
- * - At least one certificate header (x5t#S256, x5c, x5t#o, sigX5ts)
- * - sigT (signing time) present
- */
-function validateBB(header: ProtectedHeaderParams): ProfileValidationResult {
+function has(items: EtsiUItem[], name: string): boolean {
+  return items.some((item) => name in item)
+}
+
+function addSchemaIssues(
+  missing: string[],
+  prefix: string,
+  issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>
+): void {
+  for (const issue of issues) missing.push(`${prefix}${issue.path.join('.')}: ${issue.message}`)
+}
+
+function checkBaselineTimestamp(container: unknown, path: string, missing: string[], exactlyOne = false): void {
+  const tokens =
+    typeof container === 'object' &&
+    container !== null &&
+    Array.isArray((container as { tstTokens?: unknown }).tstTokens)
+      ? (container as { tstTokens: unknown[] }).tstTokens
+      : []
+  if (exactlyOne && tokens.length !== 1) missing.push(`${path} must contain exactly one RFC 3161 time-stamp token`)
+  for (const token of tokens) {
+    if (typeof token !== 'object' || token === null || Object.keys(token).length !== 1 || !('val' in token)) {
+      missing.push(`${path} baseline time-stamps must be RFC 3161 tokens represented only by val`)
+    }
+  }
+}
+
+function validateBB(
+  header: ProtectedHeaderParams,
+  unprotectedHeader?: UnprotectedHeaderParams
+): ProfileValidationResult {
   const missing: string[] = []
-
-  if (!header.alg) {
-    missing.push('alg (signature algorithm)')
+  const protectedResult = ProtectedHeaderSchema.safeParse(header)
+  if (!protectedResult.success) addSchemaIssues(missing, 'protected.', protectedResult.error.issues)
+  if (unprotectedHeader) {
+    const unprotectedResult = UnprotectedHeaderSchema.safeParse(unprotectedHeader)
+    if (!unprotectedResult.success) addSchemaIssues(missing, 'unprotected.', unprotectedResult.error.issues)
   }
-
-  const hasCertHeader = !!(header['x5t#S256'] || header.x5c || header['x5t#o'] || header.sigX5ts)
-  if (!hasCertHeader) {
-    missing.push('certificate header (x5t#S256, x5c, x5t#o, or sigX5ts)')
+  if (header.adoTst) checkBaselineTimestamp(header.adoTst, 'protected.adoTst', missing)
+  const items = decodeEtsiU(unprotectedHeader)
+  for (const item of items) {
+    for (const key of ['sigTst', 'arcTst', 'sigRTst', 'rfsTst'] as const) {
+      if (key in item) checkBaselineTimestamp(item[key], `etsiU.${key}`, missing, key === 'sigTst')
+    }
   }
-
-  if (!header.sigT) {
-    missing.push('sigT (signing time)')
+  if (has(items, 'sigPSt') && !header.sigPId?.digVal) {
+    missing.push('etsiU.sigPSt requires protected sigPId with digVal')
   }
-
-  return {
-    valid: missing.length === 0,
-    missing: missing.length > 0 ? missing : undefined,
+  for (const item of items) {
+    for (const key of ['xRefs', 'axRefs'] as const) {
+      const references = item[key]
+      if (
+        Array.isArray(references) &&
+        references.some((reference) => typeof reference === 'object' && reference && 'x5u' in reference)
+      ) {
+        missing.push(`etsiU.${key} must not contain x5u`)
+      }
+    }
   }
+  if ((has(items, 'axRefs') || has(items, 'arRefs')) && !header.srAts?.certified && !header.srAts?.signedAssertions) {
+    missing.push('axRefs and arRefs require a certified attribute or signed assertion in srAts')
+  }
+  return { valid: missing.length === 0, missing: missing.length ? missing : undefined }
 }
 
-/**
- * Validate B-T (Basic with Time) profile requirements.
- *
- * Requirements:
- * - All B-B requirements
- * - sigTst (signature timestamp) in etsiU
- */
 function validateBT(
   header: ProtectedHeaderParams,
   unprotectedHeader?: UnprotectedHeaderParams
 ): ProfileValidationResult {
-  const bbResult = validateBB(header)
-  const missing = bbResult.missing ? [...bbResult.missing] : []
-
-  const etsiU = unprotectedHeader?.etsiU as unknown[] | undefined
-  if (!hasEtsiUElement(etsiU, 'sigTst')) {
-    missing.push('sigTst (signature timestamp) in etsiU')
-  }
-
-  return {
-    valid: missing.length === 0,
-    missing: missing.length > 0 ? missing : undefined,
-  }
+  const missing = [...(validateBB(header, unprotectedHeader).missing ?? [])]
+  const items = decodeEtsiU(unprotectedHeader)
+  const timestamps = items.flatMap((item) => ('sigTst' in item ? [item.sigTst] : []))
+  if (timestamps.length === 0) missing.push('etsiU.sigTst is required')
+  return { valid: missing.length === 0, missing: missing.length ? missing : undefined }
 }
 
-/**
- * Validate B-LT (Basic Long-Term) profile requirements.
- *
- * Requirements:
- * - All B-T requirements
- * - xVals (certificate values) in etsiU
- * - rVals (revocation values) in etsiU
- */
+const REFERENCE_COMPONENTS = ['xRefs', 'rRefs', 'axRefs', 'arRefs', 'sigRTst', 'rfsTst'] as const
+
 function validateBLT(
   header: ProtectedHeaderParams,
-  unprotectedHeader?: UnprotectedHeaderParams
+  unprotectedHeader?: UnprotectedHeaderParams,
+  options: ProfileValidationOptions = {}
 ): ProfileValidationResult {
-  const btResult = validateBT(header, unprotectedHeader)
-  const missing = btResult.missing ? [...btResult.missing] : []
-
-  const etsiU = unprotectedHeader?.etsiU as unknown[] | undefined
-  if (!hasEtsiUElement(etsiU, 'xVals')) {
-    missing.push('xVals (certificate values) in etsiU')
-  }
-  if (!hasEtsiUElement(etsiU, 'rVals')) {
-    missing.push('rVals (revocation values) in etsiU')
+  const missing = [...(validateBT(header, unprotectedHeader).missing ?? [])]
+  const items = decodeEtsiU(unprotectedHeader)
+  for (const component of REFERENCE_COMPONENTS) {
+    if (has(items, component)) missing.push(`etsiU.${component} is prohibited at B-LT and B-LTA levels`)
   }
 
-  return {
-    valid: missing.length === 0,
-    missing: missing.length > 0 ? missing : undefined,
-  }
+  const valueContainers = items.flatMap((item) => {
+    if ('anyValData' in item) return [item.anyValData]
+    return [item]
+  })
+  const certificateValues =
+    options.signatureValidationDataAvailable ||
+    has(items, 'xVals') ||
+    valueContainers.some((value) => typeof value === 'object' && value !== null && 'xVals' in value)
+  const revocationValues =
+    options.signatureValidationDataAvailable ||
+    has(items, 'rVals') ||
+    valueContainers.some((value) => typeof value === 'object' && value !== null && 'rVals' in value)
+  if (!certificateValues) missing.push('Certificate validation values required for B-LT are not evidenced')
+  if (!revocationValues) missing.push('Revocation validation values required for B-LT are not evidenced')
+
+  const timestampData =
+    options.timestampValidationDataAvailable ||
+    items.some((item) => {
+      const value = 'tstVD' in item ? item.tstVD : 'anyValData' in item ? item.anyValData : undefined
+      return typeof value === 'object' && value !== null && 'xVals' in value && 'rVals' in value
+    })
+  if (!timestampData) missing.push('Validation data for electronic time-stamps is not evidenced')
+
+  return { valid: missing.length === 0, missing: missing.length ? missing : undefined }
 }
 
-/**
- * Validate B-LTA (Basic Long-Term with Archive timestamps) profile requirements.
- *
- * Requirements:
- * - All B-LT requirements
- * - arcTst (archive timestamp) in etsiU
- */
 function validateBLTA(
   header: ProtectedHeaderParams,
-  unprotectedHeader?: UnprotectedHeaderParams
+  unprotectedHeader?: UnprotectedHeaderParams,
+  options: ProfileValidationOptions = {}
 ): ProfileValidationResult {
-  const bltResult = validateBLT(header, unprotectedHeader)
-  const missing = bltResult.missing ? [...bltResult.missing] : []
-
-  const etsiU = unprotectedHeader?.etsiU as unknown[] | undefined
-  if (!hasEtsiUElement(etsiU, 'arcTst')) {
-    missing.push('arcTst (archive timestamp) in etsiU')
-  }
-
-  return {
-    valid: missing.length === 0,
-    missing: missing.length > 0 ? missing : undefined,
-  }
+  const missing = [...(validateBLT(header, unprotectedHeader, options).missing ?? [])]
+  if (!has(decodeEtsiU(unprotectedHeader), 'arcTst')) missing.push('etsiU.arcTst is required')
+  return { valid: missing.length === 0, missing: missing.length ? missing : undefined }
 }
 
-/**
- * Validate that a JAdES signature meets the requirements for a specific profile.
- *
- * @param header - Protected header parameters
- * @param profile - Target JAdES profile to validate
- * @param unprotectedHeader - Optional unprotected header (required for B-T, B-LT, B-LTA)
- * @returns Validation result with any missing requirements
- *
- * @example
- * ```typescript
- * import { validateProfile, JAdESProfile, decode } from '@owf/eudi-jades'
- *
- * const { header, unprotectedHeader } = decode(jws)
- * const result = validateProfile(header, JAdESProfile.B_T, unprotectedHeader)
- *
- * if (result.valid) {
- *   console.log('Signature meets B-T profile requirements')
- * } else {
- *   console.log('Missing:', result.missing)
- * }
- * ```
- */
 export function validateProfile(
   header: ProtectedHeaderParams,
   profile: JAdESProfile,
-  unprotectedHeader?: UnprotectedHeaderParams
+  unprotectedHeader?: UnprotectedHeaderParams,
+  options: ProfileValidationOptions = {}
 ): ProfileValidationResult {
   switch (profile) {
     case JAdESProfile.B_B:
-      return validateBB(header)
+      return validateBB(header, unprotectedHeader)
     case JAdESProfile.B_T:
       return validateBT(header, unprotectedHeader)
     case JAdESProfile.B_LT:
-      return validateBLT(header, unprotectedHeader)
+      return validateBLT(header, unprotectedHeader, options)
     case JAdESProfile.B_LTA:
-      return validateBLTA(header, unprotectedHeader)
-    default:
-      return {
-        valid: false,
-        missing: [`Unknown profile: ${profile}`],
-      }
+      return validateBLTA(header, unprotectedHeader, options)
   }
 }
 
-/**
- * Detect which JAdES profiles a signature satisfies.
- *
- * Returns all profiles the signature meets (e.g., a B-LT signature
- * also satisfies B-B and B-T requirements).
- *
- * @param header - Protected header parameters
- * @param unprotectedHeader - Optional unprotected header
- * @returns Array of satisfied profiles (highest to lowest)
- *
- * @example
- * ```typescript
- * import { detectProfiles, decode } from '@owf/eudi-jades'
- *
- * const { header, unprotectedHeader } = decode(jws)
- * const profiles = detectProfiles(header, unprotectedHeader)
- * // e.g., [JAdESProfile.B_LT, JAdESProfile.B_T, JAdESProfile.B_B]
- * ```
- */
 export function detectProfiles(
   header: ProtectedHeaderParams,
-  unprotectedHeader?: UnprotectedHeaderParams
+  unprotectedHeader?: UnprotectedHeaderParams,
+  options: ProfileValidationOptions = {}
 ): JAdESProfile[] {
-  const profiles: JAdESProfile[] = []
-
-  // Check from highest to lowest profile
-  if (validateBLTA(header, unprotectedHeader).valid) {
-    profiles.push(JAdESProfile.B_LTA)
-  }
-  if (validateBLT(header, unprotectedHeader).valid) {
-    profiles.push(JAdESProfile.B_LT)
-  }
-  if (validateBT(header, unprotectedHeader).valid) {
-    profiles.push(JAdESProfile.B_T)
-  }
-  if (validateBB(header).valid) {
-    profiles.push(JAdESProfile.B_B)
-  }
-
-  return profiles
+  return [JAdESProfile.B_LTA, JAdESProfile.B_LT, JAdESProfile.B_T, JAdESProfile.B_B].filter(
+    (profile) => validateProfile(header, profile, unprotectedHeader, options).valid
+  )
 }

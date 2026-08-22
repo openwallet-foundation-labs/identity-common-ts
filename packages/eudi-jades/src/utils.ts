@@ -50,8 +50,8 @@ export function generateX5tS256(certDer: string): string {
  */
 export function generateX5tO(certDer: string, algorithm: 'SHA-384' | 'SHA-512' = 'SHA-512'): X5tO {
   const algMap = {
-    'SHA-384': 'S384',
-    'SHA-512': 'S512',
+    'SHA-384': 'sha-384',
+    'SHA-512': 'sha-512',
   } as const
 
   const hashFn = algorithm === 'SHA-384' ? sha384 : sha512
@@ -73,11 +73,14 @@ export function generateX5tO(certDer: string, algorithm: 'SHA-384' | 'SHA-512' =
  * @param algorithm - Hash algorithm ('SHA-384' or 'SHA-512')
  * @returns Array of X5tO objects
  */
-export function generateSigX5ts(certsDer: string[], algorithm: 'SHA-384' | 'SHA-512' = 'SHA-512'): X5tO[] {
+export function generateSigX5ts(certsDer: string[], algorithm: 'SHA-256' | 'SHA-384' | 'SHA-512' = 'SHA-512'): X5tO[] {
   if (certsDer.length < 2) {
     throw new JAdESException('sigX5ts requires at least 2 certificates')
   }
 
+  if (algorithm === 'SHA-256') {
+    return certsDer.map((cert) => ({ digAlg: 'sha-256', digVal: generateX5tS256(cert) }))
+  }
   return certsDer.map((cert) => generateX5tO(cert, algorithm))
 }
 
@@ -97,6 +100,14 @@ export function encodeJSON(obj: object): string {
  *
  * @returns ISO 8601 timestamp string
  */
-export function getSigningTime(): string {
-  return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
+export function getSigningTime(): number {
+  return Math.floor(Date.now() / 1000)
+}
+
+/**
+ * Return the historical sigT representation accepted for signatures created before
+ * 2025-07-15. New signatures have to use the integer iat parameter instead.
+ */
+export function getLegacySigningTime(date = new Date()): string {
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z')
 }

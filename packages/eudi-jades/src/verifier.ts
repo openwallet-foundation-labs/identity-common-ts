@@ -1,202 +1,223 @@
-/**
- * JAdES Verifier
- *
- * Functions for verifying JAdES signatures.
- */
-
-import { base64urlDecode } from '@owf/identity-common'
+/** JAdES JWS decoding and cryptographic verification. */
+import { base64UrlToUint8Array, base64urlDecode, uint8ArrayToBase64Url } from '@owf/identity-common'
+import { CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS } from './constants'
 import { JAdESException } from './jades-exception'
-import { GeneralJWSSchema, ProtectedHeaderSchema, UnprotectedHeaderSchema } from './schemas'
-import type { GeneralJWS, ProtectedHeaderParams, UnprotectedHeaderParams } from './types'
+import { FlattenedJWSSchema, GeneralJWSSchema, ProtectedHeaderSchema, UnprotectedHeaderSchema } from './schemas'
+import type { FlattenedJWS, GeneralJWS, ProtectedHeader, UnprotectedHeaderParams, VerifyOptions } from './types'
 
-/**
- * Result of JAdES signature verification.
- */
+const decoder = new TextDecoder()
+const encoder = new TextEncoder()
+
 export interface VerifyResult<T = unknown> {
-  /** Decoded protected header */
-  header: ProtectedHeaderParams
-  /** Decoded payload */
+  header: ProtectedHeader
   payload: T
-  /** Unprotected header (if present) */
+  rawPayload: string
+  rawPayloadBytes: Uint8Array
   unprotectedHeader?: UnprotectedHeaderParams
-  /** Whether the signature is valid */
   valid: boolean
 }
 
-/**
- * Verify a JAdES signature in compact serialization.
- *
- * @param jws - Compact JWS string
- * @param verifier - Async function that verifies signature
- * @returns Promise resolving to verification result
- */
-export async function verifyCompact<T = unknown>(
-  jws: string,
-  verifier: (data: string, signature: string) => Promise<boolean>
-): Promise<VerifyResult<T>> {
-  const parts = jws.split('.')
+interface ParsedSignature<T> extends Omit<VerifyResult<T>, 'valid'> {
+  signingInput: string
+  signature: string
+}
 
-  if (parts.length !== 3) {
-    throw new JAdESException('Invalid JWS format: expected 3 parts')
+function formatIssues(issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>): string {
+  return issues.map((issue) => `${issue.path.join('.') || 'header'}: ${issue.message}`).join(', ')
+}
+
+function parseProtected(encoded: string | undefined): ProtectedHeader {
+  if (!encoded) throw new JAdESException('JAdES requires a JWS Protected Header')
+  let raw: unknown
+  try {
+    raw = JSON.parse(base64urlDecode(encoded))
+  } catch (error) {
+    throw new JAdESException('Invalid protected header encoding', error)
   }
-
-  const [encodedHeader, encodedPayload, signature] = parts
-  const signingInput = `${encodedHeader}.${encodedPayload}`
-
-  const valid = await verifier(signingInput, signature)
-
-  if (!valid) {
-    throw new JAdESException('Invalid signature')
+  const result = ProtectedHeaderSchema.safeParse(raw)
+  if (!result.success) {
+    throw new JAdESException(`Invalid protected header: ${formatIssues(result.error.issues)}`, result.error)
   }
+  return result.data as ProtectedHeader
+}
 
-  // Parse and validate header with Zod
-  const rawHeader = JSON.parse(base64urlDecode(encodedHeader))
-  const headerResult = ProtectedHeaderSchema.safeParse(rawHeader)
-  if (!headerResult.success) {
-    const errors = headerResult.error.issues.map((e) => e.message).join(', ')
-    throw new JAdESException(`Invalid protected header: ${errors}`)
+function parseUnprotected(raw: unknown): UnprotectedHeaderParams | undefined {
+  if (raw === undefined) return undefined
+  const result = UnprotectedHeaderSchema.safeParse(raw)
+  if (!result.success) {
+    throw new JAdESException(`Invalid unprotected header: ${formatIssues(result.error.issues)}`, result.error)
   }
-  const header = headerResult.data as ProtectedHeaderParams
+  return result.data
+}
 
-  const payload = encodedPayload ? (JSON.parse(base64urlDecode(encodedPayload)) as T) : ({} as T)
+function detachedBytes(payload: VerifyOptions['detachedPayload']): Uint8Array | undefined {
+  if (payload === undefined) return undefined
+  return typeof payload === 'string' ? encoder.encode(payload) : payload
+}
 
-  return {
-    header,
-    payload,
-    valid,
+function parsePayload<T>(value: string): T {
+  if (value === '') return undefined as T
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return value as T
   }
 }
 
-/**
- * Verify a JAdES signature in General JWS JSON serialization.
- *
- * @param generalJws - General JWS object
- * @param verifier - Async function that verifies signature
- * @param signatureIndex - Index of signature to verify (default: 0)
- * @returns Promise resolving to verification result
- */
+function parseSignature<T>(
+  encodedHeader: string | undefined,
+  serializedPayload: string | undefined,
+  signature: string,
+  unprotected: unknown,
+  options: VerifyOptions
+): ParsedSignature<T> {
+  const header = parseProtected(encodedHeader)
+  const understoodCriticalParameters = new Set([
+    ...CRITICAL_PARAMETERS,
+    ...(options.understoodCriticalParameters ?? []),
+  ])
+  const unsupportedCriticalParameter = header.crit?.find((parameter) => !understoodCriticalParameters.has(parameter))
+  if (unsupportedCriticalParameter) {
+    throw new JAdESException(`Unsupported critical header parameter: ${unsupportedCriticalParameter}`)
+  }
+  const suppliedBytes = detachedBytes(options.detachedPayload)
+  const suppliedPayload = suppliedBytes ? decoder.decode(suppliedBytes) : undefined
+  const objectDigest = header.sigD?.mId === DETACHED_MECHANISM_IDS.objectByUriHash
+
+  if (serializedPayload === undefined && suppliedPayload === undefined && !objectDigest) {
+    throw new JAdESException('Detached JWS payload is required for verification')
+  }
+
+  const signingPayload = objectDigest
+    ? ''
+    : suppliedPayload === undefined
+      ? (serializedPayload ?? '')
+      : header.b64 === false
+        ? suppliedPayload
+        : uint8ArrayToBase64Url(suppliedBytes as Uint8Array)
+
+  const rawPayloadBytes =
+    suppliedBytes ??
+    (serializedPayload === undefined
+      ? new Uint8Array()
+      : header.b64 === false
+        ? encoder.encode(serializedPayload)
+        : base64UrlToUint8Array(serializedPayload))
+  const rawPayload = decoder.decode(rawPayloadBytes)
+
+  return {
+    header,
+    payload: parsePayload<T>(rawPayload),
+    rawPayload,
+    rawPayloadBytes,
+    unprotectedHeader: parseUnprotected(unprotected),
+    signingInput: `${encodedHeader}.${signingPayload}`,
+    signature,
+  }
+}
+
+async function verifyParsed<T>(
+  parsed: ParsedSignature<T>,
+  verifier: (data: string, signature: string) => Promise<boolean>
+): Promise<VerifyResult<T>> {
+  if (!(await verifier(parsed.signingInput, parsed.signature))) throw new JAdESException('Invalid signature')
+  const { signingInput: _, signature: __, ...result } = parsed
+  return { ...result, valid: true }
+}
+
+export async function verifyCompact<T = unknown>(
+  jws: string,
+  verifier: (data: string, signature: string) => Promise<boolean>,
+  options: VerifyOptions = {}
+): Promise<VerifyResult<T>> {
+  const parts = jws.split('.')
+  if (parts.length !== 3) throw new JAdESException('Invalid compact JWS: expected 3 parts')
+  return verifyParsed(parseSignature<T>(parts[0], parts[1], parts[2], undefined, options), verifier)
+}
+
 export async function verifyGeneral<T = unknown>(
   generalJws: GeneralJWS,
   verifier: (data: string, signature: string) => Promise<boolean>,
-  signatureIndex = 0
+  signatureIndex = 0,
+  options: VerifyOptions = {}
 ): Promise<VerifyResult<T>> {
-  // Validate General JWS structure with Zod
-  const jwsResult = GeneralJWSSchema.safeParse(generalJws)
-  if (!jwsResult.success) {
-    const errors = jwsResult.error.issues.map((e) => e.message).join(', ')
-    throw new JAdESException(`Invalid General JWS structure: ${errors}`)
+  const result = GeneralJWSSchema.safeParse(generalJws)
+  if (!result.success) {
+    throw new JAdESException(`Invalid General JWS: ${formatIssues(result.error.issues)}`, result.error)
   }
-
-  // Use validated data
-  const validatedJws = jwsResult.data
-  const sig = validatedJws.signatures[signatureIndex]
-
-  if (!sig) {
-    throw new JAdESException(`Signature at index ${signatureIndex} not found`)
-  }
-
-  const signingInput = `${sig.protected}.${validatedJws.payload}`
-  const valid = await verifier(signingInput, sig.signature)
-
-  if (!valid) {
-    throw new JAdESException('Invalid signature')
-  }
-
-  // Parse and validate header with Zod
-  const rawHeader = JSON.parse(base64urlDecode(sig.protected))
-  const headerResult = ProtectedHeaderSchema.safeParse(rawHeader)
-  if (!headerResult.success) {
-    const errors = headerResult.error.issues.map((e) => e.message).join(', ')
-    throw new JAdESException(`Invalid protected header: ${errors}`)
-  }
-  const header = headerResult.data as ProtectedHeaderParams
-
-  const payload = validatedJws.payload ? (JSON.parse(base64urlDecode(validatedJws.payload)) as T) : ({} as T)
-
-  return {
-    header,
-    payload,
-    unprotectedHeader: sig.header as UnprotectedHeaderParams | undefined,
-    valid,
-  }
+  const selected = result.data.signatures[signatureIndex]
+  if (!selected) throw new JAdESException(`Signature at index ${signatureIndex} not found`)
+  return verifyParsed(
+    parseSignature<T>(selected.protected, result.data.payload, selected.signature, selected.header, options),
+    verifier
+  )
 }
 
-/**
- * Verify a JAdES signature (auto-detects format).
- *
- * @param jws - JWS string or GeneralJWS object
- * @param verifier - Async function that verifies signature
- * @returns Promise resolving to verification result
- */
+export async function verifyFlattened<T = unknown>(
+  flattenedJws: FlattenedJWS,
+  verifier: (data: string, signature: string) => Promise<boolean>,
+  options: VerifyOptions = {}
+): Promise<VerifyResult<T>> {
+  const result = FlattenedJWSSchema.safeParse(flattenedJws)
+  if (!result.success) {
+    throw new JAdESException(`Invalid Flattened JWS: ${formatIssues(result.error.issues)}`, result.error)
+  }
+  return verifyParsed(
+    parseSignature<T>(result.data.protected, result.data.payload, result.data.signature, result.data.header, options),
+    verifier
+  )
+}
+
 export async function verify<T = unknown>(
-  jws: string | GeneralJWS,
-  verifier: (data: string, signature: string) => Promise<boolean>
+  jws: string | GeneralJWS | FlattenedJWS,
+  verifier: (data: string, signature: string) => Promise<boolean>,
+  options: VerifyOptions = {}
 ): Promise<VerifyResult<T>> {
-  if (typeof jws === 'string') {
-    // Try to parse as JSON first (General JWS)
-    try {
-      const parsed = JSON.parse(jws) as GeneralJWS
-      if (parsed.signatures && Array.isArray(parsed.signatures)) {
-        return verifyGeneral<T>(parsed, verifier)
-      }
-    } catch {
-      // Not JSON, treat as compact
-    }
-    return verifyCompact<T>(jws, verifier)
+  if (typeof jws !== 'string') {
+    return 'signatures' in jws
+      ? verifyGeneral(jws, verifier, options.signatureIndex ?? 0, options)
+      : verifyFlattened(jws, verifier, options)
   }
-
-  return verifyGeneral<T>(jws, verifier)
+  try {
+    const parsed = JSON.parse(jws) as GeneralJWS | FlattenedJWS
+    return await verify(parsed, verifier, options)
+  } catch (error) {
+    if (error instanceof JAdESException) throw error
+    return verifyCompact(jws, verifier, options)
+  }
 }
 
-/**
- * Decode a JWS without verifying the signature.
- * Use this only for inspection - always verify before trusting the content.
- *
- * @param jws - JWS string or GeneralJWS object
- * @returns Decoded header and payload
- */
 export function decode<T = unknown>(
-  jws: string | GeneralJWS
-): {
-  header: ProtectedHeaderParams
-  payload: T
-  unprotectedHeader?: UnprotectedHeaderParams
-} {
+  jws: string | GeneralJWS | FlattenedJWS,
+  options: VerifyOptions = {}
+): Omit<VerifyResult<T>, 'valid'> {
+  let parsed: ParsedSignature<T>
   if (typeof jws === 'string') {
-    // Try JSON first
     try {
-      const parsed = JSON.parse(jws) as GeneralJWS
-      if (parsed.signatures && Array.isArray(parsed.signatures)) {
-        const sig = parsed.signatures[0]
-        const unprotectedResult = sig.header ? UnprotectedHeaderSchema.safeParse(sig.header) : undefined
-        return {
-          header: JSON.parse(base64urlDecode(sig.protected)) as ProtectedHeaderParams,
-          payload: parsed.payload ? (JSON.parse(base64urlDecode(parsed.payload)) as T) : ({} as T),
-          unprotectedHeader: unprotectedResult?.success
-            ? (unprotectedResult.data as UnprotectedHeaderParams)
-            : undefined,
-        }
-      }
-    } catch {
-      // Compact format
+      return decode(JSON.parse(jws) as GeneralJWS | FlattenedJWS, options)
+    } catch (error) {
+      if (error instanceof JAdESException) throw error
+      const parts = jws.split('.')
+      if (parts.length !== 3) throw new JAdESException('Invalid compact JWS: expected 3 parts')
+      parsed = parseSignature(parts[0], parts[1], parts[2], undefined, options)
     }
-
-    const parts = jws.split('.')
-    if (parts.length !== 3) {
-      throw new JAdESException('Invalid JWS format')
-    }
-
-    return {
-      header: JSON.parse(base64urlDecode(parts[0])) as ProtectedHeaderParams,
-      payload: parts[1] ? (JSON.parse(base64urlDecode(parts[1])) as T) : ({} as T),
-    }
+  } else if ('signatures' in jws) {
+    const result = GeneralJWSSchema.safeParse(jws)
+    if (!result.success) throw new JAdESException(`Invalid General JWS: ${formatIssues(result.error.issues)}`)
+    const signature = result.data.signatures[options.signatureIndex ?? 0]
+    if (!signature) throw new JAdESException(`Signature at index ${options.signatureIndex ?? 0} not found`)
+    parsed = parseSignature(signature.protected, result.data.payload, signature.signature, signature.header, options)
+  } else {
+    const result = FlattenedJWSSchema.safeParse(jws)
+    if (!result.success) throw new JAdESException(`Invalid Flattened JWS: ${formatIssues(result.error.issues)}`)
+    parsed = parseSignature(
+      result.data.protected,
+      result.data.payload,
+      result.data.signature,
+      result.data.header,
+      options
+    )
   }
-
-  const sig = jws.signatures[0]
-  const unprotectedResult = sig.header ? UnprotectedHeaderSchema.safeParse(sig.header) : undefined
-  return {
-    header: JSON.parse(base64urlDecode(sig.protected)) as ProtectedHeaderParams,
-    payload: jws.payload ? (JSON.parse(base64urlDecode(jws.payload)) as T) : ({} as T),
-    unprotectedHeader: unprotectedResult?.success ? (unprotectedResult.data as UnprotectedHeaderParams) : undefined,
-  }
+  const { signingInput: _, signature: __, ...decoded } = parsed
+  return decoded
 }
