@@ -6,6 +6,7 @@ with core bitstring handling, JWT transport, and CWT/CBOR transport — all in o
 ## Features
 
 - **Core StatusList**: Variable bit-width (1/2/4/8-bit) status entries with deflate compression
+- **Random index assignment**: Deterministic, non-repeating index allocation from a private seed
 - **JWT transport**: Create and decode Status List Tokens in JWT format
 - **CWT transport**: Create and decode Status List Tokens in CWT/CBOR format
 - **Referenced Token support**: Extract status claims from both JWT and CWT referenced tokens
@@ -39,6 +40,34 @@ list.getStatus(0)  // 0 (VALID)
 const compressed = list.compressStatusListToBytes()
 const restored = StatusList.decompressStatusListFromBytes(compressed, 1)
 ```
+
+### Randomly assign status-list indices
+
+Use a private, persisted seed to assign each index exactly once in a deterministic random order:
+
+```typescript
+import { createStatusListIndexAllocator } from '@owf/token-status-list'
+
+const allocator = await createStatusListIndexAllocator(1_000_000, seed)
+const index = allocator.next()
+const state = allocator.getState() // persist with the allocation counter
+```
+
+The seed must remain private to prevent predicting future assignments. Persist the allocator state
+and advance it atomically when issuing tokens; database transactions are the caller's responsibility.
+
+## Known limitation
+
+The compressed status-list format stores statuses in whole bytes, but does not
+store the original number of status entries. For example, three 1-bit entries
+are encoded in one byte, so decompressing that byte produces eight byte-aligned
+entries. The first three status values are preserved, but the original list
+length cannot be reconstructed from `bits` and `lst` alone.
+
+This is allowed by the specification: Section 4.1 permits the byte array to be
+the size of the number of Referenced Tokens multiplied by `bits` divided by 8,
+or greater. Section 13.4 recommends byte-aligned list sizes but does not require
+them. Callers that need the original logical length must preserve it separately.
 
 ### JWT transport — issue and read a Status List Token
 
@@ -118,6 +147,9 @@ const decoded = decodeCWTStatusClaim(encoded)
 | Export | Description |
 |--------|-------------|
 | `StatusList` | Main class — construct, get/set status, compress/decompress |
+| `createStatusListIndexAllocator` | Create a seeded allocator that returns each status-list index once |
+| `StatusListIndexAllocator` | Allocator class with `next()`, `remaining()`, and `getState()` |
+| `StatusListIndexAllocatorState` | Restorable allocator state type |
 | `SLException` | Error class thrown by status-list operations |
 | `StatusTypes` | Constants: `VALID`, `INVALID`, `SUSPENDED`, etc. |
 | `MediaTypes` | MIME types for JWT and CWT status list tokens |
