@@ -40,6 +40,19 @@ const compressed = list.compressStatusListToBytes()
 const restored = StatusList.decompressStatusListFromBytes(compressed, 1)
 ```
 
+## Known limitation
+
+The compressed status-list format stores statuses in whole bytes, but does not
+store the original number of status entries. For example, three 1-bit entries
+are encoded in one byte, so decompressing that byte produces eight byte-aligned
+entries. The first three status values are preserved, but the original list
+length cannot be reconstructed from `bits` and `lst` alone.
+
+This is allowed by the specification: Section 4.1 permits the byte array to be
+the size of the number of Referenced Tokens multiplied by `bits` divided by 8,
+or greater. Section 13.4 recommends byte-aligned list sizes but does not require
+them. Callers that need the original logical length must preserve it separately.
+
 ### JWT transport — issue and read a Status List Token
 
 ```typescript
