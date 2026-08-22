@@ -131,7 +131,7 @@ function parsePointers(schemeInfo: Element): TrustedListPointer[] | undefined {
 export function parseTrustedList(xml: string): TrustedList {
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   const root: Element | null = doc.documentElement
-  if (!root || root.localName !== 'TrustServiceStatusList') {
+  if (root?.localName !== 'TrustServiceStatusList') {
     throw new TrustedListParseException('Root element is not a TS 119 612 TrustServiceStatusList')
   }
 

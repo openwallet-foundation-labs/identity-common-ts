@@ -26,20 +26,20 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.13",
-    "@changesets/cli": "^2.31.1",
+    "@biomejs/biome": "2.5.10",
+    "@changesets/cli": "^3.0.1",
     "@owf/crypto": "workspace:*",
     "@owf/identity-common": "workspace:*",
     "@owf/token-status-list": "workspace:*",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.2.0",
-    "markdownlint-cli2": "^0.23.1",
-    "tsdown": "0.22.12",
-    "tsx": "^4.23.1",
-    "turbo": "^2.10.5",
+    "lint-staged": "^17.3.0",
+    "markdownlint-cli2": "^0.23.2",
+    "tsdown": "0.22.14",
+    "tsx": "^4.23.12",
+    "turbo": "^2.10.11",
     "typescript": "catalog:",
-    "vitest": "^4.1.10"
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=20"

@@ -84,8 +84,7 @@ const listAndSchemeInformationRefinement =
     }
 
     if (
-      !info.SchemeTypeCommunityRules ||
-      info.SchemeTypeCommunityRules.length !== 1 ||
+      info.SchemeTypeCommunityRules?.length !== 1 ||
       info.SchemeTypeCommunityRules[0].uriValue !== schemeTypeCommunityRulesUri
     ) {
       ctx.addIssue({
