@@ -1,0 +1,68 @@
+{
+  "name": "@owf/eudi-tl",
+  "version": "0.3.2",
+  "description": "Parse and verify ETSI TS 119 612 XML Trusted Lists, exposing normalized trust anchors",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-tl",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/eudi-tl"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs",
+        "default": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "keywords": [
+    "trusted-list",
+    "tsl",
+    "etsi",
+    "etsi-ts-119-612",
+    "eidas",
+    "eudi",
+    "wallet",
+    "x509",
+    "xades"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@owf/identity-common": "workspace:*",
+    "@peculiar/x509": "^1.12.3",
+    "@xmldom/xmldom": "^0.9.10",
+    "xadesjs": "^2.6.8",
+    "xpath": "^0.0.34",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}
