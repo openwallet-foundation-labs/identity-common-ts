@@ -175,6 +175,48 @@ describe('claims path pointers', () => {
     expect(credential.claims).toEqual([{ path: ['nationalities'] }, { path: ['places_of_work', null, 'city'] }])
   })
 
+  it('skips a rest schema that positional indices cannot address', () => {
+    const credential = toDcqlCredentialInput(
+      metaFor({
+        type: 'object',
+        properties: {
+          measurements: { type: 'array', prefixItems: [{ type: 'number' }], items: { type: 'number' } },
+          legacy_measurements: {
+            type: 'array',
+            items: [{ type: 'number' }],
+            additionalItems: { type: 'number' },
+          },
+        },
+      })
+    )
+
+    expect(credential.claims).toEqual([{ path: ['measurements', 0] }, { path: ['legacy_measurements', 0] }])
+  })
+
+  it('treats an empty positional item list as a plain array claim', () => {
+    const credential = toDcqlCredentialInput(
+      metaFor({
+        type: 'object',
+        properties: {
+          unconstrained: { type: 'array', items: [] },
+          unconstrained_prefix: { type: 'array', prefixItems: [] },
+        },
+      })
+    )
+
+    expect(credential.claims).toEqual([{ path: ['unconstrained'] }, { path: ['unconstrained_prefix'] }])
+  })
+
+  it('emits claims for a sub-schema shared between sibling properties', () => {
+    const address = { type: 'object', properties: { city: { type: 'string' } } }
+
+    const credential = toDcqlCredentialInput(
+      metaFor({ type: 'object', properties: { home_address: address, work_address: address } })
+    )
+
+    expect(credential.claims).toEqual([{ path: ['home_address', 'city'] }, { path: ['work_address', 'city'] }])
+  })
+
   it('terminates on a self-referencing schema without emitting an empty path', () => {
     const node: Record<string, unknown> = { type: 'object' }
     node.properties = { self: node, name: { type: 'string' } }

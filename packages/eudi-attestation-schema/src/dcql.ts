@@ -56,17 +56,18 @@ function isArraySchema(node: unknown): boolean {
 /**
  * Positional item schemas of a tuple-typed array, either as `prefixItems`
  * (JSON Schema 2020-12) or as the array form of `items` (draft-07 and earlier).
+ * An empty array carries no positional constraint and is not treated as a tuple.
  */
 function getTupleItemSchemas(node: unknown): unknown[] | undefined {
   if (!isPlainObject(node)) {
     return undefined
   }
 
-  if (Array.isArray(node.prefixItems)) {
+  if (Array.isArray(node.prefixItems) && node.prefixItems.length > 0) {
     return node.prefixItems
   }
 
-  if (Array.isArray(node.items)) {
+  if (Array.isArray(node.items) && node.items.length > 0) {
     return node.items
   }
 
@@ -106,12 +107,15 @@ function pushClaim(claims: DcqlClaim[], path: DcqlClaimsPathComponent[]): void {
  * Collects the claims below an array schema at `path`. Tuple entries are addressed by their
  * non-negative index, uniformly typed elements by the `null` wildcard, and an array of
  * primitives yields the array-valued claim itself.
+ *
+ * A rest schema alongside tuple entries (`items` next to `prefixItems`, or `additionalItems`)
+ * is skipped, because a claims path pointer cannot address every index from a position onwards.
  */
 function collectClaimsFromArraySchema(
   node: unknown,
   path: DcqlClaimsPathComponent[],
   claims: DcqlClaim[],
-  seen: Set<object>
+  ancestors: Set<object>
 ): void {
   const tupleItems = getTupleItemSchemas(node)
   if (tupleItems) {
@@ -119,7 +123,7 @@ function collectClaimsFromArraySchema(
       const itemPath = [...path, index]
 
       if (isObjectSchema(itemSchema) || isArraySchema(itemSchema)) {
-        collectClaimsFromSchema(itemSchema, itemPath, claims, seen)
+        collectClaimsFromSchema(itemSchema, itemPath, claims, ancestors)
       } else {
         pushClaim(claims, itemPath)
       }
@@ -130,7 +134,7 @@ function collectClaimsFromArraySchema(
 
   const items = isPlainObject(node) ? node.items : undefined
   if (items !== undefined && (isObjectSchema(items) || isArraySchema(items))) {
-    collectClaimsFromSchema(items, [...path, null], claims, seen)
+    collectClaimsFromSchema(items, [...path, null], claims, ancestors)
     return
   }
 
@@ -141,24 +145,37 @@ function collectClaimsFromSchema(
   node: unknown,
   path: DcqlClaimsPathComponent[],
   claims: DcqlClaim[],
-  seen: Set<object>
+  ancestors: Set<object>
 ): void {
   if (!isPlainObject(node)) {
     pushClaim(claims, path)
     return
   }
 
-  if (seen.has(node)) {
+  // Guards against schemas that reference themselves. The set holds the nodes on the current
+  // branch only, so a sub-schema shared between siblings still yields claims at every path it
+  // appears under.
+  if (ancestors.has(node)) {
     return
   }
-  seen.add(node)
 
+  ancestors.add(node)
+  collectClaimsFromSchemaNode(node, path, claims, ancestors)
+  ancestors.delete(node)
+}
+
+function collectClaimsFromSchemaNode(
+  node: Record<string, unknown>,
+  path: DcqlClaimsPathComponent[],
+  claims: DcqlClaim[],
+  ancestors: Set<object>
+): void {
   const combinatorKeys = ['allOf', 'anyOf', 'oneOf'] as const
   for (const key of combinatorKeys) {
     const variants = node[key]
     if (Array.isArray(variants)) {
       for (const variant of variants) {
-        collectClaimsFromSchema(variant, path, claims, seen)
+        collectClaimsFromSchema(variant, path, claims, ancestors)
       }
     }
   }
@@ -169,12 +186,12 @@ function collectClaimsFromSchema(
       const propertyPath = [...path, propertyName]
 
       if (isArraySchema(propertySchema)) {
-        collectClaimsFromArraySchema(propertySchema, propertyPath, claims, seen)
+        collectClaimsFromArraySchema(propertySchema, propertyPath, claims, ancestors)
         continue
       }
 
       if (isObjectSchema(propertySchema)) {
-        collectClaimsFromSchema(propertySchema, propertyPath, claims, seen)
+        collectClaimsFromSchema(propertySchema, propertyPath, claims, ancestors)
         continue
       }
 
@@ -185,7 +202,7 @@ function collectClaimsFromSchema(
   }
 
   if (isArraySchema(node)) {
-    collectClaimsFromArraySchema(node, path, claims, seen)
+    collectClaimsFromArraySchema(node, path, claims, ancestors)
     return
   }
 

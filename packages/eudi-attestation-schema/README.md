@@ -223,7 +223,7 @@ Claim extraction rules:
 - **Nested object properties** are recursed into; each leaf produces a multi-element path.
 - **Array properties with primitive items** produce a single path entry for the array field itself.
 - **Array properties with object or array items** are recursed into with a `null` wildcard appended to the path.
-- **Tuple-typed array properties** (`prefixItems`, or the array form of `items`) produce one path per position, addressed by its non-negative index — for example `{ "path": ["coordinates", 0] }`.
+- **Tuple-typed array properties** (a non-empty `prefixItems`, or the array form of `items`) produce one path per position, addressed by its non-negative index — for example `{ "path": ["coordinates", 0] }`. A rest schema next to those positions (`items` alongside `prefixItems`, or `additionalItems`) is skipped, because a claims path pointer cannot address every index from a position onwards.
 - Combinator keywords (`allOf`, `anyOf`, `oneOf`) are merged transparently.
 - Duplicate paths across combinators are deduplicated deterministically.
 - If no `parsedSchema` is available for a resolved reference, no `claims` key is added to the credential.
