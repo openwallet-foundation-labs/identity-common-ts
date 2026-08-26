@@ -3,13 +3,14 @@ import type {
   AttestationFormat,
   BuildDcqlFromSchemaMetaOptions,
   BuildDcqlFromSchemaMetaResult,
+  DcqlClaim,
+  DcqlClaimsPath,
+  DcqlClaimsPathComponent,
   DcqlTrustedAuthority,
   ResolvedSchemaReference,
   SchemaMeta,
   SchemaURIMeta,
 } from './types'
-
-type DcqlClaim = { path: Array<string | null> }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -49,7 +50,28 @@ function isArraySchema(node: unknown): boolean {
     return true
   }
 
-  return 'items' in node
+  return 'items' in node || 'prefixItems' in node
+}
+
+/**
+ * Positional item schemas of a tuple-typed array, either as `prefixItems`
+ * (JSON Schema 2020-12) or as the array form of `items` (draft-07 and earlier).
+ * An empty array carries no positional constraint and is not treated as a tuple.
+ */
+function getTupleItemSchemas(node: unknown): unknown[] | undefined {
+  if (!isPlainObject(node)) {
+    return undefined
+  }
+
+  if (Array.isArray(node.prefixItems) && node.prefixItems.length > 0) {
+    return node.prefixItems
+  }
+
+  if (Array.isArray(node.items) && node.items.length > 0) {
+    return node.items
+  }
+
+  return undefined
 }
 
 function isObjectSchema(node: unknown): boolean {
@@ -72,75 +94,119 @@ function isObjectSchema(node: unknown): boolean {
   return false
 }
 
+/** A claims path pointer MUST be non-empty, so the schema root itself never yields a claim. */
+function pushClaim(claims: DcqlClaim[], path: DcqlClaimsPathComponent[]): void {
+  if (path.length === 0) {
+    return
+  }
+
+  claims.push({ path: path as DcqlClaimsPath })
+}
+
+/**
+ * Collects the claims below an array schema at `path`. Tuple entries are addressed by their
+ * non-negative index, uniformly typed elements by the `null` wildcard, and an array of
+ * primitives yields the array-valued claim itself.
+ *
+ * A rest schema alongside tuple entries (`items` next to `prefixItems`, or `additionalItems`)
+ * is skipped, because a claims path pointer cannot address every index from a position onwards.
+ */
+function collectClaimsFromArraySchema(
+  node: unknown,
+  path: DcqlClaimsPathComponent[],
+  claims: DcqlClaim[],
+  ancestors: Set<object>
+): void {
+  const tupleItems = getTupleItemSchemas(node)
+  if (tupleItems) {
+    for (const [index, itemSchema] of tupleItems.entries()) {
+      const itemPath = [...path, index]
+
+      if (isObjectSchema(itemSchema) || isArraySchema(itemSchema)) {
+        collectClaimsFromSchema(itemSchema, itemPath, claims, ancestors)
+      } else {
+        pushClaim(claims, itemPath)
+      }
+    }
+
+    return
+  }
+
+  const items = isPlainObject(node) ? node.items : undefined
+  if (items !== undefined && (isObjectSchema(items) || isArraySchema(items))) {
+    collectClaimsFromSchema(items, [...path, null], claims, ancestors)
+    return
+  }
+
+  pushClaim(claims, path)
+}
+
 function collectClaimsFromSchema(
   node: unknown,
-  path: Array<string | null>,
+  path: DcqlClaimsPathComponent[],
   claims: DcqlClaim[],
-  seen: Set<object>
+  ancestors: Set<object>
 ): void {
   if (!isPlainObject(node)) {
-    if (path.length > 0) {
-      claims.push({ path })
-    }
+    pushClaim(claims, path)
     return
   }
 
-  if (seen.has(node)) {
+  // Guards against schemas that reference themselves. The set holds the nodes on the current
+  // branch only, so a sub-schema shared between siblings still yields claims at every path it
+  // appears under.
+  if (ancestors.has(node)) {
     return
   }
-  seen.add(node)
 
+  ancestors.add(node)
+  collectClaimsFromSchemaNode(node, path, claims, ancestors)
+  ancestors.delete(node)
+}
+
+function collectClaimsFromSchemaNode(
+  node: Record<string, unknown>,
+  path: DcqlClaimsPathComponent[],
+  claims: DcqlClaim[],
+  ancestors: Set<object>
+): void {
   const combinatorKeys = ['allOf', 'anyOf', 'oneOf'] as const
   for (const key of combinatorKeys) {
     const variants = node[key]
     if (Array.isArray(variants)) {
       for (const variant of variants) {
-        collectClaimsFromSchema(variant, path, claims, seen)
+        collectClaimsFromSchema(variant, path, claims, ancestors)
       }
     }
   }
 
   const properties = node.properties
   if (isPlainObject(properties)) {
-    const propertyEntries = Object.entries(properties)
-
-    for (const [propertyName, propertySchema] of propertyEntries) {
+    for (const [propertyName, propertySchema] of Object.entries(properties)) {
       const propertyPath = [...path, propertyName]
 
       if (isArraySchema(propertySchema)) {
-        const items = isPlainObject(propertySchema) ? propertySchema.items : undefined
-        if (items !== undefined && (isObjectSchema(items) || isArraySchema(items))) {
-          collectClaimsFromSchema(items, [...propertyPath, null], claims, seen)
-        } else {
-          claims.push({ path: propertyPath })
-        }
+        collectClaimsFromArraySchema(propertySchema, propertyPath, claims, ancestors)
         continue
       }
 
       if (isObjectSchema(propertySchema)) {
-        collectClaimsFromSchema(propertySchema, propertyPath, claims, seen)
+        collectClaimsFromSchema(propertySchema, propertyPath, claims, ancestors)
         continue
       }
 
-      claims.push({ path: propertyPath })
+      pushClaim(claims, propertyPath)
     }
 
     return
   }
 
-  const items = node.items
-  if (items !== undefined) {
-    if (isObjectSchema(items) || isArraySchema(items)) {
-      collectClaimsFromSchema(items, [...path, null], claims, seen)
-    } else if (path.length > 0) {
-      claims.push({ path })
-    }
+  if (isArraySchema(node)) {
+    collectClaimsFromArraySchema(node, path, claims, ancestors)
     return
   }
 
-  if (path.length > 0) {
-    claims.push({ path })
-  }
+  pushClaim(claims, path)
 }
 
 function getClaimsFromSchema(schemaRef?: ResolvedSchemaReference): DcqlClaim[] {

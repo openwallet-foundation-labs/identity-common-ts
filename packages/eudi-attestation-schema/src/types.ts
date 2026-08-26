@@ -111,6 +111,14 @@ export interface DcqlTrustedAuthority {
   values: string[]
 }
 
+export type DcqlClaimsPathComponent = string | number | null
+
+export type DcqlClaimsPath = [DcqlClaimsPathComponent, ...DcqlClaimsPathComponent[]]
+
+export interface DcqlClaim {
+  path: DcqlClaimsPath
+}
+
 export interface BuildDcqlFromSchemaMetaOptions {
   schemaMeta: SchemaMeta
   selectedFormats: AttestationFormat[]
