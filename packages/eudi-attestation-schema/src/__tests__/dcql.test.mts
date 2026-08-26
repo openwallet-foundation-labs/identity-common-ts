@@ -104,6 +104,129 @@ describe('toDcqlCredentialInput', () => {
   })
 })
 
+describe('claims path pointers', () => {
+  const metaFor = (parsedSchema: Record<string, unknown>) => ({
+    schemaMeta: schemaMeta()
+      .id('https://example.com/attestation/claims')
+      .version('1.0.0')
+      .rulebookURI('https://example.com/rulebook.md')
+      .rulebookIntegrity(RULEBOOK_INTEGRITY)
+      .attestationLoS('iso_18045_basic')
+      .bindingType('key')
+      .addSchemaURI(
+        schemaURI()
+          .format('dc+sd-jwt')
+          .uri('https://example.com/claims.json')
+          .integrity(SCHEMA_INTEGRITY)
+          .meta({ vct: 'eu.example.claims.1' })
+          .build()
+      )
+      .build(),
+    format: 'dc+sd-jwt' as const,
+    index: 0,
+    schemaRef: {
+      format: 'dc+sd-jwt' as const,
+      uri: 'https://example.com/claims.json',
+      integrity: SCHEMA_INTEGRITY,
+      rawSchema: parsedSchema,
+      parsedSchema,
+    },
+  })
+
+  it('addresses tuple entries with non-negative integers', () => {
+    const credential = toDcqlCredentialInput(
+      metaFor({
+        type: 'object',
+        properties: {
+          coordinates: {
+            type: 'array',
+            prefixItems: [{ type: 'number' }, { type: 'number' }],
+          },
+          legacy_tuple: {
+            type: 'array',
+            items: [{ type: 'string' }, { type: 'object', properties: { code: { type: 'string' } } }],
+          },
+        },
+      })
+    )
+
+    expect(credential.claims).toEqual([
+      { path: ['coordinates', 0] },
+      { path: ['coordinates', 1] },
+      { path: ['legacy_tuple', 0] },
+      { path: ['legacy_tuple', 1, 'code'] },
+    ])
+  })
+
+  it('addresses uniformly typed array elements with the null wildcard', () => {
+    const credential = toDcqlCredentialInput(
+      metaFor({
+        type: 'object',
+        properties: {
+          nationalities: { type: 'array', items: { type: 'string' } },
+          places_of_work: {
+            type: 'array',
+            items: { type: 'object', properties: { city: { type: 'string' } } },
+          },
+        },
+      })
+    )
+
+    expect(credential.claims).toEqual([{ path: ['nationalities'] }, { path: ['places_of_work', null, 'city'] }])
+  })
+
+  it('skips a rest schema that positional indices cannot address', () => {
+    const credential = toDcqlCredentialInput(
+      metaFor({
+        type: 'object',
+        properties: {
+          measurements: { type: 'array', prefixItems: [{ type: 'number' }], items: { type: 'number' } },
+          legacy_measurements: {
+            type: 'array',
+            items: [{ type: 'number' }],
+            additionalItems: { type: 'number' },
+          },
+        },
+      })
+    )
+
+    expect(credential.claims).toEqual([{ path: ['measurements', 0] }, { path: ['legacy_measurements', 0] }])
+  })
+
+  it('treats an empty positional item list as a plain array claim', () => {
+    const credential = toDcqlCredentialInput(
+      metaFor({
+        type: 'object',
+        properties: {
+          unconstrained: { type: 'array', items: [] },
+          unconstrained_prefix: { type: 'array', prefixItems: [] },
+        },
+      })
+    )
+
+    expect(credential.claims).toEqual([{ path: ['unconstrained'] }, { path: ['unconstrained_prefix'] }])
+  })
+
+  it('emits claims for a sub-schema shared between sibling properties', () => {
+    const address = { type: 'object', properties: { city: { type: 'string' } } }
+
+    const credential = toDcqlCredentialInput(
+      metaFor({ type: 'object', properties: { home_address: address, work_address: address } })
+    )
+
+    expect(credential.claims).toEqual([{ path: ['home_address', 'city'] }, { path: ['work_address', 'city'] }])
+  })
+
+  it('terminates on a self-referencing schema without emitting an empty path', () => {
+    const node: Record<string, unknown> = { type: 'object' }
+    node.properties = { self: node, name: { type: 'string' } }
+
+    const credential = toDcqlCredentialInput(metaFor(node))
+
+    expect(credential.claims).toEqual([{ path: ['name'] }])
+  })
+})
+
 describe('buildDcqlFromSchemaMeta', () => {
   it('creates credentials for selected formats', () => {
     const meta = schemaMeta()
