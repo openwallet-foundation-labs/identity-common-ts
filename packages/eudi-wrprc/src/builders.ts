@@ -101,14 +101,17 @@ export class WRPRCBuilder {
   }
 
   /**
-   * Add a service description in a specific language
+   * Add a service description in a specific language.
+   *
+   * `srv_description` is an array of services, each localized into one or more languages
+   * (B.2.1). Consecutive calls localize the same service; repeating a language starts the
+   * next one.
    */
   serviceDescription(description: string, lang = 'en'): this {
     this.payload.srv_description = this.payload.srv_description ?? []
-    // Each service description is an array of localized strings
-    const existing = this.payload.srv_description.find((group) => group.some((d) => d.lang === lang))
-    if (existing) {
-      existing.push({ lang, value: description })
+    const current = this.payload.srv_description.at(-1)
+    if (current && !current.some((d) => d.lang === lang)) {
+      current.push({ lang, value: description })
     } else {
       this.payload.srv_description.push([{ lang, value: description }])
     }
@@ -248,35 +251,24 @@ export class WRPRCBuilder {
   }
 
   /**
-   * Add a provided attestation as either a credential object or schema metadata string.
+   * Add a credential issued by the WRP (Table 8, `provides_attestations`), either as a
+   * `Credential` object or as a URL pointing at its machine-readable scheme.
    *
-   * The final payload must use one format consistently: all credentials or all strings.
+   * A payload must use one form throughout: all credentials or all URLs.
    */
   addProvidedAttestation(attestation: Credential | string): this {
     const existing = this.payload.provides_attestations
 
     if (!existing) {
-      if (typeof attestation === 'string') {
-        this.payload.provides_attestations = [attestation] as string[]
-      } else {
-        this.payload.provides_attestations = [attestation] as Credential[]
-      }
+      this.payload.provides_attestations = [attestation] as Credential[] | string[]
       return this
     }
 
-    if (typeof attestation === 'string') {
-      if (existing.length > 0 && typeof existing[0] !== 'string') {
-        throw new WRPRCException('provides_attestations must be either an array of credentials or an array of strings')
-      }
-      ;(existing as string[]).push(attestation)
-      return this
+    if (existing.length > 0 && (typeof existing[0] === 'string') !== (typeof attestation === 'string')) {
+      throw new WRPRCException('provides_attestations must be either all credentials or all scheme URLs')
     }
 
-    if (existing.length > 0 && typeof existing[0] === 'string') {
-      throw new WRPRCException('provides_attestations must be either an array of credentials or an array of strings')
-    }
-
-    ;(existing as Credential[]).push(attestation)
+    ;(existing as unknown[]).push(attestation)
     return this
   }
 
@@ -400,9 +392,10 @@ export class CredentialBuilder {
   }
 
   /**
-   * Add a simple path claim
+   * Add a simple path claim. Use an integer for an array index and null to select
+   * every element of an array, per the DCQL claims path pointer.
    */
-  addPathClaim(...path: string[]): this {
+  addPathClaim(...path: (string | number | null)[]): this {
     this.credential.claim = this.credential.claim ?? []
     this.credential.claim.push({ path })
     return this

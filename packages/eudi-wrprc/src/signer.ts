@@ -3,13 +3,17 @@
  *
  * Functions for creating and signing ETSI TS 119 475 Wallet-Relying Party Registration Certificates.
  *
+ * GEN-5.2.1-04 requires the JWT to carry a JAdES signature with the B-B profile of
+ * ETSI TS 119 182-1, so signing and decoding go through `@owf/eudi-jades`.
+ *
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
 import { pemToDer } from '@owf/crypto'
-import { base64urlEncode, decodeJwt, nowInSeconds } from '@owf/identity-common'
+import { decode, JAdESProfile, Token, validateProfile } from '@owf/eudi-jades'
+import { toWRPRCDialect, WRPRC_DIALECTS } from './dialect'
 import type { SignedWRPRC, SignOptions, WRPRCJWTHeader, WRPRCPayload } from './types'
-import { assertValidWRPRCPayload } from './validator'
+import { assertValidWRPRCPayload, parseWRPRCPayload } from './validator'
 import { WRPRCException } from './wrprc-exception'
 
 // ============================================================================
@@ -17,13 +21,21 @@ import { WRPRCException } from './wrprc-exception'
 // ============================================================================
 
 /**
- * Sign a WRPRC payload to create a JWT
+ * Sign a WRPRC payload into a JAdES B-B signed JWT
  *
  * @param options - Signing options including payload, algorithm, certificates, and signer
  * @returns Signed WRPRC with JWS string and decoded parts
  */
 export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
-  const { payload, algorithm = 'ES256', certificates, keyId, signer } = options
+  const {
+    payload,
+    algorithm = 'ES256',
+    certificates,
+    keyId,
+    signer,
+    signingTime,
+    dialect = WRPRC_DIALECTS.CURRENT,
+  } = options
 
   // Validate payload
   assertValidWRPRCPayload(payload)
@@ -41,29 +53,16 @@ export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
     return content
   })
 
-  // Create JWT header
-  const header: WRPRCJWTHeader = {
-    typ: 'rc-wrp+jwt',
-    alg: algorithm,
-    x5c,
-    iat: nowInSeconds(),
-    ...(keyId && { kid: keyId }),
-  }
+  const token = new Token(toWRPRCDialect(payload, dialect))
+    .setProtectedHeader({ typ: 'rc-wrp+jwt', alg: algorithm, ...(keyId && { kid: keyId }) })
+    .setX5c(x5c)
+    .setSigningTime(signingTime)
 
-  // Encode header and payload
-  const encodedHeader = base64urlEncode(JSON.stringify(header))
-  const encodedPayload = base64urlEncode(JSON.stringify(payload))
-  const signingInput = `${encodedHeader}.${encodedPayload}`
-
-  // Sign
-  const signature = await signer(signingInput)
-
-  // Create compact JWS
-  const jws = `${signingInput}.${signature}`
+  await token.sign(signer)
 
   return {
-    jws,
-    header,
+    jws: token.toString(),
+    header: token.getProtectedHeader() as WRPRCJWTHeader,
     payload,
   }
 }
@@ -73,26 +72,42 @@ export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
 // ============================================================================
 
 /**
- * Decode a signed WRPRC JWT (without verification)
+ * Decode a signed WRPRC JWT (without cryptographic verification)
  *
  * @param jws - The compact JWS string
  * @returns Decoded WRPRC with header and payload
  */
 export function decodeWRPRC(jws: string): SignedWRPRC {
-  const decoded = decodeJwt(jws)
+  let decoded: ReturnType<typeof decode<WRPRCPayload>>
+  try {
+    decoded = decode<WRPRCPayload>(jws)
+  } catch (error) {
+    throw new WRPRCException(
+      `WRPRC signature does not meet the JAdES B-B profile (GEN-5.2.1-04): ${(error as Error).message}`,
+      error
+    )
+  }
 
   // Validate typ header
   if (decoded.header.typ !== 'rc-wrp+jwt') {
     throw new WRPRCException(`Invalid WRPRC type: expected "rc-wrp+jwt", got "${decoded.header.typ}"`)
   }
 
+  // GEN-5.2.1-04
+  const profile = validateProfile(decoded.header, JAdESProfile.B_B, decoded.unprotectedHeader)
+  if (!profile.valid) {
+    throw new WRPRCException(
+      `WRPRC signature does not meet the JAdES B-B profile (GEN-5.2.1-04): ${profile.missing?.join(', ')}`
+    )
+  }
+
   // Validate payload structure
-  assertValidWRPRCPayload(decoded.payload)
+  const payload = parseWRPRCPayload(decoded.payload)
 
   return {
     jws,
     header: decoded.header as WRPRCJWTHeader,
-    payload: decoded.payload as WRPRCPayload,
+    payload,
   }
 }
 
@@ -103,8 +118,11 @@ export function decodeWRPRC(jws: string): SignedWRPRC {
  * @returns Decoded parts without validation
  */
 export function parseWRPRC(jws: string): { header: unknown; payload: unknown; signature: string } {
-  const decoded = decodeJwt(jws)
   const parts = jws.split('.')
+  if (parts.length !== 3) {
+    throw new WRPRCException('Invalid compact JWS: expected 3 parts')
+  }
+  const decoded = decode(jws)
 
   return {
     header: decoded.header,

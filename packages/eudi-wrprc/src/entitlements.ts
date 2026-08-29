@@ -171,16 +171,27 @@ export const IDENTIFIER_TYPES = {
 } as const
 
 /**
- * Mapping from identifier type URIs to semantic identifier prefixes
- * as defined in ETSI EN 319 412-1
+ * Mapping from identifier type URIs to semantic identifier initial characters
+ * for legal persons (Table 2, ETSI EN 319 412-1 clause 5.1.4).
+ *
+ * Note that the TIN type maps to the `VAT` initial characters for legal persons.
  */
-export const IDENTIFIER_TYPE_TO_PREFIX: Record<string, string> = {
+export const LEGAL_PERSON_IDENTIFIER_PREFIXES: Record<string, string> = {
   [IDENTIFIER_TYPES.EORI]: 'EOR',
   [IDENTIFIER_TYPES.LEI]: 'LEI',
   [IDENTIFIER_TYPES.EUID]: 'NTR',
   [IDENTIFIER_TYPES.VATIN]: 'VAT',
-  [IDENTIFIER_TYPES.TIN]: 'TIN',
+  [IDENTIFIER_TYPES.TIN]: 'VAT',
   [IDENTIFIER_TYPES.EXCISE]: 'EXC',
+}
+
+/**
+ * Mapping from identifier type URIs to semantic identifier initial characters
+ * for natural persons (Table 4, ETSI EN 319 412-1 clause 5.1.3).
+ */
+export const NATURAL_PERSON_IDENTIFIER_PREFIXES: Record<string, string> = {
+  [IDENTIFIER_TYPES.VATIN]: 'TIN',
+  [IDENTIFIER_TYPES.TIN]: 'TIN',
 }
 
 // ============================================================================
@@ -240,8 +251,12 @@ export function hasAttestationProviderEntitlement(entitlements: string[]): boole
 }
 
 /**
- * Get the semantic identifier prefix for a given identifier type URI
+ * Get the semantic identifier initial characters for a given identifier type URI
+ *
+ * @param subjectType - Which mapping to use: Table 2 for legal persons, Table 4 for natural persons
  */
-export function getIdentifierPrefix(typeUri: string): string | undefined {
-  return IDENTIFIER_TYPE_TO_PREFIX[typeUri]
+export function getIdentifierPrefix(typeUri: string, subjectType: 'legal' | 'natural' = 'legal'): string | undefined {
+  return subjectType === 'legal'
+    ? LEGAL_PERSON_IDENTIFIER_PREFIXES[typeUri]
+    : NATURAL_PERSON_IDENTIFIER_PREFIXES[typeUri]
 }
