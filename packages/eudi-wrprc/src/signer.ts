@@ -58,7 +58,7 @@ export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
     .setX5c(x5c)
     .setSigningTime(signingTime)
 
-  await token.sign(signer)
+  await token.sign(async (data) => signer(data))
 
   return {
     jws: token.toString(),

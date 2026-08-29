@@ -108,12 +108,13 @@ export class WRPRCBuilder {
    * next one.
    */
   serviceDescription(description: string, lang = 'en'): this {
-    this.payload.srv_description = this.payload.srv_description ?? []
-    const current = this.payload.srv_description.at(-1)
-    if (current && !current.some((d) => d.lang === lang)) {
+    const groups = this.payload.srv_description ?? []
+    this.payload.srv_description = groups
+    const current = groups[groups.length - 1]
+    if (current && !current.some((entry) => entry.lang === lang)) {
       current.push({ lang, value: description })
     } else {
-      this.payload.srv_description.push([{ lang, value: description }])
+      groups.push([{ lang, value: description }])
     }
     return this
   }
