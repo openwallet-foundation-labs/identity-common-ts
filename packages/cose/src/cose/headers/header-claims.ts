@@ -62,6 +62,9 @@ export type ExtendedCoseHeaderClaimEntries<Entries extends EntriesBase> = Extend
  * plus the given ones. An entry reusing a registered label replaces it, so a profile can also
  * narrow an existing claim (e.g. requiring `typ` to be a specific media type).
  *
+ * The registered header claim names are used in validation errors out of the box. Pass `keyLabels`
+ * to name the added labels too — a numeric TypeScript enum can be passed straight in.
+ *
  * @example
  * ```ts
  * const statusListHeaderClaimsSchema = extendCoseHeaderClaims([
@@ -70,9 +73,21 @@ export type ExtendedCoseHeaderClaimEntries<Entries extends EntriesBase> = Extend
  * ```
  */
 export function extendCoseHeaderClaims<const Entries extends EntriesBase>(
-  entries: Entries
+  entries: Entries,
+  {
+    keyLabels,
+  }: {
+    /**
+     * Human-readable names for the added header labels, merged with the registered COSE header
+     * claim names. See the `keyLabels` option of `typedMap`.
+     */
+    keyLabels?: Record<string | number, unknown>
+  } = {}
 ): ReturnType<typeof typedMap<ExtendedCoseHeaderClaimEntries<Entries>>> {
-  return typedMap(extendTypedMapEntries(coseHeaderClaimEntries, entries), { allowAdditionalKeys: true })
+  return typedMap(extendTypedMapEntries(coseHeaderClaimEntries, entries), {
+    allowAdditionalKeys: true,
+    keyLabels: { ...RegisteredCwtHeaderClaimKey, ...keyLabels },
+  })
 }
 
 // Widen a typed-map type to also allow access to any other integer label.

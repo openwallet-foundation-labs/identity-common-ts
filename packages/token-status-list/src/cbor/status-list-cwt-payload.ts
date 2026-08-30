@@ -21,12 +21,15 @@ export enum StatusListCwtClaimKey {
  *
  * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-13.html#name-status-list-token-in-cwt-fo
  */
-const statusListCwtPayloadSchema = extendCwtPayloadClaims([
-  [RegisteredCwtClaimKey.Subject, z.string()],
-  [RegisteredCwtClaimKey.IssuedAt, z.number()],
-  [StatusListCwtClaimKey.TimeToLive, z.number().exactOptional()],
-  [StatusListCwtClaimKey.StatusList, z.instanceof(StatusListCbor)],
-] as const)
+const statusListCwtPayloadSchema = extendCwtPayloadClaims(
+  [
+    [RegisteredCwtClaimKey.Subject, z.string()],
+    [RegisteredCwtClaimKey.IssuedAt, z.number()],
+    [StatusListCwtClaimKey.TimeToLive, z.number().exactOptional()],
+    [StatusListCwtClaimKey.StatusList, z.instanceof(StatusListCbor)],
+  ] as const,
+  { keyLabels: StatusListCwtClaimKey }
+)
 
 export type StatusListCwtPayloadEncodedStructure = z.infer<typeof statusListCwtPayloadSchema>
 export type StatusListCwtPayloadDecodedStructure = z.infer<typeof statusListCwtPayloadSchema>

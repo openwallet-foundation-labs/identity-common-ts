@@ -43,7 +43,10 @@ export const cwtPayloadClaimEntries = [
  * Schema for a CWT Claims Set carrying only the registered claims. Additional (application or
  * private use) claims are allowed through untyped.
  */
-export const cwtPayloadSchema = typedMap(cwtPayloadClaimEntries, { allowAdditionalKeys: true })
+export const cwtPayloadSchema = typedMap(cwtPayloadClaimEntries, {
+  allowAdditionalKeys: true,
+  keyLabels: RegisteredCwtClaimKey,
+})
 
 export type ExtendedCwtPayloadClaimEntries<Entries extends EntriesBase> = ExtendedEntries<
   typeof cwtPayloadClaimEntries,
@@ -55,19 +58,37 @@ export type ExtendedCwtPayloadClaimEntries<Entries extends EntriesBase> = Extend
  * entry reusing a registered claim key replaces it, which is how a CWT type makes an inherited claim
  * required or narrows its value.
  *
+ * The registered claim names are used in validation errors out of the box. Pass `keyLabels` to name
+ * the added claims too — a numeric TypeScript enum can be passed straight in.
+ *
  * @example
  * ```ts
- * const statusListCwtPayloadSchema = extendCwtPayloadClaims([
- *   // `sub` is optional in the registered claims, but required for a status list
- *   [RegisteredCwtClaimKey.Subject, z.string()],
- *   [StatusListCwtClaimKey.StatusList, z.instanceof(StatusListCbor)],
- * ] as const)
+ * const statusListCwtPayloadSchema = extendCwtPayloadClaims(
+ *   [
+ *     // `sub` is optional in the registered claims, but required for a status list
+ *     [RegisteredCwtClaimKey.Subject, z.string()],
+ *     [StatusListCwtClaimKey.StatusList, z.instanceof(StatusListCbor)],
+ *   ] as const,
+ *   { keyLabels: StatusListCwtClaimKey }
+ * )
  * ```
  */
 export function extendCwtPayloadClaims<const Entries extends EntriesBase>(
-  entries: Entries
+  entries: Entries,
+  {
+    keyLabels,
+  }: {
+    /**
+     * Human-readable names for the added claims, merged with the registered CWT claim names. See
+     * the `keyLabels` option of `typedMap`.
+     */
+    keyLabels?: Record<string | number, unknown>
+  } = {}
 ): ReturnType<typeof typedMap<ExtendedCwtPayloadClaimEntries<Entries>>> {
-  return typedMap(extendTypedMapEntries(cwtPayloadClaimEntries, entries), { allowAdditionalKeys: true })
+  return typedMap(extendTypedMapEntries(cwtPayloadClaimEntries, entries), {
+    allowAdditionalKeys: true,
+    keyLabels: { ...RegisteredCwtClaimKey, ...keyLabels },
+  })
 }
 
 export type CwtPayloadEncodedStructure = z.input<typeof cwtPayloadSchema>

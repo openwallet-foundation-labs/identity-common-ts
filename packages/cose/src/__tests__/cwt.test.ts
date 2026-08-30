@@ -315,13 +315,18 @@ describe('Extending Cwt for a specific cwt type', () => {
     Profile = 65001,
   }
 
-  const exampleCwtPayloadSchema = extendCwtPayloadClaims([
-    // `sub` is optional in the registered claims, but required for this cwt type
-    [RegisteredCwtClaimKey.Subject, z.string()],
-    [ExampleClaimKey.Nickname, z.string().exactOptional()],
-  ] as const)
+  const exampleCwtPayloadSchema = extendCwtPayloadClaims(
+    [
+      // `sub` is optional in the registered claims, but required for this cwt type
+      [RegisteredCwtClaimKey.Subject, z.string()],
+      [ExampleClaimKey.Nickname, z.string().exactOptional()],
+    ] as const,
+    { keyLabels: ExampleClaimKey }
+  )
 
-  const exampleProtectedHeaderClaims = extendCoseHeaderClaims([[ExampleHeaderKey.Profile, z.string()]] as const)
+  const exampleProtectedHeaderClaims = extendCoseHeaderClaims([[ExampleHeaderKey.Profile, z.string()]] as const, {
+    keyLabels: ExampleHeaderKey,
+  })
 
   class ExampleProtectedHeaders extends ProtectedHeaders<CoseHeadersFor<typeof exampleProtectedHeaderClaims>> {
     public static override get encodingSchema() {
@@ -396,7 +401,30 @@ describe('Extending Cwt for a specific cwt type', () => {
 
     expect(() => Cwt.fromToken(token, { payload: CwtPayload })).not.toThrow()
     expect(() => ExampleCwt.fromToken(token)).toThrow(CwtPayloadDecodeError)
-    expect(() => ExampleCwt.fromToken(token)).toThrow(/2/)
+    // The inherited registered claim names survive the extension
+    expect(() => ExampleCwt.fromToken(token)).toThrow(/Subject \(2\)/)
+  })
+
+  test('should name a claim the cwt type adds in a validation error', () => {
+    expect(() =>
+      exampleCwtPayloadSchema.parse(
+        new Map<number, unknown>([
+          [RegisteredCwtClaimKey.Subject, 'coap://light.example'],
+          [ExampleClaimKey.Nickname, 42],
+        ])
+      )
+    ).toThrow(/Nickname \(65000\)/)
+  })
+
+  test('should name a header label the cwt type adds in a validation error', () => {
+    expect(() =>
+      exampleProtectedHeaderClaims.parse(
+        new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+          [ExampleHeaderKey.Profile, 42],
+        ])
+      )
+    ).toThrow(/Profile \(65001\)/)
   })
 
   test('should reject headers missing a label the cwt type requires', async () => {
@@ -404,18 +432,19 @@ describe('Extending Cwt for a specific cwt type', () => {
       exampleCwtPayloadSchema.parse(new Map<number, unknown>([[RegisteredCwtClaimKey.Subject, 'coap://light.example']]))
     )
 
-    expect(
-      () =>
-        new ExampleCwt({
-          // `profile` (65001) is required by ExampleProtectedHeaders but absent here
-          protectedHeaders: ExampleProtectedHeaders.fromDecodedStructure(
-            TypedMap.fromMap(
-              new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256]])
-            )
-          ),
-          payload,
-        })
-    ).toThrow(/ExampleProtectedHeaders/)
+    const missingProfile = () =>
+      new ExampleCwt({
+        // `profile` (65001) is required by ExampleProtectedHeaders but absent here
+        protectedHeaders: ExampleProtectedHeaders.fromDecodedStructure(
+          TypedMap.fromMap(
+            new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256]])
+          )
+        ),
+        payload,
+      })
+
+    expect(missingProfile).toThrow(/ExampleProtectedHeaders/)
+    expect(missingProfile).toThrow(/Profile \(65001\)/)
   })
 
   test('should not let an unprotected label satisfy a protected one the cwt type requires', async () => {
