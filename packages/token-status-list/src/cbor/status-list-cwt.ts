@@ -4,7 +4,6 @@ import {
   type Mac0Context,
   type ProtectedHeaderOptions,
   ProtectedHeaders,
-  RegisteredCwtClaimKey,
   type Sign1Context,
   type SignatureAlgorithm,
   type UnprotectedHeaderOptions,
@@ -13,6 +12,7 @@ import {
 import { StatusList } from '../status-list'
 import { SLException } from '../status-list-exception'
 import { type BitsPerStatus, MediaTypes, StatusType } from '../types'
+import { verifyStatusListClaims } from '../verify-status-list-claims'
 import { StatusListCbor } from './status-list-cbor'
 import { type CreateStatusListCwtPayloadOptions, StatusListCwtPayload } from './status-list-cwt-payload'
 
@@ -169,34 +169,41 @@ export class StatusListCwt {
   }
 
   /**
+   * Verify the token's claims and the status at `idx`. The claim checks are shared with the
+   * JWT serialization through {@link verifyStatusListClaims}, so both stay in step.
+   *
    * @todo add check for `ttl` claim
    */
   public verifyStatus({
     idx,
     uri,
-    checkFreshness = true,
-    now = new Date(),
+    checkFreshness,
+    now,
+    skewSeconds,
+    requireExpirationTime,
   }: {
     idx: number
     uri: string
     checkFreshness?: boolean
     now?: Date
+    /** Clock tolerance applied to `exp` and `iat`, in seconds. Defaults to 30. */
+    skewSeconds?: number
+    /** Require `exp`, which is OPTIONAL by default. */
+    requireExpirationTime?: boolean
   }) {
-    if (this.payload.expirationTime && this.payload.expirationTime < now) {
-      throw new SLException(
-        `The expiration claim (${RegisteredCwtClaimKey.ExpirationTime}) '${this.payload.expirationTime}' is in the past (compared to '${now}'), and therefore not valid`
-      )
-    }
-    if (this.payload.subject !== uri) {
-      throw new SLException(
-        `The subject claim (${RegisteredCwtClaimKey.Subject}) '${this.payload.subject}' must be equal to the uri '${uri}'`
-      )
-    }
-    if (checkFreshness && this.payload.issuedAt > now) {
-      throw new SLException(
-        `The issued at claim (${RegisteredCwtClaimKey.IssuedAt}) '${this.payload.issuedAt}' is in the future (compared to '${now}'), and therefore not valid`
-      )
-    }
+    verifyStatusListClaims({
+      claims: {
+        subject: this.payload.subject,
+        issuedAt: this.payload.issuedAt,
+        expirationTime: this.payload.expirationTime,
+      },
+      uri,
+      now,
+      skewSeconds,
+      checkFreshness,
+      requireExpirationTime,
+    })
+
     if (this.payload.statusList.getStatus(idx) !== StatusType.Valid) {
       throw new SLException(
         `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${this.payload.statusList.getStatus(idx)}'`
