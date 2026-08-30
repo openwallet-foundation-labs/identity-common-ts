@@ -5,6 +5,7 @@ import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
 import { SLException } from './status-list-exception'
 import { type StatusListEntry, StatusType } from './types'
+import { verifyStatusListClaims } from './verify-status-list-claims'
 
 /**
  * Decode a JWT and return the payload.
@@ -53,7 +54,10 @@ export function getStatusListFromJWT(jwt: string): StatusListEntry {
 }
 
 /**
- * Verify the status of an `idx` in a `token`
+ * Verify the status of an `idx` in a `token`.
+ *
+ * The claim checks are shared with the CWT serialization through
+ * {@link verifyStatusListClaims}, so both stay in step.
  *
  * @todo properly validate the JWT with zod + signature
  */
@@ -61,31 +65,40 @@ export function verifyStatus({
   uri,
   idx,
   token,
-  checkFreshness = true,
-  now = new Date(),
+  checkFreshness,
+  now,
+  skewSeconds,
+  requireExpirationTime,
 }: {
   token: string
   idx: number
   uri: string
   checkFreshness?: boolean
   now?: Date
+  /** Clock tolerance applied to `exp` and `iat`, in seconds. Defaults to 30. */
+  skewSeconds?: number
+  /** Require `exp`, which is OPTIONAL by default. */
+  requireExpirationTime?: boolean
 }) {
   const payload = decodeJwtPayload<StatusListJWTPayload>(token)
   const compressed = base64url.decode(payload.status_list.lst)
   const statusList = StatusList.decompressStatusListFromBytes(compressed, payload.status_list.bits)
-  if (payload.subject !== uri) {
-    throw new SLException(`The subject claim '${payload.subject}' must be equal to the uri '${uri}'`)
-  }
-  if (checkFreshness && payload.iat && payload.iat > Math.floor(now.getTime() / 1000)) {
-    throw new SLException(
-      `The issued at claim '${payload.issuedAt}' is in the future (compared to '${now}'), and therefore not valid`
-    )
-  }
-  if (payload.exp && payload.exp < Math.floor(now.getTime() / 1000)) {
-    throw new SLException(
-      `The expiry claim '${payload.exp}' is in the past (compared to '${now}'), and therefore not valid`
-    )
-  }
+
+  verifyStatusListClaims({
+    claims: {
+      // The registered JWT claim names, not their CWT counterparts: a Status List Token in
+      // JWT format carries `sub`, `iat` and `exp`.
+      subject: typeof payload.sub === 'string' ? payload.sub : undefined,
+      issuedAt: typeof payload.iat === 'number' ? new Date(payload.iat * 1000) : undefined,
+      expirationTime: typeof payload.exp === 'number' ? new Date(payload.exp * 1000) : undefined,
+    },
+    uri,
+    now,
+    skewSeconds,
+    checkFreshness,
+    requireExpirationTime,
+  })
+
   if (statusList.getStatus(idx) !== StatusType.Valid) {
     throw new SLException(
       `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${statusList.getStatus(idx)}'`
