@@ -1,3 +1,4 @@
+import { isMediaType } from '@owf/identity-common'
 import { SLException } from './status-list-exception'
 import { MediaTypes } from './types'
 
@@ -34,10 +35,10 @@ export const fetchStatusList = async ({
       throw new Error(`Could not fetch status list, response status '${response.status}'`)
     }
 
-    const contentType = response.headers.get('Content-type')
-    if (contentType === MediaTypes.StatusListJwt) {
+    const contentType = response.headers.get('Content-Type')
+    if (isMediaType(contentType, MediaTypes.StatusListJwt)) {
       return await response.text()
-    } else if (contentType === MediaTypes.StatusListCwt) {
+    } else if (isMediaType(contentType, MediaTypes.StatusListCwt)) {
       return await (await response.blob()).bytes()
     }
 
