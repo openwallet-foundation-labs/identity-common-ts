@@ -30,7 +30,7 @@ export const coseHeaderClaimsSchema = typedMap(
     [RegisteredCwtHeaderClaimKey.X5T, z.array(z.unknown()).exactOptional()],
     [RegisteredCwtHeaderClaimKey.X5U, z.string().exactOptional()],
   ] as const,
-  { allowAdditionalKeys: true }
+  { allowAdditionalKeys: true, keyLabels: RegisteredCwtHeaderClaimKey }
 )
 
 export type CoseHeaderClaims = z.infer<typeof coseHeaderClaimsSchema>

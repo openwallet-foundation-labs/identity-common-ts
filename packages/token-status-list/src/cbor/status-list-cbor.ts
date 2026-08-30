@@ -6,7 +6,7 @@ import type { BitsPerStatus } from '../types'
 export const statusListCborEncodedSchema = typedMap([
   ['bits', z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(8)])],
   ['lst', zUint8Array],
-  ['aggregation_uri', z.string().optional()],
+  ['aggregation_uri', z.string().exactOptional()],
 ])
 
 export const statusListCborDecodedSchema = z.instanceof(StatusList)
@@ -30,11 +30,18 @@ export class StatusListCbor extends CborStructure<StatusListCborEncodedStructure
   public static override get encodingSchema() {
     return z.codec(statusListCborEncodedSchema, statusListCborDecodedSchema, {
       encode: (statusList) => {
-        return new TypedMap([
+        const map = new TypedMap([
           ['bits', statusList.getBitsPerStatus()],
           ['lst', statusList.compressStatusListToBytes()],
-          ['aggregation_uri', statusList.aggregationUri],
         ]) satisfies StatusListCborEncodedStructure
+
+        // `aggregation_uri` is exact optional: the key has to be omitted rather than
+        // encoded as undefined when the status list does not carry one.
+        if (statusList.aggregationUri !== undefined) {
+          map.set('aggregation_uri', statusList.aggregationUri)
+        }
+
+        return map
       },
       decode: (input) => {
         return StatusList.decompressStatusListFromBytes(
