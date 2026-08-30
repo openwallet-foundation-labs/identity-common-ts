@@ -1,5 +1,7 @@
 import {
   CoseKey,
+  Cwt,
+  CwtPayload,
   cborEncode,
   KeyType,
   RegisteredCwtClaimKey,
@@ -11,7 +13,7 @@ import { Tag } from 'cbor-x'
 import { deflate } from 'pako'
 import { expect, suite, test } from 'vitest'
 import { StatusListCbor } from '../../cbor/status-list-cbor'
-import { StatusListCwt, StatusListCwtHeaderKey } from '../../cbor/status-list-cwt'
+import { StatusListCwt } from '../../cbor/status-list-cwt'
 import { StatusListCwtClaimKey, StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
 import { SLException } from '../../status-list-exception'
@@ -46,7 +48,7 @@ suite('StatusListCwt', () => {
           statusList: new StatusList([0, 1, 0], 1),
         },
       })
-      expect(cwt.protectedHeaders?.headers.get(StatusListCwtHeaderKey.Typ)).toBe('application/statuslist+cwt')
+      expect(cwt.typ).toBe('application/statuslist+cwt')
     })
 
     test('should allow custom protected headers', () => {
@@ -59,7 +61,7 @@ suite('StatusListCwt', () => {
         protectedHeaders,
       })
       expect(cwt.protectedHeaders?.headers.get(1)).toBe(123)
-      expect(cwt.protectedHeaders?.headers.get(StatusListCwtHeaderKey.Typ)).toBe('application/statuslist+cwt')
+      expect(cwt.typ).toBe('application/statuslist+cwt')
     })
 
     test('should allow custom unprotected headers', () => {
@@ -72,6 +74,34 @@ suite('StatusListCwt', () => {
         unprotectedHeaders,
       })
       expect(cwt.unprotectedHeaders?.headers.get(10)).toBe('test')
+    })
+
+    test('should reject a protected Typ header that is not the status list media type', () => {
+      expect(
+        () =>
+          new StatusListCwt({
+            payload: {
+              subject: 'did:test',
+              statusList: new StatusList([0, 1, 0], 1),
+            },
+            protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListJwt]]),
+          })
+      ).toThrow(/StatusListCwtProtectedHeaders/)
+    })
+
+    test('should not let an unprotected Typ header stand in for the protected one', () => {
+      // RFC 9596 forbids `typ` in the unprotected headers, and `Cwt.typ` ignores it, so an
+      // unprotected copy must not satisfy the requirement. The protected one is defaulted instead.
+      const cwt = new StatusListCwt({
+        payload: {
+          subject: 'did:test',
+          statusList: new StatusList([0, 1, 0], 1),
+        },
+        unprotectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListJwt]]),
+      })
+
+      expect(cwt.typ).toBe(MediaTypes.StatusListCwt)
+      expect(cwt.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.Typ)).toBe(MediaTypes.StatusListCwt)
     })
   })
 
@@ -352,7 +382,28 @@ suite('StatusListCwt', () => {
       )
 
       const decoded = StatusListCwt.fromToken(token)
-      expect(decoded.protectedHeaders?.headers.get(StatusListCwtHeaderKey.Typ)).toBe('application/statuslist+cwt')
+      expect(decoded.typ).toBe('application/statuslist+cwt')
+    })
+
+    test('should reject a token whose protected Typ header says it is something else', async () => {
+      // A well formed CWT carrying a status list claims set, but announcing a different media type.
+      // Built through the base Cwt so the status list header structure does not default `typ`.
+      const statusListCwt = StatusListCwt.createFromStatusListAndSubject(
+        { statusList: [0, 0, 0], bitsPerStatus: 1 },
+        'did:test'
+      )
+      const token = await Cwt.create({
+        payload: statusListCwt.payload,
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+          [RegisteredCwtHeaderClaimKey.Typ, 'application/example+cwt'],
+        ]),
+      }).signAndEncode({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)
+
+      // The base Cwt has no opinion on `typ`, a status list CWT does
+      expect(() => Cwt.fromToken(token, { payload: CwtPayload })).not.toThrow()
+      expect(() => StatusListCwt.fromToken(token)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(token)).toThrow(/application\/statuslist\+cwt/)
     })
   })
 
@@ -546,7 +597,7 @@ suite('StatusListCwt', () => {
         await Sign1.create({
           protectedHeaders: new Map<number, unknown>([
             [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
-            [StatusListCwtHeaderKey.Typ, MediaTypes.StatusListCwt],
+            [RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListCwt],
           ]),
           payload: foreignPayload,
         }).sign({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)

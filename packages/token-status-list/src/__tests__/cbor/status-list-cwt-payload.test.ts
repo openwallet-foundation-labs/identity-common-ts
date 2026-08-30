@@ -74,8 +74,8 @@ suite('StatusListCwtPayload', () => {
     const encoded = payload.encode()
     const fromEncoded = StatusListCwtPayload.decode(encoded)
 
-    expect(fromEncoded.getCustomClaim<string>(1000)).toStrictEqual('hello world')
-    expect(fromEncoded.getCustomClaim<string>(1001)).toStrictEqual('Goodbye!')
+    expect(fromEncoded.getClaim(1000)).toStrictEqual('hello world')
+    expect(fromEncoded.getClaim(1001)).toStrictEqual('Goodbye!')
 
     expect(fromEncoded).toMatchObject(payload)
   })

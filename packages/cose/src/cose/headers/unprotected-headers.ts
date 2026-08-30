@@ -1,6 +1,6 @@
 import z from 'zod'
 import { CborStructure } from '../../cbor/cbor-structure.js'
-import { TypedMap } from '../../utils/typed-map.js'
+import { type AnyTypedMap, TypedMap } from '../../utils/typed-map.js'
 import { type CoseHeaders, coseHeaderClaimsSchema } from './header-claims.js'
 
 // Wire form: a plain map of integer label -> value (used by the COSE_Sign1 encoded schema).
@@ -16,16 +16,23 @@ export type UnprotectedHeaderOptions = {
   unprotectedHeaders?: UnprotectedHeadersEncodedStructure
 }
 
-export class UnprotectedHeaders extends CborStructure<
+/**
+ * The unprotected header map of a COSE structure. Subclassed the same way as
+ * {@link ProtectedHeaders}, except that the claims schema is the encoding schema directly, since
+ * the unprotected headers are carried as a plain map rather than wrapped in a bstr.
+ *
+ * @template Headers - The typed view over the header map. See {@link ProtectedHeaders}.
+ */
+export class UnprotectedHeaders<Headers extends AnyTypedMap = CoseHeaders> extends CborStructure<
   UnprotectedHeadersEncodedStructure,
-  UnprotectedHeadersDecodedStructure
+  Headers
 > {
-  public static override get encodingSchema() {
+  public static override get encodingSchema(): z.ZodType {
     return coseHeaderClaimsSchema
   }
 
-  public get headers(): CoseHeaders {
-    return this.structure as unknown as CoseHeaders
+  public get headers(): Headers {
+    return this.structure
   }
 
   public static create(options: UnprotectedHeaderOptions) {

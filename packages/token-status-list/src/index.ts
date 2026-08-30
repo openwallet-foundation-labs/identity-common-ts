@@ -1,7 +1,8 @@
 export type { CreateStatusListCborOptions, StatusListCborWithStatusListOptions } from './cbor/status-list-cbor'
 export { StatusListCbor } from './cbor/status-list-cbor'
 export type { StatusListCwtOptions } from './cbor/status-list-cwt'
-export { StatusListCwt, StatusListCwtHeaderKey } from './cbor/status-list-cwt'
+export { StatusListCwt } from './cbor/status-list-cwt'
+export { StatusListCwtProtectedHeaders } from './cbor/status-list-cwt-headers'
 export type { CreateStatusListCwtPayloadOptions } from './cbor/status-list-cwt-payload'
 export { StatusListCwtClaimKey, StatusListCwtPayload } from './cbor/status-list-cwt-payload'
 export type {

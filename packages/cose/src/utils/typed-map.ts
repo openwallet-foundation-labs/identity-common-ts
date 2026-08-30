@@ -125,13 +125,57 @@ type EntriesArrayToSchema<T extends ReadonlyArray<readonly [any, any]>> = {
 const isExactOptional = (schema: z.ZodType) =>
   !schema.safeParse(undefined).success && z.object({ test: schema }).safeParse({}).success
 
-type EntriesBase = ReadonlyArray<
+export type EntriesBase = ReadonlyArray<
   readonly [
     string | number, // for now we only allow string or number keys
     // biome-ignore lint/suspicious/noExplicitAny: no explanation
     z.ZodType<any>,
   ]
 >
+
+/**
+ * A `TypedMap` with any schema. Useful as a generic constraint for structures that are generic over
+ * the shape of their map, where the concrete schema is supplied by a subclass.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: intentionally unconstrained, used as a generic bound
+export type AnyTypedMap = TypedMap<any, any>
+
+type EntryKey<Entry> = Entry extends readonly [infer Key, z.ZodType] ? Key : never
+
+/**
+ * Drops every entry from `Entries` whose key is present in `Keys`, preserving tuple order.
+ */
+type WithoutEntryKeys<Entries extends EntriesBase, Keys> = Entries extends readonly [
+  infer Head,
+  ...infer Rest extends EntriesBase,
+]
+  ? EntryKey<Head> extends Keys
+    ? WithoutEntryKeys<Rest, Keys>
+    : readonly [Head, ...WithoutEntryKeys<Rest, Keys>]
+  : readonly []
+
+export type ExtendedEntries<Base extends EntriesBase, Extra extends EntriesBase> = readonly [
+  ...WithoutEntryKeys<Base, Extra[number][0]>,
+  ...Extra,
+]
+
+/**
+ * Merges a base set of `typedMap` entries with additional ones, so a structure can be extended for a
+ * specific profile (e.g. a status list CWT payload extending the registered CWT claims).
+ *
+ * An entry in `extra` that reuses a key from `base` replaces it, both in the resulting type and at
+ * runtime. That is what makes it possible to narrow an inherited claim, e.g. turning the optional
+ * registered `sub` claim into a required one. Without the replacement the two schemas for the same
+ * key would collapse into a union and the key would stay optional.
+ */
+export function extendTypedMapEntries<const Base extends EntriesBase, const Extra extends EntriesBase>(
+  base: Base,
+  extra: Extra
+): ExtendedEntries<Base, Extra> {
+  const overriddenKeys = new Set<string | number>(extra.map(([key]) => key))
+
+  return [...base.filter(([key]) => !overriddenKeys.has(key)), ...extra] as unknown as ExtendedEntries<Base, Extra>
+}
 
 type InferredEntries<Entries extends EntriesBase> = {
   [K in keyof Entries]: readonly [Entries[K][0], z.infer<Entries[K][1]>]

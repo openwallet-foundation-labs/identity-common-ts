@@ -1,4 +1,11 @@
-import { CborStructure, RegisteredCwtClaimKey, TypedMap, typedMap } from '@owf/cose'
+import {
+  type CreateCwtPayloadOptions,
+  CwtPayload,
+  cwtPayloadClaimsFromOptions,
+  extendCwtPayloadClaims,
+  RegisteredCwtClaimKey,
+  TypedMap,
+} from '@owf/cose'
 import z from 'zod'
 import type { StatusList } from '../status-list'
 import { StatusListCbor, type StatusListCborEncodedStructure } from './status-list-cbor'
@@ -8,33 +15,29 @@ export enum StatusListCwtClaimKey {
   StatusList = 65533,
 }
 
-const statusListCwtPayloadSchema = typedMap(
-  [
-    [RegisteredCwtClaimKey.Subject, z.string()],
-    [RegisteredCwtClaimKey.IssuedAt, z.number()],
-    [RegisteredCwtClaimKey.ExpirationTime, z.number().exactOptional()],
-    [StatusListCwtClaimKey.TimeToLive, z.number().exactOptional()],
-    [StatusListCwtClaimKey.StatusList, z.instanceof(StatusListCbor)],
-  ],
-  { allowAdditionalKeys: true }
-)
+/**
+ * The registered CWT claims, with the ones a status list CWT requires narrowed to non-optional, plus
+ * the status list specific claims.
+ *
+ * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-13.html#name-status-list-token-in-cwt-fo
+ */
+const statusListCwtPayloadSchema = extendCwtPayloadClaims([
+  [RegisteredCwtClaimKey.Subject, z.string()],
+  [RegisteredCwtClaimKey.IssuedAt, z.number()],
+  [StatusListCwtClaimKey.TimeToLive, z.number().exactOptional()],
+  [StatusListCwtClaimKey.StatusList, z.instanceof(StatusListCbor)],
+] as const)
 
 export type StatusListCwtPayloadEncodedStructure = z.infer<typeof statusListCwtPayloadSchema>
 export type StatusListCwtPayloadDecodedStructure = z.infer<typeof statusListCwtPayloadSchema>
 
-export type CreateStatusListCwtPayloadOptions = {
+export type CreateStatusListCwtPayloadOptions = CreateCwtPayloadOptions & {
   subject: string
   statusList: StatusListCbor | StatusList
-  issuedAt?: Date
-  expirationTime?: Date
   timeToLive?: number
-  additionalClaims?: Map<number | string, unknown>
 }
 
-export class StatusListCwtPayload extends CborStructure<
-  StatusListCwtPayloadEncodedStructure,
-  StatusListCwtPayloadDecodedStructure
-> {
+export class StatusListCwtPayload extends CwtPayload<StatusListCwtPayloadDecodedStructure> {
   public static override get encodingSchema() {
     return z.codec(statusListCwtPayloadSchema.in, statusListCwtPayloadSchema.out, {
       decode: (input) => {
@@ -57,59 +60,36 @@ export class StatusListCwtPayload extends CborStructure<
     })
   }
 
-  public static create(options: CreateStatusListCwtPayloadOptions) {
-    const map = new TypedMap([
-      [RegisteredCwtClaimKey.Subject, options.subject],
-      [RegisteredCwtClaimKey.IssuedAt, Math.floor((options.issuedAt?.getTime() ?? Date.now()) / 1000)],
-      [
-        StatusListCwtClaimKey.StatusList,
-        options.statusList instanceof StatusListCbor
-          ? options.statusList
-          : StatusListCbor.create({ statusList: options.statusList }),
-      ],
-      ...(options.additionalClaims ?? new Map()).entries(),
-    ]) satisfies StatusListCwtPayloadEncodedStructure
+  public static override create(options: CreateStatusListCwtPayloadOptions) {
+    // `iat` is required for a status list token, so it defaults to now rather than being omitted.
+    const claims = cwtPayloadClaimsFromOptions({ issuedAt: new Date(), ...options })
 
-    if (options.expirationTime) {
-      map.set(RegisteredCwtClaimKey.ExpirationTime, Math.floor(options.expirationTime.getTime() / 1000))
+    claims.set(
+      StatusListCwtClaimKey.StatusList,
+      options.statusList instanceof StatusListCbor
+        ? options.statusList
+        : StatusListCbor.create({ statusList: options.statusList })
+    )
+
+    if (options.timeToLive !== undefined) {
+      claims.set(StatusListCwtClaimKey.TimeToLive, options.timeToLive)
     }
 
-    if (options.timeToLive) {
-      map.set(StatusListCwtClaimKey.TimeToLive, options.timeToLive)
-    }
-
-    return new StatusListCwtPayload(statusListCwtPayloadSchema.parse(map.toMap()))
+    return StatusListCwtPayload.fromDecodedStructure(TypedMap.fromMap(claims))
   }
 
-  public get subject() {
-    return this.structure.get(RegisteredCwtClaimKey.Subject)
-  }
-
-  public get issuedAt() {
-    return new Date(this.structure.get(RegisteredCwtClaimKey.IssuedAt) * 1000)
-  }
-
-  public get expirationTime() {
-    return this.structure.has(RegisteredCwtClaimKey.ExpirationTime)
-      ? // biome-ignore lint/style/noNonNullAssertion: checked with `has` in the line above
-        new Date(this.structure.get(RegisteredCwtClaimKey.ExpirationTime)! * 1000)
-      : undefined
-  }
-
+  /** `ttl` (65534), in seconds. */
   public get timeToLive() {
-    return this.structure.get(StatusListCwtClaimKey.TimeToLive)
+    return this.getClaim(StatusListCwtClaimKey.TimeToLive)
   }
 
-  public get statusList() {
-    return this.structure.get(StatusListCwtClaimKey.StatusList).statusList
-  }
-
-  public getCustomClaim<ClaimType = unknown>(key: number) {
-    return this.structure.get(key) as ClaimType | unknown
+  /** `status_list` (65533) */
+  public get statusList(): StatusList {
+    return this.getClaim(StatusListCwtClaimKey.StatusList).statusList
   }
 
   public setStatusList(statusList: StatusList | StatusListCbor) {
-    this.structure.set(
+    this.claims.set(
       StatusListCwtClaimKey.StatusList,
       statusList instanceof StatusListCbor ? statusList : StatusListCbor.create({ statusList })
     )
