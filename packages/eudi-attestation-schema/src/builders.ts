@@ -34,6 +34,14 @@ export class TrustAuthorityBuilder {
   }
 
   /**
+   * Set the trust list verification method metadata
+   */
+  verificationMethod(verificationMethod: TrustAuthority['verificationMethod']): this {
+    this.data.verificationMethod = verificationMethod
+    return this
+  }
+
+  /**
    * Build the TrustAuthority object
    */
   build(): TrustAuthority {

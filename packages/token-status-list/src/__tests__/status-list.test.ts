@@ -59,121 +59,115 @@ describe('StatusList', () => {
     }
   })
 
-  describe.each([
-    [1 as BitsPerStatus],
-    [2 as BitsPerStatus],
-    [4 as BitsPerStatus],
-    [8 as BitsPerStatus],
-  ])('with %i bitsPerStatus', (bitsPerStatus) => {
-    let manager: StatusList
+  describe.each([[1 as BitsPerStatus], [2 as BitsPerStatus], [4 as BitsPerStatus], [8 as BitsPerStatus]])(
+    'with %i bitsPerStatus',
+    (bitsPerStatus) => {
+      let manager: StatusList
 
-    function createList(length: number, bitsPerStatus: BitsPerStatus): number[] {
-      const list: number[] = []
-      for (let i = 0; i < length; i++) {
-        list.push(Math.floor(Math.random() * 2 ** bitsPerStatus))
+      function createList(length: number, bitsPerStatus: BitsPerStatus): number[] {
+        const list: number[] = []
+        for (let i = 0; i < length; i++) {
+          list.push(Math.floor(Math.random() * 2 ** bitsPerStatus))
+        }
+        return list
       }
-      return list
-    }
 
-    it('should pass an incorrect list with wrong entries', () => {
-      expect(() => {
-        new StatusList([2 ** bitsPerStatus + 1], bitsPerStatus)
-      }).toThrowError()
-    })
-
-    it('should compress and decompress status list correctly', () => {
-      const statusList = createList(listLength, bitsPerStatus)
-      manager = new StatusList(statusList, bitsPerStatus)
-      const compressed = manager.compressStatusListToBytes()
-      const decoded = StatusList.decompressStatusListFromBytes(compressed, bitsPerStatus)
-      checkIfEqual(decoded, statusList)
-    })
-
-    it('should return the bitsPerStatus value', () => {
-      const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
-      manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
-      expect(manager.getBitsPerStatus()).toBe(bitsPerStatus)
-    })
-
-    it('getStatus returns the correct status', () => {
-      const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
-      manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
-
-      for (let i = 0; i < statusList.length; i++) {
-        expect(manager.getStatus(i)).toBe(statusList[i])
-      }
-    })
-
-    it('setStatus sets the correct status', () => {
-      const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
-      manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
-
-      const newValue = Math.floor(Math.random() * 2 ** bitsPerStatus)
-      manager.setStatus(0, newValue)
-      expect(manager.getStatus(0)).toBe(newValue)
-    })
-
-    it('getStatus throws an error for out of bounds index', () => {
-      const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
-      manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
-
-      expect(() => manager.getStatus(-1)).toThrow('Index out of bounds')
-      expect(() => manager.getStatus(listLength)).toThrow('Index out of bounds')
-    })
-
-    it('setStatus throws an error for out of bounds index', () => {
-      const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
-      manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
-
-      expect(() => manager.setStatus(-1, 5)).toThrow('Index out of bounds')
-      expect(() => manager.setStatus(listLength, 6)).toThrow('Index out of bounds')
-    })
-
-    it('decompressStatusListFromBytes throws an error when decompression fails', () => {
-      expect(() => StatusList.decompressStatusListFromBytes(new Uint8Array([0, 1, 2, 3]), bitsPerStatus)).toThrowError()
-    })
-
-    test('encodeStatusList covers remaining bits in last byte', () => {
-      const totalStatuses = 10
-      const statusList = Array(totalStatuses).fill(0)
-      const manager = new StatusList(statusList, 1)
-      const compressed = manager.compressStatusListToBytes()
-      const decoded = StatusList.decompressStatusListFromBytes(compressed, 1)
-      checkIfEqual(decoded, statusList)
-    })
-
-    function checkIfEqual(statusList1: StatusList, rawStatusList: number[]) {
-      for (let i = 0; i < rawStatusList.length; i++) {
-        expect(statusList1.getStatus(i)).toBe(rawStatusList[i])
-      }
-    }
-
-    describe('constructor', () => {
-      test.each<[number]>([
-        [3],
-        [5],
-        [6],
-        [7],
-        [9],
-        [10],
-      ])('throws an error for invalid bitsPerStatus value (%i)', (bps) => {
+      it('should pass an incorrect list with wrong entries', () => {
         expect(() => {
-          new StatusList([], bps as BitsPerStatus)
-        }).toThrow('bitsPerStatus must be 1, 2, 4, or 8')
+          new StatusList([2 ** bitsPerStatus + 1], bitsPerStatus)
+        }).toThrowError()
       })
 
-      test.each<[BitsPerStatus]>([
-        [1],
-        [2],
-        [4],
-        [8],
-      ])('does not throw an error for valid bitsPerStatus value (%i)', (bps) => {
-        expect(() => {
-          new StatusList([], bps)
-        }).not.toThrow()
+      it('should compress and decompress status list correctly', () => {
+        const statusList = createList(listLength, bitsPerStatus)
+        manager = new StatusList(statusList, bitsPerStatus)
+        const compressed = manager.compressStatusListToBytes()
+        const decoded = StatusList.decompressStatusListFromBytes(compressed, bitsPerStatus)
+        checkIfEqual(decoded, statusList)
       })
-    })
-  })
+
+      it('should return the bitsPerStatus value', () => {
+        const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
+        manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
+        expect(manager.getBitsPerStatus()).toBe(bitsPerStatus)
+      })
+
+      it('getStatus returns the correct status', () => {
+        const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
+        manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
+
+        for (let i = 0; i < statusList.length; i++) {
+          expect(manager.getStatus(i)).toBe(statusList[i])
+        }
+      })
+
+      it('setStatus sets the correct status', () => {
+        const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
+        manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
+
+        const newValue = Math.floor(Math.random() * 2 ** bitsPerStatus)
+        manager.setStatus(0, newValue)
+        expect(manager.getStatus(0)).toBe(newValue)
+      })
+
+      it('getStatus throws an error for out of bounds index', () => {
+        const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
+        manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
+
+        expect(() => manager.getStatus(-1)).toThrow('Index out of bounds')
+        expect(() => manager.getStatus(listLength)).toThrow('Index out of bounds')
+      })
+
+      it('setStatus throws an error for out of bounds index', () => {
+        const statusList = createList(listLength, bitsPerStatus as BitsPerStatus)
+        manager = new StatusList(statusList, bitsPerStatus as BitsPerStatus)
+
+        expect(() => manager.setStatus(-1, 5)).toThrow('Index out of bounds')
+        expect(() => manager.setStatus(listLength, 6)).toThrow('Index out of bounds')
+      })
+
+      it('decompressStatusListFromBytes throws an error when decompression fails', () => {
+        expect(() =>
+          StatusList.decompressStatusListFromBytes(new Uint8Array([0, 1, 2, 3]), bitsPerStatus)
+        ).toThrowError()
+      })
+
+      test('encodeStatusList covers remaining bits in last byte', () => {
+        const totalStatuses = 10
+        const statusList = Array(totalStatuses).fill(0)
+        const manager = new StatusList(statusList, 1)
+        const compressed = manager.compressStatusListToBytes()
+        const decoded = StatusList.decompressStatusListFromBytes(compressed, 1)
+        checkIfEqual(decoded, statusList)
+      })
+
+      function checkIfEqual(statusList1: StatusList, rawStatusList: number[]) {
+        for (let i = 0; i < rawStatusList.length; i++) {
+          expect(statusList1.getStatus(i)).toBe(rawStatusList[i])
+        }
+      }
+
+      describe('constructor', () => {
+        test.each<[number]>([[3], [5], [6], [7], [9], [10]])(
+          'throws an error for invalid bitsPerStatus value (%i)',
+          (bps) => {
+            expect(() => {
+              new StatusList([], bps as BitsPerStatus)
+            }).toThrow('bitsPerStatus must be 1, 2, 4, or 8')
+          }
+        )
+
+        test.each<[BitsPerStatus]>([[1], [2], [4], [8]])(
+          'does not throw an error for valid bitsPerStatus value (%i)',
+          (bps) => {
+            expect(() => {
+              new StatusList([], bps)
+            }).not.toThrow()
+          }
+        )
+      })
+    }
+  )
 
   describe('SLException', () => {
     it('should create exception with message', () => {

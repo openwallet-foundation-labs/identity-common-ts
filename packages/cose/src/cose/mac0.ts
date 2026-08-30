@@ -153,7 +153,6 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
     const rawStructure = cborDecode(bytes)
 
     // May feel weird, but using new this makes TypeScript understand we may return a subclass
-    // biome-ignore lint/complexity/noThisInStatic: this.decode is intentional for subclass support
     return new this(
       // NOTE: If decoded with Mac0 tag, the cbor decoder already transforms to the class instances
       // In that case we create new instance based on the decoded structure, to ensure we create the
@@ -209,7 +208,6 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
         ? options.unprotectedHeaders
         : UnprotectedHeaders.create({ unprotectedHeaders: options.unprotectedHeaders })
 
-    // biome-ignore lint/complexity/noThisInStatic: this.create is intentional for subclass support
     const mac0 = new this({
       protectedHeaders,
       unprotectedHeaders,

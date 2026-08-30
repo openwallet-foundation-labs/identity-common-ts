@@ -68,7 +68,16 @@ async function main() {
         .meta({ doctype_value: 'org.iso.18013.5.1.mDL' })
         .build()
     )
-    .addTrustAuthority(trustAuthority().frameworkType('etsi_tl').value('https://trust-list.example.eu/tl.xml').build())
+    .addTrustAuthority(
+      trustAuthority()
+        .frameworkType('etsi_tl')
+        .value('https://trust-list.example.eu/tl.xml')
+        .verificationMethod({
+          type: 'X509Certificate',
+          x509Certificate: 'MIIBczCCARmgAwIBAgIUZt2jkmAgIIiw/wpvJU/4yL7ek/YwCgYIKoZIzj0EAwIw',
+        })
+        .build()
+    )
     .build()
 
   console.log('SchemaMeta:', JSON.stringify(meta, null, 2))

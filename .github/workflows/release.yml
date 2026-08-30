@@ -26,7 +26,7 @@ jobs:
       - uses: pnpm/action-setup@v6
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: "pnpm"
@@ -39,7 +39,7 @@ jobs:
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
           title: "chore(release): new version"
           commit: "chore(release): new version"
@@ -75,7 +75,7 @@ jobs:
       - uses: pnpm/action-setup@v6
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: "pnpm"

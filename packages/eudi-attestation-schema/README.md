@@ -44,6 +44,10 @@ const meta = schemaMeta()
     trustAuthority()
       .frameworkType('etsi_tl')
       .value('https://example.com/trust-lists/gym-members.jws')
+      .verificationMethod({
+        type: 'X509Certificate',
+        x509Certificate: 'MIIBczCCARmgAwIBAgIUZt2jkmAgIIiw/wpvJU/4yL7ek/YwCgYIKoZIzj0EAwIw',
+      })
       .build()
   )
   .attestationLoS('iso_18045_basic')
@@ -211,12 +215,15 @@ The resulting DCQL credential will contain:
 }
 ```
 
+Every generated `path` is a DCQL claims path pointer: a non-empty array of strings, `null`s and non-negative integers, where a string selects the member with that key of an object, a non-negative integer selects the element at that index of an array, and `null` selects all elements of an array.
+
 Claim extraction rules:
 
 - **Primitive properties** (`string`, `number`, `boolean`, …) produce a single-element path.
 - **Nested object properties** are recursed into; each leaf produces a multi-element path.
 - **Array properties with primitive items** produce a single path entry for the array field itself.
-- **Array properties with object or array items** are recursed into with a `null` wildcard appended to the path per the DCQL spec.
+- **Array properties with object or array items** are recursed into with a `null` wildcard appended to the path.
+- **Tuple-typed array properties** (a non-empty `prefixItems`, or the array form of `items`) produce one path per position, addressed by its non-negative index — for example `{ "path": ["coordinates", 0] }`. A rest schema next to those positions (`items` alongside `prefixItems`, or `additionalItems`) is skipped, because a claims path pointer cannot address every index from a position onwards.
 - Combinator keywords (`allOf`, `anyOf`, `oneOf`) are merged transparently.
 - Duplicate paths across combinators are deduplicated deterministically.
 - If no `parsedSchema` is available for a resolved reference, no `claims` key is added to the credential.
@@ -285,6 +292,21 @@ const meta = schemaMeta()
 | `uri` | Yes | `string` (URL) | URI of the format-specific schema |
 | `integrity` | Yes | `string` | Required W3C SRI sha256 integrity metadata for the referenced schema |
 | `meta` | Yes | format-specific object | Credential-type metadata required by the selected format |
+
+### TrustAuthority
+
+| Field | Required | Type | Description |
+|---|---|---|---|
+| `frameworkType` | Yes | `FrameworkType` | Trust framework discriminator (`etsi_tl`) |
+| `value` | Yes | `string` | URI pointing to the trust list |
+| `verificationMethod` | Yes | object | Verification material for the trust list signature |
+
+#### TrustAuthority.verificationMethod
+
+| Field | Required | Type | Description |
+|---|---|---|---|
+| `type` | Yes | `'X509Certificate'` | Verification method type |
+| `x509Certificate` | Yes | `string` | Base64-encoded DER X.509 certificate |
 
 ### Enumerations
 
