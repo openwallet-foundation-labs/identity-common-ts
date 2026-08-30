@@ -208,6 +208,7 @@ export function typedMap<const Entries extends EntriesBase>(
   entries: Entries,
   {
     allowAdditionalKeys = true,
+    keyLabels,
     encode,
     decode,
   }: {
@@ -217,6 +218,19 @@ export function typedMap<const Entries extends EntriesBase>(
      * @default true
      */
     allowAdditionalKeys?: boolean
+
+    /**
+     * Human-readable names for the map's keys, used in validation errors so that a bare CBOR
+     * label (`Expected key '4' to be defined.`) is not all a reader gets.
+     *
+     * A numeric TypeScript enum can be passed straight in — its reverse mapping supplies the
+     * names — and several can be merged with a spread:
+     *
+     *   typedMap(entries, { keyLabels: { ...RegisteredCwtClaimKey, ...StatusListCwtClaimKey } })
+     *
+     * An explicit record (`{ 4: 'exp' }`) works too. Keys with no name keep their raw label.
+     */
+    keyLabels?: Record<string | number, unknown>
 
     /**
      * Allows overriding the encode function. The original encode method is passed as second
@@ -241,6 +255,13 @@ export function typedMap<const Entries extends EntriesBase>(
   const requiredKeys = entries.filter(([, valueSchema]) => !isExactOptional(valueSchema)).map(([key]) => key)
 
   const schemaMap = new Map(entries)
+
+  // `RegisteredCwtClaimKey[4]` is `'ExpirationTime'` for a numeric enum, so a reverse-mapped
+  // string is a name. A numeric value is the enum's forward mapping and not a name.
+  const labelFor = (key: string | number) => {
+    const label = keyLabels?.[key]
+    return typeof label === 'string' ? `${label} (${key})` : `${key}`
+  }
 
   const originalEncode = (decoded: TypedMap<InferredSchema<Entries>, OptionalKeys<Entries>>) => decoded.toMap()
   const originalDecode = (encoded: Map<unknown, unknown>) =>
@@ -273,7 +294,7 @@ export function typedMap<const Entries extends EntriesBase>(
               path: [additionalKey],
               input: map,
               issues: [],
-              message: `Unexpected key '${additionalKey}' found in map, additional keys are not allowed.`,
+              message: `Unexpected key '${labelFor(additionalKey)}' found in map, additional keys are not allowed.`,
             })
           }
         }
@@ -287,8 +308,9 @@ export function typedMap<const Entries extends EntriesBase>(
           ctx.addIssue({
             code: 'invalid_value',
             continue: true,
-            message: `Expected key '${key}' to be defined.`,
-            path: [key],
+            message: `Expected key '${labelFor(key)}' to be defined.`,
+            // NOTE: stringified for the same reason as the value issues below
+            path: [`${key}`],
             values: [],
             input: value,
           })
@@ -306,8 +328,9 @@ export function typedMap<const Entries extends EntriesBase>(
             ctx.addIssue({
               ...issue,
               // NOTE: if we use numbers, zod-validation-error will use "index", thinking
-              // it's an array, that's confusing
-              path: [`${key}`, ...issue.path],
+              // it's an array, that's confusing. The value schema owns the message, so the
+              // key's name has to travel on the path.
+              path: [labelFor(key), ...issue.path],
             } as zCore.$ZodSuperRefineIssue)
           }
         }

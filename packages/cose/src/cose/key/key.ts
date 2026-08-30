@@ -33,31 +33,34 @@ export enum CoseKeyParameter {
 }
 
 // Zod schema for CoseKey validation
-const coseKeySchema = typedMap([
-  [CoseKeyParameter.KeyType, z.union([z.enum(KeyType), z.string()])],
+const coseKeySchema = typedMap(
   [
-    CoseKeyParameter.KeyId,
-    // NOTE: string is NOT allowed, but seems mDocs issued with v0.5 of this library
-    // do include string keyIds. We need to ensure we don't break interop. For newly
-    // created keys we ensure correct encoding.
-    zUint8Array.or(z.string()).exactOptional(),
-  ],
-  [
-    CoseKeyParameter.Algorithm,
-    z
-      .union([
-        z.string({ error: 'Cose algorithm must be a string' }),
-        z.number({ error: 'Cose algorithm must be a number' }),
-      ])
-      .exactOptional(),
-  ],
-  [CoseKeyParameter.KeyOps, z.array(z.union([z.enum(KeyOps), z.string()])).exactOptional()],
-  [CoseKeyParameter.BaseIv, zUint8Array.exactOptional()],
-  [CoseKeyParameter.CurveOrK, z.union([z.enum(Curve), zUint8Array]).exactOptional()],
-  [CoseKeyParameter.X, zUint8Array.exactOptional()],
-  [CoseKeyParameter.Y, zUint8Array.exactOptional()],
-  [CoseKeyParameter.D, zUint8Array.exactOptional()],
-] as const)
+    [CoseKeyParameter.KeyType, z.union([z.enum(KeyType), z.string()])],
+    [
+      CoseKeyParameter.KeyId,
+      // NOTE: string is NOT allowed, but seems mDocs issued with v0.5 of this library
+      // do include string keyIds. We need to ensure we don't break interop. For newly
+      // created keys we ensure correct encoding.
+      zUint8Array.or(z.string()).exactOptional(),
+    ],
+    [
+      CoseKeyParameter.Algorithm,
+      z
+        .union([
+          z.string({ error: 'Cose algorithm must be a string' }),
+          z.number({ error: 'Cose algorithm must be a number' }),
+        ])
+        .exactOptional(),
+    ],
+    [CoseKeyParameter.KeyOps, z.array(z.union([z.enum(KeyOps), z.string()])).exactOptional()],
+    [CoseKeyParameter.BaseIv, zUint8Array.exactOptional()],
+    [CoseKeyParameter.CurveOrK, z.union([z.enum(Curve), zUint8Array]).exactOptional()],
+    [CoseKeyParameter.X, zUint8Array.exactOptional()],
+    [CoseKeyParameter.Y, zUint8Array.exactOptional()],
+    [CoseKeyParameter.D, zUint8Array.exactOptional()],
+  ] as const,
+  { keyLabels: CoseKeyParameter }
+)
 
 // Infer structure type from Zod schema
 export type CoseKeyDecodedStructure = z.output<typeof coseKeySchema>

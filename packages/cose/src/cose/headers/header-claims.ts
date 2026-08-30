@@ -45,7 +45,10 @@ export const coseHeaderClaimEntries = [
  * rejected at decode for every Sign1-derived structure. Additional (unregistered or private-use)
  * labels are allowed through (`allowAdditionalKeys`).
  */
-export const coseHeaderClaimsSchema = typedMap(coseHeaderClaimEntries, { allowAdditionalKeys: true })
+export const coseHeaderClaimsSchema = typedMap(coseHeaderClaimEntries, {
+  allowAdditionalKeys: true,
+  keyLabels: RegisteredCwtHeaderClaimKey,
+})
 
 export type CoseHeaderClaims = z.infer<typeof coseHeaderClaimsSchema>
 
