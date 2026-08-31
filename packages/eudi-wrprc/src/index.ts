@@ -18,12 +18,18 @@ export {
   WRPRCBuilder,
   wrprc,
 } from './builders'
+// Dialects
+export type { WRPRCDialect } from './dialect'
+export { normalizeWRPRCPayload, toWRPRCDialect, WRPRC_DIALECTS } from './dialect'
 // Entitlements (ETSI TS 119 475 Annex A)
 export {
+  getIdentifierPrefix,
   hasAttestationProviderEntitlement,
   IDENTIFIER_TYPES,
   isPSPSubEntitlement,
   isValidEntitlement,
+  LEGAL_PERSON_IDENTIFIER_PREFIXES,
+  NATURAL_PERSON_IDENTIFIER_PREFIXES,
   PSP_SUB_ENTITLEMENTS,
   WRP_ENTITLEMENTS,
 } from './entitlements'
@@ -38,6 +44,7 @@ export {
   NaturalPersonSubjectSchema,
   StatusSchema,
   SupervisoryAuthoritySchema,
+  WRPRC_JWS_ALGORITHMS,
   WRPRCCWTHeaderSchema,
   WRPRCJWTHeaderSchema,
   WRPRCPayloadSchema,
@@ -70,6 +77,7 @@ export {
   assertValidWRPRCPayload,
   isLegalPersonWRPRC,
   isNaturalPersonWRPRC,
+  parseWRPRCPayload,
   validateLegalPersonWRPRC,
   validateNaturalPersonWRPRC,
   validateWRPRC,
