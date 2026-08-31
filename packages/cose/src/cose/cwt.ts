@@ -192,7 +192,25 @@ export class Cwt<
   ProtectedHeadersStructure extends AnyProtectedHeaders = ProtectedHeaders,
   UnprotectedHeadersStructure extends AnyUnprotectedHeaders = UnprotectedHeaders,
 > {
-  public payload: Payload
+  #payload: Payload
+
+  /**
+   * The claims set of this CWT.
+   *
+   * Assignable, and assigning drops the retained {@link originalPayloadBytes}, so the new claims set
+   * is what gets signed or verified. Mutating the claims set in place cannot be seen from here, so
+   * call {@link markPayloadModified} after doing so — the mutation helpers a CWT type exposes, such
+   * as `StatusListCwt.updateStatusList`, already do.
+   */
+  public get payload(): Payload {
+    return this.#payload
+  }
+
+  public set payload(payload: Payload) {
+    this.#payload = payload
+    this.markPayloadModified()
+  }
+
   public protectedHeaders: ProtectedHeadersStructure
   public unprotectedHeaders: UnprotectedHeadersStructure
 
@@ -221,7 +239,9 @@ export class Cwt<
   private originalPayloadBytes?: Uint8Array
 
   public constructor(options: CwtOptions<Payload, ProtectedHeadersStructure, UnprotectedHeadersStructure>) {
-    this.payload = options.payload
+    // Set the field rather than going through the setter: there is nothing to invalidate yet, and
+    // `originalPayloadBytes` is assigned below.
+    this.#payload = options.payload
 
     // A raw map only reaches here for a CWT using the default header structures, see `RawHeadersFor`.
     // `create` validates it, so the headers of every CWT are checked by their own schema.
@@ -352,9 +372,10 @@ export class Cwt<
 
   /**
    * Drops the retained {@link originalPayloadBytes}, so that the payload is re-encoded on the next
-   * signing or verification. Call this from a subclass after mutating the payload.
+   * signing or verification. Call this after mutating {@link payload} in place, from a subclass or
+   * from outside; assigning a new payload marks it automatically.
    */
-  protected markPayloadModified() {
+  public markPayloadModified() {
     this.originalPayloadBytes = undefined
   }
 
