@@ -219,6 +219,9 @@ importers:
       '@owf/crypto':
         specifier: workspace:*
         version: link:../crypto
+      '@owf/eudi-jades':
+        specifier: workspace:*
+        version: link:../eudi-jades
       '@owf/identity-common':
         specifier: workspace:*
         version: link:../identity-common
