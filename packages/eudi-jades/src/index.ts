@@ -84,6 +84,7 @@ export type {
   SignerAttributes,
   SignOptions,
   SigTst,
+  TokenContext,
   TstContainer,
   TstToken,
   TstTokens,

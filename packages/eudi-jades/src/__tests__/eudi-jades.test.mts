@@ -149,15 +149,20 @@ describe('Token and verification', () => {
     const token = new Token({ value: 1 }).setProtectedHeader(protectedHeader())
     const algorithms: string[] = []
 
-    const digest = await token.getHash((data, alg) => {
-      algorithms.push(alg)
-      return hasher(data, alg)
-    })
+    const digest = await token.getHash(
+      {},
+      {
+        hasher: (data, alg) => {
+          algorithms.push(alg)
+          return hasher(data, alg)
+        },
+      }
+    )
 
     // The algorithm defaults to the one implied by `alg` and is overridable.
     expect(algorithms).toEqual(['SHA-256'])
     expect(digest).toEqual(sha256(token.getSigningInput()))
-    expect(await token.getHash(hasher, 'SHA-512')).toEqual(sha512(token.getSigningInput()))
+    expect(await token.getHash({ algorithm: 'SHA-512' }, { hasher })).toEqual(sha512(token.getSigningInput()))
   })
 
   it('invalidates a signature when signed material changes', async () => {

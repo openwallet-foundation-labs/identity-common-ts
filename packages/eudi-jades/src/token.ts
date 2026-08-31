@@ -1,5 +1,5 @@
 /** JAdES signature builder for ETSI TS 119 182-1 V1.2.1. */
-import { type Hasher, uint8ArrayToBase64Url } from '@owf/identity-common'
+import { uint8ArrayToBase64Url } from '@owf/identity-common'
 import { CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS } from './constants'
 import { JAdESException } from './jades-exception'
 import {
@@ -8,7 +8,15 @@ import {
   SigDSchema,
   UnprotectedHeaderSchema,
 } from './schemas'
-import type { FlattenedJWS, GeneralJWS, ProtectedHeaderParams, SigD, UnprotectedHeaderParams, X5tO } from './types'
+import type {
+  FlattenedJWS,
+  GeneralJWS,
+  ProtectedHeaderParams,
+  SigD,
+  TokenContext,
+  UnprotectedHeaderParams,
+  X5tO,
+} from './types'
 import { encodeJSON, getSigningTime } from './utils'
 
 const encoder = new TextEncoder()
@@ -155,13 +163,13 @@ export class Token<T = unknown> {
    * Hash the signing input with a caller-supplied hasher, so the package never
    * depends on a global Web Crypto implementation being present.
    *
-   * @param hasher - Hashing callback, e.g. `hasher` from `@owf/crypto`
-   * @param algorithm - Digest algorithm, defaulting to the one implied by `alg`
+   * @param options.algorithm - Digest algorithm, defaulting to the one implied by `alg`
+   * @param ctx.hasher - Hashing callback, e.g. `hasher` from `@owf/crypto`
    */
-  async getHash(hasher: Hasher, algorithm?: string): Promise<Uint8Array> {
+  async getHash(options: { algorithm?: string }, ctx: Pick<TokenContext, 'hasher'>): Promise<Uint8Array> {
     this.validateBeforeSign()
     const signingInput = encoder.encode(this.getSigningInput())
-    return await hasher(signingInput.buffer as ArrayBuffer, algorithm ?? this.getHashAlgorithm())
+    return await ctx.hasher(signingInput.buffer as ArrayBuffer, options.algorithm ?? this.getHashAlgorithm())
   }
 
   setSignature(signature: string): this {
