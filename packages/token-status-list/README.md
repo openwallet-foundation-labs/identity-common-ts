@@ -46,11 +46,20 @@ const restored = StatusList.decompressStatusListFromBytes(compressed, 1)
 Use a private, persisted seed to assign each index exactly once in a deterministic random order:
 
 ```typescript
-import { createStatusListIndexAllocator } from '@owf/token-status-list'
+import { hasher } from '@owf/crypto'
+import { StatusListIndexAllocator, createStatusListIndexAllocator } from '@owf/token-status-list'
 
-const allocator = await createStatusListIndexAllocator(1_000_000, seed)
+// The package never touches a global Web Crypto implementation: pass the
+// hasher that expands the seed. It must compute SHA-256 for the permutation to
+// be reproducible across restarts.
+const ctx = { hasher }
+
+const allocator = await createStatusListIndexAllocator({ length: 1_000_000, seed }, ctx)
 const index = allocator.next()
 const state = allocator.getState() // persist with the allocation counter
+
+// Resume later — the persisted state is accepted as-is
+const resumed = await StatusListIndexAllocator.create(state, ctx)
 ```
 
 The seed must remain private to prevent predicting future assignments. Persist the allocator state

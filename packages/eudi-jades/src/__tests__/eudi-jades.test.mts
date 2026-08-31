@@ -1,4 +1,4 @@
-import { ES256, parseCertificateChain } from '@owf/crypto'
+import { ES256, hasher, parseCertificateChain, sha256, sha512 } from '@owf/crypto'
 import { base64urlEncode } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
@@ -143,6 +143,21 @@ describe('Token and verification', () => {
     token.setLegacySigningTime('2024-01-01T00:00:00Z')
     const signer = await ES256.getSigner(TEST_PRIVATE_KEY)
     await expect(token.sign(signer)).rejects.toThrow('sigT is prohibited')
+  })
+
+  it('hashes the signing input with the supplied hasher, not a global crypto implementation', async () => {
+    const token = new Token({ value: 1 }).setProtectedHeader(protectedHeader())
+    const algorithms: string[] = []
+
+    const digest = await token.getHash((data, alg) => {
+      algorithms.push(alg)
+      return hasher(data, alg)
+    })
+
+    // The algorithm defaults to the one implied by `alg` and is overridable.
+    expect(algorithms).toEqual(['SHA-256'])
+    expect(digest).toEqual(sha256(token.getSigningInput()))
+    expect(await token.getHash(hasher, 'SHA-512')).toEqual(sha512(token.getSigningInput()))
   })
 
   it('invalidates a signature when signed material changes', async () => {

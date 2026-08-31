@@ -15,7 +15,11 @@ export type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusLis
 export { JWT_STATUS_LIST_TYPE, JWTClaimNames } from './jwt-types'
 export { StatusList } from './status-list'
 export { SLException } from './status-list-exception'
-export type { StatusListIndexAllocatorState } from './status-list-index'
+export type {
+  StatusListIndexAllocatorContext,
+  StatusListIndexAllocatorOptions,
+  StatusListIndexAllocatorState,
+} from './status-list-index'
 export { createStatusListIndexAllocator, StatusListIndexAllocator } from './status-list-index'
 export { createHeaderAndPayload, getListFromStatusListJWT, getStatusListFromJWT, verifyStatus } from './status-list-jwt'
 export type { BitsPerStatus, StatusListEntry } from './types'
