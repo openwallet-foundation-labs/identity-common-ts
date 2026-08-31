@@ -1,6 +1,10 @@
+import type { Hasher } from '@owf/identity-common'
 import { SLException } from './status-list-exception'
 
 const UINT32_RANGE = 0x100000000
+
+/** The permutation is defined over SHA-256 of `seed || counter`. */
+const SEED_HASH_ALGORITHM = 'sha-256'
 
 export interface StatusListIndexAllocatorState {
   length: number
@@ -8,14 +12,37 @@ export interface StatusListIndexAllocatorState {
   seed: Uint8Array
 }
 
+export interface StatusListIndexAllocatorOptions {
+  /** Number of indices in the status list. */
+  length: number
+  /** Private seed the permutation is derived from. */
+  seed: Uint8Array
+  /** Number of indices already handed out. Defaults to 0. */
+  position?: number
+}
+
+/**
+ * Hashing callback used to expand the seed. This package never reaches for a
+ * global Web Crypto implementation — the caller decides which engine computes
+ * the digest.
+ *
+ * The permutation is only reproducible when `hasher` computes SHA-256, so the
+ * same seed keeps allocating the same indices across restarts and processes.
+ */
+export interface StatusListIndexAllocatorContext {
+  hasher: Hasher
+}
+
 class SeededRandom {
   private readonly seed: Uint8Array
+  private readonly hasher: Hasher
   private counter = 0
-  private buffer = new Uint8Array(0)
+  private buffer: Uint8Array = new Uint8Array(0)
   private bufferOffset = 0
 
-  constructor(seed: Uint8Array) {
+  constructor(seed: Uint8Array, hasher: Hasher) {
     this.seed = new Uint8Array(seed)
+    this.hasher = hasher
   }
 
   async nextInt(maxExclusive: number): Promise<number> {
@@ -34,7 +61,13 @@ class SeededRandom {
       const input = new Uint8Array(this.seed.length + 4)
       input.set(this.seed)
       new DataView(input.buffer).setUint32(this.seed.length, this.counter++)
-      this.buffer = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', input))
+      const digest = await this.hasher(input.buffer as ArrayBuffer, SEED_HASH_ALGORITHM)
+      // Guard against a hasher that returns too little to make progress on:
+      // without this the do/while in nextInt would spin forever.
+      if (digest.length < 4) {
+        throw new SLException(`hasher returned ${digest.length} bytes for ${SEED_HASH_ALGORITHM}, expected at least 4`)
+      }
+      this.buffer = digest
       this.bufferOffset = 0
     }
 
@@ -55,7 +88,10 @@ export class StatusListIndexAllocator {
     this.position = position
   }
 
-  static async create(length: number, seed: Uint8Array, position = 0): Promise<StatusListIndexAllocator> {
+  static async create(
+    { length, seed, position = 0 }: StatusListIndexAllocatorOptions,
+    ctx: StatusListIndexAllocatorContext
+  ): Promise<StatusListIndexAllocator> {
     validateLength(length)
     validateSeed(seed)
     validatePosition(position, length)
@@ -65,7 +101,7 @@ export class StatusListIndexAllocator {
       indices[index] = index
     }
 
-    const random = new SeededRandom(seed)
+    const random = new SeededRandom(seed, ctx.hasher)
     for (let index = length - 1; index > 0; index--) {
       const swapIndex = await random.nextInt(index + 1)
       const value = indices[index]
@@ -98,11 +134,10 @@ export class StatusListIndexAllocator {
 }
 
 export async function createStatusListIndexAllocator(
-  length: number,
-  seed: Uint8Array,
-  position = 0
+  options: StatusListIndexAllocatorOptions,
+  ctx: StatusListIndexAllocatorContext
 ): Promise<StatusListIndexAllocator> {
-  return StatusListIndexAllocator.create(length, seed, position)
+  return StatusListIndexAllocator.create(options, ctx)
 }
 
 function validateLength(length: number): void {

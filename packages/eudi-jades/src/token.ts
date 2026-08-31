@@ -1,5 +1,5 @@
 /** JAdES signature builder for ETSI TS 119 182-1 V1.2.1. */
-import { uint8ArrayToBase64Url } from '@owf/identity-common'
+import { type Hasher, uint8ArrayToBase64Url } from '@owf/identity-common'
 import { CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS } from './constants'
 import { JAdESException } from './jades-exception'
 import {
@@ -151,13 +151,17 @@ export class Token<T = unknown> {
     return `${this.getEncodedProtectedHeader()}.${this.getSigningPayloadSegment()}`
   }
 
-  async getHash(algorithm?: string): Promise<Uint8Array> {
+  /**
+   * Hash the signing input with a caller-supplied hasher, so the package never
+   * depends on a global Web Crypto implementation being present.
+   *
+   * @param hasher - Hashing callback, e.g. `hasher` from `@owf/crypto`
+   * @param algorithm - Digest algorithm, defaulting to the one implied by `alg`
+   */
+  async getHash(hasher: Hasher, algorithm?: string): Promise<Uint8Array> {
     this.validateBeforeSign()
-    const hashBuffer = await globalThis.crypto.subtle.digest(
-      algorithm ?? this.getHashAlgorithm(),
-      encoder.encode(this.getSigningInput())
-    )
-    return new Uint8Array(hashBuffer)
+    const signingInput = encoder.encode(this.getSigningInput())
+    return await hasher(signingInput.buffer as ArrayBuffer, algorithm ?? this.getHashAlgorithm())
   }
 
   setSignature(signature: string): this {
