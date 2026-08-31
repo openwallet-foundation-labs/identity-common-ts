@@ -39,7 +39,8 @@ export const fetchStatusList = async ({
     if (isMediaType(contentType, MediaTypes.StatusListJwt)) {
       return await response.text()
     } else if (isMediaType(contentType, MediaTypes.StatusListCwt)) {
-      return await (await response.blob()).bytes()
+      // NOTE: RN does not support .blob, use .arrayBuffer() instead
+      return new Uint8Array(await response.arrayBuffer())
     }
 
     throw new SLException('Content type was either not provided in the response or invalid.')
