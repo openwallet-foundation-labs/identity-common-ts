@@ -45,7 +45,7 @@
   "dependencies": {
     "@owf/cose": "workspace:*",
     "@owf/identity-common": "workspace:*",
-    "cbor-x": "^1.6.4",
+    "cbor-x": "^1.6.6",
     "pako": "^3.0.1",
     "zod": "catalog:"
   },
