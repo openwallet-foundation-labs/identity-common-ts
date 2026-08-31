@@ -49,8 +49,8 @@
     "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
-    "@noble/curves": "^2.0.1",
-    "@noble/hashes": "^2.0.1",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@panva/hkdf": "^1.2.1",
     "@peculiar/x509": "^2.0.0",
     "jose": "^6.1.0",
