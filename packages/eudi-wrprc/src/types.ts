@@ -9,6 +9,7 @@
 
 import type { Signer } from '@owf/crypto'
 import type { z } from 'zod'
+import type { WRPRCDialect } from './dialect'
 import type {
   ActSchema,
   ClaimSchema,
@@ -111,11 +112,15 @@ export interface SignOptions {
   /** The WRPRC payload to sign */
   payload: WRPRCPayload
   /** Algorithm (default: ES256) */
-  algorithm?: 'ES256' | 'ES384' | 'ES512' | 'RS256' | 'RS384' | 'RS512'
+  algorithm?: WRPRCJWTHeader['alg']
   /** PEM-encoded certificates for x5c header (each element is a single PEM certificate) */
   certificates: string[]
   /** Key ID (optional) */
   keyId?: string
+  /** JAdES claimed signing time; defaults to now */
+  signingTime?: number | string | Date
+  /** Wire dialect to emit; defaults to ETSI TS 119 475 v1.2.1 as published */
+  dialect?: WRPRCDialect
   /** Signer function for signing the JWS */
   signer: Signer
 }

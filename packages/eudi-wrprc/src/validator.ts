@@ -7,6 +7,7 @@
  */
 
 import { secondsToDate } from '@owf/identity-common'
+import { normalizeWRPRCPayload } from './dialect'
 import { ALL_ENTITLEMENTS, ALL_PSP_SUB_ENTITLEMENTS, ATTESTATION_PROVIDER_ENTITLEMENTS } from './entitlements'
 import {
   LegalPersonSubjectSchema,
@@ -37,8 +38,14 @@ export const WRPRC_VALIDATION_CODES = {
   UNKNOWN_ENTITLEMENT: 'unknown_entitlement',
   /** Attestation provider without provides_attestations (GEN-5.2.4-05) */
   MISSING_PROVIDES_ATTESTATIONS: 'missing_provides_attestations',
+  /** Service provider without credentials (GEN-5.2.4-06, Table 9) */
+  MISSING_CREDENTIALS: 'missing_credentials',
+  /** Service provider without purpose (GEN-5.2.4-06, Table 9) */
+  MISSING_PURPOSE: 'missing_purpose',
   /** sub does not follow the semantic identifier format of clause 5.1 */
   INVALID_SEMANTIC_IDENTIFIER: 'invalid_semantic_identifier',
+  /** sub uses initial characters outside Tables 2 and 4, which may be a national scheme */
+  UNKNOWN_IDENTIFIER_PREFIX: 'unknown_identifier_prefix',
   /** sub parses but deviates from the expected identifier shape */
   IDENTIFIER_FORMAT_WARNING: 'identifier_format_warning',
   /** exp more than 12 months after iat (GEN-5.2.4-08) */
@@ -86,10 +93,85 @@ export interface ValidationResult {
 // ============================================================================
 
 /**
+ * Entitlement-driven checks: GEN-5.2.4-03 to GEN-5.2.4-06.
+ */
+function validateEntitlementRequirements(
+  payload: WRPRCPayload,
+  errors: ValidationError[],
+  warnings: ValidationError[]
+): void {
+  for (const entitlement of payload.entitlements) {
+    const known =
+      ALL_ENTITLEMENTS.includes(entitlement as (typeof ALL_ENTITLEMENTS)[number]) ||
+      ALL_PSP_SUB_ENTITLEMENTS.includes(entitlement as (typeof ALL_PSP_SUB_ENTITLEMENTS)[number])
+    if (!known) {
+      warnings.push({
+        path: ['entitlements'],
+        message: `Unknown entitlement URI: ${entitlement}. This may be a national or EU-defined extension.`,
+        code: WRPRC_VALIDATION_CODES.UNKNOWN_ENTITLEMENT,
+      })
+    }
+  }
+
+  // GEN-5.2.4-03: At least one entitlement must be specified
+  if (payload.entitlements.length === 0) {
+    errors.push({
+      path: ['entitlements'],
+      message: 'At least one entitlement must be specified (GEN-5.2.4-03)',
+      code: WRPRC_VALIDATION_CODES.MISSING_ENTITLEMENT,
+    })
+  }
+
+  const hasSubEntitlement = payload.entitlements.some((e) =>
+    ALL_PSP_SUB_ENTITLEMENTS.includes(e as (typeof ALL_PSP_SUB_ENTITLEMENTS)[number])
+  )
+  const hasServiceProvider = payload.entitlements.includes('https://uri.etsi.org/19475/Entitlement/Service_Provider')
+
+  // GEN-5.2.4-04: If sub-entitlements are present, a base entitlement must also be present
+  if (hasSubEntitlement && !hasServiceProvider) {
+    errors.push({
+      path: ['entitlements'],
+      message: 'Service provider sub-entitlements require Service_Provider entitlement (GEN-5.2.4-04)',
+      code: WRPRC_VALIDATION_CODES.MISSING_BASE_ENTITLEMENT,
+    })
+  }
+
+  // GEN-5.2.4-05: Attestation providers should have provides_attestations
+  const hasAttestationProviderRole = payload.entitlements.some((e) =>
+    ATTESTATION_PROVIDER_ENTITLEMENTS.includes(e as (typeof ATTESTATION_PROVIDER_ENTITLEMENTS)[number])
+  )
+  if (hasAttestationProviderRole && !payload.provides_attestations) {
+    warnings.push({
+      path: ['provides_attestations'],
+      message:
+        'Attestation providers should include provides_attestations field (GEN-5.2.4-05). This is recommended but not required.',
+      code: WRPRC_VALIDATION_CODES.MISSING_PROVIDES_ATTESTATIONS,
+    })
+  }
+
+  // GEN-5.2.4-06: service providers carry the intended use fields of Table 9. The registry
+  // may not have provided them, so these are warnings rather than errors.
+  if (hasServiceProvider && !payload.credentials) {
+    warnings.push({
+      path: ['credentials'],
+      message: 'Service provider WRPRCs should include the credentials field (GEN-5.2.4-06)',
+      code: WRPRC_VALIDATION_CODES.MISSING_CREDENTIALS,
+    })
+  }
+  if (hasServiceProvider && !payload.purpose) {
+    warnings.push({
+      path: ['purpose'],
+      message: 'Service provider WRPRCs should include the purpose field (GEN-5.2.4-06)',
+      code: WRPRC_VALIDATION_CODES.MISSING_PURPOSE,
+    })
+  }
+}
+
+/**
  * Validate a WRPRC payload against the schema
  */
 export function validateWRPRCPayload(payload: unknown): ValidationResult {
-  const result = WRPRCPayloadSchema.safeParse(payload)
+  const result = WRPRCPayloadSchema.safeParse(normalizeWRPRCPayload(payload))
   const errors: ValidationError[] = []
   const warnings: ValidationError[] = []
 
@@ -107,56 +189,7 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
   // Additional semantic validations
   const validPayload: WRPRCPayload = result.data
 
-  // Check entitlements are valid URIs from the standard
-  for (const entitlement of validPayload.entitlements) {
-    if (!ALL_ENTITLEMENTS.includes(entitlement as (typeof ALL_ENTITLEMENTS)[number])) {
-      // Check if it's a sub-entitlement
-      if (!ALL_PSP_SUB_ENTITLEMENTS.includes(entitlement as (typeof ALL_PSP_SUB_ENTITLEMENTS)[number])) {
-        warnings.push({
-          path: ['entitlements'],
-          message: `Unknown entitlement URI: ${entitlement}. This may be a national or EU-defined extension.`,
-          code: WRPRC_VALIDATION_CODES.UNKNOWN_ENTITLEMENT,
-        })
-      }
-    }
-  }
-
-  // GEN-5.2.4-03: At least one entitlement must be specified
-  if (validPayload.entitlements.length === 0) {
-    errors.push({
-      path: ['entitlements'],
-      message: 'At least one entitlement must be specified (GEN-5.2.4-03)',
-      code: WRPRC_VALIDATION_CODES.MISSING_ENTITLEMENT,
-    })
-  }
-
-  // GEN-5.2.4-04: If sub-entitlements are present, a base entitlement must also be present
-  const hasSubEntitlement = validPayload.entitlements.some((e) =>
-    ALL_PSP_SUB_ENTITLEMENTS.includes(e as (typeof ALL_PSP_SUB_ENTITLEMENTS)[number])
-  )
-  const hasServiceProvider = validPayload.entitlements.includes(
-    'https://uri.etsi.org/19475/Entitlement/Service_Provider'
-  )
-  if (hasSubEntitlement && !hasServiceProvider) {
-    errors.push({
-      path: ['entitlements'],
-      message: 'Service provider sub-entitlements require Service_Provider entitlement (GEN-5.2.4-04)',
-      code: WRPRC_VALIDATION_CODES.MISSING_BASE_ENTITLEMENT,
-    })
-  }
-
-  // GEN-5.2.4-05: Attestation providers should have provides_attestations
-  const hasAttestationProviderRole = validPayload.entitlements.some((e) =>
-    ATTESTATION_PROVIDER_ENTITLEMENTS.includes(e as (typeof ATTESTATION_PROVIDER_ENTITLEMENTS)[number])
-  )
-  if (hasAttestationProviderRole && !validPayload.provides_attestations) {
-    warnings.push({
-      path: ['provides_attestations'],
-      message:
-        'Attestation providers should include provides_attestations field (GEN-5.2.4-05). This is recommended but not required.',
-      code: WRPRC_VALIDATION_CODES.MISSING_PROVIDES_ATTESTATIONS,
-    })
-  }
+  validateEntitlementRequirements(validPayload, errors, warnings)
 
   // Validate subject identifier format (semantic identifier)
   const subResult = validateSemanticIdentifier(validPayload.sub)
@@ -165,6 +198,12 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
       path: ['sub'],
       message: subResult.message,
       code: WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER,
+    })
+  } else if (subResult.unknownPrefix) {
+    warnings.push({
+      path: ['sub'],
+      message: `Unknown semantic identifier initial characters: ${subResult.unknownPrefix}. This may be a national scheme (ETSI EN 319 412-1).`,
+      code: WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX,
     })
   }
 
@@ -276,7 +315,7 @@ export function isNaturalPersonWRPRC(payload: WRPRCPayload): boolean {
  * Validate as legal person WRPRC
  */
 export function validateLegalPersonWRPRC(payload: unknown): ValidationResult {
-  const result = LegalPersonSubjectSchema.safeParse(payload)
+  const result = LegalPersonSubjectSchema.safeParse(normalizeWRPRCPayload(payload))
   const errors: ValidationError[] = []
   const warnings: ValidationError[] = []
 
@@ -312,7 +351,7 @@ export function validateLegalPersonWRPRC(payload: unknown): ValidationResult {
  * Validate as natural person WRPRC
  */
 export function validateNaturalPersonWRPRC(payload: unknown): ValidationResult {
-  const result = NaturalPersonSubjectSchema.safeParse(payload)
+  const result = NaturalPersonSubjectSchema.safeParse(normalizeWRPRCPayload(payload))
   const errors: ValidationError[] = []
   const warnings: ValidationError[] = []
 
@@ -349,19 +388,25 @@ export function validateNaturalPersonWRPRC(payload: unknown): ValidationResult {
 // ============================================================================
 
 /**
- * Valid semantic identifier prefixes for legal persons (ETSI EN 319 412-1 clause 5.1.4)
+ * Valid semantic identifier initial characters for legal persons
+ * (Table 2, ETSI EN 319 412-1 clause 5.1.4)
  */
-const LEGAL_PERSON_PREFIXES = ['EOR', 'LEI', 'NTR', 'VAT', 'TIN', 'EXC']
+const LEGAL_PERSON_PREFIXES = ['EOR', 'LEI', 'NTR', 'VAT', 'EXC']
 
 /**
- * Valid semantic identifier prefixes for natural persons (ETSI EN 319 412-1 clause 5.1.3)
+ * Valid semantic identifier initial characters for natural persons
+ * (Table 4, ETSI EN 319 412-1 clause 5.1.3)
  */
-const NATURAL_PERSON_PREFIXES = ['TIN', 'PAS', 'IDC', 'PNO', 'TAX']
+const NATURAL_PERSON_PREFIXES = ['TIN', 'PAS', 'IDC', 'PNO']
 
 /**
  * Validate a semantic identifier format
  */
-function validateSemanticIdentifier(identifier: string): { valid: boolean; message: string } {
+function validateSemanticIdentifier(identifier: string): {
+  valid: boolean
+  message: string
+  unknownPrefix?: string
+} {
   // Format: PREFIX (3 chars) + COUNTRY (2 chars) + "-" + ID
   const match = identifier.match(/^([A-Z]{3})([A-Z]{2})-(.+)$/)
 
@@ -372,23 +417,11 @@ function validateSemanticIdentifier(identifier: string): { valid: boolean; messa
     }
   }
 
-  const [, prefix, , id] = match
+  const [, prefix] = match
+  const known = LEGAL_PERSON_PREFIXES.includes(prefix) || NATURAL_PERSON_PREFIXES.includes(prefix)
 
-  // Check if prefix is known
-  const allPrefixes = [...LEGAL_PERSON_PREFIXES, ...NATURAL_PERSON_PREFIXES]
-  if (!allPrefixes.includes(prefix)) {
-    // Unknown prefix is allowed per spec (national schemes may define additional prefixes)
-    // but we validate the format is correct
-  }
-
-  if (!id || id.length === 0) {
-    return {
-      valid: false,
-      message: 'Semantic identifier must have a non-empty ID part after the hyphen',
-    }
-  }
-
-  return { valid: true, message: '' }
+  // National schemes may define further initial characters, so an unknown one is not an error
+  return { valid: true, message: '', ...(known ? {} : { unknownPrefix: prefix }) }
 }
 
 // ============================================================================
@@ -404,6 +437,16 @@ export function assertValidWRPRCPayload(payload: unknown): asserts payload is WR
     const messages = result.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('\n')
     throw new WRPRCException(`Invalid WRPRC payload:\n${messages}`, result.errors)
   }
+}
+
+/**
+ * Parse a WRPRC payload into its canonical form, accepting either dialect spelling.
+ *
+ * @throws WRPRCException if the payload is invalid
+ */
+export function parseWRPRCPayload(payload: unknown): WRPRCPayload {
+  assertValidWRPRCPayload(payload)
+  return WRPRCPayloadSchema.parse(normalizeWRPRCPayload(payload))
 }
 
 /**
