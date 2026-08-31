@@ -1,8 +1,15 @@
 import { Tag } from 'cbor-x'
-import type { AnyCborStructure, DecodedStructureType, EncodedStructureType } from '../cbor'
+import type { AnyCborStructure, EncodedStructureType } from '../cbor'
 import { cborDecode, describeCborValue } from '../cbor'
 import type { AnyCwtPayload, CwtPayload } from './claims/cwt-payload'
-import { CosePayloadInvalidStructureError, CwtDetachedPayloadError, CwtPayloadDecodeError } from './error'
+import {
+  CoseInvalidSignatureError,
+  CosePayloadInvalidStructureError,
+  CwtDetachedPayloadError,
+  CwtMissingVerifyContextError,
+  CwtNotSignedError,
+  CwtPayloadDecodeError,
+} from './error'
 import {
   type ProtectedHeaderOptions,
   ProtectedHeaders,
@@ -47,10 +54,17 @@ export type CwtOptions<
   /** The CWT claims set. */
   payload: Payload
 
-  /** The COSE_Sign1 signature or the COSE_Mac0 authentication tag, when the CWT carries one. */
-  signatureOrTag?: Uint8Array
+  /**
+   * The COSE_Sign1 signature over the payload. Set for a signed CWT, and mutually exclusive with
+   * {@link tag} — a CWT is one or the other.
+   */
+  signature?: Uint8Array
 
-  externalAad?: Uint8Array
+  /**
+   * The COSE_Mac0 authentication tag over the payload. Set for a MACed CWT, and mutually exclusive
+   * with {@link signature}.
+   */
+  tag?: Uint8Array
 
   /**
    * The payload bytes exactly as they appeared in the COSE message. Set when decoding a token, so
@@ -61,6 +75,37 @@ export type CwtOptions<
    */
   originalPayloadBytes?: Uint8Array
 }
+
+/**
+ * The verification context {@link Cwt.verify} needs. Both are optional, so a caller that only deals
+ * with one of the two COSE structures passes only that one, and a CWT carried in the other is
+ * rejected rather than verified with the wrong context.
+ */
+export type CwtVerifyContext = {
+  /** Verifies the signature of a CWT carried in a COSE_Sign1. */
+  sign1?: Pick<Sign1Context, 'verify'>
+
+  /** Verifies the authentication tag of a CWT carried in a COSE_Mac0. */
+  mac0?: Pick<Mac0Context, 'verify'>
+}
+
+/**
+ * The options the payload of `Cwt` takes for claim verification. Reading them off the payload class
+ * is what lets a CWT type require its own options — a status list CWT its `uri`, say — on the `Cwt`
+ * methods that forward to it.
+ */
+export type CwtClaimsOptionsFor<Payload extends AnyCwtPayload> = NonNullable<Parameters<Payload['verifyClaims']>[0]>
+
+/** The options {@link Cwt.verify} takes: the key, the claim options of its payload, and the AAD. */
+export type CwtVerifyOptions<Payload extends AnyCwtPayload> = {
+  key: CoseKey
+
+  /**
+   * Externally supplied data covered by the signature or authentication tag. It is not carried in
+   * the token, so it has to be the same value the issuer signed with.
+   */
+  externalAad?: Uint8Array
+} & CwtClaimsOptionsFor<Payload>
 
 // biome-ignore lint/suspicious/noExplicitAny: intentionally unconstrained, used as a generic bound
 export type AnyProtectedHeaders = ProtectedHeaders<any>
@@ -78,15 +123,12 @@ export type CwtProtectedHeadersType<T> = T extends Cwt<any, infer Headers, any> 
 export type CwtUnprotectedHeadersType<T> = T extends Cwt<any, any, infer Headers> ? Headers : never
 
 /**
- * The static side of a `CborStructure` subclass, reduced to what decoding a CWT needs: constructing
- * an instance, and validating an encoded structure into a decoded one. Kept structural rather than
- * `typeof SomeClass` so that any subclass is accepted.
+ * The static side of a `CborStructure` subclass, reduced to what decoding a CWT needs: turning an
+ * encoded structure into a validated instance. Kept structural rather than `typeof SomeClass` so
+ * that any subclass is accepted.
  */
 export type CwtStructureClass<Structure extends AnyCborStructure> = {
-  new (structure: DecodedStructureType<Structure>): Structure
-  fromEncodedStructure(encodedStructure: EncodedStructureType<Structure>): {
-    decodedStructure: DecodedStructureType<Structure>
-  }
+  fromEncodedStructure(encodedStructure: EncodedStructureType<Structure>): Structure
 }
 
 /**
@@ -153,10 +195,18 @@ export class Cwt<
   public payload: Payload
   public protectedHeaders: ProtectedHeadersStructure
   public unprotectedHeaders: UnprotectedHeadersStructure
-  public externalAad?: Uint8Array
 
-  /** The COSE_Sign1 signature or COSE_Mac0 authentication tag, when the CWT carries one. */
-  public signatureOrTag?: Uint8Array
+  /**
+   * The COSE_Sign1 signature over the payload, for a signed CWT.
+   *
+   * Kept apart from {@link tag} rather than as one 'signature or tag' value, because which of the
+   * two a CWT carries is what says whether it is a COSE_Sign1 or a COSE_Mac0 — a distinction the
+   * encoded structure does not carry, and that {@link verify} needs.
+   */
+  public signature?: Uint8Array
+
+  /** The COSE_Mac0 authentication tag over the payload, for a MACed CWT. See {@link signature}. */
+  public tag?: Uint8Array
 
   /**
    * The payload bytes as received in the COSE message, kept so that verification can use them
@@ -188,8 +238,14 @@ export class Cwt<
           })
     ) as UnprotectedHeadersStructure
 
-    this.signatureOrTag = options.signatureOrTag
-    this.externalAad = options.externalAad
+    if (options.signature && options.tag) {
+      throw new CosePayloadInvalidStructureError(
+        'A CWT carries either a COSE_Sign1 signature or a COSE_Mac0 authentication tag, not both'
+      )
+    }
+
+    this.signature = options.signature
+    this.tag = options.tag
     this.originalPayloadBytes = options.originalPayloadBytes
   }
 
@@ -253,7 +309,8 @@ export class Cwt<
       payload,
       protectedHeaders,
       unprotectedHeaders,
-      signatureOrTag: coseStructure instanceof Sign1 ? coseStructure.signature : coseStructure.tag,
+      signature: coseStructure instanceof Sign1 ? coseStructure.signature : undefined,
+      tag: coseStructure instanceof Mac0 ? coseStructure.tag : undefined,
       // Keep the exact bytes the issuer signed, see `originalPayloadBytes`.
       originalPayloadBytes: new Uint8Array(payloadBytes),
     })
@@ -345,13 +402,17 @@ export class Cwt<
     )
   }
 
+  /** The proof this CWT carries, whichever of the two it is: its {@link signature} or its {@link tag}. */
+  public get signatureOrTag(): Uint8Array | undefined {
+    return this.signature ?? this.tag
+  }
+
   public get asSign1() {
     return Sign1.create({
       protectedHeaders: this.protectedHeaders,
       unprotectedHeaders: this.unprotectedHeaders,
       payload: this.payloadBytes,
-      signature: this.signatureOrTag,
-      externalAad: this.externalAad,
+      signature: this.signature,
     })
   }
 
@@ -360,28 +421,99 @@ export class Cwt<
       protectedHeaders: this.protectedHeaders,
       unprotectedHeaders: this.unprotectedHeaders,
       payload: this.payloadBytes,
-      tag: this.signatureOrTag,
-      externalAad: this.externalAad,
+      tag: this.tag,
     })
   }
 
   public async signAndEncode(
-    options: { signingKey: CoseKey; algorithm?: SignatureAlgorithm },
+    options: { signingKey: CoseKey; algorithm?: SignatureAlgorithm; externalAad?: Uint8Array },
     ctx: Pick<Sign1Context, 'sign'>
   ) {
     return (await this.asSign1.sign(options, ctx)).encode()
   }
 
-  public async authenticateAndEncode({ key }: { key: CoseKey }, ctx: Pick<Mac0Context, 'authenticate'>) {
-    return (await this.asMac0.authenticate({ key }, ctx)).encode()
+  public async authenticateAndEncode(
+    options: { key: CoseKey; externalAad?: Uint8Array },
+    ctx: Pick<Mac0Context, 'authenticate'>
+  ) {
+    return (await this.asMac0.authenticate(options, ctx)).encode()
   }
 
-  public async verifySignature({ key }: { key: CoseKey }, ctx: Pick<Sign1Context, 'verify'>) {
-    return await this.asSign1.verifySignature({ key }, ctx)
+  /**
+   * Verifies the claims of this CWT's payload. See `CwtPayload.verifyClaims` for what is checked; a
+   * CWT type that narrows its payload class narrows this along with it, options included.
+   *
+   * This checks the claims only. {@link verify} checks the signature or authentication tag as well,
+   * and is what a verifier wants: the claims of a token whose issuer has not been established mean
+   * nothing.
+   *
+   * @throws CwtClaimVerificationError if a required claim is missing, a claim does not match what
+   *   was expected, or the token is outside its validity window.
+   */
+  public verifyClaims(options: CwtClaimsOptionsFor<Payload>): void {
+    this.payload.verifyClaims(options)
   }
 
-  public async verifyAuthenticationCode({ key }: { key: CoseKey }, ctx: Pick<Mac0Context, 'verify'>) {
-    return await this.asMac0.verifyAuthenticationCode({ key }, ctx)
+  /**
+   * Verifies this CWT completely: the signature or authentication tag over the payload, and then
+   * the claims in it.
+   *
+   * Which of the two is checked follows whether this CWT carries a {@link signature} or a
+   * {@link tag}, and the matching entry of `ctx` is used, so a caller does not have to know which
+   * of the two structures a token turned out to be.
+   *
+   * @throws CwtNotSignedError if the CWT carries neither, and so has nothing to verify.
+   * @throws CwtMissingVerifyContextError if `ctx` has no entry for the structure this CWT is.
+   * @throws CoseInvalidSignatureError if the signature or authentication tag does not verify.
+   * @throws CwtClaimVerificationError if the claims do not, see {@link verifyClaims}.
+   */
+  public async verify(
+    { key, externalAad, ...claimsOptions }: CwtVerifyOptions<Payload>,
+    ctx: CwtVerifyContext
+  ): Promise<void> {
+    if (this.tag !== undefined) {
+      if (!ctx.mac0) {
+        throw new CwtMissingVerifyContextError(
+          'The CWT carries a COSE_Mac0 authentication tag, but no `mac0` verification context was provided'
+        )
+      }
+
+      if (!(await this.verifyAuthenticationCode({ key, externalAad }, ctx.mac0))) {
+        throw new CoseInvalidSignatureError(
+          'The authentication tag of the CWT could not be verified with the provided key'
+        )
+      }
+    } else if (this.signature !== undefined) {
+      if (!ctx.sign1) {
+        throw new CwtMissingVerifyContextError(
+          'The CWT carries a COSE_Sign1 signature, but no `sign1` verification context was provided'
+        )
+      }
+
+      if (!(await this.verifySignature({ key, externalAad }, ctx.sign1))) {
+        throw new CoseInvalidSignatureError('The signature of the CWT could not be verified with the provided key')
+      }
+    } else {
+      throw new CwtNotSignedError(
+        'The CWT carries neither a signature nor an authentication tag, so there is nothing to verify. ' +
+          'Decode a signed or authenticated token with `fromToken` to verify it.'
+      )
+    }
+
+    // NOTE: cast because TypeScript cannot see that the rest of a generic intersection is still the
+    // payload's options type.
+    this.verifyClaims(claimsOptions as CwtClaimsOptionsFor<Payload>)
+  }
+
+  public async verifySignature(options: { key: CoseKey; externalAad?: Uint8Array }, ctx: Pick<Sign1Context, 'verify'>) {
+    return await this.asSign1.verifySignature(options, ctx)
+  }
+
+  public async verifyAuthenticationCode(
+    options: { key: CoseKey; externalAad?: Uint8Array },
+    ctx: Pick<Mac0Context, 'verify'>
+  ) {
+    return await this.asMac0.verifyAuthenticationCode(options, ctx)
   }
 }
 
@@ -394,5 +526,8 @@ function decodeStructure<Structure extends AnyCborStructure>(
   structureClass: CwtStructureClass<Structure>,
   encodedStructure: EncodedStructureType<Structure>
 ): Structure {
-  return new structureClass(structureClass.fromEncodedStructure(encodedStructure).decodedStructure)
+  // NOTE: the instance `fromEncodedStructure` builds is used as is, rather than re-wrapped around
+  // its decoded structure: a structure can carry more than that map — `ProtectedHeaders` keeps the
+  // bstr it was decoded from — and re-wrapping would drop it.
+  return structureClass.fromEncodedStructure(encodedStructure)
 }

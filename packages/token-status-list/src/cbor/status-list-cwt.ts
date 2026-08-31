@@ -6,6 +6,8 @@ import {
   CwtPayloadDecodeError,
   type CwtStaticThis,
   type CwtStructures,
+  type CwtVerifyContext,
+  type CwtVerifyOptions,
   ProtectedHeaders,
   RegisteredCwtHeaderClaimKey,
   TypedMap,
@@ -14,8 +16,7 @@ import {
 } from '@owf/cose'
 import { StatusList } from '../status-list'
 import { SLException } from '../status-list-exception'
-import { type BitsPerStatus, MediaTypes, StatusType } from '../types'
-import { verifyStatusListClaims } from '../verify-status-list-claims'
+import { type BitsPerStatus, MediaTypes } from '../types'
 import { StatusListCbor } from './status-list-cbor'
 import { StatusListCwtProtectedHeaders } from './status-list-cwt-headers'
 import { type CreateStatusListCwtPayloadOptions, StatusListCwtPayload } from './status-list-cwt-payload'
@@ -150,45 +151,27 @@ export class StatusListCwt extends Cwt<StatusListCwtPayload, StatusListCwtProtec
   }
 
   /**
-   * Verify the token's claims and the status at `idx`. The claim checks are shared with the
-   * JWT serialization through {@link verifyStatusListClaims}, so both stay in step.
+   * Verify the token completely: its signature or authentication tag, its claims, and — when `idx`
+   * is given — that the status at that index is `Valid`. This is what a verifier resolving a status
+   * list reference wants, and the only form in which the claims mean anything, since they are only
+   * the issuer's if the token verifies.
    *
-   * @todo add check for `ttl` claim
+   * @throws CoseInvalidSignatureError if the signature or authentication tag does not verify.
+   * @throws SLException if the claims or the status at `idx` do not.
    */
-  public verifyStatus({
-    idx,
-    uri,
-    checkFreshness,
-    now,
-    skewSeconds,
-    requireExpirationTime,
-  }: {
-    idx: number
-    uri: string
-    checkFreshness?: boolean
-    now?: Date
-    /** Clock tolerance applied to `exp` and `iat`, in seconds. Defaults to 30. */
-    skewSeconds?: number
-    /** Require `exp`, which is OPTIONAL by default. */
-    requireExpirationTime?: boolean
-  }) {
-    verifyStatusListClaims({
-      claims: {
-        subject: this.payload.subject,
-        issuedAt: this.payload.issuedAt,
-        expirationTime: this.payload.expirationTime,
-      },
-      uri,
-      now,
-      skewSeconds,
-      checkFreshness,
-      requireExpirationTime,
-    })
+  public override async verify(
+    { idx, ...options }: CwtVerifyOptions<StatusListCwtPayload> & { idx?: number },
+    ctx: CwtVerifyContext
+  ): Promise<void> {
+    await super.verify(options, ctx)
 
-    if (this.payload.statusList.getStatus(idx) !== StatusType.Valid) {
-      throw new SLException(
-        `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${this.payload.statusList.getStatus(idx)}'`
-      )
-    }
+    if (idx !== undefined) this.payload.verifyStatus(idx)
+  }
+
+  /**
+   * Verify the token's status at `idx`, without verifying the remaining claims or signature.
+   */
+  public verifyStatus(idx: number) {
+    this.payload.verifyStatus(idx)
   }
 }

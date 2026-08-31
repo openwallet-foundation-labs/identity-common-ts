@@ -1,13 +1,17 @@
 import {
   type CreateCwtPayloadOptions,
+  CwtClaimVerificationError,
   CwtPayload,
   cwtPayloadClaimsFromOptions,
   extendCwtPayloadClaims,
   RegisteredCwtClaimKey,
   TypedMap,
+  type VerifyCwtClaimsOptions,
 } from '@owf/cose'
 import z from 'zod'
 import type { StatusList } from '../status-list'
+import { SLException } from '../status-list-exception'
+import { StatusType } from '../types'
 import { StatusListCbor, type StatusListCborEncodedStructure } from './status-list-cbor'
 
 export enum StatusListCwtClaimKey {
@@ -33,6 +37,15 @@ const statusListCwtPayloadSchema = extendCwtPayloadClaims(
 
 export type StatusListCwtPayloadEncodedStructure = z.infer<typeof statusListCwtPayloadSchema>
 export type StatusListCwtPayloadDecodedStructure = z.infer<typeof statusListCwtPayloadSchema>
+
+/**
+ * The options {@link StatusListCwtPayload.verifyClaims} takes: the generic CWT ones, with `sub`
+ * replaced by the `uri` it has to be equal to.
+ */
+export type VerifyStatusListCwtClaimsOptions = Omit<VerifyCwtClaimsOptions, 'expectedSubject' | 'keyLabels'> & {
+  /** The `uri` of the status list reference the token was fetched for, which `sub` must equal. */
+  uri: string
+}
 
 export type CreateStatusListCwtPayloadOptions = CreateCwtPayloadOptions & {
   subject: string
@@ -65,7 +78,9 @@ export class StatusListCwtPayload extends CwtPayload<StatusListCwtPayloadDecoded
 
   public static override create(options: CreateStatusListCwtPayloadOptions) {
     // `iat` is required for a status list token, so it defaults to now rather than being omitted.
-    const claims = cwtPayloadClaimsFromOptions({ issuedAt: new Date(), ...options })
+    // NOTE: applied after the spread, so that an explicit `issuedAt: undefined` — what passing
+    // through an optional value gives — defaults the same way omitting the key does.
+    const claims = cwtPayloadClaimsFromOptions({ ...options, issuedAt: options.issuedAt ?? new Date() })
 
     claims.set(
       StatusListCwtClaimKey.StatusList,
@@ -78,7 +93,8 @@ export class StatusListCwtPayload extends CwtPayload<StatusListCwtPayloadDecoded
       claims.set(StatusListCwtClaimKey.TimeToLive, options.timeToLive)
     }
 
-    return StatusListCwtPayload.fromDecodedStructure(TypedMap.fromMap(claims))
+    // biome-ignore lint/complexity/noThisInStatic: this.fromDecodedStructure is intentional for subclass support
+    return this.fromDecodedStructure(TypedMap.fromMap(claims))
   }
 
   /** `ttl` (65534), in seconds. */
@@ -89,6 +105,50 @@ export class StatusListCwtPayload extends CwtPayload<StatusListCwtPayloadDecoded
   /** `status_list` (65533) */
   public get statusList(): StatusList {
     return this.getClaim(StatusListCwtClaimKey.StatusList).statusList
+  }
+
+  /**
+   * Verifies the claims of a Status List Token, on top of the generic CWT ones: `sub` and `iat` are
+   * REQUIRED, and `sub` has to match the URI the token was referenced by — without that check a
+   * token published for one URI can be replayed for another under the same issuer.
+   *
+   * A profile that makes a further claim mandatory — ISO/IEC 18013-5 second edition § 12.3.6.3 does
+   * for `exp`, on the revocation list of an MSO — adds it through `requiredClaims`.
+   *
+   * @throws SLException if a required claim is missing, `sub` is not the referenced URI, or the
+   *   token is outside its validity window. The underlying error is available on the `details`
+   *   property.
+   *
+   * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5
+   */
+  public override verifyClaims({ uri, requiredClaims = [], ...options }: VerifyStatusListCwtClaimsOptions): void {
+    try {
+      super.verifyClaims({
+        ...options,
+        expectedSubject: uri,
+        requiredClaims: [RegisteredCwtClaimKey.Subject, RegisteredCwtClaimKey.IssuedAt, ...requiredClaims],
+        keyLabels: StatusListCwtClaimKey,
+      })
+    } catch (error) {
+      if (error instanceof CwtClaimVerificationError) {
+        throw new SLException(`Status list token claim verification failed. ${error.message}`, error)
+      }
+
+      throw error
+    }
+  }
+
+  /**
+   * Verifies that the status at `idx` in this token's status list is `Valid`.
+   *
+   * @throws SLException if it is any other status.
+   */
+  public verifyStatus(idx: number): void {
+    const status = this.statusList.getStatus(idx)
+
+    if (status !== StatusType.Valid) {
+      throw new SLException(`Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`)
+    }
   }
 
   public setStatusList(statusList: StatusList | StatusListCbor) {

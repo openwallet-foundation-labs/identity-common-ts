@@ -391,6 +391,21 @@ describe('Extending Cwt for a specific cwt type', () => {
     expect(await decoded.verifySignature({ key: signKey }, sign1Context)).toBe(true)
   })
 
+  test('should build the subclass, validated by its own schema, from create', () => {
+    // `create` is inherited, so it has to construct the class it was called on rather than the base
+    // one — otherwise a profile's extra requirements are silently skipped.
+    const payload = ExampleCwtPayload.create({ subject: 'coap://light.example' })
+    const headers = ExampleProtectedHeaders.create({ protectedHeaders: protectedHeaderMap })
+
+    expect(payload).toBeInstanceOf(ExampleCwtPayload)
+    expect(headers).toBeInstanceOf(ExampleProtectedHeaders)
+
+    // `sub` is optional for a plain CWT but required here, and `profile` (65001) is required by
+    // ExampleProtectedHeaders, so neither is accepted without it
+    expect(() => ExampleCwtPayload.create({ issuer: 'coap://as.example' })).toThrow(/Subject \(2\)/)
+    expect(() => ExampleProtectedHeaders.create({ protectedHeaders: new Map() })).toThrow(/Profile \(65001\)/)
+  })
+
   test('should reject a payload missing a claim the cwt type requires', async () => {
     // `sub` is optional for a plain CWT, so this is a valid base payload but not a valid ExampleCwt one
     const cwt = Cwt.create({

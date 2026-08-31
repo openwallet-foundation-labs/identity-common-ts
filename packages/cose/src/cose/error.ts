@@ -33,3 +33,15 @@ export class CwtDetachedPayloadError extends CoseError {}
 
 /** The CWT payload is not a valid claims set for the CWT type it was decoded as. */
 export class CwtPayloadDecodeError extends CoseError {}
+
+/** The CWT carries neither a signature nor an authentication tag, so there is nothing to verify. */
+export class CwtNotSignedError extends CoseError {}
+
+/** No verification context was provided for the COSE structure the CWT is carried in. */
+export class CwtMissingVerifyContextError extends CoseError {}
+
+/**
+ * A claim required by the profile the token is verified against is missing, a claim does not match
+ * the value it was expected to have, or the token is outside its validity window.
+ */
+export class CwtClaimVerificationError extends CoseError {}

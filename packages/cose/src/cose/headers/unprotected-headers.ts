@@ -36,6 +36,7 @@ export class UnprotectedHeaders<Headers extends AnyTypedMap = CoseHeaders> exten
   }
 
   public static create(options: UnprotectedHeaderOptions) {
-    return UnprotectedHeaders.fromDecodedStructure(TypedMap.fromMap(options.unprotectedHeaders ?? new Map()))
+    // biome-ignore lint/complexity/noThisInStatic: this.fromDecodedStructure is intentional for subclass support
+    return this.fromDecodedStructure(TypedMap.fromMap(options.unprotectedHeaders ?? new Map()))
   }
 }

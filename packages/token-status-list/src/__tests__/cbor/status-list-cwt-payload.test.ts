@@ -4,6 +4,25 @@ import { StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
 
 suite('StatusListCwtPayload', () => {
+  test('defaults a missing issued at to now, however it was left out', () => {
+    const statusList = StatusListCbor.create({ statusList: new StatusList(new Array(10).fill(0), 1) })
+
+    // `iat` is required for a status list token. Passing an optional value through — which yields an
+    // explicit `undefined` — has to default the same way omitting the key does.
+    for (const options of [{}, { issuedAt: undefined }]) {
+      const payload = StatusListCwtPayload.create({
+        subject: 'https://example.com/statuslists/1',
+        statusList,
+        ...options,
+      })
+
+      // `iat` is a NumericDate, so the default is truncated to whole seconds
+      expect(payload.issuedAt).toBeInstanceOf(Date)
+      expect(Date.now() - payload.issuedAt.getTime()).toBeGreaterThanOrEqual(0)
+      expect(Date.now() - payload.issuedAt.getTime()).toBeLessThan(2000)
+    }
+  })
+
   test('encode/decode', () => {
     const statusList = new StatusList(new Array(10).fill(0), 4, 'https://example.com/aggregate')
     statusList.setStatus(0, 1)

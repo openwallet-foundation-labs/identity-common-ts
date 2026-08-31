@@ -3,7 +3,10 @@ export { StatusListCbor } from './cbor/status-list-cbor'
 export type { StatusListCwtOptions } from './cbor/status-list-cwt'
 export { StatusListCwt } from './cbor/status-list-cwt'
 export { StatusListCwtProtectedHeaders } from './cbor/status-list-cwt-headers'
-export type { CreateStatusListCwtPayloadOptions } from './cbor/status-list-cwt-payload'
+export type {
+  CreateStatusListCwtPayloadOptions,
+  VerifyStatusListCwtClaimsOptions,
+} from './cbor/status-list-cwt-payload'
 export { StatusListCwtClaimKey, StatusListCwtPayload } from './cbor/status-list-cwt-payload'
 export type {
   StatusListInfoDecodedStructure,
@@ -18,8 +21,7 @@ export { StatusList } from './status-list'
 export { SLException } from './status-list-exception'
 export type { StatusListIndexAllocatorState } from './status-list-index'
 export { createStatusListIndexAllocator, StatusListIndexAllocator } from './status-list-index'
+export type { VerifyStatusListJwtClaimsOptions } from './status-list-jwt'
 export { createHeaderAndPayload, getListFromStatusListJWT, getStatusListFromJWT, verifyStatus } from './status-list-jwt'
 export type { BitsPerStatus, StatusListEntry } from './types'
 export { MediaTypes, StatusType } from './types'
-export type { StatusListClaims, VerifyStatusListClaimsOptions } from './verify-status-list-claims'
-export { verifyStatusListClaims } from './verify-status-list-claims'

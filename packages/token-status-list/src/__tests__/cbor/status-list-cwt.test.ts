@@ -14,6 +14,7 @@ import { deflate } from 'pako'
 import { expect, suite, test } from 'vitest'
 import { StatusListCbor } from '../../cbor/status-list-cbor'
 import { StatusListCwt } from '../../cbor/status-list-cwt'
+import { StatusListCwtProtectedHeaders } from '../../cbor/status-list-cwt-headers'
 import { StatusListCwtClaimKey, StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
 import { SLException } from '../../status-list-exception'
@@ -86,6 +87,26 @@ suite('StatusListCwt', () => {
             },
             protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListJwt]]),
           })
+      ).toThrow(/StatusListCwtProtectedHeaders/)
+    })
+
+    test('should validate the Typ header when the headers are built with create', () => {
+      // `create` is inherited from ProtectedHeaders, so it has to construct the class it was called
+      // on — a base ProtectedHeaders would carry no `typ` requirement at all
+      const headers = StatusListCwtProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListCwt]]),
+      })
+
+      expect(headers).toBeInstanceOf(StatusListCwtProtectedHeaders)
+      expect(headers.headers.get(RegisteredCwtHeaderClaimKey.Typ)).toBe(MediaTypes.StatusListCwt)
+
+      expect(() => StatusListCwtProtectedHeaders.create({ protectedHeaders: new Map() })).toThrow(
+        /StatusListCwtProtectedHeaders/
+      )
+      expect(() =>
+        StatusListCwtProtectedHeaders.create({
+          protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListJwt]]),
+        })
       ).toThrow(/StatusListCwtProtectedHeaders/)
     })
 

@@ -5,7 +5,6 @@ import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
 import { SLException } from './status-list-exception'
 import { type StatusListEntry, StatusType } from './types'
-import { verifyStatusListClaims } from './verify-status-list-claims'
 
 /**
  * Decode a JWT and return the payload.
@@ -53,51 +52,111 @@ export function getStatusListFromJWT(jwt: string): StatusListEntry {
   return payload.status.status_list
 }
 
+export type VerifyStatusListJwtClaimsOptions = {
+  /** The `uri` of the status list reference the token was fetched for, which `sub` must equal. */
+  uri: string
+  now?: Date
+  /**
+   * Clock tolerance applied to `exp`, `nbf` and `iat`, in seconds. Defaults to 30, which keeps a
+   * token that only just expired — or was issued a moment ago by a slightly fast clock — usable
+   * across the small clock differences typical between issuer and verifier.
+   */
+  skewSeconds?: number
+  /** When false, `iat` is not compared against `now`. Its presence is still required. */
+  checkFreshness?: boolean
+  /**
+   * Require `exp` to be present. It is OPTIONAL in the Token Status List specification, but
+   * profiles can make it mandatory — ISO/IEC 18013-5 second edition § 12.3.6.3 does, for the
+   * revocation list of an MSO.
+   */
+  requireExpirationTime?: boolean
+}
+
 /**
- * Verify the status of an `idx` in a `token`.
+ * Verify the claims of a Status List Token in JWT format.
  *
- * The claim checks are shared with the CWT serialization through
- * {@link verifyStatusListClaims}, so both stay in step.
+ * Both `sub` and `iat` are REQUIRED claims of a Status List Token, and `sub` has to match the URI
+ * the token was referenced by — without that check a token published for one URI can be replayed
+ * for another under the same issuer.
+ *
+ * The CWT serialization verifies the same rules through `StatusListCwtPayload.verifyClaims`, which
+ * builds on the generic CWT claim verification. A JWT has no such base to build on yet, so the
+ * checks are spelled out here.
+ *
+ * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5
+ */
+function verifyStatusListJwtClaims(
+  payload: StatusListJWTPayload,
+  {
+    uri,
+    now = new Date(),
+    skewSeconds = 30,
+    checkFreshness = true,
+    requireExpirationTime = false,
+  }: VerifyStatusListJwtClaimsOptions
+): void {
+  const skewMs = skewSeconds * 1000
+  const secondsToDate = (value: unknown) => (typeof value === 'number' ? new Date(value * 1000) : undefined)
+
+  // The registered JWT claim names, not their CWT counterparts: a Status List Token in JWT format
+  // carries `sub`, `iat`, `nbf` and `exp`.
+  const subject = typeof payload.sub === 'string' ? payload.sub : undefined
+  const issuedAt = secondsToDate(payload.iat)
+  const notBefore = secondsToDate(payload.nbf)
+  const expirationTime = secondsToDate(payload.exp)
+
+  if (subject === undefined) {
+    throw new SLException('The status list token has no subject claim, which is required')
+  }
+
+  if (subject !== uri) {
+    throw new SLException(`The subject claim '${subject}' must be equal to the uri '${uri}'`)
+  }
+
+  if (expirationTime === undefined) {
+    if (requireExpirationTime) {
+      throw new SLException('The status list token has no expiration claim, which is required for this profile')
+    }
+    // `exp` is the first instant the token is no longer valid, so a token that expired within the
+    // tolerance is still accepted.
+  } else if (new Date(expirationTime.getTime() + skewMs) < now) {
+    throw new SLException(
+      `The expiration claim '${expirationTime.toISOString()}' is in the past (compared to '${now.toISOString()}'), and therefore not valid`
+    )
+  }
+
+  if (issuedAt === undefined) {
+    throw new SLException('The status list token has no issued at claim, which is required')
+  }
+
+  if (checkFreshness && new Date(issuedAt.getTime() - skewMs) > now) {
+    throw new SLException(
+      `The issued at claim '${issuedAt.toISOString()}' is in the future (compared to '${now.toISOString()}'), and therefore not valid`
+    )
+  }
+
+  if (notBefore !== undefined && new Date(notBefore.getTime() - skewMs) > now) {
+    throw new SLException(
+      `The not before claim '${notBefore.toISOString()}' is in the future (compared to '${now.toISOString()}'), and therefore not valid`
+    )
+  }
+}
+
+/**
+ * Verify the claims of a `token` and the status of an `idx` in it.
  *
  * @todo properly validate the JWT with zod + signature
  */
 export function verifyStatus({
-  uri,
-  idx,
   token,
-  checkFreshness,
-  now,
-  skewSeconds,
-  requireExpirationTime,
-}: {
-  token: string
-  idx: number
-  uri: string
-  checkFreshness?: boolean
-  now?: Date
-  /** Clock tolerance applied to `exp` and `iat`, in seconds. Defaults to 30. */
-  skewSeconds?: number
-  /** Require `exp`, which is OPTIONAL by default. */
-  requireExpirationTime?: boolean
-}) {
+  idx,
+  ...claimsOptions
+}: { token: string; idx: number } & VerifyStatusListJwtClaimsOptions) {
   const payload = decodeJwtPayload<StatusListJWTPayload>(token)
   const compressed = base64url.decode(payload.status_list.lst)
   const statusList = StatusList.decompressStatusListFromBytes(compressed, payload.status_list.bits)
 
-  verifyStatusListClaims({
-    claims: {
-      // The registered JWT claim names, not their CWT counterparts: a Status List Token in
-      // JWT format carries `sub`, `iat` and `exp`.
-      subject: typeof payload.sub === 'string' ? payload.sub : undefined,
-      issuedAt: typeof payload.iat === 'number' ? new Date(payload.iat * 1000) : undefined,
-      expirationTime: typeof payload.exp === 'number' ? new Date(payload.exp * 1000) : undefined,
-    },
-    uri,
-    now,
-    skewSeconds,
-    checkFreshness,
-    requireExpirationTime,
-  })
+  verifyStatusListJwtClaims(payload, claimsOptions)
 
   if (statusList.getStatus(idx) !== StatusType.Valid) {
     throw new SLException(
