@@ -50,7 +50,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@openid4vc/openid4vci": "^0.5.4",
+    "@openid4vc/openid4vci": "^0.5.5",
     "@owf/crypto": "workspace:",
     "@owf/identity-common": "workspace:",
     "@owf/mdoc": "^0.7.0",
@@ -59,7 +59,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "nock": "^14.0.16",
+    "nock": "^14.0.17",
     "vitest": "catalog:"
   }
 }
