@@ -55,6 +55,7 @@
   },
   "dependencies": {
     "@owf/crypto": "workspace:*",
+    "@owf/eudi-jades": "workspace:*",
     "@owf/identity-common": "workspace:*",
     "zod": "catalog:"
   },

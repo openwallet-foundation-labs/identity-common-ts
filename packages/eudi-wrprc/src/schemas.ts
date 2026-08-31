@@ -40,17 +40,23 @@ export const SupervisoryAuthoritySchema = z.object({
 })
 
 /**
- * Claim schema for credential attribute specification (B.2.10 Class Claim)
+ * Claim schema for credential attribute specification (B.2.10 Class Claim).
+ *
+ * `path` follows the DCQL claims path pointer: string for an object key, integer for an
+ * array index, null to select every element of an array.
  */
 export const ClaimSchema = z.object({
   /** Path pointer that specifies the path to a claim within the Credential */
-  path: z.array(z.string()).min(1),
+  path: z.array(z.union([z.string(), z.number().int(), z.null()])).min(1),
   /** Array of expected values of the claim */
   values: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
 })
 
 /**
- * Credential schema for attestations (B.2.9 Class Credential)
+ * Credential schema for attestations (B.2.9 Class Credential).
+ *
+ * The subfield is named `claim` (singular) even though it holds an array. This follows
+ * ETSI TS 119 475 v1.2.1 Tables 8 and 9 and Annex C verbatim; see the package README.
  */
 export const CredentialSchema = z.object({
   /** Format of the attestation (e.g., "dc+sd-jwt", "mso_mdoc") */
@@ -81,6 +87,9 @@ export const StatusSchema = z.object({
 /**
  * Intermediary information when WRP acts through an intermediary (Table 10).
  * The intermediary's semantic identifier comes from its own WRPAC.
+ *
+ * The common name subfield is `sname` per the normative Table 10. The informative
+ * Annex C example spells it `name`; see the package README.
  */
 export const IntermediarySchema = z.object({
   /** Semantic identifier of the intermediary (from the intermediary's WRPAC) */
@@ -171,8 +180,14 @@ export const WRPRCPayloadSchema = z.object({
   /** Set of credentials intended to be requested by the WRP */
   credentials: z.array(CredentialSchema).optional(),
 
-  /** Set of credentials issued by the WRP (for attestation providers) */
-  provides_attestations: z.union([z.array(CredentialSchema), z.array(z.string())]).optional(),
+  /**
+   * Set of credentials issued by the WRP (for attestation providers, Table 8).
+   *
+   * v1.2.1 defines this as `Credential` objects. An array of URLs pointing at the
+   * machine-readable schemes in the Catalogue of Attestations, anticipated for a later
+   * edition and already emitted by some SDKs, is accepted when parsing.
+   */
+  provides_attestations: z.union([z.array(CredentialSchema), z.array(z.url())]).optional(),
 
   /** Intermediary information when WRP acts through an intermediary (Table 10) */
   intermediary: IntermediarySchema.optional(),
@@ -195,23 +210,47 @@ export const WRPRCPayloadSchema = z.object({
 // ============================================================================
 
 /**
- * JWT Header schema according to ETSI TS 119 475 clause 5.2.2
+ * Signature algorithms permitted for JAdES B-B signatures (ETSI TS 119 182-1 clause 5.1.2),
+ * referenced by GEN-5.2.1-04.
+ */
+export const WRPRC_JWS_ALGORITHMS = [
+  'ES256',
+  'ES384',
+  'ES512',
+  'PS256',
+  'PS384',
+  'PS512',
+  'RS256',
+  'RS384',
+  'RS512',
+  'EdDSA',
+] as const
+
+/**
+ * JWT Header schema according to ETSI TS 119 475 clause 5.2.2 (Table 5).
+ *
+ * Table 5 lists `typ`, `alg` and `x5c` as the minimum set. GEN-5.2.1-04 additionally
+ * requires a JAdES B-B signature, whose protected header carries `iat` as the claimed
+ * signing time (ETSI TS 119 182-1 clause 5.1.9). The informative Annex C header omits it.
  */
 export const WRPRCJWTHeaderSchema = z.object({
   /** Type of the Web Token - must be "rc-wrp+jwt" for JWT */
   typ: z.literal('rc-wrp+jwt'),
   /** Algorithm used to sign the JWT */
-  alg: z.enum(['ES256', 'ES384', 'ES512', 'RS256', 'RS384', 'RS512']),
+  alg: z.enum(WRPRC_JWS_ALGORITHMS),
   /** Certificate chain to verify the JWT */
   x5c: z.array(z.string()).min(1),
   /** Key ID */
   kid: z.string().optional(),
-  /** Unix timestamp indicating when the WRPRC was issued */
+  /** JAdES claimed signing time as a Unix timestamp */
   iat: z.number().int().positive(),
 })
 
 /**
- * CWT Header schema according to ETSI TS 119 475 clause 5.2.3
+ * CWT Header schema according to ETSI TS 119 475 clause 5.2.3 (Table 6).
+ *
+ * GEN-5.2.1-05 requires an advanced electronic signature per RFC 9052 and RFC 9360
+ * rather than a JAdES profile, so no claimed signing time is imposed here.
  */
 export const WRPRCCWTHeaderSchema = z.object({
   /** Type of the Web Token - must be "rc-wrp+cwt" for CWT */
@@ -220,8 +259,8 @@ export const WRPRCCWTHeaderSchema = z.object({
   alg: z.number().int(),
   /** Certificate chain to verify the CWT per RFC 9360 */
   x5chain: z.array(z.instanceof(Uint8Array)).min(1),
-  /** Unix timestamp indicating when the WRPRC was issued */
-  iat: z.number().int().positive(),
+  /** Unix timestamp indicating when the WRPRC was issued (payload field, not in Table 6) */
+  iat: z.number().int().positive().optional(),
 })
 
 // ============================================================================
