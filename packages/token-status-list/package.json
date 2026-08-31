@@ -50,9 +50,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@noble/curves": "^2.2.0",
-    "@noble/hashes": "^2.2.0",
-    "@types/pako": "^2.0.4",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@types/pako": "^3.0.0",
     "vitest": "catalog:"
   }
 }
