@@ -1,3 +1,4 @@
+export * from './claims/cwt-payload'
 export * from './claims/default'
 export * from './cwt'
 export * from './error'

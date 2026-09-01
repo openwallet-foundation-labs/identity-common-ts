@@ -50,6 +50,7 @@ export class StatusListInfo extends CborStructure<StatusListInfoEncodedStructure
     if (options.certificate) {
       map.set('certificate', options.certificate)
     }
-    return StatusListInfo.fromDecodedStructure(map)
+    // biome-ignore lint/complexity/noThisInStatic: this.fromDecodedStructure is intentional for subclass support
+    return this.fromDecodedStructure(map)
   }
 }

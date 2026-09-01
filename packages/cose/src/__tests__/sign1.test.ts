@@ -43,29 +43,42 @@ describe('sign1', () => {
         signature: cborDecode<Sign1>(hex.decode(testVector['sign1::sign'].expectedOutput.cborHex)).signature,
       })
 
-      sign1.externalAad = hex.decode(testVector['sign1::sign'].external)
+      // The external AAD is not carried in the COSE structure, so it is supplied to every call that
+      // builds the Sig_Structure: `toBeSigned`, `verifySignature` and `sign`.
+      const externalAad = hex.decode(testVector['sign1::sign'].external)
 
-      const tbsHex = hex.encode(sign1.toBeSigned())
+      const tbsHex = hex.encode(sign1.toBeSigned({ externalAad }))
 
       expect(tbsHex).toStrictEqual(testVector['sign1::sign'].tbsHex.cborHex)
 
-      const isValid = await sign1.verifySignature({ key }, sign1Context)
+      const isValid = await sign1.verifySignature({ key, externalAad }, sign1Context)
       expect(isValid).toBe(true)
+
+      // Verifying without it must not pass — for the vector that actually carries one, since an
+      // empty external input is the same as none.
+      if (externalAad.length > 0) {
+        expect(await sign1.verifySignature({ key }, sign1Context)).toBe(false)
+      }
 
       const sign1Resigned = Sign1.create({
         protectedHeaders: sign1.protectedHeaders,
         unprotectedHeaders: sign1.unprotectedHeaders,
         payload: sign1.payload,
-        externalAad: sign1.externalAad,
       })
 
       const sign1ResignedWithSignature = await sign1Resigned.sign(
-        { signingKey: key, algorithm: SignatureAlgorithm.ES256, externalAad: sign1.externalAad },
+        { signingKey: key, algorithm: SignatureAlgorithm.ES256, externalAad },
         sign1Context
       )
 
-      const isValidAfterResign = await sign1ResignedWithSignature.verifySignature({ key }, sign1Context)
+      const isValidAfterResign = await sign1ResignedWithSignature.verifySignature({ key, externalAad }, sign1Context)
       expect(isValidAfterResign).toBe(true)
+
+      // Regression: signing used the AAD passed to `sign` while verification used one held on the
+      // structure, so a signature made with an AAD did not verify against that same AAD.
+      if (externalAad.length > 0) {
+        expect(await sign1ResignedWithSignature.verifySignature({ key }, sign1Context)).toBe(false)
+      }
     })
   })
 })

@@ -1,79 +1,86 @@
 import {
-  type CoseKey,
+  type AnyCwt,
   Cwt,
-  type Mac0Context,
-  type ProtectedHeaderOptions,
+  CwtDetachedPayloadError,
+  type CwtOptions,
+  CwtPayloadDecodeError,
+  type CwtStaticThis,
+  type CwtStructures,
+  type CwtVerifyContext,
+  type CwtVerifyOptions,
   ProtectedHeaders,
-  type Sign1Context,
-  type SignatureAlgorithm,
+  RegisteredCwtHeaderClaimKey,
+  TypedMap,
   type UnprotectedHeaderOptions,
-  UnprotectedHeaders,
+  type UnprotectedHeaders,
 } from '@owf/cose'
 import { StatusList } from '../status-list'
 import { SLException } from '../status-list-exception'
-import { type BitsPerStatus, MediaTypes, StatusType } from '../types'
-import { verifyStatusListClaims } from '../verify-status-list-claims'
+import { type BitsPerStatus, MediaTypes } from '../types'
 import { StatusListCbor } from './status-list-cbor'
+import { StatusListCwtProtectedHeaders } from './status-list-cwt-headers'
 import { type CreateStatusListCwtPayloadOptions, StatusListCwtPayload } from './status-list-cwt-payload'
 
-export type StatusListCwtOptions = {
+export type StatusListCwtOptions = Omit<
+  CwtOptions<StatusListCwtPayload, StatusListCwtProtectedHeaders>,
+  'payload' | 'protectedHeaders'
+> & {
   payload: StatusListCwtPayload | CreateStatusListCwtPayloadOptions
-  protectedHeaders?: ProtectedHeaders | ProtectedHeaderOptions['protectedHeaders']
-  unprotectedHeaders?: UnprotectedHeaders | UnprotectedHeaderOptions['unprotectedHeaders']
-  signatureOrTag?: Uint8Array
-  originalPayloadBytes?: Uint8Array
-}
-
-export enum StatusListCwtHeaderKey {
-  Typ = 16,
-}
-
-export class StatusListCwt {
-  public payload: StatusListCwtPayload
-  public protectedHeaders?: ProtectedHeaders
-  public unprotectedHeaders?: UnprotectedHeaders
-  private signatureOrTag?: Uint8Array
 
   /**
-   * The payload bytes as received in the COSE message, kept so that verification can use them
-   * directly. RFC 9052 puts the payload into `Sig_structure`/`MAC_structure` as an opaque `bstr`, so
-   * what was signed is the exact bytes the issuer sent, not whatever we would encode the decoded
-   * payload back into. Cleared as soon as the payload is modified, since the signature over it no
-   * longer means anything at that point.
-   *
-   * @see https://datatracker.ietf.org/doc/rfc9052/#section-4.4
-   * @see https://datatracker.ietf.org/doc/rfc9052/#section-6
+   * The protected headers. `typ` (16) is set to the status list media type when absent, so only the
+   * one value it is allowed to have has to be supplied.
    */
-  private originalPayloadBytes?: Uint8Array
+  protectedHeaders?: StatusListCwtProtectedHeaders | ProtectedHeaders | Map<number, unknown>
 
+  unprotectedHeaders?: UnprotectedHeaders | UnprotectedHeaderOptions['unprotectedHeaders']
+}
+
+/**
+ * Builds the protected headers of a status list CWT, defaulting `typ` (16) to the status list media
+ * type. Validated against {@link StatusListCwtProtectedHeaders}, so a `typ` that is present but says
+ * the token is something else is rejected here rather than silently overwritten.
+ */
+function statusListProtectedHeaders(
+  protectedHeaders: StatusListCwtOptions['protectedHeaders']
+): StatusListCwtProtectedHeaders {
+  if (protectedHeaders instanceof StatusListCwtProtectedHeaders) return protectedHeaders
+
+  const headers = new Map<number, unknown>(
+    protectedHeaders instanceof ProtectedHeaders ? protectedHeaders.decodedStructure : protectedHeaders
+  )
+  if (headers.get(RegisteredCwtHeaderClaimKey.Typ) === undefined) {
+    headers.set(RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListCwt)
+  }
+
+  return StatusListCwtProtectedHeaders.fromDecodedStructure(TypedMap.fromMap(headers))
+}
+
+/**
+ * A status list token in CWT format: a CWT whose claims set carries a status list.
+ *
+ * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-13.html#name-status-list-token-in-cwt-fo
+ */
+export class StatusListCwt extends Cwt<StatusListCwtPayload, StatusListCwtProtectedHeaders> {
   public constructor(options: StatusListCwtOptions) {
-    this.payload =
-      options.payload instanceof StatusListCwtPayload ? options.payload : StatusListCwtPayload.create(options.payload)
-    this.protectedHeaders =
-      options.protectedHeaders instanceof ProtectedHeaders
-        ? options.protectedHeaders
-        : ProtectedHeaders.create({ protectedHeaders: options.protectedHeaders })
-    this.unprotectedHeaders =
-      options.unprotectedHeaders instanceof UnprotectedHeaders
-        ? options.unprotectedHeaders
-        : UnprotectedHeaders.create({ unprotectedHeaders: options.unprotectedHeaders })
-
-    this.signatureOrTag = options.signatureOrTag
-    this.originalPayloadBytes = options.originalPayloadBytes
-
-    if (this.protectedHeaders.headers.get(StatusListCwtHeaderKey.Typ) === undefined) {
-      this.protectedHeaders.headers.set(StatusListCwtHeaderKey.Typ, MediaTypes.StatusListCwt)
-    }
+    super({
+      ...options,
+      protectedHeaders: statusListProtectedHeaders(options.protectedHeaders),
+      payload:
+        options.payload instanceof StatusListCwtPayload
+          ? options.payload
+          : StatusListCwtPayload.create(options.payload),
+    })
   }
 
   public setStatusList(statusList: StatusList | StatusListCbor) {
     this.payload.setStatusList(statusList)
-    this.originalPayloadBytes = undefined
+    this.markPayloadModified()
   }
 
   public updateStatusList(index: number, value: number) {
     this.payload.statusList.setStatus(index, value)
-    this.originalPayloadBytes = undefined
+    this.markPayloadModified()
   }
 
   /**
@@ -109,127 +116,62 @@ export class StatusListCwt {
    *   payload is not a valid status list CWT payload. The underlying error is available on
    *   the `details` property.
    */
-  public static fromToken(token: Uint8Array) {
-    let cwt: Cwt
+  public static override fromToken<T extends AnyCwt>(this: CwtStaticThis<T>, token: Uint8Array): T {
     try {
-      cwt = Cwt.fromToken(token)
+      // NOTE: `super.fromToken`, not `Cwt.fromToken`: the base implementation constructs `this`, so
+      // a further subclass of StatusListCwt is what comes back. The casts are because TypeScript
+      // resolves `super.fromToken` against the base class, and cannot see that `T` is a status list
+      // CWT and is therefore made of these structures.
+      // biome-ignore lint/complexity/noThisInStatic: dispatching to the subclass is intentional
+      return super.fromToken(token, {
+        payload: StatusListCwtPayload,
+        protectedHeaders: StatusListCwtProtectedHeaders,
+      } as unknown as CwtStructures<T>) as T
     } catch (error) {
+      if (error instanceof CwtDetachedPayloadError) {
+        throw new SLException(
+          'Cwt does not contain payload, detached payload is not supported for status list CWT',
+          error
+        )
+      }
+
+      if (error instanceof CwtPayloadDecodeError) {
+        const cause = error.cause
+        throw new SLException(
+          `Unable to decode status list CWT payload: ${cause instanceof Error ? cause.message : String(cause)}`,
+          error
+        )
+      }
+
       throw new SLException(
         `Unable to decode status list CWT: ${error instanceof Error ? error.message : String(error)}`,
         error
       )
     }
-
-    // A COSE token carries `null` for a detached payload, which we cannot resolve here.
-    if (!cwt.payload) {
-      throw new SLException('Cwt does not contain payload, detached payload is not supported for status list CWT')
-    }
-
-    let payload: StatusListCwtPayload
-    try {
-      payload = StatusListCwtPayload.decode(cwt.payload)
-    } catch (error) {
-      throw new SLException(
-        `Unable to decode status list CWT payload: ${error instanceof Error ? error.message : String(error)}`,
-        error
-      )
-    }
-
-    return new StatusListCwt({
-      payload,
-      protectedHeaders: cwt.protectedHeaders,
-      unprotectedHeaders: cwt.unprotectedHeaders,
-      signatureOrTag: cwt.signatureOrTag,
-      originalPayloadBytes: new Uint8Array(cwt.payload),
-    })
-  }
-
-  public async signAndEncode(
-    options: {
-      signingKey: CoseKey
-      algorithm?: SignatureAlgorithm
-    },
-    ctx: Pick<Sign1Context, 'sign'>
-  ) {
-    const cwt = new Cwt({
-      protectedHeaders: this.protectedHeaders,
-      unprotectedHeaders: this.unprotectedHeaders,
-      payload: this.payload.encode(),
-    })
-    return (await cwt.asSign1.sign(options, ctx)).encode()
-  }
-
-  public async authenticateAndEncode(options: { key: CoseKey }, ctx: Pick<Mac0Context, 'authenticate'>) {
-    const cwt = new Cwt({
-      protectedHeaders: this.protectedHeaders,
-      unprotectedHeaders: this.unprotectedHeaders,
-      payload: this.payload.encode(),
-    })
-    return (await cwt.asMac0.authenticate(options, ctx)).encode()
   }
 
   /**
-   * Verify the token's claims and the status at `idx`. The claim checks are shared with the
-   * JWT serialization through {@link verifyStatusListClaims}, so both stay in step.
+   * Verify the token completely: its signature or authentication tag, its claims, and — when `idx`
+   * is given — that the status at that index is `Valid`. This is what a verifier resolving a status
+   * list reference wants, and the only form in which the claims mean anything, since they are only
+   * the issuer's if the token verifies.
    *
-   * @todo add check for `ttl` claim
+   * @throws CoseInvalidSignatureError if the signature or authentication tag does not verify.
+   * @throws SLException if the claims or the status at `idx` do not.
    */
-  public verifyStatus({
-    idx,
-    uri,
-    checkFreshness,
-    now,
-    skewSeconds,
-    requireExpirationTime,
-  }: {
-    idx: number
-    uri: string
-    checkFreshness?: boolean
-    now?: Date
-    /** Clock tolerance applied to `exp` and `iat`, in seconds. Defaults to 30. */
-    skewSeconds?: number
-    /** Require `exp`, which is OPTIONAL by default. */
-    requireExpirationTime?: boolean
-  }) {
-    verifyStatusListClaims({
-      claims: {
-        subject: this.payload.subject,
-        issuedAt: this.payload.issuedAt,
-        expirationTime: this.payload.expirationTime,
-      },
-      uri,
-      now,
-      skewSeconds,
-      checkFreshness,
-      requireExpirationTime,
-    })
+  public override async verify(
+    { idx, ...options }: CwtVerifyOptions<StatusListCwtPayload> & { idx?: number },
+    ctx: CwtVerifyContext
+  ): Promise<void> {
+    await super.verify(options, ctx)
 
-    if (this.payload.statusList.getStatus(idx) !== StatusType.Valid) {
-      throw new SLException(
-        `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${this.payload.statusList.getStatus(idx)}'`
-      )
-    }
+    if (idx !== undefined) this.payload.verifyStatus(idx)
   }
 
-  public async verifySignature({ key }: { key: CoseKey }, ctx: Pick<Sign1Context, 'verify'>) {
-    const cwt = new Cwt({
-      protectedHeaders: this.protectedHeaders,
-      unprotectedHeaders: this.unprotectedHeaders,
-      payload: this.originalPayloadBytes ?? this.payload.encode(),
-      signature: this.signatureOrTag,
-    })
-
-    return await cwt.verifySignature({ key }, ctx)
-  }
-
-  public async verifyAuthenticationCode({ key }: { key: CoseKey }, ctx: Pick<Mac0Context, 'verify'>) {
-    const cwt = new Cwt({
-      protectedHeaders: this.protectedHeaders,
-      unprotectedHeaders: this.unprotectedHeaders,
-      payload: this.originalPayloadBytes ?? this.payload.encode(),
-      tag: this.signatureOrTag,
-    })
-
-    return await cwt.verifyAuthenticationCode({ key }, ctx)
+  /**
+   * Verify the token's status at `idx`, without verifying the remaining claims or signature.
+   */
+  public verifyStatus(idx: number) {
+    this.payload.verifyStatus(idx)
   }
 }

@@ -1,4 +1,5 @@
 /** Types derived from the ETSI TS 119 182-1 V1.2.1 runtime schemas. */
+import type { Hasher } from '@owf/identity-common'
 import type { z } from 'zod'
 import type {
   AdoTstSchema,
@@ -61,6 +62,11 @@ export type ArcTst = TstContainer
 export type GeneralJWS = z.infer<typeof GeneralJWSSchema>
 export type FlattenedJWS = z.infer<typeof FlattenedJWSSchema>
 export type CompactJWS = string
+
+/** Callbacks the token needs from its host environment. */
+export type TokenContext = {
+  hasher: Hasher
+}
 
 export type SignOptions = z.infer<typeof SignOptionsSchema> & {
   signer: (data: string) => Promise<string>

@@ -1,6 +1,17 @@
-import { CborStructure, RegisteredCwtClaimKey, TypedMap, typedMap } from '@owf/cose'
+import {
+  type CreateCwtPayloadOptions,
+  CwtClaimVerificationError,
+  CwtPayload,
+  cwtPayloadClaimsFromOptions,
+  extendCwtPayloadClaims,
+  RegisteredCwtClaimKey,
+  TypedMap,
+  type VerifyCwtClaimsOptions,
+} from '@owf/cose'
 import z from 'zod'
 import type { StatusList } from '../status-list'
+import { SLException } from '../status-list-exception'
+import { StatusType } from '../types'
 import { StatusListCbor, type StatusListCborEncodedStructure } from './status-list-cbor'
 
 export enum StatusListCwtClaimKey {
@@ -8,33 +19,41 @@ export enum StatusListCwtClaimKey {
   StatusList = 65533,
 }
 
-const statusListCwtPayloadSchema = typedMap(
+/**
+ * The registered CWT claims, with the ones a status list CWT requires narrowed to non-optional, plus
+ * the status list specific claims.
+ *
+ * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-13.html#name-status-list-token-in-cwt-fo
+ */
+const statusListCwtPayloadSchema = extendCwtPayloadClaims(
   [
     [RegisteredCwtClaimKey.Subject, z.string()],
     [RegisteredCwtClaimKey.IssuedAt, z.number()],
-    [RegisteredCwtClaimKey.ExpirationTime, z.number().exactOptional()],
     [StatusListCwtClaimKey.TimeToLive, z.number().exactOptional()],
     [StatusListCwtClaimKey.StatusList, z.instanceof(StatusListCbor)],
-  ],
-  { allowAdditionalKeys: true }
+  ] as const,
+  { keyLabels: StatusListCwtClaimKey }
 )
 
 export type StatusListCwtPayloadEncodedStructure = z.infer<typeof statusListCwtPayloadSchema>
 export type StatusListCwtPayloadDecodedStructure = z.infer<typeof statusListCwtPayloadSchema>
 
-export type CreateStatusListCwtPayloadOptions = {
-  subject: string
-  statusList: StatusListCbor | StatusList
-  issuedAt?: Date
-  expirationTime?: Date
-  timeToLive?: number
-  additionalClaims?: Map<number | string, unknown>
+/**
+ * The options {@link StatusListCwtPayload.verifyClaims} takes: the generic CWT ones, with `sub`
+ * replaced by the `uri` it has to be equal to.
+ */
+export type VerifyStatusListCwtClaimsOptions = Omit<VerifyCwtClaimsOptions, 'expectedSubject' | 'keyLabels'> & {
+  /** The `uri` of the status list reference the token was fetched for, which `sub` must equal. */
+  uri: string
 }
 
-export class StatusListCwtPayload extends CborStructure<
-  StatusListCwtPayloadEncodedStructure,
-  StatusListCwtPayloadDecodedStructure
-> {
+export type CreateStatusListCwtPayloadOptions = CreateCwtPayloadOptions & {
+  subject: string
+  statusList: StatusListCbor | StatusList
+  timeToLive?: number
+}
+
+export class StatusListCwtPayload extends CwtPayload<StatusListCwtPayloadDecodedStructure> {
   public static override get encodingSchema() {
     return z.codec(statusListCwtPayloadSchema.in, statusListCwtPayloadSchema.out, {
       decode: (input) => {
@@ -57,59 +76,83 @@ export class StatusListCwtPayload extends CborStructure<
     })
   }
 
-  public static create(options: CreateStatusListCwtPayloadOptions) {
-    const map = new TypedMap([
-      [RegisteredCwtClaimKey.Subject, options.subject],
-      [RegisteredCwtClaimKey.IssuedAt, Math.floor((options.issuedAt?.getTime() ?? Date.now()) / 1000)],
-      [
-        StatusListCwtClaimKey.StatusList,
-        options.statusList instanceof StatusListCbor
-          ? options.statusList
-          : StatusListCbor.create({ statusList: options.statusList }),
-      ],
-      ...(options.additionalClaims ?? new Map()).entries(),
-    ]) satisfies StatusListCwtPayloadEncodedStructure
+  public static override create(options: CreateStatusListCwtPayloadOptions) {
+    // `iat` is required for a status list token, so it defaults to now rather than being omitted.
+    // NOTE: applied after the spread, so that an explicit `issuedAt: undefined` — what passing
+    // through an optional value gives — defaults the same way omitting the key does.
+    const claims = cwtPayloadClaimsFromOptions({ ...options, issuedAt: options.issuedAt ?? new Date() })
 
-    if (options.expirationTime) {
-      map.set(RegisteredCwtClaimKey.ExpirationTime, Math.floor(options.expirationTime.getTime() / 1000))
+    claims.set(
+      StatusListCwtClaimKey.StatusList,
+      options.statusList instanceof StatusListCbor
+        ? options.statusList
+        : StatusListCbor.create({ statusList: options.statusList })
+    )
+
+    if (options.timeToLive !== undefined) {
+      claims.set(StatusListCwtClaimKey.TimeToLive, options.timeToLive)
     }
 
-    if (options.timeToLive) {
-      map.set(StatusListCwtClaimKey.TimeToLive, options.timeToLive)
-    }
-
-    return new StatusListCwtPayload(statusListCwtPayloadSchema.parse(map.toMap()))
+    // biome-ignore lint/complexity/noThisInStatic: this.fromDecodedStructure is intentional for subclass support
+    return this.fromDecodedStructure(TypedMap.fromMap(claims))
   }
 
-  public get subject() {
-    return this.structure.get(RegisteredCwtClaimKey.Subject)
-  }
-
-  public get issuedAt() {
-    return new Date(this.structure.get(RegisteredCwtClaimKey.IssuedAt) * 1000)
-  }
-
-  public get expirationTime() {
-    return this.structure.has(RegisteredCwtClaimKey.ExpirationTime)
-      ? // biome-ignore lint/style/noNonNullAssertion: checked with `has` in the line above
-        new Date(this.structure.get(RegisteredCwtClaimKey.ExpirationTime)! * 1000)
-      : undefined
-  }
-
+  /** `ttl` (65534), in seconds. */
   public get timeToLive() {
-    return this.structure.get(StatusListCwtClaimKey.TimeToLive)
+    return this.getClaim(StatusListCwtClaimKey.TimeToLive)
   }
 
-  public get statusList() {
-    return this.structure.get(StatusListCwtClaimKey.StatusList).statusList
+  /** `status_list` (65533) */
+  public get statusList(): StatusList {
+    return this.getClaim(StatusListCwtClaimKey.StatusList).statusList
   }
 
-  public getCustomClaim<ClaimType = unknown>(key: number) {
-    return this.structure.get(key) as ClaimType | unknown
+  /**
+   * Verifies the claims of a Status List Token, on top of the generic CWT ones: `sub` and `iat` are
+   * REQUIRED, and `sub` has to match the URI the token was referenced by — without that check a
+   * token published for one URI can be replayed for another under the same issuer.
+   *
+   * A profile that makes a further claim mandatory — ISO/IEC 18013-5 second edition § 12.3.6.3 does
+   * for `exp`, on the revocation list of an MSO — adds it through `requiredClaims`.
+   *
+   * @throws SLException if a required claim is missing, `sub` is not the referenced URI, or the
+   *   token is outside its validity window. The underlying error is available on the `details`
+   *   property.
+   *
+   * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5
+   */
+  public override verifyClaims({ uri, requiredClaims = [], ...options }: VerifyStatusListCwtClaimsOptions): void {
+    try {
+      super.verifyClaims({
+        ...options,
+        expectedSubject: uri,
+        requiredClaims: [RegisteredCwtClaimKey.Subject, RegisteredCwtClaimKey.IssuedAt, ...requiredClaims],
+        keyLabels: StatusListCwtClaimKey,
+      })
+    } catch (error) {
+      if (error instanceof CwtClaimVerificationError) {
+        throw new SLException(`Status list token claim verification failed. ${error.message}`, error)
+      }
+
+      throw error
+    }
+  }
+
+  /**
+   * Verifies that the status at `idx` in this token's status list is `Valid`.
+   *
+   * @throws SLException if it is any other status.
+   */
+  public verifyStatus(idx: number): void {
+    const status = this.statusList.getStatus(idx)
+
+    if (status !== StatusType.Valid) {
+      throw new SLException(`Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`)
+    }
   }
 
   public setStatusList(statusList: StatusList | StatusListCbor) {
-    this.structure.set(
+    this.claims.set(
       StatusListCwtClaimKey.StatusList,
       statusList instanceof StatusListCbor ? statusList : StatusListCbor.create({ statusList })
     )

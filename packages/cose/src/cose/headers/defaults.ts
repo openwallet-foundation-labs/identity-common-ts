@@ -14,6 +14,7 @@ export enum RegisteredCwtHeaderClaimKey {
   CounterSignature0 = 9,
   CounterSignatureV2 = 11,
   CounterSignature0V2 = 12,
+  Typ = 16,
   X5Bag = 32,
   X5Chain = 33,
   X5T = 34,

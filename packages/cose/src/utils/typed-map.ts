@@ -26,6 +26,16 @@ import type zCore from 'zod/v4/core'
 export class TypedMap<Schema extends Record<PropertyKey, any>, OptionalKeys extends keyof Schema = never> {
   private readonly map: Map<keyof Schema, Schema[keyof Schema]>
 
+  /**
+   * Called whenever an entry is added, changed or removed. Set by a structure that caches the bytes
+   * it was decoded from, so that the cache is dropped as soon as the map no longer matches them.
+   *
+   * NOTE: only changes made through this map are seen. Mutating a value in place —
+   * `map.get(key)[0] = 1` — does not go through `set`/`delete`/`clear` and does not fire this, so a
+   * structure that caches its encoded form has to be told about such a change explicitly.
+   */
+  public onChange?: () => void
+
   constructor(entries?: (readonly [keyof Schema, Schema[keyof Schema]])[] | null) {
     this.map = new Map(entries)
   }
@@ -60,6 +70,7 @@ export class TypedMap<Schema extends Record<PropertyKey, any>, OptionalKeys exte
    */
   set<K extends keyof Schema>(key: K, value: Schema[K]): this {
     this.map.set(key, value)
+    this.onChange?.()
     return this
   }
 
@@ -68,11 +79,15 @@ export class TypedMap<Schema extends Record<PropertyKey, any>, OptionalKeys exte
   }
 
   delete(key: keyof Schema): boolean {
-    return this.map.delete(key)
+    const deleted = this.map.delete(key)
+    if (deleted) this.onChange?.()
+    return deleted
   }
 
   clear(): void {
+    if (this.map.size === 0) return
     this.map.clear()
+    this.onChange?.()
   }
 
   get size(): number {
@@ -125,13 +140,71 @@ type EntriesArrayToSchema<T extends ReadonlyArray<readonly [any, any]>> = {
 const isExactOptional = (schema: z.ZodType) =>
   !schema.safeParse(undefined).success && z.object({ test: schema }).safeParse({}).success
 
-type EntriesBase = ReadonlyArray<
+/**
+ * Names a map key for an error message: `ExpirationTime (4)` when `keyLabels` has a name for the
+ * key, and the bare label otherwise.
+ *
+ * `RegisteredCwtClaimKey[4]` is `'ExpirationTime'` for a numeric enum, so a reverse-mapped string
+ * is a name. A numeric value is the enum's forward mapping and not a name.
+ *
+ * @see the `keyLabels` option of {@link typedMap}
+ */
+export function keyLabel(key: string | number, keyLabels?: Record<string | number, unknown>): string {
+  const label = keyLabels?.[key]
+  return typeof label === 'string' ? `${label} (${key})` : `${key}`
+}
+
+export type EntriesBase = ReadonlyArray<
   readonly [
     string | number, // for now we only allow string or number keys
     // biome-ignore lint/suspicious/noExplicitAny: no explanation
     z.ZodType<any>,
   ]
 >
+
+/**
+ * A `TypedMap` with any schema. Useful as a generic constraint for structures that are generic over
+ * the shape of their map, where the concrete schema is supplied by a subclass.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: intentionally unconstrained, used as a generic bound
+export type AnyTypedMap = TypedMap<any, any>
+
+type EntryKey<Entry> = Entry extends readonly [infer Key, z.ZodType] ? Key : never
+
+/**
+ * Drops every entry from `Entries` whose key is present in `Keys`, preserving tuple order.
+ */
+type WithoutEntryKeys<Entries extends EntriesBase, Keys> = Entries extends readonly [
+  infer Head,
+  ...infer Rest extends EntriesBase,
+]
+  ? EntryKey<Head> extends Keys
+    ? WithoutEntryKeys<Rest, Keys>
+    : readonly [Head, ...WithoutEntryKeys<Rest, Keys>]
+  : readonly []
+
+export type ExtendedEntries<Base extends EntriesBase, Extra extends EntriesBase> = readonly [
+  ...WithoutEntryKeys<Base, Extra[number][0]>,
+  ...Extra,
+]
+
+/**
+ * Merges a base set of `typedMap` entries with additional ones, so a structure can be extended for a
+ * specific profile (e.g. a status list CWT payload extending the registered CWT claims).
+ *
+ * An entry in `extra` that reuses a key from `base` replaces it, both in the resulting type and at
+ * runtime. That is what makes it possible to narrow an inherited claim, e.g. turning the optional
+ * registered `sub` claim into a required one. Without the replacement the two schemas for the same
+ * key would collapse into a union and the key would stay optional.
+ */
+export function extendTypedMapEntries<const Base extends EntriesBase, const Extra extends EntriesBase>(
+  base: Base,
+  extra: Extra
+): ExtendedEntries<Base, Extra> {
+  const overriddenKeys = new Set<string | number>(extra.map(([key]) => key))
+
+  return [...base.filter(([key]) => !overriddenKeys.has(key)), ...extra] as unknown as ExtendedEntries<Base, Extra>
+}
 
 type InferredEntries<Entries extends EntriesBase> = {
   [K in keyof Entries]: readonly [Entries[K][0], z.infer<Entries[K][1]>]
@@ -212,12 +285,7 @@ export function typedMap<const Entries extends EntriesBase>(
 
   const schemaMap = new Map(entries)
 
-  // `RegisteredCwtClaimKey[4]` is `'ExpirationTime'` for a numeric enum, so a reverse-mapped
-  // string is a name. A numeric value is the enum's forward mapping and not a name.
-  const labelFor = (key: string | number) => {
-    const label = keyLabels?.[key]
-    return typeof label === 'string' ? `${label} (${key})` : `${key}`
-  }
+  const labelFor = (key: string | number) => keyLabel(key, keyLabels)
 
   const originalEncode = (decoded: TypedMap<InferredSchema<Entries>, OptionalKeys<Entries>>) => decoded.toMap()
   const originalDecode = (encoded: Map<unknown, unknown>) =>
