@@ -1,5 +1,13 @@
 # @owf/crypto
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [b7e7f15]
+- Updated dependencies [5934a14]
+  - @owf/identity-common@0.4.0
+
 ## 0.3.2
 
 ### Patch Changes
