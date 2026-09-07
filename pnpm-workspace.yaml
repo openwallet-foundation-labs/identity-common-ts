@@ -6,5 +6,5 @@ catalog:
   '@peculiar/asn1-x509': ^2.9.4
   '@peculiar/x509': ^2.1.0
   typescript: ~6.0.3
-  vitest: ^4.1.11
+  vitest: ^5.0.0
   zod: ^4.5.4
