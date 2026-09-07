@@ -10,6 +10,8 @@
  * signatures — it never signs. After regenerating, run `pnpm style:fix` at the
  * repo root.
  */
+// Required by @peculiar/x509 v2 (tsyringe); this script is dev-only tooling.
+import 'reflect-metadata'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

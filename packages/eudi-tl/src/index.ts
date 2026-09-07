@@ -25,6 +25,7 @@ export {
 export {
   getPointerSigningCertificates,
   getTrustAnchors,
+  type ParseTrustedListOptions,
   parseTrustedList,
   type TrustAnchorFilter,
   type TrustedListPointerFilter,
@@ -66,7 +67,7 @@ export {
   verifyTrustedListSignature,
 } from './verify'
 
-import { parseTrustedList } from './parse'
+import { type ParseTrustedListOptions, parseTrustedList } from './parse'
 import type { TrustedList } from './types'
 import { type VerifyTrustedListOptions, verifyTrustedListSignature } from './verify'
 
@@ -75,7 +76,10 @@ import { type VerifyTrustedListOptions, verifyTrustedListSignature } from './ver
  * the safe entry point: it never returns a {@link TrustedList} whose
  * authenticity has not been established.
  */
-export async function loadTrustedList(xml: string, options: VerifyTrustedListOptions = {}): Promise<TrustedList> {
+export async function loadTrustedList(
+  xml: string,
+  options: VerifyTrustedListOptions & ParseTrustedListOptions = {}
+): Promise<TrustedList> {
   await verifyTrustedListSignature(xml, options)
-  return parseTrustedList(xml)
+  return parseTrustedList(xml, options)
 }

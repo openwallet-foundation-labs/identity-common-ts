@@ -56,13 +56,16 @@
   },
   "dependencies": {
     "@owf/identity-common": "workspace:*",
-    "@peculiar/x509": "^1.12.3",
+    "@peculiar/asn1-schema": "catalog:",
+    "@peculiar/asn1-x509": "catalog:",
     "@xmldom/xmldom": "^0.9.12",
     "xadesjs": "^2.6.8",
     "xpath": "^0.0.34",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@peculiar/x509": "catalog:",
+    "reflect-metadata": "^0.2.2",
     "vitest": "catalog:"
   }
 }

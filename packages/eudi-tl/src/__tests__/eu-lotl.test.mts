@@ -1,3 +1,7 @@
+// @peculiar/x509 v2 requires a Reflect polyfill (tsyringe). It is a dev-only
+// dependency here — the package's runtime path uses @peculiar/asn1-x509, which
+// needs no polyfill — so the global patch never reaches consumers.
+import 'reflect-metadata'
 import { base64, hexEncode } from '@owf/identity-common'
 import { X509Certificate } from '@peculiar/x509'
 import { describe, expect, it } from 'vitest'
