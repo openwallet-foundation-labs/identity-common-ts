@@ -1,5 +1,6 @@
 import { base64, hexEncode } from '@owf/identity-common'
-import { SubjectKeyIdentifierExtension, X509Certificate } from '@peculiar/x509'
+import { AsnConvert, type IAsnParseOptions } from '@peculiar/asn1-schema'
+import { Certificate, id_ce_subjectKeyIdentifier, SubjectKeyIdentifier } from '@peculiar/asn1-x509'
 import { DOMParser, type Element } from '@xmldom/xmldom'
 import { TrustedListParseException } from './trusted-list-exception'
 import type {
@@ -44,11 +45,14 @@ function localizedName(parent: Element | undefined): string | undefined {
 }
 
 /** Lowercase-hex SubjectKeyIdentifier from a certificate, best-effort. */
-function skiFromCertificate(certBase64: string): string | undefined {
+function skiFromCertificate(certBase64: string, options?: IAsnParseOptions): string | undefined {
   try {
-    const cert = new X509Certificate(certBase64)
-    const ext = cert.getExtension(SubjectKeyIdentifierExtension)
-    if (ext?.keyId) return ext.keyId.toLowerCase()
+    const cert = AsnConvert.parse(base64.decode(certBase64), Certificate, options)
+    const extension = cert.tbsCertificate.extensions?.find((e) => e.extnID === id_ce_subjectKeyIdentifier)
+    if (extension) {
+      const ski = AsnConvert.parse(extension.extnValue, SubjectKeyIdentifier, options)
+      return hexEncode(new Uint8Array(ski.buffer))
+    }
   } catch {
     // Malformed extensions (seen in some reference certificates) — caller
     // falls back to the published X509SKI element if any.
@@ -61,7 +65,7 @@ function skiFromCertificate(certBase64: string): string | undefined {
  * `DigitalId` children (X509Certificate / X509SubjectName / X509SKI) — a
  * standard list may identify a service without embedding the full certificate.
  */
-function parseDigitalIdentities(container: Element): DigitalIdentity[] {
+function parseDigitalIdentities(container: Element, certificateParseOptions?: IAsnParseOptions): DigitalIdentity[] {
   const identities: DigitalIdentity[] = []
   for (const sdi of descendants(container, 'ServiceDigitalIdentity')) {
     let certificate: string | undefined
@@ -79,7 +83,9 @@ function parseDigitalIdentities(container: Element): DigitalIdentity[] {
     identities.push({
       certificate,
       subjectName,
-      subjectKeyIdentifier: certificate ? (skiFromCertificate(certificate) ?? x509SkiHex) : x509SkiHex,
+      subjectKeyIdentifier: certificate
+        ? (skiFromCertificate(certificate, certificateParseOptions) ?? x509SkiHex)
+        : x509SkiHex,
     })
   }
   return identities
@@ -106,7 +112,10 @@ function parseHistory(service: Element): ServiceHistoryInstance[] | undefined {
   return history.length > 0 ? history : undefined
 }
 
-function parsePointers(schemeInfo: Element): TrustedListPointer[] | undefined {
+function parsePointers(
+  schemeInfo: Element,
+  certificateParseOptions?: IAsnParseOptions
+): TrustedListPointer[] | undefined {
   const pointers: TrustedListPointer[] = []
   for (const pointer of descendants(schemeInfo, 'OtherTSLPointer')) {
     const location = textOf(firstDescendant(pointer, 'TSLLocation'))
@@ -117,10 +126,25 @@ function parsePointers(schemeInfo: Element): TrustedListPointer[] | undefined {
       schemeTerritory: textOf(firstDescendant(pointer, 'SchemeTerritory')),
       // The pointer's own ServiceDigitalIdentities: the certificate(s) the
       // pointed-to list is signed with.
-      digitalIdentities: parseDigitalIdentities(pointer),
+      digitalIdentities: parseDigitalIdentities(pointer, certificateParseOptions),
     })
   }
   return pointers.length > 0 ? pointers : undefined
+}
+
+export interface ParseTrustedListOptions {
+  /**
+   * ASN.1 parse options for the X.509 certificates embedded in the list —
+   * `asn1js.fromBER` resource limits (`maxDepth`, `maxNodes`,
+   * `maxContentLength`) with which to bound the work done on untrusted input.
+   * When omitted, the asn1js defaults apply (maxDepth 100, maxNodes 10000,
+   * maxContentLength 16MB).
+   *
+   * A certificate that exceeds the limits fails to parse like any other
+   * malformed one: its `subjectKeyIdentifier` falls back to the `X509SKI`
+   * element published alongside it, if any.
+   */
+  certificateParseOptions?: IAsnParseOptions
 }
 
 /**
@@ -128,7 +152,7 @@ function parsePointers(schemeInfo: Element): TrustedListPointer[] | undefined {
  * {@link TrustedList}. This does NOT verify the list signature — call
  * {@link verifyTrustedListSignature} first (or use {@link loadTrustedList}).
  */
-export function parseTrustedList(xml: string): TrustedList {
+export function parseTrustedList(xml: string, options: ParseTrustedListOptions = {}): TrustedList {
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   const root: Element | null = doc.documentElement
   if (root?.localName !== 'TrustServiceStatusList') {
@@ -152,7 +176,7 @@ export function parseTrustedList(xml: string): TrustedList {
         serviceTypeIdentifier,
         serviceStatus,
         serviceName: localizedName(firstDescendant(info, 'ServiceName')),
-        digitalIdentities: parseDigitalIdentities(info),
+        digitalIdentities: parseDigitalIdentities(info, options.certificateParseOptions),
         qualifiers: parseQualifiers(info),
         history: parseHistory(service),
       })
@@ -172,7 +196,7 @@ export function parseTrustedList(xml: string): TrustedList {
     listIssueDateTime: textOf(schemeInfo && firstDescendant(schemeInfo, 'ListIssueDateTime')),
     nextUpdate: textOf(nextUpdate && firstDescendant(nextUpdate, 'dateTime')),
     providers,
-    pointersToOtherLists: schemeInfo ? parsePointers(schemeInfo) : undefined,
+    pointersToOtherLists: schemeInfo ? parsePointers(schemeInfo, options.certificateParseOptions) : undefined,
   })
 }
 

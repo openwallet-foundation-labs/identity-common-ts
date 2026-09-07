@@ -128,6 +128,21 @@ const trustedList = parseTrustedList(xml);
 const { valid, errors } = validateTrustedList(trustedList);
 ```
 
+The certificates embedded in a list are parsed with the `asn1js` defaults
+(`maxDepth` 100, `maxNodes` 10000, `maxContentLength` 16MB). Pass
+`certificateParseOptions` to bound that work more tightly on untrusted input —
+`parseTrustedList`, `loadTrustedList` and `loadEuLotl` all accept it:
+
+```typescript
+const trustedList = parseTrustedList(xml, {
+  certificateParseOptions: { berOptions: { maxDepth: 20, maxNodes: 2000 } },
+});
+```
+
+A certificate that exceeds the limits fails to parse like any other malformed
+one: its `subjectKeyIdentifier` falls back to the `X509SKI` element published
+alongside it, if any.
+
 ### Verifying the signature only
 
 ```typescript

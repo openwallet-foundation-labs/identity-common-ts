@@ -1,6 +1,6 @@
 import { base64 } from '@owf/identity-common'
 import { EU_LOTL_SIGNING_CERTIFICATES } from './eu-lotl-anchors'
-import { parseTrustedList } from './parse'
+import { type ParseTrustedListOptions, parseTrustedList } from './parse'
 import { TrustedListProfiles } from './profiles'
 import { TrustedListParseException } from './trusted-list-exception'
 import type { TrustedList } from './types'
@@ -51,9 +51,12 @@ export function verifyEuLotlSignature(
  * `PointersToOtherTSL` entries from which national list anchors are derived
  * with `getPointerSigningCertificates`.
  */
-export async function loadEuLotl(xml: string, options: VerifyTrustedListOptions = {}): Promise<TrustedList> {
+export async function loadEuLotl(
+  xml: string,
+  options: VerifyTrustedListOptions & ParseTrustedListOptions = {}
+): Promise<TrustedList> {
   await verifyEuLotlSignature(xml, options)
-  const lotl = parseTrustedList(xml)
+  const lotl = parseTrustedList(xml, options)
   const profile = validateTrustedListProfile(lotl, TrustedListProfiles.euLotl)
   if (!profile.valid) {
     const details = profile.errors.map((error) => `${error.path}: ${error.message}`).join('; ')
