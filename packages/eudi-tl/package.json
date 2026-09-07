@@ -56,7 +56,7 @@
   },
   "dependencies": {
     "@owf/identity-common": "workspace:*",
-    "@peculiar/x509": "^1.12.3",
+    "@peculiar/x509": "^2.0.0",
     "@xmldom/xmldom": "^0.9.12",
     "xadesjs": "^2.6.8",
     "xpath": "^0.0.34",
