@@ -1,6 +1,6 @@
 {
   "name": "@owf/eudi-sca",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Tools and utilities for EUDI Strong Customer Authentication per TS12",
   "files": [
     "dist"
