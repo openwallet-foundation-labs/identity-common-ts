@@ -52,7 +52,7 @@
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@panva/hkdf": "^1.2.1",
-    "jose": "^6.2.10",
+    "jose": "^6.2.12",
     "vitest": "catalog:"
   }
 }
