@@ -19,6 +19,7 @@ jobs:
       pull-requests: write
     outputs:
       published: ${{ steps.changesets.outputs.published }}
+      published-packages: ${{ steps.changesets.outputs.published-packages }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v7
@@ -54,15 +55,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get current package version
-        id: get_version
-        run: echo "current_package_version=$(node -p "require('./packages/identity-common/package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Create Github Release
-        if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ steps.get_version.outputs.current_package_version }}
+      - name: Create Github Releases for published packages
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.published-packages }}
+        run: |
+          # Packages now version independently, so tag/release each published package on its own.
+          echo "$PUBLISHED_PACKAGES" | jq -c '.[]' | while read -r pkg; do
+            name=$(echo "$pkg" | jq -r '.name')
+            version=$(echo "$pkg" | jq -r '.version')
+            tag="${name}@${version}"
+            gh release create "$tag" --title "$tag" --generate-notes
+          done
 
   release-unstable:
     runs-on: ubuntu-24.04
