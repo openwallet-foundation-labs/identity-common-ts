@@ -22,8 +22,8 @@ catalogs:
       specifier: ^5.0.0
       version: 5.0.0
     zod:
-      specifier: ^4.5.4
-      version: 4.5.4
+      specifier: ^4.6.2
+      version: 4.6.2
 
 importers:
 
@@ -45,8 +45,8 @@ importers:
         specifier: workspace:*
         version: link:packages/token-status-list
       '@types/node':
-        specifier: ^26.4.1
-        version: 26.4.1
+        specifier: ^26.5.1
+        version: 26.5.1
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -70,7 +70,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/cose:
     dependencies:
@@ -82,10 +82,10 @@ importers:
         version: 1.6.6
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.2
       zod-validation-error:
         specifier: ^5.0.0
-        version: 5.0.0(zod@4.5.4)
+        version: 5.0.0(zod@4.6.2)
     devDependencies:
       '@noble/curves':
         specifier: ^2.4.0
@@ -101,7 +101,7 @@ importers:
         version: 6.2.12
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/crypto:
     dependencies:
@@ -114,7 +114,7 @@ importers:
     devDependencies:
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/eudi-attestation-schema:
     dependencies:
@@ -126,11 +126,11 @@ importers:
         version: link:../identity-common
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.2
     devDependencies:
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/eudi-jades:
     dependencies:
@@ -142,11 +142,11 @@ importers:
         version: link:../identity-common
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.2
     devDependencies:
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/eudi-lote:
     dependencies:
@@ -158,11 +158,11 @@ importers:
         version: link:../identity-common
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.2
     devDependencies:
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/eudi-sca:
     dependencies:
@@ -186,14 +186,14 @@ importers:
         version: 0.19.0
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.2
     devDependencies:
       nock:
         specifier: ^14.0.17
         version: 14.0.17
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/eudi-tl:
     dependencies:
@@ -217,7 +217,7 @@ importers:
         version: 0.0.34
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.2
     devDependencies:
       '@peculiar/x509':
         specifier: 'catalog:'
@@ -227,7 +227,7 @@ importers:
         version: 0.2.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/eudi-wrprc:
     dependencies:
@@ -242,17 +242,17 @@ importers:
         version: link:../identity-common
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.2
     devDependencies:
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/identity-common:
     devDependencies:
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/token-status-list:
     dependencies:
@@ -270,7 +270,7 @@ importers:
         version: 3.0.1
       zod:
         specifier: 'catalog:'
-        version: 4.5.4
+        version: 4.6.2
     devDependencies:
       '@noble/curves':
         specifier: ^2.4.0
@@ -283,7 +283,7 @@ importers:
         version: 3.0.0
       vitest:
         specifier: 'catalog:'
-        version: 5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
 
 packages:
 
@@ -634,8 +634,8 @@ packages:
     resolution: {integrity: sha512-VVPPgHyQ6ShqnrmDWuxjmUIsO9gWyOZFmuOfLd9LfBGQJwZfy0gvv9pbHSJuoFNIYC7ZDX9aoFwowjcdSC4E8w==}
     engines: {node: '>=18'}
 
-  '@napi-rs/wasm-runtime@1.2.3':
-    resolution: {integrity: sha512-UMduMbqO5s5zF2NkNacMT/yK5Y5QiKvWr2+50bzIIxFDwVJ2h49b+oyjaCGPhJxd2/gC2x39EHv/gHVuu36x2Q==}
+  '@napi-rs/wasm-runtime@1.2.4':
+    resolution: {integrity: sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=23.5.0}
     peerDependencies:
       '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
@@ -1031,8 +1031,8 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
-  '@types/node@26.4.1':
-    resolution: {integrity: sha512-k97ENvZWtvA6yqz5/FS6a7duDgOPEeOQOc2iKS/nY6mX6qJUKtLnWzQS+Xj6tXweyj6ZcTAK2Qecetnvi9nCLA==}
+  '@types/node@26.5.1':
+    resolution: {integrity: sha512-CzNm2FezW4VR/LjG6yUdiEgLE/rAQ9Slj5gCu/C2VrdcW7I0ahNZ8DRbHT7zOZ6r3ONgd/bsQIeSaoDGrd1C6g==}
 
   '@types/pako@3.0.0':
     resolution: {integrity: sha512-MtIzg1Ul1GxhHZLq6oSKvWQENKqmfK1fdaW+SDcPJe7+YcJVo6AbmkW0BvGFH6+559+hEuCwdXZZe8F85lBPkA==}
@@ -1635,8 +1635,8 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  nanoid@3.3.18:
-    resolution: {integrity: sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==}
+  nanoid@3.3.19:
+    resolution: {integrity: sha512-Y2tUNy4ouw6tq5oDSKeQYGOyhkUBhNOcGV/02KC+6kd9eDGqdZd++mjMiIDilrBYvjEnCYvVtsuHCuP+okSfug==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -1885,8 +1885,8 @@ packages:
   unconfig-core@7.5.0:
     resolution: {integrity: sha512-Su3FauozOGP44ZmKdHy2oE6LPjk51M/TRRjHv2HNCWiDvfvCoxC2lno6jevMA91MYAdCdwP05QnWdWpSbncX/w==}
 
-  undici-types@8.3.0:
-    resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
   unicorn-magic@0.4.0:
     resolution: {integrity: sha512-wH590V9VNgYH9g3lH9wWjTrUoKsjLF6sGLjhR4sH1LWpLmCOH0Zf7PukhDA8BiS7KHe4oPNkcTHqYkj7SOGUOw==}
@@ -2034,8 +2034,8 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  zod@4.5.4:
-    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
+  zod@4.6.2:
+    resolution: {integrity: sha512-lh5RCAGFa1Cm2hjtNwLQhSs/AsqdWnTQaBER9fEwN/88pSh7KOtJavtBx/0VlkN/uFd61SwYmljLMDAsHlvzBQ==}
 
 snapshots:
 
@@ -2335,7 +2335,7 @@ snapshots:
       outvariant: 1.4.3
       strict-event-emitter: 0.5.1
 
-  '@napi-rs/wasm-runtime@1.2.3(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
+  '@napi-rs/wasm-runtime@1.2.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
@@ -2374,26 +2374,26 @@ snapshots:
   '@openid4vc/oauth2@0.5.5':
     dependencies:
       '@openid4vc/utils': 0.5.5
-      zod: 4.5.4
+      zod: 4.6.2
 
   '@openid4vc/openid4vci@0.5.5':
     dependencies:
       '@openid4vc/oauth2': 0.5.5
       '@openid4vc/utils': 0.5.5
-      zod: 4.5.4
+      zod: 4.6.2
 
   '@openid4vc/utils@0.5.5':
     dependencies:
       buffer: 6.0.3
-      zod: 4.5.4
-      zod-validation-error: 5.0.0(zod@4.5.4)
+      zod: 4.6.2
+      zod-validation-error: 5.0.0(zod@4.6.2)
 
   '@owf/cose@0.3.0':
     dependencies:
       '@owf/identity-common': 0.3.0
       cbor-x: 1.6.6
-      zod: 4.5.4
-      zod-validation-error: 5.0.0(zod@4.5.4)
+      zod: 4.6.2
+      zod-validation-error: 5.0.0(zod@4.6.2)
 
   '@owf/identity-common@0.3.0': {}
 
@@ -2404,7 +2404,7 @@ snapshots:
       '@owf/cose': 0.3.0
       '@owf/identity-common': 0.3.0
       '@owf/token-status-list': 0.3.0
-      zod: 4.5.4
+      zod: 4.6.2
 
   '@owf/token-status-list@0.3.0':
     dependencies:
@@ -2412,7 +2412,7 @@ snapshots:
       '@owf/identity-common': 0.3.0
       cbor-x: 1.6.6
       pako: 2.2.0
-      zod: 4.5.4
+      zod: 4.6.2
 
   '@oxc-project/types@0.127.0': {}
 
@@ -2615,7 +2615,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
-      '@napi-rs/wasm-runtime': 1.2.3(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
+      '@napi-rs/wasm-runtime': 1.2.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     optional: true
 
   '@rolldown/binding-win32-arm64-msvc@1.0.0-rc.17':
@@ -2682,9 +2682,9 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
-  '@types/node@26.4.1':
+  '@types/node@26.5.1':
     dependencies:
-      undici-types: 8.3.0
+      undici-types: 8.9.0
 
   '@types/pako@3.0.0':
     dependencies:
@@ -2692,14 +2692,14 @@ snapshots:
 
   '@types/unist@2.0.11': {}
 
-  '@vitest/mocker@5.0.0(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))':
+  '@vitest/mocker@5.0.0(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.0
       estree-walker: 3.0.3
       magic-string: 1.2.3
     optionalDependencies:
-      vite: 8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0)
+      vite: 8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0)
 
   '@vitest/spy@5.0.0': {}
 
@@ -3294,7 +3294,7 @@ snapshots:
 
   ms@2.1.3: {}
 
-  nanoid@3.3.18: {}
+  nanoid@3.3.19: {}
 
   nock@14.0.17:
     dependencies:
@@ -3344,7 +3344,7 @@ snapshots:
 
   postcss@8.5.28:
     dependencies:
-      nanoid: 3.3.18
+      nanoid: 3.3.19
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -3534,7 +3534,7 @@ snapshots:
       '@quansync/fs': 1.0.0
       quansync: 1.0.0
 
-  undici-types@8.3.0: {}
+  undici-types@8.9.0: {}
 
   unicorn-magic@0.4.0: {}
 
@@ -3545,7 +3545,7 @@ snapshots:
 
   verkit@0.4.0: {}
 
-  vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0):
+  vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -3553,16 +3553,16 @@ snapshots:
       rolldown: 1.0.0-rc.17
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 26.4.1
+      '@types/node': 26.5.1
       esbuild: 0.28.2
       fsevents: 2.3.3
       tsx: 4.23.13
       yaml: 2.9.0
 
-  vitest@5.0.0(@types/node@26.4.1)(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0)):
+  vitest@5.0.0(@types/node@26.5.1)(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.0(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+      '@vitest/mocker': 5.0.0(vite@8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
       chai: 6.2.2
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -3573,10 +3573,10 @@ snapshots:
       tinybench: 6.1.4
       tinyexec: 1.3.0
       tinyglobby: 0.2.17
-      vite: 8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0)
+      vite: 8.0.10(@types/node@26.5.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/node': 26.4.1
+      '@types/node': 26.5.1
     transitivePeerDependencies:
       - msw
 
@@ -3654,8 +3654,8 @@ snapshots:
       '@yuku-parser/binding-win32-arm64': 0.9.3
       '@yuku-parser/binding-win32-x64': 0.9.3
 
-  zod-validation-error@5.0.0(zod@4.5.4):
+  zod-validation-error@5.0.0(zod@4.6.2):
     dependencies:
-      zod: 4.5.4
+      zod: 4.6.2
 
-  zod@4.5.4: {}
+  zod@4.6.2: {}
