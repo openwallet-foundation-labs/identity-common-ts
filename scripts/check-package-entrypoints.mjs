@@ -6,16 +6,18 @@ import { join } from 'node:path'
 const rootDir = process.cwd()
 const packagesDir = join(rootDir, 'packages')
 
+// Within the workspace, packages export their TypeScript source, so tests and type checks don't need a build.
+// The published entrypoints are configured in `publishConfig`, which pnpm applies when packing or publishing.
+const sourceExports = './src/index.ts'
+
 // Packages are either ESM-only, or ship both an ESM and a CommonJS build. ESM-only packages point `require`
 // to the ESM build through the `default` condition, which Node.js supports through `require(esm)` (Node.js 20.19 and later, or 22.12 and later).
 // Packages are being migrated to ESM-only.
 const conventions = {
   'esm-only': {
-    rootFields: {
-      main: './dist/index.mjs',
-      module: './dist/index.mjs',
-      types: './dist/index.d.mts',
-    },
+    main: './dist/index.mjs',
+    module: './dist/index.mjs',
+    types: './dist/index.d.mts',
     exports: {
       '.': {
         types: './dist/index.d.mts',
@@ -25,11 +27,9 @@ const conventions = {
     },
   },
   'esm-and-cjs': {
-    rootFields: {
-      main: './dist/index.cjs',
-      module: './dist/index.mjs',
-      types: './dist/index.d.mts',
-    },
+    main: './dist/index.cjs',
+    module: './dist/index.mjs',
+    types: './dist/index.d.mts',
     exports: {
       '.': {
         types: './dist/index.d.mts',
@@ -55,10 +55,6 @@ function stableStringify(value) {
   }
 
   return JSON.stringify(value)
-}
-
-function isEqual(left, right) {
-  return stableStringify(left) === stableStringify(right)
 }
 
 function formatMismatch(name, expected, actual) {
@@ -90,38 +86,27 @@ async function main() {
     const packageJson = JSON.parse(packageJsonRaw)
     const packageFailures = []
 
-    // A package with a CommonJS entrypoint is checked against the ESM and CommonJS convention
-    const conventionName = packageJson.main === './dist/index.cjs' ? 'esm-and-cjs' : 'esm-only'
-    const { rootFields: expectedRootFields, exports: expectedExports } = conventions[conventionName]
-
-    for (const [field, expectedValue] of Object.entries(expectedRootFields)) {
-      if (packageJson[field] !== expectedValue) {
-        packageFailures.push(formatMismatch(field, expectedValue, packageJson[field]))
-      }
+    if (packageJson.exports !== sourceExports) {
+      packageFailures.push(formatMismatch('exports', sourceExports, packageJson.exports))
     }
 
-    if (!isEqual(packageJson.exports, expectedExports)) {
-      packageFailures.push(
-        `  - exports: expected ${JSON.stringify(expectedExports)}, got ${JSON.stringify(packageJson.exports)}`
-      )
+    for (const field of ['main', 'module', 'types']) {
+      if (packageJson[field] !== undefined) {
+        packageFailures.push(`  - ${field}: expected to only be set in publishConfig`)
+      }
     }
 
     if (packageJson.publishConfig?.access !== 'public') {
       packageFailures.push('  - publishConfig.access: expected "public"')
     }
 
-    for (const [field, expectedValue] of Object.entries(expectedRootFields)) {
-      if (packageJson.publishConfig?.[field] !== expectedValue) {
-        packageFailures.push(
-          formatMismatch(`publishConfig.${field}`, expectedValue, packageJson.publishConfig?.[field])
-        )
+    // A package with a CommonJS entrypoint is checked against the ESM and CommonJS convention
+    const conventionName = packageJson.publishConfig?.main === './dist/index.cjs' ? 'esm-and-cjs' : 'esm-only'
+    for (const [field, expectedValue] of Object.entries(conventions[conventionName])) {
+      const actualValue = packageJson.publishConfig?.[field]
+      if (stableStringify(actualValue) !== stableStringify(expectedValue)) {
+        packageFailures.push(formatMismatch(`publishConfig.${field}`, expectedValue, actualValue))
       }
-    }
-
-    if (!isEqual(packageJson.publishConfig?.exports, expectedExports)) {
-      packageFailures.push(
-        `  - publishConfig.exports: expected ${JSON.stringify(expectedExports)}, got ${JSON.stringify(packageJson.publishConfig?.exports)}`
-      )
     }
 
     if (packageFailures.length > 0) {

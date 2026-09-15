@@ -7,16 +7,7 @@
   ],
   "license": "Apache-2.0",
   "author": "Animo Solutions",
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "default": "./dist/index.mjs"
-    },
-    "./package.json": "./package.json"
-  },
+  "exports": "./src/index.ts",
   "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/mdoc",
   "repository": {
     "type": "git",
@@ -45,8 +36,7 @@
     "cose"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts --format esm --dts --sourcemap",
-    "test": "vitest run"
+    "build": "tsdown src/index.ts --format esm --dts --sourcemap"
   },
   "dependencies": {
     "@owf/cose": "workspace:^",
@@ -62,7 +52,6 @@
     "hpke": "^1.1.4",
     "jose": "^6.2.12",
     "nock": "^14.0.17",
-    "reflect-metadata": "^0.2.2",
-    "vitest": "catalog:"
+    "reflect-metadata": "^0.2.2"
   }
 }

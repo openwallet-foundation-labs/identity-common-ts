@@ -230,7 +230,7 @@ yarn add @owf/identity-common
 
 ### Development Setup
 
-This monorepo uses [pnpm](https://pnpm.io) for package management and [Turborepo](https://turbo.build/repo) for task orchestration.
+This monorepo uses [pnpm workspaces](https://pnpm.io/workspaces).
 
 ```bash
 # Clone the repository
@@ -240,49 +240,18 @@ cd identity-common-ts
 # Install dependencies (requires pnpm)
 pnpm install
 
-# Build all packages
-pnpm build
-
-# Run all tests
+# Run all tests, or a subset
 pnpm test
+pnpm test packages/mdoc
+
+# Type-check the workspace
+pnpm types:check
+
+# Build all packages with tsdown
+pnpm build
 ```
 
-### Turborepo
-
-All build and test tasks run through **Turborepo**, which provides:
-
-- **Caching** — tasks whose inputs haven't changed are skipped entirely (a cached full run completes in ~15ms)
-- **Parallelism** — independent packages build and test concurrently
-- **Correct ordering** — packages are always built before the packages that depend on them
-
-#### Task pipeline
-
-| Task | Depends on | What it does |
-|------|-----------|--------------|
-| `build` | upstream `build` | Compiles each package with `tsdown` (ESM + CJS + `.d.ts`) |
-| `test` | upstream `build` | Runs `vitest` tests for each package |
-| `types:check` | upstream `build` | Type-checks the workspace with `tsc --noEmit` |
-| `esm:check` | local `build` | Validates the built packages can be imported and required |
-| `lint` | — | Linting (no build prerequisite) |
-
-Run any task across all packages:
-
-```bash
-pnpm build          # turbo run build
-pnpm test           # turbo run test
-
-# Scope to a single package
-npx turbo run build --filter=@owf/identity-common
-npx turbo run test  --filter=@owf/crypto
-```
-
-The first run executes everything. Subsequent runs that find no changed inputs print `FULL TURBO` and finish instantly.
-
-#### Cache details
-
-Turbo computes a hash for each task from its **input files** (`src/**`, `package.json`, `tsconfig.json`), the global config (`tsconfig.json`, `vite.config.js`), and the pnpm lockfile. If the hash matches a previously-stored result the task is restored from `.turbo/cache/` without re-running.
-
-The `.turbo/` directory is intentionally **not committed** (`.gitignore`) — every developer gets their own local cache.
+Within the workspace, packages export their TypeScript source, so tests, type checks, and examples run without a build. The built `dist` entrypoints are configured in `publishConfig` and only used for the published packages. See the [Contributing Guide](./CONTRIBUTING.md) for all available scripts.
 
 ---
 
@@ -353,7 +322,7 @@ Please read our [Contributing Guide](./CONTRIBUTING.md) to get started.
 
 ### Adding a New Package
 
-A script is provided to scaffold a new package with the correct structure, build config, and Turborepo wiring already in place:
+A script is provided to scaffold a new package with the correct structure and build config already in place:
 
 ```bash
 pnpm create-package <name>           # e.g. jose

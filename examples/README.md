@@ -11,11 +11,10 @@ examples/
 
 ## Running examples
 
-Build the packages first, then run an example with `tsx` from the repository root:
+Run an example with `tsx` from the repository root:
 
 ```bash
-pnpm build
 pnpm tsx examples/sd-jwt/core/basic.ts
 ```
 
-Examples import packages by their published name (e.g. `@sd-jwt/core`). Packages used by examples are listed as `workspace:*` dev dependencies in the root `package.json`. Examples are type-checked as part of `pnpm types:check`.
+Examples import packages by their published name (e.g. `@sd-jwt/core`), which resolves to the package source, so no build is needed. Packages used by examples are listed as `workspace:*` dev dependencies in the root `package.json`. Examples are type-checked as part of `pnpm types:check`.

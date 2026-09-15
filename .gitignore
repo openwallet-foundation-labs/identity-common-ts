@@ -2,5 +2,4 @@
 .idea
 node_modules
 dist
-.tgz
-.turbo
+*.tgz
