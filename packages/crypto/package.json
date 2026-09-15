@@ -31,7 +31,7 @@
     "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
   },
   "dependencies": {
-    "@noble/hashes": "^2.4.0",
+    "@noble/hashes": "catalog:",
     "@owf/identity-common": "workspace:*"
   }
 }

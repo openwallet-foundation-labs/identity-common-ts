@@ -44,8 +44,5 @@
     "@owf/mdoc": "workspace:^",
     "@sd-jwt/core": "workspace:^",
     "zod": "catalog:"
-  },
-  "devDependencies": {
-    "nock": "^14.0.17"
   }
 }
