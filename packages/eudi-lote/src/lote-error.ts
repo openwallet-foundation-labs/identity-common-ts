@@ -7,7 +7,6 @@ import type { LoteValidationIssue } from './validator'
 export class LoteError extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, LoteError.prototype)
     this.name = 'LoteError'
   }
 }
@@ -20,7 +19,6 @@ export class LoteValidationError extends LoteError {
 
   constructor(message: string, issues: LoteValidationIssue[]) {
     super(validationErrorMessage(message, issues))
-    Object.setPrototypeOf(this, LoteValidationError.prototype)
     this.name = 'LoteValidationError'
     this.issues = issues
   }

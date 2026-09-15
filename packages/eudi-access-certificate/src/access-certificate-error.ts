@@ -7,7 +7,6 @@ import type { AccessCertificateValidationIssue } from './validate'
 export class AccessCertificateError extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, AccessCertificateError.prototype)
     this.name = 'AccessCertificateError'
   }
 }
@@ -20,7 +19,6 @@ export class AccessCertificateValidationError extends AccessCertificateError {
 
   constructor(message: string, issues: AccessCertificateValidationIssue[]) {
     super(validationErrorMessage(message, issues))
-    Object.setPrototypeOf(this, AccessCertificateValidationError.prototype)
     this.name = 'AccessCertificateValidationError'
     this.issues = issues
   }

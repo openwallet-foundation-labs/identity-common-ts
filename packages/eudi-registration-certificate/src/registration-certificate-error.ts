@@ -7,7 +7,6 @@ import type { RegistrationCertificateValidationIssue } from './validator'
 export class RegistrationCertificateError extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, RegistrationCertificateError.prototype)
     this.name = 'RegistrationCertificateError'
   }
 }
@@ -20,7 +19,6 @@ export class RegistrationCertificateValidationError extends RegistrationCertific
 
   constructor(message: string, issues: RegistrationCertificateValidationIssue[]) {
     super(validationErrorMessage(message, issues))
-    Object.setPrototypeOf(this, RegistrationCertificateValidationError.prototype)
     this.name = 'RegistrationCertificateValidationError'
     this.issues = issues
   }

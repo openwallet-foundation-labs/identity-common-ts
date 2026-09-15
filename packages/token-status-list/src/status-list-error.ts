@@ -6,7 +6,6 @@ import { IdentityError } from '@owf/identity-common'
 export class StatusListError extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, StatusListError.prototype)
     this.name = 'StatusListError'
   }
 }
@@ -23,7 +22,6 @@ export class StatusListEntryNotValidError extends StatusListError {
 
   constructor(message: string, { idx, status }: { idx: number; status: number }) {
     super(message, { idx, status })
-    Object.setPrototypeOf(this, StatusListEntryNotValidError.prototype)
     this.name = 'StatusListEntryNotValidError'
     this.idx = idx
     this.status = status

@@ -6,7 +6,6 @@ import { IdentityError } from '@owf/identity-common'
 export class CryptoError extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, CryptoError.prototype)
     this.name = 'CryptoError'
   }
 }
