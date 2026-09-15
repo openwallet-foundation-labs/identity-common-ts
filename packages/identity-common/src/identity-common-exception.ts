@@ -6,7 +6,6 @@ import { IdentityException } from './identity-exception'
 export class IdentityCommonException extends IdentityException {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, IdentityCommonException.prototype)
     this.name = 'IdentityCommonException'
   }
 }

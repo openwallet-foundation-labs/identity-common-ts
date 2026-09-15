@@ -6,7 +6,6 @@ import { IdentityException } from '@owf/identity-common'
 export class CryptoException extends IdentityException {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, CryptoException.prototype)
     this.name = 'CryptoException'
   }
 }

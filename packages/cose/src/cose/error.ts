@@ -1,11 +1,18 @@
-// biome-ignore format: no explanation
-class CoseError extends Error {
+import { IdentityException } from '@owf/identity-common'
+
+/**
+ * Base error class for the COSE structures in this package.
+ *
+ * Extends `IdentityException` so that a caller can catch every error raised by the identity-common
+ * packages in one place.
+ */
+export class CoseError extends IdentityException {
   // NOTE: declared explicitly rather than passing `{ cause }` to `super`, as the
   // project targets ES2020 and `Error.cause` was only added in ES2022.
   public readonly cause?: unknown
 
-  constructor(message: string = new.target.name, options?: { cause?: unknown }) {
-    super(message)
+  constructor(message: string = new.target.name, options?: { cause?: unknown; details?: unknown }) {
+    super(message, options?.details)
     this.name = new.target.name
     this.cause = options?.cause
   }

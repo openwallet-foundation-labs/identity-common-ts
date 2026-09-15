@@ -8,7 +8,15 @@ export class IdentityException extends Error {
 
   constructor(message: string, details?: unknown) {
     super(message)
-    Object.setPrototypeOf(this, IdentityException.prototype)
+
+    // NOTE: `new.target` is the class that was constructed, so `instanceof` holds for every
+    // subclass, however deep, without any of them having to repeat this. Setting
+    // `IdentityException.prototype` here instead would overwrite the prototype that `super()`
+    // installed, and break `instanceof` for every subclass that does not set it again itself.
+    //
+    // The call is only needed when this compiles down to ES5, where `super()` becomes
+    // `Error.call(this)` and returns a new object rather than initializing `this`.
+    Object.setPrototypeOf(this, new.target.prototype)
     this.name = 'IdentityException'
     this.details = details
   }

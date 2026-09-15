@@ -6,7 +6,6 @@ import { IdentityException } from '@owf/identity-common'
 export class LoTEException extends IdentityException {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, LoTEException.prototype)
     this.name = 'LoTEException'
   }
 }
