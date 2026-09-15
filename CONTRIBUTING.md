@@ -40,17 +40,13 @@ This project follows the [OpenWallet Foundation Code of Conduct](https://tac.ope
    pnpm install
    ```
 
-3. Build all packages:
-
-   ```bash
-   pnpm build
-   ```
-
-4. Run tests:
+3. Run tests:
 
    ```bash
    pnpm test
    ```
+
+Within the workspace, packages export their TypeScript source (`src/index.ts`), so tests, type checks, and examples don't need a build. The built `dist` entrypoints are only used when publishing, through `publishConfig`.
 
 ## Project Structure
 
@@ -107,8 +103,10 @@ From the root of the repository:
 | Command | Description |
 | ------- | ----------- |
 | `pnpm build` | Build all packages |
-| `pnpm test` | Run all tests |
+| `pnpm test` | Run all tests (`pnpm test packages/mdoc` to run a subset) |
 | `pnpm types:check` | Type-check all packages |
+| `pnpm packages:check` | Validate the `package.json` entrypoints of all packages |
+| `pnpm esm:check` | Validate the built packages can be imported and required (run `pnpm build` first) |
 | `pnpm style:check` | Check code style with Biome |
 | `pnpm style:fix` | Fix code style issues |
 | `pnpm md:check` | Check markdown files |
@@ -152,16 +150,7 @@ Create `packages/my-package/package.json`:
   "description": "Description of your package",
   "files": ["dist"],
   "license": "Apache-2.0",
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "default": "./dist/index.mjs"
-    },
-    "./package.json": "./package.json"
-  },
+  "exports": "./src/index.ts",
   "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/my-package",
   "repository": {
     "type": "git",
@@ -189,7 +178,9 @@ Create `packages/my-package/package.json`:
 }
 ```
 
-New packages are ESM-only: `require` resolves to the ESM build through the `default` condition. Some existing packages also ship a CommonJS build (`dist/index.cjs`) while they are migrated. `pnpm packages:check` validates that each package follows one of these two layouts, and `pnpm esm:check` validates that each built package can be imported and required.
+The top-level `exports` points to the TypeScript source, so other packages, tests, and examples in the workspace use the source directly. The published entrypoints are set in `publishConfig`, which pnpm applies when packing and publishing.
+
+New packages are ESM-only: `require` resolves to the ESM build through the `default` condition. Some existing packages also ship a CommonJS build (`dist/index.cjs`) while they are migrated. `pnpm packages:check` validates that each package follows one of these two layouts, and `pnpm esm:check` validates that each packed package can be imported and required.
 
 **Naming conventions:**
 
@@ -203,12 +194,7 @@ Create `packages/my-package/tsconfig.json`:
 
 ```json
 {
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src"
-  },
-  "include": ["src"]
+  "extends": "../../tsconfig.json"
 }
 ```
 
@@ -281,11 +267,11 @@ If your package needs to be available in the root `package.json` for testing:
 }
 ```
 
-### 8. Install and Build
+### 8. Install and Test
 
 ```bash
 pnpm install
-pnpm build
+pnpm test
 ```
 
 ## Coding Standards
@@ -426,8 +412,10 @@ When adding a new package to the monorepo:
 
    ```bash
    cd packages/your-new-package
-   npm publish --access public
+   pnpm publish --access public
    ```
+
+   Use `pnpm publish`, not `npm publish`: only pnpm applies the `main`, `types`, and `exports` fields from `publishConfig`. With `npm publish`, the package would point to the TypeScript source, which isn't included in the published files.
 
    You must be logged into npm (`npm login`) with an account that has publish access to the `@owf` scope.
 

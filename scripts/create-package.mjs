@@ -48,18 +48,7 @@ const packageJson = {
   description: `TODO: Add description for ${fullPackageName}`,
   files: ['dist'],
   license: 'Apache-2.0',
-  main: './dist/index.cjs',
-  module: './dist/index.mjs',
-  types: './dist/index.d.mts',
-  exports: {
-    '.': {
-      types: './dist/index.d.mts',
-      import: './dist/index.mjs',
-      require: './dist/index.cjs',
-      default: './dist/index.mjs',
-    },
-    './package.json': './package.json',
-  },
+  exports: './src/index.ts',
   homepage: `https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/${packageName}`,
   repository: {
     type: 'git',
@@ -68,37 +57,26 @@ const packageJson = {
   },
   publishConfig: {
     access: 'public',
-    main: './dist/index.cjs',
+    main: './dist/index.mjs',
     module: './dist/index.mjs',
     types: './dist/index.d.mts',
     exports: {
       '.': {
         types: './dist/index.d.mts',
-        import: './dist/index.mjs',
-        require: './dist/index.cjs',
         default: './dist/index.mjs',
       },
       './package.json': './package.json',
     },
   },
   scripts: {
-    build: 'tsdown src/index.ts --format esm,cjs --dts --sourcemap',
-    test: 'vitest run',
+    build: 'tsdown src/index.ts --format esm --dts --sourcemap',
   },
   dependencies: {},
-  devDependencies: {
-    vitest: 'catalog:',
-  },
 }
 
 // tsconfig.json template
 const tsconfigJson = {
   extends: '../../tsconfig.json',
-  compilerOptions: {
-    outDir: 'dist',
-    rootDir: 'src',
-  },
-  include: ['src'],
 }
 
 // README template
@@ -192,8 +170,7 @@ async function main() {
     console.log(`  2. Add your code to packages/${packageName}/src/index.ts`)
     console.log(`  3. Add tests to packages/${packageName}/src/__tests__/`)
     console.log('  4. Run: pnpm install')
-    console.log('  5. Run: pnpm build  (or: turbo run build)')
-    console.log('  6. Run: pnpm test   (or: turbo run test)')
+    console.log('  5. Run: pnpm test')
     console.log('')
   } catch (error) {
     console.error('Error creating package:', error)

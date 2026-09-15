@@ -1,6 +1,6 @@
 # SD-JWT Examples
 
-Examples for [`@sd-jwt/core`](../../packages/sd-jwt-core) and [`@sd-jwt/sd-jwt-vc`](../../packages/sd-jwt-vc). Run them from the repository root after `pnpm build`:
+Examples for [`@sd-jwt/core`](../../packages/sd-jwt-core) and [`@sd-jwt/sd-jwt-vc`](../../packages/sd-jwt-vc). Run them from the repository root:
 
 ```bash
 pnpm tsx examples/sd-jwt/core/basic.ts

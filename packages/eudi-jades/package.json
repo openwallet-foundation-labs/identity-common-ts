@@ -6,18 +6,7 @@
     "dist"
   ],
   "license": "Apache-2.0",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs",
-      "default": "./dist/index.mjs"
-    },
-    "./package.json": "./package.json"
-  },
+  "exports": "./src/index.ts",
   "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-jades",
   "repository": {
     "type": "git",
@@ -49,15 +38,11 @@
     "ts-119-182"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
-    "test": "vitest run"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
   },
   "dependencies": {
     "@owf/crypto": "workspace:*",
     "@owf/identity-common": "workspace:*",
     "zod": "catalog:"
-  },
-  "devDependencies": {
-    "vitest": "catalog:"
   }
 }

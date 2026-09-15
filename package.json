@@ -9,7 +9,6 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "pretypes:check": "turbo run build",
     "types:check": "tsc --noEmit",
     "style:check": "biome check --unsafe",
     "style:fix": "biome check --write --unsafe",
@@ -18,8 +17,8 @@
     "packages:check": "node scripts/check-package-entrypoints.mjs",
     "esm:check": "node scripts/check-package-esm-imports.mjs",
     "ci:check": "pnpm style:check && pnpm md:check && pnpm types:check && pnpm test",
-    "build": "turbo run build",
-    "test": "turbo run test",
+    "build": "pnpm -r build",
+    "test": "vitest",
     "create-package": "node scripts/create-package.mjs",
     "release": "pnpm packages:check && pnpm types:check && pnpm build && pnpm esm:check && pnpm changeset publish --no-git-tag 2>&1 | tee changeset-publish.log",
     "changeset-version": "pnpm changeset version && pnpm style:fix",
@@ -39,7 +38,6 @@
     "markdownlint-cli2": "^0.23.2",
     "tsdown": "0.23.0",
     "tsx": "^4.23.13",
-    "turbo": "^2.10.12",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
