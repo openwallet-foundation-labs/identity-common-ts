@@ -1,0 +1,55 @@
+{
+  "name": "dcql",
+  "version": "3.0.0",
+  "description": "Digital Credentials Query Language (DCQL)",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "author": "Martin Auer",
+  "exports": "./src/index.ts",
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/dcql",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/dcql"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.mjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "keywords": [
+    "Digital Credentials Query Language (DCQL)",
+    "Credentials Query Language",
+    "Verifiable Presentation Query Language",
+    "Verifiable Presentations",
+    "Presentation Definition",
+    "Credentials",
+    "SSI",
+    "OpenID",
+    "SIOP",
+    "Self Issued OpenId Provider",
+    "OpenId for Verifiable Presentations",
+    "SIOPv2",
+    "OID4VC",
+    "OID4VP",
+    "OpenID4VP",
+    "OpenID4VC",
+    "OIDC4VP"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+  },
+  "dependencies": {
+    "valibot": "^1.4.2"
+  }
+}

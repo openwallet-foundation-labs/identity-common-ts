@@ -60,6 +60,7 @@ jobs:
           echo "current_package_version=$(node -p "require('./packages/identity-common/package.json').version")" >> $GITHUB_OUTPUT
           echo "sd_jwt_package_version=$(node -p "require('./packages/sd-jwt-core/package.json').version")" >> $GITHUB_OUTPUT
           echo "mdoc_package_version=$(node -p "require('./packages/mdoc/package.json').version")" >> $GITHUB_OUTPUT
+          echo "dcql_package_version=$(node -p "require('./packages/dcql/package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Create Github Release
         if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
@@ -80,6 +81,13 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: mdoc-v${{ steps.get_version.outputs.mdoc_package_version }}
+
+      # dcql is versioned separately from the other packages, so it gets its own tag prefix
+      - name: Create DCQL Github Release
+        if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: dcql-v${{ steps.get_version.outputs.dcql_package_version }}
 
   release-unstable:
     runs-on: ubuntu-24.04
@@ -119,6 +127,7 @@ jobs:
           '@owf/identity-common': patch
           '@sd-jwt/core': patch
           '@owf/mdoc': patch
+          'dcql': patch
           ---
 
           snapshot release
@@ -134,9 +143,11 @@ jobs:
           CURRENT_PACKAGE_VERSION=$(node -p "require('./packages/identity-common/package.json').version")
           SD_JWT_PACKAGE_VERSION=$(node -p "require('./packages/sd-jwt-core/package.json').version")
           MDOC_PACKAGE_VERSION=$(node -p "require('./packages/mdoc/package.json').version")
+          DCQL_PACKAGE_VERSION=$(node -p "require('./packages/dcql/package.json').version")
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag v$CURRENT_PACKAGE_VERSION
           git tag sd-jwt-v$SD_JWT_PACKAGE_VERSION
           git tag mdoc-v$MDOC_PACKAGE_VERSION
-          git push origin v$CURRENT_PACKAGE_VERSION sd-jwt-v$SD_JWT_PACKAGE_VERSION mdoc-v$MDOC_PACKAGE_VERSION --no-verify
+          git tag dcql-v$DCQL_PACKAGE_VERSION
+          git push origin v$CURRENT_PACKAGE_VERSION sd-jwt-v$SD_JWT_PACKAGE_VERSION mdoc-v$MDOC_PACKAGE_VERSION dcql-v$DCQL_PACKAGE_VERSION --no-verify

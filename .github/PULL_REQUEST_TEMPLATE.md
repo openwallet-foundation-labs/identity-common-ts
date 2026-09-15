@@ -23,6 +23,7 @@ Fixes #
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
 - [ ] `@owf/mdoc`
+- [ ] `dcql`
 - [ ] Other: _____________
 
 ## Checklist
