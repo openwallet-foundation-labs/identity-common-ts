@@ -37,6 +37,33 @@
   },
   "overrides": [
     {
+      "includes": [
+        "packages/oauth2/src/**",
+        "packages/openid4vci/src/**",
+        "packages/openid4vp/src/**",
+        "packages/openid4vc-utils/src/**",
+        "!**/__tests__/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "URL": "URL should be imported from the @openid4vc/utils package.",
+                  "URLSearchParams": "URLSearchParams should be imported from the @openid4vc/utils package.",
+                  "fetch": "fetch should be imported from the @openid4vc/utils package.",
+                  "Response": "Response should be imported from the @openid4vc/utils package.",
+                  "Headers": "Headers should be imported from the @openid4vc/utils package."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/__tests__/**"],
       "linter": {
         "rules": {

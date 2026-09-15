@@ -79,7 +79,6 @@ Are there existing implementations that could be migrated or used as reference?
 
 How would this package integrate with other OWF projects?
 
-- [ ] oid4vc-ts
 - [ ] openid-federation-ts
 - [ ] credo-ts
 - [ ] Other: _____________
