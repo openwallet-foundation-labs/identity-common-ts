@@ -62,6 +62,7 @@ identity-common-ts/
 │   ├── token-status-list/       # JWT/CWT Token Status List (planned)
 │   ├── sd-jwt-*/                # SD-JWT and SD-JWT VC packages (@sd-jwt/*)
 │   ├── mdoc/                    # ISO/IEC 18013-5 mDOC and mDL (@owf/mdoc)
+│   ├── dcql/                    # Digital Credentials Query Language (dcql)
 │   └── eudi-*/                  # EUDI-specific packages (planned)
 ├── examples/                    # Runnable examples, grouped by topic (e.g. examples/sd-jwt)
 ├── docs/sd-jwt/                 # sdjwt.js.org landing page (deployed to GitHub Pages)
@@ -72,7 +73,7 @@ identity-common-ts/
 
 ### Package Categories
 
-Packages are organized into four main categories:
+Packages are organized into five main categories:
 
 1. **Core Identity Utilities** (`@owf/identity-*`)
    - Generic, reusable utilities for any identity solution
@@ -93,6 +94,11 @@ Packages are organized into four main categories:
    - ISO/IEC 18013-5 mDOC and mDL implementation
    - Located in `packages/mdoc`
    - Versioned separately from the other `@owf/*` packages (see `.changeset/config.json`)
+
+5. **DCQL** (`dcql`)
+   - Digital Credentials Query Language (OpenID4VP) implementation
+   - Located in `packages/dcql`
+   - Published under the unscoped `dcql` name, so it is not part of a fixed version group and is versioned separately
 
 ## Development Workflow
 

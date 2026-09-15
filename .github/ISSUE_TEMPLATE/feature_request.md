@@ -23,6 +23,7 @@ Which package(s) would this feature belong to?
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
 - [ ] `@owf/mdoc`
+- [ ] `dcql`
 - [ ] New package: _____________
 
 ## Problem Statement

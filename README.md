@@ -38,7 +38,7 @@ To avoid reinventing the wheel, many identity projects share common needs for da
 
 ### Project Categories
 
-The project is organized into four main categories:
+The project is organized into five main categories:
 
 #### Core Identity Utilities
 
@@ -82,6 +82,14 @@ Implementation of [ISO/IEC 18013-5](https://www.iso.org/standard/69084.html) mDO
 | Package | Description | Status |
 |---------|-------------|--------|
 | [`@owf/mdoc`](./packages/mdoc) | ISO/IEC 18013-5 mDOC and mDL issuance, presentation, and verification | ✅ Available |
+
+#### DCQL
+
+Implementation of the [Digital Credentials Query Language (DCQL)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-digital-credentials-query-l) from OpenID4VP, previously developed in [dcql-ts](https://github.com/openwallet-foundation-labs/dcql-ts). `dcql` is versioned separately from the other packages.
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| [`dcql`](./packages/dcql) | Create, validate, and execute DCQL queries, and validate presentations against them | ✅ Available |
 
 > **Note**: While the EUDI Wallet is built on open standards (OpenID4VC, SD-JWT VC), it requires specific extensions for Trust, Payments, and document signing that are better suited in dedicated packages.
 
@@ -208,6 +216,18 @@ npm install @owf/mdoc
 ```
 
 📖 [View package documentation](./packages/mdoc/README.md)
+
+### dcql
+
+[![dcql version](https://img.shields.io/npm/v/dcql)](https://npmjs.com/package/dcql)
+
+Digital Credentials Query Language (DCQL): create and validate queries, match them against credentials, and validate presentation results. Supports `mso_mdoc`, `dc+sd-jwt` and W3C VC formats, from OpenID4VP Draft 22 up to 1.0.
+
+```bash
+npm install dcql
+```
+
+📖 [View package documentation](./packages/dcql/README.md)
 
 ---
 

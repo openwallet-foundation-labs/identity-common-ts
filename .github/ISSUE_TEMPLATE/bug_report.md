@@ -18,6 +18,7 @@ Which package(s) does this affect?
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
 - [ ] `@owf/mdoc`
+- [ ] `dcql`
 - [ ] Other: _____________
 
 ## To Reproduce
