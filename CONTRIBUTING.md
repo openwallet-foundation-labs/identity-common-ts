@@ -63,6 +63,8 @@ identity-common-ts/
 │   ├── sd-jwt-*/                # SD-JWT and SD-JWT VC packages (@sd-jwt/*)
 │   ├── mdoc/                    # ISO/IEC 18013-5 mDOC and mDL (@owf/mdoc)
 │   ├── dcql/                    # Digital Credentials Query Language (dcql)
+│   ├── oauth2/                  # OAuth 2.0 (@openid4vc/oauth2)
+│   ├── openid4vc*/              # OpenID4VCI, OpenID4VP and shared utilities (@openid4vc/*)
 │   └── eudi-*/                  # EUDI-specific packages (planned)
 ├── examples/                    # Runnable examples, grouped by topic (e.g. examples/sd-jwt)
 ├── docs/sd-jwt/                 # sdjwt.js.org landing page (deployed to GitHub Pages)
@@ -73,7 +75,7 @@ identity-common-ts/
 
 ### Package Categories
 
-Packages are organized into five main categories:
+Packages are organized into six main categories:
 
 1. **Core Identity Utilities** (`@owf/identity-*`)
    - Generic, reusable utilities for any identity solution
@@ -99,6 +101,11 @@ Packages are organized into five main categories:
    - Digital Credentials Query Language (OpenID4VP) implementation
    - Located in `packages/dcql`
    - Published under the unscoped `dcql` name, so it is not part of a fixed version group and is versioned separately
+
+6. **OpenID4VC** (`@openid4vc/*`)
+   - OAuth 2.0, OpenID4VCI and OpenID4VP implementations
+   - Located in `packages/oauth2`, `packages/openid4vci`, `packages/openid4vp` and `packages/openid4vc-utils` (`@openid4vc/utils`)
+   - Versioned together, separately from the other packages (see `.changeset/config.json`)
 
 ## Development Workflow
 
@@ -193,6 +200,7 @@ New packages are ESM-only: `require` resolves to the ESM build through the `defa
 - Core utilities: `@owf/identity-<name>` or `@owf/<name>` (e.g., `@owf/jose`, `@owf/x509`)
 - EUDI-specific: `@owf/eudi-<name>` (e.g., `@owf/eudi-lote`, `@owf/eudi-payment`)
 - SD-JWT: `@sd-jwt/<name>` in `packages/sd-jwt-<name>` (e.g., `@sd-jwt/core` in `packages/sd-jwt-core`)
+- OpenID4VC: `@openid4vc/<name>` in `packages/<name>` (e.g., `@openid4vc/openid4vp` in `packages/openid4vp`), except `@openid4vc/utils` in `packages/openid4vc-utils`
 
 ### 3. Create TypeScript Configuration
 

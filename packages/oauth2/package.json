@@ -1,0 +1,45 @@
+{
+  "name": "@openid4vc/oauth2",
+  "version": "0.5.5",
+  "description": "OAuth 2.0 Authorization Framework implementation, including extension specifications",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "author": "Animo Solutions",
+  "exports": "./src/index.ts",
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/oauth2",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/oauth2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.mjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "keywords": [
+    "oauth2",
+    "dpop",
+    "pkce",
+    "par",
+    "jar",
+    "openid4vc"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+  },
+  "dependencies": {
+    "@openid4vc/utils": "workspace:^",
+    "zod": "catalog:"
+  }
+}

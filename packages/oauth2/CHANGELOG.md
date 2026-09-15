@@ -1,0 +1,232 @@
+# @openid4vc/oauth2
+
+## 0.5.5
+
+### Patch Changes
+
+- 6060c2d: Add `getAuthorizationServerMetadata` and `getJwks` callbacks to the `CallbackContext`, allowing authorization server metadata and JWK Sets to be resolved without performing a request.
+  
+  This makes it possible to avoid network requests for metadata and keys that the caller already has (for example an authorization server hosted by the same application, which would otherwise result in an HTTP request to itself when verifying an access token it issued), and to serve metadata and keys from a cache.
+  
+  Both callbacks are optional. If not provided, or if they return `undefined`, the metadata and JWK Sets are fetched over HTTP as before. `getAuthorizationServerMetadata` can additionally return `null` to indicate the metadata definitively does not exist, so it is not requested again.
+  
+  Values returned by the callbacks are validated exactly like fetched values: a JWK Set is parsed with the JWK Set schema, and authorization server metadata is parsed with the authorization server metadata schema and must have an `issuer` matching the requested issuer.
+  
+  The second parameter of the exported `fetchJwks` and `fetchAuthorizationServerMetadata` functions now also accepts an object with `fetch` and the matching resolve callback, in addition to the `Fetch` implementation it accepted before.
+- @openid4vc/utils@0.5.5
+
+## 0.5.4
+
+### Patch Changes
+
+- 63aeaa9: Add support for the DPoP-bound `attest_jwt_client_auth_dpop` client authentication method (draft 09 §5.2): a new `clientAuthenticationClientAttestationJwtDpop` client-auth callback that emits a single DPoP proof doubling as the Client Attestation PoP (client instance key == DPoP key), plus authorization-server verification of the combined method (attestation JWT + DPoP proof with a mandatory `cnf` JWK to DPoP key match). The combined method is rejected when the authorization server advertises client authentication methods that do not include `attest_jwt_client_auth_dpop`.
+  - @openid4vc/utils@0.5.4
+
+## 0.5.3
+
+### Patch Changes
+
+- 9c4c66c: Add support for di_vp proofs in credential requests
+- 6886ca5: Add `Oauth2Client.requestClientAttestationChallenge` to fetch a Client Attestation challenge from the authorization server's `challenge_endpoint`, and support the `use_attestation_challenge` reactive challenge retry (draft 09) so the challenge is automatically included in the Client Attestation PoP when the server requests one.
+  - @openid4vc/utils@0.5.3
+
+## 0.5.2
+
+### Patch Changes
+
+- 33adaf0: Align wallet (client) attestation with draft 09 of OAuth 2.0 Attestation-Based Client Authentication.
+
+  - Client Attestation and Client Attestation PoP JWTs no longer emit the `iss` claim (removed in draft 08). Verification still accepts legacy JWTs that include `iss`.
+  - The Client Attestation PoP JWT uses the `challenge` claim (renamed from `nonce` in draft 06) and no longer includes `exp` (removed in draft 06). Verification accepts either `challenge` or the legacy `nonce`. The `nonce`/`expectedNonce` options are deprecated aliases for `challenge`/`expectedChallenge`.
+  - Added authorization server metadata parameters `client_attestation_signing_alg_values_supported` and `client_attestation_pop_signing_alg_values_supported` (draft 07), the `challenge_endpoint` parameter, the `attest_jwt_client_auth_dpop` authentication method, and the `OAuth-Client-Attestation-Challenge` header (draft 09).
+  - `verifyClientAttestationPopJwt` accepts an `expectedAudience` option so a resource server can verify a PoP JWT bound to its own identifier (draft 09).
+  - @openid4vc/utils@0.5.2
+
+## 0.5.1
+
+### Patch Changes
+
+- @openid4vc/utils@0.5.1
+
+## 0.5.0
+
+### Minor Changes
+
+- 675b5b2: Pass allowedSkewInSeconds to verifyClientAttestation and verifyAttestationJWT functions, and deprecate clockSkewSec in favor of allowedSkewInSeconds for better naming consistency.
+- fa29ab6: chore: drop node 18 support. Lowest supported Node.JS version is now 20.19 +
+- 1a8372b: Parses and Verify grant types against grant_types_supported.
+  This can cause issues if the authorization server does not have the
+  correct grant_types_supported configured correctly.
+
+### Patch Changes
+
+- 4877518: fix: make an exception for openid4vci-proof+jwt jwt typ where iss value does not match the did in the jwt proof header
+- 6d35a38: feat: add support for request & reponse encryption
+- fa29ab6: feat: add support for Node 26
+- ba93c72: feat: add support for the new Interactive Authorization Endpoint from OpenID4VCI 1.1 draft to allow presentation during issuance. NOTE: this feature is experimental and not stable in OpenID4VCI yet, it may be changed in this library in an incompatible way in a patch release.
+- 3fb55be: Remove exp field from wallet attestation JWT payload schema
+  Export CreateCredentialResponseOptions type
+- Updated dependencies [fa29ab6]
+- Updated dependencies [fa29ab6]
+  - @openid4vc/utils@0.5.0
+
+## 0.4.5
+
+### Patch Changes
+
+- 9c0ac58: fix: allow non-integer (decimal) numbers for JWT claims (iat/nbf/exp)
+- 4fb7574: feat: support retrieving client credentials access token
+- Updated dependencies [9c0ac58]
+  - @openid4vc/utils@0.4.5
+
+## 0.4.4
+
+### Patch Changes
+
+- 0bf46b7: feat: add support for RFC 9207 OAuth 2.0 Authorization Server Issuer Identification and add methods to the Oauth2Client and Openid4vciClient to parse and verify an authorization response. To meet HAIP requirements you should set `authorization_response_iss_parameter_supported` to true in your authorization server, and in the wallet you should use the new `Openid4vciClient.parseAndVerifyAuthorizationResponseRedirectUrl` to parse and verify the authorization response. The verification method only verifies against the authorization server metadata, while HAIP/FAPI require the value to ALWAYS be present. In the future a method will be added that verifies if the authorization server metadata is aligned with the requirements of HAIP. This way the verification methods can stay simpler, and verify based on the authorization server metadata.
+- 3f3cfe7: fix: throw error in well known metadata retrieval if an error was thrown during first try
+- 3f3cfe7: chore: better zod errors with more detail of nested errors
+- Updated dependencies [3f3cfe7]
+  - @openid4vc/utils@0.4.4
+
+## 0.4.3
+
+### Patch Changes
+
+- @openid4vc/utils@0.4.3
+
+## 0.4.2
+
+### Patch Changes
+
+- Updated dependencies [05af867]
+  - @openid4vc/utils@0.4.2
+
+## 0.4.1
+
+### Patch Changes
+
+- @openid4vc/utils@0.4.1
+
+## 0.4.0
+
+### Minor Changes
+
+- dfa7819: Remove support for the CommonJS/CJS syntax. Since React Native bundles your code, the update to ESM should not cause issues. In addition all latest minor releases of Node 20+ support requiring ESM modules. This means that even if you project is still a CommonJS project, it can now depend on ESM modules. For this reason oid4vc-ts is now fully an ESM module.
+
+### Patch Changes
+
+- Updated dependencies [dfa7819]
+  - @openid4vc/utils@0.4.0
+
+## 0.3.0
+
+### Minor Changes
+
+- 70b9740: Add support for OpenID4VCI draft 15. It also includes improved support for client (wallet) attestations, and better support for server side verification.
+
+  Due to the changes between Draft 14 and Draft 15 and it's up to the caller of this library to handle the difference between the versions. Draft 11 is still supported based on Draft 14 syntax (and thus will be automatically converted).
+
+- fccae5c: chore: update to zod 4. Although the public API has not changed, it does impact the error messages and some of the error structures
+- 06c016f: apu and apv in JWE encryptor are now base64 encoded values, to align with JOSE
+- 06db16a: feat: add support for JAR in pushed authorization requests.
+
+  NOTE: the `parsePushedAuthorizationRequest` now optionally returns an `authorizationRequestJwt` parameter. You MUST pass this to the `verifyPushedAuthorizationResponse` method to ensure the JWT is verified.
+
+- 70b9740: fix typo in param from authorizationServerMetata to authorizationServerMetadata
+- 70b9740: replace the `dpopJwk` return value with `dpop` object with `jwk` key. It now also returns the `jwkThumbprint`
+- 26451d7: Before this PR, all packages used Valibot for data validation.
+  We have now fully transitioned to Zod. This introduces obvious breaking changes for some packages that re-exported Valibot types or schemas for example.
+- f798259: refactor: change the jwt signer method 'trustChain' to 'federation' and make 'trustChain' variable optional.
+- c23c86f: add support for sha-384, sha-512, rename SHA-256 to sha-256 to align with IANA hash algorithm names (<https://www.iana.org/assignments/named-information/named-information.xhtml>)
+
+### Patch Changes
+
+- 08dbc00: Add grant_types_supported to the authorization server metadata.
+- a70c87b: fix: make key_ops array of strings instead of string in jwk
+- 5b69ca4: Fixes miscellaneous typos and adds code to the authorization request.
+- e206509: Add support for deferred credential issuance and Draft 16 of the OpenID for Verifiable Credential Issuance.
+- 2cc4e31: Add function to parse authorization response redirect URLs.
+- e206509: Fix a myriad of typos across errors, comments, and variable names.
+- c29dd5a: fix: entry file in package.json for cjs to point to the correct file extension
+- c8ce780: fix: path where oauth2 authorization server metadata is retrieved from.
+
+  For OAuth you need to put `.well-known/oauth-authorization-server` between the origin and path (so `https://funke.animo.id/provider` becomes `https://funke.animo.id/.well-known/oauth-authorization-server/provider`). We were putting the well known path after the full issuer url.
+
+  It will now first check the correct path, and fall back to the invalid path.
+
+- e9483ca: Add support for parsing and verifying an ID Token JWT according to the OpenID Connect specification.
+
+  Exports some other utilities.
+
+- c2c3499: Add authorization server support for refresh tokens, as well as verifying requests with refresh token grants.
+- 9bf578f: fix: loosen the allowed content type for JWK Set to include application/json
+- 158fa8c: feat: support node 22 and 24
+- d9b8118: feat: add `kid` to the JwtSigner interface
+- 4d1bfd7: Add function to parse a pushed authorization request uri.
+- 3b9b88a: fix: create fetch wrapper that always calls toString on URLSearchParams as React Native does not encode this correctly while Node.JS does
+- ef05cf9: Correctly passes the state down to the authentication challenge request.
+- 1ba4a59: Add support for parsing and verifying array 'aud' in JWTs.
+- 80d0ec1: Send redirect_uri along in the authorization challenge endpoint, allowing the server to use it when defaulting to a PAR request.
+- 1ad09cf: Pass state onto the authorization request URL.
+- Updated dependencies [70b9740]
+- Updated dependencies [fccae5c]
+- Updated dependencies [70b9740]
+- Updated dependencies [c29dd5a]
+- Updated dependencies [26451d7]
+- Updated dependencies [158fa8c]
+- Updated dependencies [3b9b88a]
+  - @openid4vc/utils@0.3.0
+
+## 0.2.0
+
+### Minor Changes
+
+- 0f60387: feat: add client attestations
+- 3f6d360: change order of fetching authorization server metadata. First `oauth-authorization-server` metadata is fetched now. If that returns a 404, the `openid-configuration` will be fetched.
+
+### Patch Changes
+
+- @openid4vc/utils@0.2.0
+
+## 0.1.4
+
+### Patch Changes
+
+- 12a517a: feat: add refresh_token grant type
+  - @openid4vc/utils@0.1.4
+
+## 0.1.3
+
+### Patch Changes
+
+- d4b9279: chore: create github release
+- Updated dependencies [d4b9279]
+  - @openid4vc/utils@0.1.3
+
+## 0.1.2
+
+### Patch Changes
+
+- 1de27e5: chore: correct formatting for publishing
+- Updated dependencies [1de27e5]
+  - @openid4vc/utils@0.1.2
+
+## 0.1.1
+
+### Patch Changes
+
+- 6434781: docs: add readme
+- Updated dependencies [6434781]
+  - @openid4vc/utils@0.1.1
+
+## 0.1.0
+
+### Minor Changes
+
+- 71326c8: feat: initial release
+
+### Patch Changes
+
+- Updated dependencies [71326c8]
+  - @openid4vc/utils@0.1.0

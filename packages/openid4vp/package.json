@@ -1,0 +1,44 @@
+{
+  "name": "@openid4vc/openid4vp",
+  "version": "0.5.5",
+  "description": "OpenID for Verifiable Presentations (OpenID4VP) implementation",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "author": "Animo Solutions",
+  "exports": "./src/index.ts",
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/openid4vp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/openid4vp"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.mjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "keywords": [
+    "openid4vc",
+    "openid4vp",
+    "oid4vp",
+    "verifiable presentations"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+  },
+  "dependencies": {
+    "@openid4vc/oauth2": "workspace:^",
+    "@openid4vc/utils": "workspace:^",
+    "zod": "catalog:"
+  }
+}

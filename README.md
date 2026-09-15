@@ -38,7 +38,7 @@ To avoid reinventing the wheel, many identity projects share common needs for da
 
 ### Project Categories
 
-The project is organized into five main categories:
+The project is organized into six main categories:
 
 #### Core Identity Utilities
 
@@ -90,6 +90,17 @@ Implementation of the [Digital Credentials Query Language (DCQL)](https://openid
 | Package | Description | Status |
 |---------|-------------|--------|
 | [`dcql`](./packages/dcql) | Create, validate, and execute DCQL queries, and validate presentations against them | ✅ Available |
+
+#### OpenID4VC
+
+Implementations of OAuth 2.0, [OpenID for Verifiable Credential Issuance (OpenID4VCI)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) and [OpenID for Verifiable Presentations (OpenID4VP)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html), previously developed in [oid4vc-ts](https://github.com/openwallet-foundation-labs/oid4vc-ts). The `@openid4vc/*` packages are versioned together, separately from the other packages.
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| [`@openid4vc/oauth2`](./packages/oauth2) | OAuth 2.0 client, authorization server and resource server, including PAR, PKCE, DPoP, JAR and attestation-based client authentication | ✅ Available |
+| [`@openid4vc/openid4vci`](./packages/openid4vci) | OpenID4VCI issuer and client, from draft 11 up to 1.0 | ✅ Available |
+| [`@openid4vc/openid4vp`](./packages/openid4vp) | OpenID4VP verifier and client, from draft 18 up to 1.0 | ✅ Available |
+| [`@openid4vc/utils`](./packages/openid4vc-utils) | Shared utilities for the `@openid4vc/*` packages | ✅ Available |
 
 > **Note**: While the EUDI Wallet is built on open standards (OpenID4VC, SD-JWT VC), it requires specific extensions for Trust, Payments, and document signing that are better suited in dedicated packages.
 
@@ -229,6 +240,42 @@ npm install dcql
 
 📖 [View package documentation](./packages/dcql/README.md)
 
+### @openid4vc/oauth2
+
+[![@openid4vc/oauth2 version](https://img.shields.io/npm/v/@openid4vc/oauth2)](https://npmjs.com/package/@openid4vc/oauth2)
+
+OAuth 2.0 Authorization Framework implementation, including Pushed Authorization Requests, PKCE, DPoP, token introspection, JWT access tokens, resource indicators and attestation-based client authentication.
+
+```bash
+npm install @openid4vc/oauth2
+```
+
+📖 [View package documentation](./packages/oauth2/README.md)
+
+### @openid4vc/openid4vci
+
+[![@openid4vc/openid4vci version](https://img.shields.io/npm/v/@openid4vc/openid4vci)](https://npmjs.com/package/@openid4vc/openid4vci)
+
+OpenID for Verifiable Credential Issuance: authorization code and pre-authorized code flows, credential offers, signed issuer metadata, key attestations and presentation during issuance. Supports 1.0 with backwards compatibility down to draft 11.
+
+```bash
+npm install @openid4vc/openid4vci
+```
+
+📖 [View package documentation](./packages/openid4vci/README.md)
+
+### @openid4vc/openid4vp
+
+[![@openid4vc/openid4vp version](https://img.shields.io/npm/v/@openid4vc/openid4vp)](https://npmjs.com/package/@openid4vc/openid4vp)
+
+OpenID for Verifiable Presentations: signed and unsigned requests (JAR), `direct_post`, `direct_post.jwt`, `dc_api` and `dc_api.jwt` response modes, JARM and transaction data. Supports 1.0 with backwards compatibility down to draft 18.
+
+```bash
+npm install @openid4vc/openid4vp
+```
+
+📖 [View package documentation](./packages/openid4vp/README.md)
+
 ---
 
 ## Getting Started
@@ -322,7 +369,6 @@ const result = await someFunction({
 
 This library is designed to work with and support other OpenWallet Foundation projects:
 
-- [**oid4vc-ts**](https://github.com/openwallet-foundation-labs/oid4vc-ts) - OpenID4VC implementation
 - [**openid-federation-ts**](https://github.com/openwallet-foundation-labs/openid-federation-ts) - OpenID Federation implementation
 - [**credo-ts**](https://github.com/openwallet-foundation/credo-ts) - Aries Framework JavaScript
 - [**EUDIPLO**](https://github.com/openwallet-foundation-labs/eudiplo) - EUDI Wallet implementation
