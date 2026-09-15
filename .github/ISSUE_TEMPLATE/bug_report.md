@@ -17,6 +17,7 @@ Which package(s) does this affect?
 - [ ] `@owf/identity-common`
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
+- [ ] `@owf/mdoc`
 - [ ] Other: _____________
 
 ## To Reproduce

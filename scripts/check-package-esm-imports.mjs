@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readdir, readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -45,6 +46,7 @@ async function getWorkspacePackages() {
     packages.push({
       name: packageJson.name,
       esmEntry: join(packagesDir, entry.name, esmEntry.replace(/^\.\//, '')),
+      packageJsonPath,
     })
   }
 
@@ -55,17 +57,26 @@ async function main() {
   const packages = await getWorkspacePackages()
   const failures = []
 
-  for (const { name, esmEntry } of packages) {
+  for (const { name, esmEntry, packageJsonPath } of packages) {
     try {
       await import(pathToFileURL(esmEntry).href)
       console.log(`ESM import ok: ${name}`)
     } catch (error) {
       failures.push({ packageName: name, error })
     }
+
+    // Require the package by its own name, so the `exports` of the package are resolved. For ESM-only
+    // packages this loads the ESM build through `require(esm)`, which fails for instance on top-level await.
+    try {
+      createRequire(packageJsonPath)(name)
+      console.log(`require ok: ${name}`)
+    } catch (error) {
+      failures.push({ packageName: name, error })
+    }
   }
 
   if (failures.length > 0) {
-    console.error('\nESM import validation failed:')
+    console.error('\nESM import or require validation failed:')
     for (const { packageName, error } of failures) {
       console.error(`\n${packageName}`)
       console.error(error)
@@ -73,7 +84,7 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(`\nESM import validation passed for ${packages.length} package(s).`)
+  console.log(`\nESM import and require validation passed for ${packages.length} package(s).`)
 }
 
 main().catch((error) => {

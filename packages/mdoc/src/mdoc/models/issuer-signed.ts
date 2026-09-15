@@ -1,0 +1,212 @@
+import { CborStructure, TypedMap, typedMap } from '@owf/cose'
+import { base64url } from '@owf/identity-common'
+import { z } from 'zod'
+import type { MdocContext } from '../../context'
+import { defaultVerificationCallback, onCategoryCheck, type VerificationCallback } from '../check-callback'
+import { IssuerAuth, type IssuerAuthEncodedStructure, type IssuerAuthVerificationResult } from './issuer-auth'
+import { IssuerNamespaces, type IssuerNamespacesEncodedStructure } from './issuer-namespaces'
+import type { IssuerSignedItem } from './issuer-signed-item'
+import type { Namespace } from './namespace'
+
+// 18013-5 8.3.2.1.2.2: `nameSpaces` is optional, and left out when no issuer-signed element is
+// disclosed, as `IssuerNameSpaces` must have at least one namespace.
+const issuerSignedSchema = typedMap([
+  ['nameSpaces', z.instanceof(IssuerNamespaces).exactOptional()],
+  ['issuerAuth', z.instanceof(IssuerAuth)],
+])
+
+export type IssuerSignedDecodedStructure = z.output<typeof issuerSignedSchema>
+export type IssuerSignedEncodedStructure = z.input<typeof issuerSignedSchema>
+
+export type IssuerSignedOptions = {
+  issuerNamespaces?: IssuerNamespaces
+  issuerAuth: IssuerAuth
+}
+
+export type IssuerSignedVerificationResult = IssuerAuthVerificationResult
+
+export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, IssuerSignedDecodedStructure> {
+  public static override get encodingSchema() {
+    return z.codec(issuerSignedSchema.in, issuerSignedSchema.out, {
+      decode: (input) => {
+        const map: IssuerSignedDecodedStructure = TypedMap.fromMap(input)
+
+        // Need to transform namespace into class type
+        if (input.has('nameSpaces')) {
+          map.set(
+            'nameSpaces',
+            IssuerNamespaces.fromEncodedStructure(input.get('nameSpaces') as IssuerNamespacesEncodedStructure)
+          )
+        }
+
+        // Need to transform namespace into class type
+        map.set('issuerAuth', IssuerAuth.fromEncodedStructure(input.get('issuerAuth') as IssuerAuthEncodedStructure))
+
+        return map
+      },
+      encode: (output) => {
+        const map = output.toMap() as Map<unknown, unknown>
+        const nameSpaces = output.get('nameSpaces')
+        if (nameSpaces !== undefined) map.set('nameSpaces', nameSpaces.encodedStructure)
+        map.set('issuerAuth', output.get('issuerAuth').encodedStructure)
+
+        return map
+      },
+    })
+  }
+
+  public get issuerNamespaces() {
+    return this.structure.get('nameSpaces')
+  }
+
+  public get issuerAuth() {
+    return this.structure.get('issuerAuth')
+  }
+
+  public getIssuerNamespace(namespace: Namespace) {
+    return this.issuerNamespaces?.getIssuerNamespace(namespace)
+  }
+
+  public getPrettyClaims(namespace: Namespace) {
+    const issuerSignedItems = this.getIssuerNamespace(namespace)
+    if (!issuerSignedItems) return undefined
+
+    return Object.fromEntries(issuerSignedItems.map((item) => [item.elementIdentifier, item.elementValue]))
+  }
+
+  public get encodedForOid4Vci() {
+    return base64url.encode(this.encode())
+  }
+
+  public static fromEncodedForOid4Vci(encoded: string): IssuerSigned {
+    // biome-ignore lint/complexity/noThisInStatic: this.decode is intentional for subclass support
+    return this.decode(base64url.decode(encoded)) as IssuerSigned
+  }
+
+  public async verify(
+    options: {
+      verificationCallback?: VerificationCallback
+      now?: Date
+      trustedCertificates?: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
+      disableCertificateChainValidation?: boolean
+      disableStatusValidation?: boolean
+      skewSeconds?: number
+    },
+    ctx: Pick<MdocContext, 'x509' | 'crypto' | 'cose' | 'fetch'>
+  ): Promise<IssuerSignedVerificationResult> {
+    const { valueDigests, digestAlgorithm } = this.issuerAuth.mobileSecurityObject
+
+    const onCheck = onCategoryCheck(options.verificationCallback ?? defaultVerificationCallback, 'DATA_INTEGRITY')
+
+    onCheck({
+      status: digestAlgorithm ? 'PASSED' : 'FAILED',
+      check: 'Issuer Auth must include a supported digestAlgorithm element',
+    })
+
+    // Verify the issuer auth
+    const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
+      await this.issuerAuth.verify(options, ctx)
+
+    const namespaces = this.issuerNamespaces?.issuerNamespaces ?? new Map<string, IssuerSignedItem[]>()
+
+    await Promise.all(
+      Array.from(namespaces.entries()).map(async ([ns, nsItems]) => {
+        onCheck({
+          status: valueDigests?.valueDigests.has(ns) ? 'PASSED' : 'FAILED',
+          check: `Issuer Auth must include digests for namespace: ${ns}`,
+        })
+
+        // 18013-5 8.3.2.1.2.2: the mdoc shall not include two or more IssuerSignedItem elements with
+        // the same element identifier in a single namespace and document.
+        const elementIdentifiers = nsItems.map((item) => item.elementIdentifier)
+        const duplicates = new Set(elementIdentifiers.filter((id, index) => elementIdentifiers.indexOf(id) !== index))
+        onCheck({
+          status: duplicates.size === 0 ? 'PASSED' : 'FAILED',
+          check: `Namespace ${ns} must not include multiple elements with the same element identifier`,
+          reason: duplicates.size
+            ? `Namespace ${ns} includes multiple elements for ${Array.from(duplicates)
+                .map((id) => `'${id}'`)
+                .join(', ')}`
+            : undefined,
+        })
+
+        const verifications = await Promise.all(
+          nsItems.map(async (ev) => {
+            const isValid = await ev.isValid(ns, this.issuerAuth, ctx)
+            return { ev, ns, isValid }
+          })
+        )
+
+        for (const verification of verifications.filter((v) => v.isValid)) {
+          onCheck({
+            status: 'PASSED',
+            check: `The calculated digest for ${ns}/${verification.ev.elementIdentifier} attribute must match the digest in the issuerAuth element`,
+          })
+        }
+
+        for (const verification of verifications.filter((v) => !v.isValid)) {
+          onCheck({
+            status: 'FAILED',
+            check: `The calculated digest for ${ns}/${verification.ev.elementIdentifier} attribute must match the digest in the issuerAuth element`,
+          })
+        }
+
+        if (ns === 'org.iso.18013.5.1') {
+          const certificateData = await ctx.x509.getCertificateData({
+            certificate: this.issuerAuth.certificate,
+          })
+          if (!certificateData.issuerName) {
+            onCheck({
+              status: 'FAILED',
+              check:
+                "The 'issuing_country' if present must match the 'countryName' in the subject field within the DS certificate",
+              reason:
+                "The 'issuing_country' and 'issuing_jurisdiction' cannot be verified because the DS certificate was not provided",
+            })
+          } else {
+            const invalidCountry = verifications
+              .filter((v) => v.ns === ns && v.ev.elementIdentifier === 'issuing_country')
+              .find((v) => !v.isValid || !v.ev.matchCertificate(this.issuerAuth, ctx))
+
+            onCheck({
+              status: invalidCountry ? 'FAILED' : 'PASSED',
+              check:
+                "The 'issuing_country' if present must match the 'countryName' in the subject field within the DS certificate",
+              reason: invalidCountry
+                ? `The 'issuing_country' (${invalidCountry.ev.elementValue}) must match the 'countryName' (${this.issuerAuth.getIssuingCountry(ctx)}) in the subject field within the issuer certificate`
+                : undefined,
+            })
+
+            const invalidJurisdiction = verifications
+              .filter((v) => v.ns === ns && v.ev.elementIdentifier === 'issuing_jurisdiction')
+              .find((v) => !v.isValid || !v.ev.matchCertificate(this.issuerAuth, ctx))
+
+            onCheck({
+              status: invalidJurisdiction ? 'FAILED' : 'PASSED',
+              check:
+                "The 'issuing_jurisdiction' if present must match the 'stateOrProvinceName' in the subject field within the DS certificate",
+              reason: invalidJurisdiction
+                ? `The 'issuing_jurisdiction' (${invalidJurisdiction.ev.elementValue}) must match the 'stateOrProvinceName' (${this.issuerAuth.getIssuingStateOrProvince(ctx)}) in the subject field within the issuer certificate`
+                : undefined,
+            })
+          }
+        }
+      })
+    )
+
+    return { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain }
+  }
+
+  public static create(options: IssuerSignedOptions): IssuerSigned {
+    const map: IssuerSignedDecodedStructure = new TypedMap([])
+
+    if (options.issuerNamespaces) {
+      map.set('nameSpaces', options.issuerNamespaces)
+    }
+
+    map.set('issuerAuth', options.issuerAuth)
+
+    // biome-ignore lint/complexity/noThisInStatic: this.fromDecodedStructure is intentional for subclass support
+    return this.fromDecodedStructure(map)
+  }
+}

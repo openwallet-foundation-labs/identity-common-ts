@@ -1,4 +1,4 @@
-import { DeviceSignedItems } from '@owf/mdoc'
+import { DeviceNamespaces, DeviceSignedItems } from '@owf/mdoc'
 import { beforeEach, expect, suite, test, vi } from 'vitest'
 import { createMdocDeviceResponse } from '../mdoc'
 import { AuthenticationMethodsReferences } from '../responseClaims'
@@ -20,9 +20,7 @@ suite('createMdocDeviceResponse', () => {
     mockGetRandomValues.mockClear()
 
     // Create a mock MDOC document with the required structure
-    const deviceNamespaces = {
-      deviceNamespaces: new Map(),
-    }
+    const deviceNamespaces = DeviceNamespaces.create({ deviceNamespaces: new Map() })
 
     mockMdoc = {
       deviceSigned: {
@@ -68,16 +66,24 @@ suite('createMdocDeviceResponse', () => {
     })
   })
 
+  test('encodes the SCA device namespace when the device namespaces were decoded', async () => {
+    // A decoded structure encodes with the bytes it was decoded from until it is modified
+    mockMdoc.deviceSigned.deviceNamespaces = DeviceNamespaces.decode(
+      DeviceNamespaces.create({ deviceNamespaces: new Map() }).encode()
+    )
+
+    const result = await createMdocDeviceResponse(baseOptions, mockCtx)
+    const encodedDeviceNamespaces = DeviceNamespaces.decode(result.deviceSigned.deviceNamespaces.encode())
+
+    expect(encodedDeviceNamespaces.getDeviceNamespace('eu.europa.ec.eudi.sca.1')?.deviceSignedItems.get('jti')).toEqual(
+      'AQID'
+    )
+  })
+
   test('throws error when device namespace key already exists', async () => {
     // Add the SCA namespace to the mdoc first
-    const existingDeviceSignedItems = new DeviceSignedItems(
-      new Map(
-        Object.entries({
-          existing: 'data',
-        })
-      )
-    )
-    mockMdoc.deviceSigned.deviceNamespaces.deviceNamespaces.set('eu.europa.ec.eudi.sca.1', existingDeviceSignedItems)
+    const existingDeviceSignedItems = DeviceSignedItems.create({ deviceSignedItems: new Map([['existing', 'data']]) })
+    mockMdoc.deviceSigned.deviceNamespaces.setDeviceNamespace('eu.europa.ec.eudi.sca.1', existingDeviceSignedItems)
 
     await expect(createMdocDeviceResponse(baseOptions, mockCtx)).rejects.toThrow(
       "Device namespace key 'eu.europa.ec.eudi.sca.1' has already been set on the device namespaces"

@@ -12,16 +12,18 @@ export const createMdocDeviceResponse = async (
   options: CreateMdocDeviceResponseOptions,
   ctx: { hasher: Hasher; getRandomValues: (length: number) => Uint8Array }
 ) => {
-  if (options.mdoc.deviceSigned.deviceNamespaces.deviceNamespaces.has(DEVICE_NAMESPACE_KEY)) {
+  const deviceNamespaces = options.mdoc.deviceSigned.deviceNamespaces
+  if (deviceNamespaces.getDeviceNamespace(DEVICE_NAMESPACE_KEY)) {
     throw new Error(`Device namespace key '${DEVICE_NAMESPACE_KEY}' has already been set on the device namespaces`)
   }
 
   const responseClaims = await createResponseClaims(options, ctx)
 
-  const scaDeviceSigneditems = new DeviceSignedItems(new Map(Object.entries(responseClaims)))
+  const scaDeviceSignedItems = DeviceSignedItems.create({ deviceSignedItems: new Map(Object.entries(responseClaims)) })
 
   // TODO: we need to sign this?
-  options.mdoc.deviceSigned.deviceNamespaces.deviceNamespaces.set(DEVICE_NAMESPACE_KEY, scaDeviceSigneditems)
+  // `setDeviceNamespace` drops the bytes the device namespaces were decoded from, so the namespace is encoded
+  deviceNamespaces.setDeviceNamespace(DEVICE_NAMESPACE_KEY, scaDeviceSignedItems)
 
   return options.mdoc
 }

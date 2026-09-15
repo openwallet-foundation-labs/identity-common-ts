@@ -1,0 +1,1612 @@
+import 'reflect-metadata'
+import { MediaTypes, StatusList, StatusListCwt, StatusListInfo, StatusType } from '@owf/token-status-list'
+import { X509Certificate } from '@peculiar/x509'
+import nock from 'nock'
+import { expect, suite, test, vi } from 'vitest'
+import z from 'zod'
+import {
+  CoseKey,
+  DeviceKey,
+  DeviceRequest,
+  DeviceResponse,
+  DocRequest,
+  Holder,
+  IdentifierList,
+  IdentifierListCwt,
+  MediaTypes as IdentifierListMediaTypes,
+  Issuer,
+  IssuerSigned,
+  ItemsRequest,
+  ProtectedHeaders,
+  RegisteredCwtHeaderClaimKey,
+  SessionTranscript,
+  SignatureAlgorithm,
+  Status,
+  //StatusListInfo,
+  Verifier,
+} from '../..'
+import { Handover } from '../../mdoc/models/handover'
+import {
+  DEVICE_JWK_PRIVATE,
+  DEVICE_JWK_PUBLIC,
+  INVALID_CERTIFICATE,
+  ISSUER_CERTIFICATE,
+  ISSUER_PRIVATE_KEY_JWK,
+} from '../config'
+import { mdocContext } from '../context'
+
+const signed = new Date('2023-10-24T14:55:18Z')
+const validFrom = new Date(signed)
+validFrom.setMinutes(signed.getMinutes() + 5)
+const validUntil = new Date(signed)
+validUntil.setFullYear(signed.getFullYear() + 30)
+
+const validTrustedCertificates = [
+  {
+    issuance: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+    status: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+  },
+]
+
+const invalidTrustedCertificates = [
+  {
+    issuance: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+    status: [new Uint8Array(new X509Certificate(INVALID_CERTIFICATE).rawData)],
+  },
+]
+
+const emptyTrustedCertificates = [
+  {
+    issuance: [],
+    status: [],
+  },
+]
+
+const emptyStatusTrustedCertificates = [
+  {
+    issuance: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+    status: [],
+  },
+]
+
+suite('Verification', () => {
+  test('Verify simple mdoc', async () => {
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: {
+              'org.iso.18013.5.1.mDL': {
+                first_name: true,
+                last_name: true,
+              },
+            },
+          }),
+        }),
+      ],
+    })
+
+    const fakeSessionTranscript = await SessionTranscript.forOid4Vp(
+      {
+        clientId: 'my-client-id',
+        responseUri: 'my-response-uri.com',
+        nonce: 'my-random-nonce',
+      },
+      mdocContext
+    )
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript: fakeSessionTranscript,
+        documents: [
+          {
+            issuerSigned: credential,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    const encodedDeviceResponse = deviceResponse.encodedForOid4Vp
+
+    // openid4vp protocol
+
+    const decodedDeviceResponse = DeviceResponse.fromEncodedForOid4Vp(encodedDeviceResponse)
+
+    const result = await Verifier.verifyDeviceResponse(
+      {
+        deviceRequest,
+        deviceResponse: decodedDeviceResponse,
+        sessionTranscript: fakeSessionTranscript,
+        trustedCertificates: validTrustedCertificates,
+      },
+      mdocContext
+    )
+
+    expect(result.documents).toHaveLength(1)
+    const [
+      {
+        document,
+        trustedIssuanceChain,
+        statusList,
+        trustedStatusListChain,
+        identifierList,
+        trustedIdentifierListChain,
+      },
+    ] = result.documents
+    expect(document).toBeDefined()
+    expect(trustedIssuanceChain).toHaveLength(1)
+    expect(trustedIssuanceChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
+    expect(statusList).toBeUndefined()
+    expect(trustedStatusListChain).toBeUndefined()
+    expect(identifierList).toBeUndefined()
+    expect(trustedIdentifierListChain).toBeUndefined()
+  })
+
+  test('Verify mdoc with selective disclosure', async () => {
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      middle_name: 'Middle',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: {
+              'org.iso.18013.5.1.mDL': {
+                first_name: true,
+                last_name: true,
+              },
+            },
+          }),
+        }),
+      ],
+    })
+
+    const fakeSessionTranscript = await SessionTranscript.forOid4Vp(
+      {
+        clientId: 'my-client-id',
+        responseUri: 'my-response-uri.com',
+        nonce: 'my-random-nonce',
+      },
+      mdocContext
+    )
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript: fakeSessionTranscript,
+        documents: [
+          {
+            issuerSigned: credential,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    expect(deviceResponse.documents?.[0].issuerSigned.getPrettyClaims('org.iso.18013.5.1.mDL')).toMatchObject({
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const encodedDeviceResponse = deviceResponse.encodedForOid4Vp
+
+    // openid4vp protocol
+
+    const decodedDeviceResponse = DeviceResponse.fromEncodedForOid4Vp(encodedDeviceResponse)
+
+    await expect(
+      Verifier.verifyDeviceResponse(
+        {
+          deviceRequest,
+          deviceResponse: decodedDeviceResponse,
+          sessionTranscript: fakeSessionTranscript,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+  })
+
+  test('Verify with custom session transcript', async () => {
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: {
+              'org.iso.18013.5.1.mDL': {
+                first_name: true,
+                last_name: true,
+              },
+            },
+          }),
+        }),
+      ],
+    })
+
+    class CustomHandover extends Handover<null> {
+      static get encodingSchema() {
+        return z.null()
+      }
+    }
+    const fakeSessionTranscript = SessionTranscript.create({
+      handover: CustomHandover.fromEncodedStructure(null),
+    })
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript: fakeSessionTranscript,
+        documents: [
+          {
+            issuerSigned: credential,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    const encodedDeviceResponse = deviceResponse.encodedForOid4Vp
+
+    // openid4vp protocol
+
+    const decodedDeviceResponse = DeviceResponse.fromEncodedForOid4Vp(encodedDeviceResponse)
+
+    await expect(
+      Verifier.verifyDeviceResponse(
+        {
+          deviceRequest,
+          deviceResponse: decodedDeviceResponse,
+          sessionTranscript: fakeSessionTranscript,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+  })
+
+  const issueMdocWithStatus = async (status: {
+    statusList?: { idx: number; uri: string }
+    identifierList?: { id: Uint8Array; uri: string }
+  }) => {
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', { first_name: 'First', last_name: 'Last' })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+      status,
+    })
+
+    return IssuerSigned.fromEncodedForOid4Vci(issuerSigned.encodedForOid4Vci)
+  }
+
+  const verifyIssuerSigned = (credential: IssuerSigned, options: { skewSeconds?: number } = {}) =>
+    Holder.verifyIssuerSigned(
+      { issuerSigned: credential, trustedCertificates: validTrustedCertificates, ...options },
+      mdocContext
+    )
+
+  const signStatusListCwt = async ({
+    uri,
+    idx,
+    status = StatusType.Valid,
+    subject,
+    issuedAt,
+    expirationTime = new Date(Date.now() + 3_600_000),
+  }: {
+    uri: string
+    idx: number
+    status?: StatusType
+    subject?: string
+    issuedAt?: Date
+    /** `null` omits the claim; absent uses the conformant default. */
+    expirationTime?: Date | null
+  }) => {
+    const statusListCwt = new StatusListCwt({
+      payload: {
+        statusList: new StatusList(new Array(10).fill(StatusType.Invalid), 2),
+        subject: subject ?? uri,
+        issuedAt,
+        expirationTime: expirationTime ?? undefined,
+      },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+        ]),
+      }),
+    })
+    statusListCwt.updateStatusList(idx, status)
+
+    return Buffer.from(
+      await statusListCwt.signAndEncode(
+        { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+        { sign: mdocContext.cose.sign1.sign }
+      )
+    )
+  }
+
+  const mockStatusList = async (path: string, options: Omit<Parameters<typeof signStatusListCwt>[0], 'uri'>) => {
+    const uri = `https://example.org${path}`
+
+    nock('https://example.org')
+      .matchHeader('Accept', /application\/statuslist\+cwt/)
+      .persist()
+      .get(path)
+      .reply(200, await signStatusListCwt({ uri, ...options }), { 'Content-Type': MediaTypes.StatusListCwt })
+
+    return uri
+  }
+
+  // Token Status List, made binding by § 12.3.6.1: `sub` shall equal the uri the list was
+  // referenced by.
+  test('Verify mdoc with a status list whose subject does not match the uri it was fetched from', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/wrong-subject', {
+      idx,
+      subject: 'https://example.org/status-list/somewhere-else',
+    })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    await expect(verifyIssuerSigned(credential)).rejects.toThrow(
+      "The 'Subject (2)' claim 'https://example.org/status-list/somewhere-else' does not match the expected value"
+    )
+  })
+
+  // ISO 18013-5 § 12.3.6.3: "The exp claim shall be present." OPTIONAL in the Token Status List
+  // specification, so it is this profile that rejects a list without one.
+  test('Verify mdoc with a status list that has no expiration', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/no-exp', { idx, expirationTime: null })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    await expect(verifyIssuerSigned(credential)).rejects.toThrow(
+      "The token has no 'ExpirationTime (4)' claim, which is required"
+    )
+  })
+
+  test('Verify mdoc with a status list that expired within the allowed skew', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/skew', { idx, expirationTime: new Date(Date.now() - 10_000) })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    // Default skew is 30 seconds, so a list that expired 10 seconds ago is still accepted...
+    await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
+    // ...but not once the caller narrows the tolerance.
+    await expect(verifyIssuerSigned(credential, { skewSeconds: 1 })).rejects.toThrow('is in the past')
+  })
+
+  test('Verify mdoc with a revoked entry in a status list', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/revoked', { idx, status: StatusType.Invalid })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    await expect(verifyIssuerSigned(credential)).rejects.toThrow(
+      `Status for id '${idx}' is not Valid (0), but is instead '1'`
+    )
+  })
+
+  const signIdentifierListCwt = async ({
+    uri,
+    identifiers,
+    subject,
+    issuedAt,
+    expirationTime = new Date(Date.now() + 3_600_000),
+  }: {
+    uri: string
+    identifiers: Array<Uint8Array>
+    subject?: string
+    issuedAt?: Date
+    expirationTime?: Date
+  }) => {
+    const identifierListCwt = new IdentifierListCwt({
+      payload: {
+        identifierList: IdentifierList.create({ identifiers }),
+        uri: subject ?? uri,
+        issuedAt,
+        expirationTime,
+      },
+      // `typ` is defaulted to the identifier list media type, so only the x5chain
+      // § 12.3.6.3 requires and the algorithm have to be supplied.
+      protectedHeaders: new Map<number, unknown>([
+        [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+        [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+      ]),
+    })
+
+    return Buffer.from(
+      await identifierListCwt.signAndEncode(
+        { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+        { sign: mdocContext.cose.sign1.sign }
+      )
+    )
+  }
+
+  const mockIdentifierList = async (
+    path: string,
+    options: Omit<Parameters<typeof signIdentifierListCwt>[0], 'uri'>
+  ) => {
+    const uri = `https://example.org${path}`
+
+    nock('https://example.org')
+      .matchHeader('Accept', IdentifierListMediaTypes.IdentifierListCwt)
+      .persist()
+      .get(path)
+      .reply(200, await signIdentifierListCwt({ uri, ...options }), {
+        'Content-Type': IdentifierListMediaTypes.IdentifierListCwt,
+      })
+
+    return uri
+  }
+
+  // ISO 18013-5 § 12.3.6.4: the list enumerates revoked identifiers, so an MSO whose own
+  // identifier is absent from it is valid.
+  test('Verify mdoc with an identifier list that does not carry its identifier', async () => {
+    const id = new Uint8Array([0xab, 0xcd])
+    const uri = await mockIdentifierList('/identifier-list/valid', { identifiers: [new Uint8Array([0x01])] })
+
+    const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+
+    await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
+  })
+
+  // A fetch that records the URIs it is asked for, so a test can assert no revocation list was requested.
+  const recordingContext = () => {
+    const requestedUris: string[] = []
+    const ctx = {
+      ...mdocContext,
+      fetch: (async (input: Parameters<typeof fetch>[0]) => {
+        requestedUris.push(String(input))
+        throw new Error('The revocation list must not be fetched')
+      }) as typeof fetch,
+    }
+    return { ctx, requestedUris }
+  }
+
+  test('Verify mdoc with a status list does not fetch the list without trusted status certificates', async () => {
+    const credential = await issueMdocWithStatus({
+      statusList: { idx: 3, uri: 'https://example.org/status-list/no-trusted-status-certificates' },
+    })
+    const { ctx, requestedUris } = recordingContext()
+
+    await expect(
+      Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates: emptyStatusTrustedCertificates }, ctx)
+    ).rejects.toThrow('Atleast one certificate is required to check the status of the mdoc')
+    expect(requestedUris).toEqual([])
+  })
+
+  test('Verify mdoc with a status list does not fetch the list when the issuer signature is invalid', async () => {
+    const credential = await issueMdocWithStatus({
+      statusList: { idx: 3, uri: 'https://example.org/status-list/forged-mso' },
+    })
+    const { ctx, requestedUris } = recordingContext()
+    const verificationCallback = vi.fn()
+
+    await Holder.verifyIssuerSigned(
+      { issuerSigned: credential, trustedCertificates: validTrustedCertificates, verificationCallback },
+      { ...ctx, cose: { ...ctx.cose, sign1: { ...ctx.cose.sign1, verify: async () => false } } }
+    )
+
+    expect(requestedUris).toEqual([])
+    expect(verificationCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'FAILED', check: 'Issuer auth signature is invalid' })
+    )
+  })
+
+  // Disabling certificate chain validation also applies to the signer of a revocation list, but the
+  // revocation status itself is still checked.
+  const verifyWithoutChainValidation = (credential: IssuerSigned) =>
+    Holder.verifyIssuerSigned(
+      { issuerSigned: credential, trustedCertificates: [], disableCertificateChainValidation: true },
+      mdocContext
+    )
+
+  test('Verify mdoc with a status list without certificate chain validation', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/no-chain-validation', { idx })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    const { statusList, trustedStatusListChain } = await verifyWithoutChainValidation(credential)
+    expect(statusList).toBeDefined()
+    expect(trustedStatusListChain).toBeUndefined()
+  })
+
+  test('Verify mdoc with a revoked entry in a status list without certificate chain validation', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/no-chain-validation-revoked', { idx, status: StatusType.Invalid })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    await expect(verifyWithoutChainValidation(credential)).rejects.toThrow(
+      `Status for id '${idx}' is not Valid (0), but is instead '1'`
+    )
+  })
+
+  test('Verify mdoc with an identifier list that carries its identifier without certificate chain validation', async () => {
+    const id = new Uint8Array([0xab, 0xcd])
+    const uri = await mockIdentifierList('/identifier-list/no-chain-validation-revoked', { identifiers: [id] })
+
+    const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+
+    await expect(verifyWithoutChainValidation(credential)).rejects.toThrow(
+      `Identifier abcd found in the revoked identifier list at '${uri}'`
+    )
+  })
+
+  test('Verify mdoc with an identifier list that carries its identifier', async () => {
+    const id = new Uint8Array([0xab, 0xcd])
+    const uri = await mockIdentifierList('/identifier-list/revoked', { identifiers: [id] })
+
+    const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+
+    await expect(verifyIssuerSigned(credential)).rejects.toThrow(
+      `Identifier abcd found in the revoked identifier list at '${uri}'`
+    )
+  })
+
+  // Token Status List, made binding on both mechanisms by § 12.3.6.1: `sub` shall equal the
+  // uri the list was referenced by.
+  test('Verify mdoc with an identifier list whose subject does not match the uri it was fetched from', async () => {
+    const id = new Uint8Array([0xab, 0xcd])
+    const uri = await mockIdentifierList('/identifier-list/wrong-subject', {
+      identifiers: [],
+      subject: 'https://example.org/identifier-list/somewhere-else',
+    })
+
+    const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+
+    await expect(verifyIssuerSigned(credential)).rejects.toThrow(
+      "The 'Subject (2)' claim 'https://example.org/identifier-list/somewhere-else' does not match the expected value"
+    )
+  })
+
+  test('Verify mdoc with an identifier list that expired within the allowed skew', async () => {
+    const id = new Uint8Array([0xab, 0xcd])
+    const uri = await mockIdentifierList('/identifier-list/skew', {
+      identifiers: [],
+      expirationTime: new Date(Date.now() - 10_000),
+    })
+
+    const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+
+    // Default skew is 30 seconds, so a list that expired 10 seconds ago is still accepted...
+    await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
+    // ...but not once the caller narrows the tolerance.
+    await expect(verifyIssuerSigned(credential, { skewSeconds: 1 })).rejects.toThrow('is in the past')
+  })
+
+  // Token Status List § 8.2, applied to the identifier list media type by § 12.3.6.4.
+  test('Verify mdoc with an identifier list served as another media type', async () => {
+    const id = new Uint8Array([0xab, 0xcd])
+    const uri = 'https://example.org/identifier-list/wrong-content-type'
+
+    nock('https://example.org')
+      .persist()
+      .get('/identifier-list/wrong-content-type')
+      .reply(200, await signIdentifierListCwt({ uri, identifiers: [] }), { 'Content-Type': MediaTypes.StatusListCwt })
+
+    const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+
+    await expect(verifyIssuerSigned(credential)).rejects.toThrow(
+      `Identifier list at ${uri} was served as 'application/statuslist+cwt', expected 'application/identifierlist+cwt'`
+    )
+  })
+
+  test('Verify mdoc with status status_list check', async () => {
+    const idx = 3
+    const uri = 'https://example.org/status-list/10'
+    const statusList = new StatusList(new Array(10).fill(StatusType.Invalid), 2)
+    const statusListCwt = new StatusListCwt({
+      payload: { statusList, subject: uri, expirationTime: new Date(Date.now() + 60 * 60 * 1000) },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+        ]),
+      }),
+    })
+    statusListCwt.updateStatusList(idx, StatusType.Valid)
+    const encodedCwt = await statusListCwt.signAndEncode(
+      { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+      { sign: mdocContext.cose.sign1.sign }
+    )
+
+    nock('https://example.org')
+      .matchHeader('Accept', /application\/statuslist\+cwt/)
+      .persist()
+      .get('/status-list/10')
+      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+      status: { statusList: { idx: 3, uri } },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: {
+              'org.iso.18013.5.1.mDL': {
+                first_name: true,
+                last_name: true,
+              },
+            },
+          }),
+        }),
+      ],
+    })
+
+    const fakeSessionTranscript = await SessionTranscript.forOid4Vp(
+      {
+        clientId: 'my-client-id',
+        responseUri: 'my-response-uri.com',
+        nonce: 'my-random-nonce',
+      },
+      mdocContext
+    )
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript: fakeSessionTranscript,
+        documents: [
+          {
+            issuerSigned: credential,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    const encodedDeviceResponse = deviceResponse.encodedForOid4Vp
+
+    // openid4vp protocol
+
+    const decodedDeviceResponse = DeviceResponse.fromEncodedForOid4Vp(encodedDeviceResponse)
+
+    const result = await Verifier.verifyDeviceResponse(
+      {
+        deviceRequest,
+        deviceResponse: decodedDeviceResponse,
+        sessionTranscript: fakeSessionTranscript,
+        trustedCertificates: validTrustedCertificates,
+      },
+      mdocContext
+    )
+
+    expect(result.documents).toHaveLength(1)
+    const [
+      {
+        document,
+        trustedIssuanceChain,
+        statusList: resultStatusList,
+        trustedStatusListChain,
+        identifierList,
+        trustedIdentifierListChain,
+      },
+    ] = result.documents
+    expect(document).toBeDefined()
+    expect(trustedIssuanceChain).toHaveLength(1)
+    expect(trustedIssuanceChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
+    expect(trustedStatusListChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
+    expect(resultStatusList).toBeDefined()
+    expect(identifierList).toBeUndefined()
+    expect(trustedIdentifierListChain).toBeUndefined()
+  })
+
+  test('Verify mdoc with status status_list check with trusted certificates', async () => {
+    const idx = 3
+    const uri = 'https://example.org/status-list/10'
+    const statusList = new StatusList(new Array(10).fill(StatusType.Invalid), 2)
+    const statusListCwt = new StatusListCwt({
+      payload: { statusList, subject: uri, expirationTime: new Date(Date.now() + 60 * 60 * 1000) },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+        ]),
+      }),
+    })
+    statusListCwt.updateStatusList(idx, StatusType.Valid)
+    const encodedCwt = await statusListCwt.signAndEncode(
+      { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+      { sign: mdocContext.cose.sign1.sign }
+    )
+
+    nock('https://example.org')
+      .matchHeader('Accept', /application\/statuslist\+cwt/)
+      .persist()
+      .get('/status-list/10')
+      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+      status: { statusList: { idx: 3, uri } },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: {
+              'org.iso.18013.5.1.mDL': {
+                first_name: true,
+                last_name: true,
+              },
+            },
+          }),
+        }),
+      ],
+    })
+
+    const fakeSessionTranscript = await SessionTranscript.forOid4Vp(
+      {
+        clientId: 'my-client-id',
+        responseUri: 'my-response-uri.com',
+        nonce: 'my-random-nonce',
+      },
+      mdocContext
+    )
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript: fakeSessionTranscript,
+        documents: [
+          {
+            issuerSigned: credential,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    const encodedDeviceResponse = deviceResponse.encodedForOid4Vp
+
+    // openid4vp protocol
+
+    const decodedDeviceResponse = DeviceResponse.fromEncodedForOid4Vp(encodedDeviceResponse)
+
+    await Verifier.verifyDeviceResponse(
+      {
+        deviceRequest,
+        deviceResponse: decodedDeviceResponse,
+        sessionTranscript: fakeSessionTranscript,
+        trustedCertificates: validTrustedCertificates,
+      },
+      mdocContext
+    )
+  })
+
+  test('Verify mdoc with status status_list invalid status list format of JWT', async () => {
+    const idx = 3
+    const uri = 'https://example.org/status-list/30'
+    const statusList = new StatusList(new Array(10).fill(StatusType.Invalid), 2)
+    const statusListCwt = new StatusListCwt({
+      payload: { statusList, subject: uri, expirationTime: new Date(Date.now() + 60 * 60 * 1000) },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+        ]),
+      }),
+    })
+    statusListCwt.updateStatusList(idx, StatusType.Valid)
+    nock('https://example.org')
+      .matchHeader('Accept', /application\/statuslist\+cwt/)
+      .persist()
+      .get('/status-list/30')
+      .reply(200, 'invalid-jwt', { 'Content-Type': MediaTypes.StatusListJwt })
+
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+      status: { statusList: { idx: 3, uri } },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).rejects.toThrow(`The status list at ${uri} was served in JWT format`)
+  })
+
+  test('Verify mdoc with status invalid no trusted certificates supplied', async () => {
+    const idx = 3
+    const uri = 'https://example.org/status-list/40'
+    const statusList = new StatusList(new Array(10).fill(StatusType.Invalid), 2)
+    const statusListCwt = new StatusListCwt({
+      payload: { statusList, subject: uri, expirationTime: new Date(Date.now() + 60 * 60 * 1000) },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+        ]),
+      }),
+    })
+    statusListCwt.updateStatusList(idx, StatusType.Valid)
+    const encodedCwt = await statusListCwt.signAndEncode(
+      { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+      { sign: mdocContext.cose.sign1.sign }
+    )
+    nock('https://example.org')
+      .matchHeader('Accept', /application\/statuslist\+cwt/)
+      .persist()
+      .get('/status-list/40')
+      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+      status: { statusList: { idx: 3, uri } },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: emptyTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).rejects.toThrow('No trusted certificate was found while validating the X.509 chain')
+  })
+
+  test('Verify mdoc with status status_list invalid no trusted status certificates supplied', async () => {
+    const idx = 3
+    const uri = 'https://example.org/status-list/40'
+    const statusList = new StatusList(new Array(10).fill(StatusType.Invalid), 2)
+    const statusListCwt = new StatusListCwt({
+      payload: { statusList, subject: uri, expirationTime: new Date(Date.now() + 60 * 60 * 1000) },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+        ]),
+      }),
+    })
+    statusListCwt.updateStatusList(idx, StatusType.Valid)
+    const encodedCwt = await statusListCwt.signAndEncode(
+      { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+      { sign: mdocContext.cose.sign1.sign }
+    )
+    nock('https://example.org')
+      .matchHeader('Accept', /application\/statuslist\+cwt/)
+      .persist()
+      .get('/status-list/40')
+      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+      status: { statusList: { idx: 3, uri } },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: emptyStatusTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).rejects.toThrow(
+      'Atleast one certificate is required to check the status of the mdoc. Make sure to supply them in the `trustedStatusCertificates` option'
+    )
+  })
+
+  test('Verify mdoc with status status_list check with invalid trusted certificates', async () => {
+    const idx = 3
+    const uri = 'https://example.org/status-list/10'
+    const statusList = new StatusList(new Array(10).fill(StatusType.Invalid), 2)
+    const statusListCwt = new StatusListCwt({
+      payload: { statusList, subject: uri, expirationTime: new Date(Date.now() + 60 * 60 * 1000) },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+        ]),
+      }),
+    })
+    statusListCwt.updateStatusList(idx, StatusType.Valid)
+    const encodedCwt = await statusListCwt.signAndEncode(
+      { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+      { sign: mdocContext.cose.sign1.sign }
+    )
+
+    nock('https://example.org')
+      .matchHeader('Accept', /application\/statuslist\+cwt/)
+      .persist()
+      .get('/status-list/10')
+      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+      status: { statusList: { idx: 3, uri } },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: invalidTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).rejects.toThrow('No trusted certificate was found while validating the X.509 chain')
+  })
+
+  test('Verify mdoc with status status_list check while credential is suspended', async () => {
+    const idx = 3
+    const uri = 'https://example.org/status-list/20'
+    const statusList = new StatusList(new Array(10).fill(StatusType.Invalid), 2)
+    const statusListCwt = new StatusListCwt({
+      payload: { statusList, subject: uri, expirationTime: new Date(Date.now() + 60 * 60 * 1000) },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+          [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+        ]),
+      }),
+    })
+    statusListCwt.updateStatusList(idx, StatusType.Suspended)
+    const encodedCwt = await statusListCwt.signAndEncode(
+      { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+      { sign: mdocContext.cose.sign1.sign }
+    )
+
+    nock('https://example.org')
+      .matchHeader('Accept', /application\/statuslist\+cwt/)
+      .persist()
+      .get('/status-list/20')
+      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+      status: { statusList: { idx: 3, uri } },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).rejects.toThrow(`Status for id '3' is not Valid (0), but is instead '2'`)
+  })
+
+  test('Fail to create mdoc with not enough attributes', async () => {
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: {
+              'org.iso.18013.5.1.mDL': {
+                first_name: true,
+                middle_name: true,
+                last_name: true,
+              },
+            },
+          }),
+        }),
+      ],
+    })
+
+    const fakeSessionTranscript = await SessionTranscript.forOid4Vp(
+      {
+        clientId: 'my-client-id',
+        responseUri: 'my-response-uri.com',
+        nonce: 'my-random-nonce',
+      },
+      mdocContext
+    )
+
+    await expect(
+      Holder.createDeviceResponseForDeviceRequest(
+        {
+          deviceRequest,
+          sessionTranscript: fakeSessionTranscript,
+          documents: [
+            {
+              issuerSigned: credential,
+              docRequestIndex: 0,
+              signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+            },
+          ],
+        },
+        mdocContext
+      )
+    ).rejects.toThrow()
+  })
+
+  test('Verify with skewSeconds allows time difference', async () => {
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    // Create a credential that is valid from 5 minutes in the future
+    const now = new Date()
+    const validFromFuture = new Date(now.getTime() + 5 * 60 * 1000) // 5 minutes in future
+    const validUntilFuture = new Date(validFromFuture.getTime() + 30 * 365 * 24 * 60 * 60 * 1000) // 30 years
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom: validFromFuture, validUntil: validUntilFuture },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    // Verification should fail with default skew (30 seconds)
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+          now,
+        },
+        mdocContext
+      )
+    ).rejects.toThrow()
+
+    // Verification should succeed with 10 minutes skew (600 seconds)
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+          now,
+          skewSeconds: 600,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+  })
+
+  test('Fail to verify with not matching device request', async () => {
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', {
+      first_name: 'First',
+      last_name: 'Last',
+    })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+    })
+
+    const encodedIssuerSigned = issuerSigned.encodedForOid4Vci
+
+    // openid4vci protocol
+
+    const credential = IssuerSigned.fromEncodedForOid4Vci(encodedIssuerSigned)
+
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: credential,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: {
+              'org.iso.18013.5.1.mDL': {
+                first_name: true,
+                last_name: true,
+              },
+            },
+          }),
+        }),
+      ],
+    })
+
+    const fakeSessionTranscript = await SessionTranscript.forOid4Vp(
+      {
+        clientId: 'my-client-id',
+        responseUri: 'my-response-uri.com',
+        nonce: 'my-random-nonce',
+      },
+      mdocContext
+    )
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript: fakeSessionTranscript,
+        documents: [
+          {
+            issuerSigned: credential,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    const encodedDeviceResponse = deviceResponse.encodedForOid4Vp
+
+    // openid4vp protocol
+
+    const decodedDeviceResponse = DeviceResponse.fromEncodedForOid4Vp(encodedDeviceResponse)
+
+    const newDeviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: {
+              'org.iso.18013.5.1.mDL': {
+                first_name: true,
+                middle_name: true,
+                last_name: true,
+              },
+            },
+          }),
+        }),
+      ],
+    })
+
+    await expect(
+      Verifier.verifyDeviceResponse(
+        {
+          deviceRequest: newDeviceRequest,
+          deviceResponse: decodedDeviceResponse,
+          sessionTranscript: fakeSessionTranscript,
+          trustedCertificates: validTrustedCertificates,
+        },
+        mdocContext
+      )
+    ).rejects.toThrow()
+  })
+
+  test('Issue mdoc with embedded Status (status_list)', async () => {
+    const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+    issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', { first_name: 'First', last_name: 'Last' })
+
+    const issuerSigned = await issuer.sign({
+      signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      certificates: [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom, validUntil },
+      status: Status.create({
+        statusList: StatusListInfo.create({ uri: 'https://issuer.example/status/1', idx: 42 }),
+      }),
+    })
+
+    // Verify the signed credential still validates end-to-end.
+    await expect(
+      Holder.verifyIssuerSigned(
+        {
+          issuerSigned: IssuerSigned.fromEncodedForOid4Vci(issuerSigned.encodedForOid4Vci),
+          trustedCertificates: validTrustedCertificates,
+          disableStatusValidation: true,
+        },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+
+    // The Status payload survived signing + decode.
+    const mso = issuerSigned.issuerAuth.mobileSecurityObject
+    expect(mso.status).toBeInstanceOf(Status)
+    expect(mso.status?.statusList?.uri).toBe('https://issuer.example/status/1')
+    expect(mso.status?.statusList?.idx).toBe(42)
+  })
+
+  // Regression tests for status-certificate selection across multiple trusted-certificate
+  // entries. After the issuer chain validates, the verifier must pick the `status` certs from
+  // the SAME entry whose `issuance` certs actually anchored the chain — not just the first entry.
+  // A previous `.map()` (instead of `.some()`) always returned a truthy array, so `find()` matched
+  // the first entry unconditionally and the wrong `status` certificates were used. These tests use
+  // more than one entry so the wrong-entry behaviour is observable; with a single entry both
+  // implementations happen to agree.
+  suite('Status certificate selection across multiple trusted certificates', () => {
+    const idx = 3
+    const issuerCert = new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)
+    const otherCert = new Uint8Array(new X509Certificate(INVALID_CERTIFICATE).rawData)
+
+    // Signs a valid status-list CWT (signer = the issuer key, chain = the issuer cert) where the
+    // credential's index is Valid, and serves it from `uri`.
+    const mockValidStatusList = async (uri: string, path: string) => {
+      const statusList = new StatusList(new Array(10).fill(StatusType.Invalid), 2)
+      const statusListCwt = new StatusListCwt({
+        payload: { statusList, subject: uri, expirationTime: new Date(Date.now() + 60 * 60 * 1000) },
+        protectedHeaders: ProtectedHeaders.create({
+          protectedHeaders: new Map<number, unknown>([
+            [RegisteredCwtHeaderClaimKey.X5Chain, [issuerCert]],
+            [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+          ]),
+        }),
+      })
+      statusListCwt.updateStatusList(idx, StatusType.Valid)
+      const encodedCwt = await statusListCwt.signAndEncode(
+        { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+        { sign: mdocContext.cose.sign1.sign }
+      )
+
+      nock('https://example.org')
+        .matchHeader('Accept', /application\/statuslist\+cwt/)
+        .persist()
+        .get(path)
+        .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+    }
+
+    const signCredentialWithStatus = async (uri: string) => {
+      const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
+      issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', { first_name: 'First', last_name: 'Last' })
+
+      const issuerSigned = await issuer.sign({
+        signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+        certificates: [issuerCert],
+        algorithm: SignatureAlgorithm.ES256,
+        digestAlgorithm: 'SHA-256',
+        deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+        validityInfo: { signed, validFrom, validUntil },
+        status: { statusList: { idx, uri } },
+      })
+
+      return IssuerSigned.fromEncodedForOid4Vci(issuerSigned.encodedForOid4Vci)
+    }
+
+    test('selects the status certs from the entry whose issuance anchored the chain (matching entry is not first)', async () => {
+      const uri = 'https://example.org/status-list/50'
+      await mockValidStatusList(uri, '/status-list/50')
+      const credential = await signCredentialWithStatus(uri)
+
+      // The first entry does NOT contain the chain's root in `issuance`, and carries a `status` cert
+      // that cannot verify the status-list CWT. Only the second entry actually anchors the chain and
+      // carries the correct `status` cert. The verifier must skip the first entry and use the second.
+      const trustedCertificates = [
+        { issuance: [otherCert], status: [otherCert] },
+        { issuance: [issuerCert], status: [issuerCert] },
+      ]
+
+      await expect(
+        Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates }, mdocContext)
+      ).resolves.toBeDefined()
+    })
+
+    test('does not borrow status certs from an earlier, non-matching entry', async () => {
+      const uri = 'https://example.org/status-list/51'
+      await mockValidStatusList(uri, '/status-list/51')
+      const credential = await signCredentialWithStatus(uri)
+
+      // Inverse of the test above: the first entry has the correct `status` cert but its `issuance`
+      // does NOT anchor the chain. The matching (second) entry has a `status` cert that cannot verify
+      // the status-list CWT. Selecting by the first entry would wrongly succeed; the matching entry
+      // must be used, so status validation fails.
+      const trustedCertificates = [
+        { issuance: [otherCert], status: [issuerCert] },
+        { issuance: [issuerCert], status: [otherCert] },
+      ]
+
+      await expect(
+        Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates }, mdocContext)
+      ).rejects.toThrow('No trusted certificate was found while validating the X.509 chain')
+    })
+  })
+})

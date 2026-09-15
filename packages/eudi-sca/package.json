@@ -53,7 +53,7 @@
     "@openid4vc/openid4vci": "^0.5.5",
     "@owf/crypto": "workspace:",
     "@owf/identity-common": "workspace:",
-    "@owf/mdoc": "^0.7.0",
+    "@owf/mdoc": "workspace:^",
     "@sd-jwt/core": "workspace:^",
     "zod": "catalog:"
   },

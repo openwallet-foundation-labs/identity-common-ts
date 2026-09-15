@@ -22,6 +22,7 @@ Which package(s) would this feature belong to?
 - [ ] `@owf/eudi-*` (EUDI-specific)
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
+- [ ] `@owf/mdoc`
 - [ ] New package: _____________
 
 ## Problem Statement
