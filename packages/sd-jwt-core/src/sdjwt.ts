@@ -247,7 +247,14 @@ export const pack = async <T extends Record<string, unknown>>(
     for (const key in disclosureFrame) {
       if (key !== SD_DIGEST) {
         const idx = Number.parseInt(key, 10)
-        const packed = await pack(claims[idx], disclosureFrame[idx], hash, saltGenerator, seenSalts, seenDigests)
+        const packed = await pack<Record<string, unknown>>(
+          claims[idx],
+          disclosureFrame[idx] as DisclosureFrame<Record<string, unknown>> | undefined,
+          hash,
+          saltGenerator,
+          seenSalts,
+          seenDigests
+        )
         recursivePackedClaims[idx] = packed.packedClaims
         disclosures.push(...packed.disclosures)
       }

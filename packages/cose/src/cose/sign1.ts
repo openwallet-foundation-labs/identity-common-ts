@@ -169,7 +169,7 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
       // instance based on this (and ensure extended classes work)
       rawStructure instanceof Sign1
         ? rawStructure.decodedStructure
-        : Sign1.fromEncodedStructure(rawStructure as EncodedStructureType<T>).decodedStructure
+        : Sign1.fromEncodedStructure(rawStructure as EncodedStructureType<Sign1>).decodedStructure
     ) as unknown as T
   }
 

@@ -40,6 +40,6 @@
   "devDependencies": {
     "@owf/crypto": "workspace:*",
     "jose": "^6.2.12",
-    "msw": "^2.14.6"
+    "msw": "^2.15.0"
   }
 }

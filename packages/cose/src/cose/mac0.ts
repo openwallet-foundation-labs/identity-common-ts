@@ -159,7 +159,7 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
       // instance based on this (and ensure extended classes work)
       rawStructure instanceof Mac0
         ? rawStructure.decodedStructure
-        : Mac0.fromEncodedStructure(rawStructure as EncodedStructureType<T>).decodedStructure
+        : Mac0.fromEncodedStructure(rawStructure as EncodedStructureType<Mac0>).decodedStructure
     ) as unknown as T
   }
 
