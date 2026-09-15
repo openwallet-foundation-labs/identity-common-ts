@@ -257,7 +257,9 @@ describe('my-package', () => {
 
 ### 7. Update Root Configuration (if needed)
 
-If your package needs to be available in the root `package.json` for testing:
+Dependencies that are only used in tests, examples, or scripts are shared across packages and go in the `devDependencies` of the root `package.json`, not in the package itself. Use [msw](https://mswjs.io) to mock HTTP requests.
+
+If your package needs to be available in the root `package.json` for examples or integration tests:
 
 ```json
 {

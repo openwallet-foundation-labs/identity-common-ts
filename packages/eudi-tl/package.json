@@ -50,9 +50,5 @@
     "xadesjs": "^2.6.8",
     "xpath": "^0.0.34",
     "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@peculiar/x509": "catalog:",
-    "reflect-metadata": "^0.2.2"
   }
 }

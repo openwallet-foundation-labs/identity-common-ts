@@ -43,15 +43,5 @@
     "@owf/identity-common": "workspace:^",
     "@owf/token-status-list": "workspace:^",
     "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@noble/curves": "^2.4.0",
-    "@noble/hashes": "^2.4.0",
-    "@panva/hkdf": "^1.2.1",
-    "@peculiar/x509": "catalog:",
-    "hpke": "^1.1.7",
-    "jose": "^6.2.12",
-    "nock": "^14.0.17",
-    "reflect-metadata": "^0.2.2"
   }
 }

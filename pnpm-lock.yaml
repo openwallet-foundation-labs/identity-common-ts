@@ -6,15 +6,21 @@ settings:
 
 catalogs:
   default:
+    '@noble/curves':
+      specifier: ^2.4.0
+      version: 2.4.0
+    '@noble/hashes':
+      specifier: ^2.4.0
+      version: 2.4.0
     '@peculiar/asn1-schema':
       specifier: ^2.9.4
       version: 2.9.4
     '@peculiar/asn1-x509':
       specifier: ^2.9.4
       version: 2.9.4
-    '@peculiar/x509':
-      specifier: ^2.1.0
-      version: 2.1.0
+    cbor-x:
+      specifier: ^1.6.6
+      version: 1.6.6
     typescript:
       specifier: ~7.0.2
       version: 7.0.2
@@ -35,6 +41,12 @@ importers:
       '@changesets/cli':
         specifier: ^3.0.3
         version: 3.0.3
+      '@noble/curves':
+        specifier: 'catalog:'
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: 'catalog:'
+        version: 2.4.0
       '@owf/crypto':
         specifier: workspace:*
         version: link:packages/crypto
@@ -44,6 +56,12 @@ importers:
       '@owf/token-status-list':
         specifier: workspace:*
         version: link:packages/token-status-list
+      '@panva/hkdf':
+        specifier: ^1.2.1
+        version: 1.2.1
+      '@peculiar/x509':
+        specifier: ^2.1.0
+        version: 2.1.0
       '@sd-jwt/core':
         specifier: workspace:*
         version: link:packages/sd-jwt-core
@@ -53,15 +71,27 @@ importers:
       '@types/node':
         specifier: ^26.5.1
         version: 26.5.1
+      hpke:
+        specifier: ^1.1.7
+        version: 1.1.7
       husky:
         specifier: ^9.1.7
         version: 9.1.7
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
       lint-staged:
         specifier: ^17.5.1
         version: 17.5.1
       markdownlint-cli2:
         specifier: ^0.23.2
         version: 0.23.2
+      msw:
+        specifier: ^2.15.0
+        version: 2.15.0(@types/node@26.5.1)(typescript@7.0.2)
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
       tsdown:
         specifier: 0.23.0
         version: 0.23.0(tsx@4.23.13)(typescript@7.0.2)(unrun@0.2.37)
@@ -81,7 +111,7 @@ importers:
         specifier: workspace:*
         version: link:../identity-common
       cbor-x:
-        specifier: ^1.6.6
+        specifier: 'catalog:'
         version: 1.6.6
       zod:
         specifier: 'catalog:'
@@ -89,24 +119,11 @@ importers:
       zod-validation-error:
         specifier: ^5.0.0
         version: 5.0.0(zod@4.6.5)
-    devDependencies:
-      '@noble/curves':
-        specifier: ^2.4.0
-        version: 2.4.0
-      '@noble/hashes':
-        specifier: ^2.4.0
-        version: 2.4.0
-      '@panva/hkdf':
-        specifier: ^1.2.1
-        version: 1.2.1
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
 
   packages/crypto:
     dependencies:
       '@noble/hashes':
-        specifier: ^2.4.0
+        specifier: 'catalog:'
         version: 2.4.0
       '@owf/identity-common':
         specifier: workspace:*
@@ -168,10 +185,6 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.5
-    devDependencies:
-      nock:
-        specifier: ^14.0.17
-        version: 14.0.17
 
   packages/eudi-tl:
     dependencies:
@@ -196,13 +209,6 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.5
-    devDependencies:
-      '@peculiar/x509':
-        specifier: 'catalog:'
-        version: 2.1.0
-      reflect-metadata:
-        specifier: ^0.2.2
-        version: 0.2.2
 
   packages/eudi-wrprc:
     dependencies:
@@ -235,44 +241,12 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.5
-    devDependencies:
-      '@noble/curves':
-        specifier: ^2.4.0
-        version: 2.4.0
-      '@noble/hashes':
-        specifier: ^2.4.0
-        version: 2.4.0
-      '@panva/hkdf':
-        specifier: ^1.2.1
-        version: 1.2.1
-      '@peculiar/x509':
-        specifier: 'catalog:'
-        version: 2.1.0
-      hpke:
-        specifier: ^1.1.7
-        version: 1.1.7
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
-      nock:
-        specifier: ^14.0.17
-        version: 14.0.17
-      reflect-metadata:
-        specifier: ^0.2.2
-        version: 0.2.2
 
   packages/sd-jwt-core:
     dependencies:
       '@owf/identity-common':
         specifier: workspace:^
         version: link:../identity-common
-    devDependencies:
-      '@owf/crypto':
-        specifier: workspace:*
-        version: link:../crypto
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
 
   packages/sd-jwt-vc:
     dependencies:
@@ -288,16 +262,6 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.5
-    devDependencies:
-      '@owf/crypto':
-        specifier: workspace:*
-        version: link:../crypto
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
-      msw:
-        specifier: ^2.15.0
-        version: 2.15.0(@types/node@26.5.1)(typescript@7.0.2)
 
   packages/token-status-list:
     dependencies:
@@ -308,7 +272,7 @@ importers:
         specifier: workspace:*
         version: link:../identity-common
       cbor-x:
-        specifier: ^1.6.6
+        specifier: 'catalog:'
         version: 1.6.6
       pako:
         specifier: ^3.0.2
@@ -316,13 +280,6 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.5
-    devDependencies:
-      '@noble/curves':
-        specifier: ^2.4.0
-        version: 2.4.0
-      '@noble/hashes':
-        specifier: ^2.4.0
-        version: 2.4.0
 
 packages:
 
@@ -1594,9 +1551,6 @@ packages:
     resolution: {integrity: sha512-dayzUzKkJ1MkuUtZglSebU43utNXH0OWQByK9rKOOuYIO8M5TV1y+n8ALMdG0rdzBnfNkOmZEqrURepb0ejqBw==}
     hasBin: true
 
-  json-stringify-safe@5.0.1:
-    resolution: {integrity: sha512-ZClg6AaYvamvYEE82d3Iyd3vSSIjQ+odgjaTzRuO3s7toCdFKczob2i0zCh7JE8kWn17yvAWhUVxvqGwUalsRA==}
-
   jsonc-parser@3.3.1:
     resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
 
@@ -1818,10 +1772,6 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
-  nock@14.0.17:
-    resolution: {integrity: sha512-EjRr1weMa4ALQX35AgZTEnP+weJJjlW1KGDiNM2IQC2069YDHas4f4B4UUYR+TTLyKWxJvOz2wObDKQs/LNreA==}
-    engines: {node: '>=18.20.0 <20 || >=20.12.1'}
-
   node-gyp-build-optional-packages@5.1.1:
     resolution: {integrity: sha512-+P72GAjVAbTxjjwUmwjVrqrdZROD4nf8KgpBoDxqXXTiYZZt/ud60dE5yvCSr9lRO8e8yv6kgJIC0K0PfZFVQw==}
     hasBin: true
@@ -1863,10 +1813,6 @@ packages:
   postcss@8.5.28:
     resolution: {integrity: sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==}
     engines: {node: ^10 || ^12 || >=14}
-
-  propagate@2.0.1:
-    resolution: {integrity: sha512-vGrhOavPSTz4QVNuBNdcNXePNdNMaO1xj9yBeH1ScQPjk/rhg9sSlCXPhMkFuaNNW/syTvYqsnbIJxMBfRbbag==}
-    engines: {node: '>= 8'}
 
   punycode.js@2.3.1:
     resolution: {integrity: sha512-uxFIHU0YlHYhDQtV4R9J6a52SLx28BCjT+4ieh7IGbgwVJWO+km431c4yRlREUAsAmt/uMjQUyQHNEPf0M39CA==}
@@ -3309,8 +3255,6 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
-  json-stringify-safe@5.0.1: {}
-
   jsonc-parser@3.3.1: {}
 
   jsonpointer@5.0.1: {}
@@ -3642,12 +3586,6 @@ snapshots:
 
   nanoid@3.3.19: {}
 
-  nock@14.0.17:
-    dependencies:
-      '@mswjs/interceptors': 0.41.9
-      json-stringify-safe: 5.0.1
-      propagate: 2.0.1
-
   node-gyp-build-optional-packages@5.1.1:
     dependencies:
       detect-libc: 2.1.2
@@ -3693,8 +3631,6 @@ snapshots:
       nanoid: 3.3.19
       picocolors: 1.1.1
       source-map-js: 1.2.1
-
-  propagate@2.0.1: {}
 
   punycode.js@2.3.1: {}
 

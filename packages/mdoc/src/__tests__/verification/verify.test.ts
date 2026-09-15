@@ -1,8 +1,9 @@
 import 'reflect-metadata'
 import { MediaTypes, StatusList, StatusListCwt, StatusListInfo, StatusType } from '@owf/token-status-list'
 import { X509Certificate } from '@peculiar/x509'
-import nock from 'nock'
-import { expect, suite, test, vi } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { setupServer } from 'msw/node'
+import { afterAll, afterEach, beforeAll, expect, suite, test, vi } from 'vitest'
 import z from 'zod'
 import {
   CoseKey,
@@ -70,6 +71,26 @@ const emptyStatusTrustedCertificates = [
 ]
 
 suite('Verification', () => {
+  const server = setupServer()
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+  afterEach(() => server.resetHandlers())
+  afterAll(() => server.close())
+
+  // Serves `body` for GET requests to `uri`. When `accept` is provided, requests with a different Accept header fail.
+  const mockGet = (uri: string, body: Uint8Array | string, contentType: string, accept?: string | RegExp) =>
+    server.use(
+      http.get(uri, ({ request }) => {
+        const acceptHeader = request.headers.get('Accept') ?? ''
+        if (accept && (typeof accept === 'string' ? acceptHeader !== accept : !accept.test(acceptHeader))) {
+          return HttpResponse.error()
+        }
+
+        return new HttpResponse(typeof body === 'string' ? body : new Uint8Array(body), {
+          headers: { 'Content-Type': contentType },
+        })
+      })
+    )
+
   test('Verify simple mdoc', async () => {
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -438,11 +459,7 @@ suite('Verification', () => {
   const mockStatusList = async (path: string, options: Omit<Parameters<typeof signStatusListCwt>[0], 'uri'>) => {
     const uri = `https://example.org${path}`
 
-    nock('https://example.org')
-      .matchHeader('Accept', /application\/statuslist\+cwt/)
-      .persist()
-      .get(path)
-      .reply(200, await signStatusListCwt({ uri, ...options }), { 'Content-Type': MediaTypes.StatusListCwt })
+    mockGet(uri, await signStatusListCwt({ uri, ...options }), MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
 
     return uri
   }
@@ -541,13 +558,12 @@ suite('Verification', () => {
   ) => {
     const uri = `https://example.org${path}`
 
-    nock('https://example.org')
-      .matchHeader('Accept', IdentifierListMediaTypes.IdentifierListCwt)
-      .persist()
-      .get(path)
-      .reply(200, await signIdentifierListCwt({ uri, ...options }), {
-        'Content-Type': IdentifierListMediaTypes.IdentifierListCwt,
-      })
+    mockGet(
+      uri,
+      await signIdentifierListCwt({ uri, ...options }),
+      IdentifierListMediaTypes.IdentifierListCwt,
+      IdentifierListMediaTypes.IdentifierListCwt
+    )
 
     return uri
   }
@@ -694,10 +710,7 @@ suite('Verification', () => {
     const id = new Uint8Array([0xab, 0xcd])
     const uri = 'https://example.org/identifier-list/wrong-content-type'
 
-    nock('https://example.org')
-      .persist()
-      .get('/identifier-list/wrong-content-type')
-      .reply(200, await signIdentifierListCwt({ uri, identifiers: [] }), { 'Content-Type': MediaTypes.StatusListCwt })
+    mockGet(uri, await signIdentifierListCwt({ uri, identifiers: [] }), MediaTypes.StatusListCwt)
 
     const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
 
@@ -725,11 +738,7 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    nock('https://example.org')
-      .matchHeader('Accept', /application\/statuslist\+cwt/)
-      .persist()
-      .get('/status-list/10')
-      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+    mockGet('https://example.org/status-list/10', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -859,11 +868,7 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    nock('https://example.org')
-      .matchHeader('Accept', /application\/statuslist\+cwt/)
-      .persist()
-      .get('/status-list/10')
-      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+    mockGet('https://example.org/status-list/10', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -969,11 +974,12 @@ suite('Verification', () => {
       }),
     })
     statusListCwt.updateStatusList(idx, StatusType.Valid)
-    nock('https://example.org')
-      .matchHeader('Accept', /application\/statuslist\+cwt/)
-      .persist()
-      .get('/status-list/30')
-      .reply(200, 'invalid-jwt', { 'Content-Type': MediaTypes.StatusListJwt })
+    mockGet(
+      'https://example.org/status-list/30',
+      'invalid-jwt',
+      MediaTypes.StatusListJwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1027,11 +1033,7 @@ suite('Verification', () => {
       { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
       { sign: mdocContext.cose.sign1.sign }
     )
-    nock('https://example.org')
-      .matchHeader('Accept', /application\/statuslist\+cwt/)
-      .persist()
-      .get('/status-list/40')
-      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+    mockGet('https://example.org/status-list/40', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1085,11 +1087,7 @@ suite('Verification', () => {
       { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
       { sign: mdocContext.cose.sign1.sign }
     )
-    nock('https://example.org')
-      .matchHeader('Accept', /application\/statuslist\+cwt/)
-      .persist()
-      .get('/status-list/40')
-      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+    mockGet('https://example.org/status-list/40', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1146,11 +1144,7 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    nock('https://example.org')
-      .matchHeader('Accept', /application\/statuslist\+cwt/)
-      .persist()
-      .get('/status-list/10')
-      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+    mockGet('https://example.org/status-list/10', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1205,11 +1199,7 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    nock('https://example.org')
-      .matchHeader('Accept', /application\/statuslist\+cwt/)
-      .persist()
-      .get('/status-list/20')
-      .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+    mockGet('https://example.org/status-list/20', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1548,11 +1538,7 @@ suite('Verification', () => {
         { sign: mdocContext.cose.sign1.sign }
       )
 
-      nock('https://example.org')
-        .matchHeader('Accept', /application\/statuslist\+cwt/)
-        .persist()
-        .get(path)
-        .reply(200, Buffer.from(encodedCwt), { 'Content-Type': MediaTypes.StatusListCwt })
+      mockGet(`https://example.org${path}`, encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
     }
 
     const signCredentialWithStatus = async (uri: string) => {

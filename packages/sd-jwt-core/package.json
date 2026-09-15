@@ -33,9 +33,5 @@
   },
   "dependencies": {
     "@owf/identity-common": "workspace:^"
-  },
-  "devDependencies": {
-    "@owf/crypto": "workspace:*",
-    "jose": "^6.2.12"
   }
 }

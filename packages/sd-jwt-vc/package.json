@@ -36,10 +36,5 @@
     "@owf/token-status-list": "workspace:^",
     "@sd-jwt/core": "workspace:*",
     "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@owf/crypto": "workspace:*",
-    "jose": "^6.2.12",
-    "msw": "^2.15.0"
   }
 }
