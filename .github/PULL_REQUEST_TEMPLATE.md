@@ -22,6 +22,7 @@ Fixes #
 - [ ] `@owf/identity-common`
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
+- [ ] `@owf/mdoc`
 - [ ] Other: _____________
 
 ## Checklist

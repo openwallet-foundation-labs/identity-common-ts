@@ -65,6 +65,7 @@ identity-common-ts/
 │   ├── x509/                    # X.509 certificate utilities (planned)
 │   ├── token-status-list/       # JWT/CWT Token Status List (planned)
 │   ├── sd-jwt-*/                # SD-JWT and SD-JWT VC packages (@sd-jwt/*)
+│   ├── mdoc/                    # ISO/IEC 18013-5 mDOC and mDL (@owf/mdoc)
 │   └── eudi-*/                  # EUDI-specific packages (planned)
 ├── examples/                    # Runnable examples, grouped by topic (e.g. examples/sd-jwt)
 ├── docs/sd-jwt/                 # sdjwt.js.org landing page (deployed to GitHub Pages)
@@ -75,7 +76,7 @@ identity-common-ts/
 
 ### Package Categories
 
-Packages are organized into three main categories:
+Packages are organized into four main categories:
 
 1. **Core Identity Utilities** (`@owf/identity-*`)
    - Generic, reusable utilities for any identity solution
@@ -91,6 +92,11 @@ Packages are organized into three main categories:
    - SD-JWT (RFC 9901) and SD-JWT VC implementations
    - Located in `packages/sd-jwt-<name>` (or `packages/sd-jwt-vc`)
    - Versioned separately from the `@owf/*` packages (see `.changeset/config.json`)
+
+4. **mDOC** (`@owf/mdoc`)
+   - ISO/IEC 18013-5 mDOC and mDL implementation
+   - Located in `packages/mdoc`
+   - Versioned separately from the other `@owf/*` packages (see `.changeset/config.json`)
 
 ## Development Workflow
 
@@ -146,7 +152,16 @@ Create `packages/my-package/package.json`:
   "description": "Description of your package",
   "files": ["dist"],
   "license": "Apache-2.0",
-  "exports": "./src/index.ts",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
   "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/my-package",
   "repository": {
     "type": "git",
@@ -155,10 +170,14 @@ Create `packages/my-package/package.json`:
   },
   "publishConfig": {
     "access": "public",
+    "main": "./dist/index.mjs",
     "module": "./dist/index.mjs",
     "types": "./dist/index.d.mts",
     "exports": {
-      ".": "./dist/index.mjs",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -169,6 +188,8 @@ Create `packages/my-package/package.json`:
   "devDependencies": {}
 }
 ```
+
+New packages are ESM-only: `require` resolves to the ESM build through the `default` condition. Some existing packages also ship a CommonJS build (`dist/index.cjs`) while they are migrated. `pnpm packages:check` validates that each package follows one of these two layouts, and `pnpm esm:check` validates that each built package can be imported and required.
 
 **Naming conventions:**
 

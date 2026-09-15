@@ -182,8 +182,8 @@ importers:
         specifier: 'workspace:'
         version: link:../identity-common
       '@owf/mdoc':
-        specifier: ^0.7.0
-        version: 0.7.0
+        specifier: workspace:^
+        version: link:../mdoc
       '@sd-jwt/core':
         specifier: workspace:^
         version: link:../sd-jwt-core
@@ -253,6 +253,49 @@ importers:
 
   packages/identity-common:
     devDependencies:
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@types/node@26.4.1)(msw@2.15.0(@types/node@26.4.1)(typescript@6.0.3))(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/mdoc:
+    dependencies:
+      '@owf/cose':
+        specifier: workspace:^
+        version: link:../cose
+      '@owf/identity-common':
+        specifier: workspace:^
+        version: link:../identity-common
+      '@owf/token-status-list':
+        specifier: workspace:^
+        version: link:../token-status-list
+      zod:
+        specifier: 'catalog:'
+        version: 4.5.4
+    devDependencies:
+      '@noble/curves':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@panva/hkdf':
+        specifier: ^1.2.1
+        version: 1.2.1
+      '@peculiar/x509':
+        specifier: 'catalog:'
+        version: 2.1.0
+      hpke:
+        specifier: ^1.1.4
+        version: 1.1.7
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
+      nock:
+        specifier: ^14.0.17
+        version: 14.0.17
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
       vitest:
         specifier: 'catalog:'
         version: 5.0.0(@types/node@26.4.1)(msw@2.15.0(@types/node@26.4.1)(typescript@6.0.3))(vite@8.0.10(@types/node@26.4.1)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
@@ -763,19 +806,6 @@ packages:
 
   '@openid4vc/utils@0.5.5':
     resolution: {integrity: sha512-3vao4GiufkbFM4V7jL6GBvsdjo2434VXj9uXCUmwstifq64PclVgIj7rVqzgF0WxliNcaJ1aVGAEuBNEQVqIpQ==}
-
-  '@owf/cose@0.3.0':
-    resolution: {integrity: sha512-fED6VqssD2X7QuGffrrbgqTs5xeptupTE0so3syPMgWKvzydwiW4mj9FbML+SPMo6ZZpJeNh/kII9qiK8WcOeA==}
-
-  '@owf/identity-common@0.3.0':
-    resolution: {integrity: sha512-Ot+T8zHqb9cPqPdHL2edRXjWtRLng95N+auhb9TZq+Jy4HxjRzBUMVnB0wzeV5GCgoIkINcHAeLXFMsHs77hVQ==}
-
-  '@owf/mdoc@0.7.0':
-    resolution: {integrity: sha512-WgYwmpxawDgkMmej719DwlgZ/6gmzCWyyFYf4Z/9eA50Xq/rAi5nQ4oQTu1/79A0IZwwWJdrcJp53yiOQHbUtg==}
-    engines: {node: '>=20.19'}
-
-  '@owf/token-status-list@0.3.0':
-    resolution: {integrity: sha512-6XkQIQJVsFyxVdeAD2SVktBFD7wIANVJ/tgGw4D4N6lKadsc2Tb8+Gr1m+UEKbYPnbV6eIUbfpPafulTInruug==}
 
   '@oxc-project/types@0.127.0':
     resolution: {integrity: sha512-aIYXQBo4lCbO4z0R3FHeucQHpF46l2LbMdxRvqvuRuW2OxdnSkcng5B8+K12spgLDj93rtN3+J2Vac/TIO+ciQ==}
@@ -1458,6 +1488,9 @@ packages:
   hookable@6.1.1:
     resolution: {integrity: sha512-U9LYDy1CwhMCnprUfeAZWZGByVbhd54hwepegYTK7Pi5NvqEj63ifz5z+xukznehT7i6NIZRu89Ay1AZmRsLEQ==}
 
+  hpke@1.1.7:
+    resolution: {integrity: sha512-wQGOBpFBFlP2h7euuLuey8yJGUtJ+c8D/ohPxtTQqpICItFtHDpbXk2B29xfUpIFPn0miS9TJVObFGAeEZzDJA==}
+
   human-id@4.2.1:
     resolution: {integrity: sha512-zPGsiS+dWoTZtZ4AtpA9Y+BdSFSNWvnouNlWNoUFyAM6xHOHmdCvqO3k8AIbdamCOv4gUFUVNPf6rJFfc4UiJw==}
     hasBin: true
@@ -1767,9 +1800,6 @@ packages:
 
   package-manager-detector@1.8.0:
     resolution: {integrity: sha512-yQA4H19AmPEoMUeavPMDIe1higySl/gH/yaQrkT/s07Qp+7pp2hYz30N3z2l5BkjVkF9Ow6o0wjJamm2y7Sn0A==}
-
-  pako@2.2.0:
-    resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
 
   pako@3.0.1:
     resolution: {integrity: sha512-GupotUUI0mlhugKjUs4bjOwLt3nrehy9Ys2dxC0GtgVef5cnKggkDMmf2bq2poCCuVXopWPmqsc9VDT2iJUy+w==}
@@ -2594,30 +2624,6 @@ snapshots:
       zod: 4.5.4
       zod-validation-error: 5.0.0(zod@4.5.4)
 
-  '@owf/cose@0.3.0':
-    dependencies:
-      '@owf/identity-common': 0.3.0
-      cbor-x: 1.6.6
-      zod: 4.5.4
-      zod-validation-error: 5.0.0(zod@4.5.4)
-
-  '@owf/identity-common@0.3.0': {}
-
-  '@owf/mdoc@0.7.0':
-    dependencies:
-      '@owf/cose': 0.3.0
-      '@owf/identity-common': 0.3.0
-      '@owf/token-status-list': 0.3.0
-      zod: 4.5.4
-
-  '@owf/token-status-list@0.3.0':
-    dependencies:
-      '@owf/cose': 0.3.0
-      '@owf/identity-common': 0.3.0
-      cbor-x: 1.6.6
-      pako: 2.2.0
-      zod: 4.5.4
-
   '@oxc-project/types@0.127.0': {}
 
   '@oxc-project/types@0.148.0': {}
@@ -3187,6 +3193,8 @@ snapshots:
 
   hookable@6.1.1: {}
 
+  hpke@1.1.7: {}
+
   human-id@4.2.1: {}
 
   husky@9.1.7: {}
@@ -3581,8 +3589,6 @@ snapshots:
   outvariant@1.4.3: {}
 
   package-manager-detector@1.8.0: {}
-
-  pako@2.2.0: {}
 
   pako@3.0.1: {}
 

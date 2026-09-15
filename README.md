@@ -38,7 +38,7 @@ To avoid reinventing the wheel, many identity projects share common needs for da
 
 ### Project Categories
 
-The project is organized into three main categories:
+The project is organized into four main categories:
 
 #### Core Identity Utilities
 
@@ -74,6 +74,14 @@ Implementations of [Selective Disclosure for JWTs (SD-JWT)](https://www.rfc-edit
 |---------|-------------|--------|
 | [`@sd-jwt/core`](./packages/sd-jwt-core) | SD-JWT (RFC 9901) issuance, presentation, and verification | ✅ Available |
 | [`@sd-jwt/sd-jwt-vc`](./packages/sd-jwt-vc) | SD-JWT VC (draft-ietf-oauth-sd-jwt-vc) built on top of `@sd-jwt/core` | ✅ Available |
+
+#### mDOC
+
+Implementation of [ISO/IEC 18013-5](https://www.iso.org/standard/69084.html) mDOC and mDL (mobile driving licence) documents, including the ISO/IEC 18013-7 and OpenID4VP presentation flows, previously developed in [mdoc-ts](https://github.com/openwallet-foundation-labs/mdoc-ts). `@owf/mdoc` is versioned separately from the other `@owf/*` packages.
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| [`@owf/mdoc`](./packages/mdoc) | ISO/IEC 18013-5 mDOC and mDL issuance, presentation, and verification | ✅ Available |
 
 > **Note**: While the EUDI Wallet is built on open standards (OpenID4VC, SD-JWT VC), it requires specific extensions for Trust, Payments, and document signing that are better suited in dedicated packages.
 
@@ -189,6 +197,18 @@ npm install @sd-jwt/sd-jwt-vc
 
 📖 [View package documentation](./packages/sd-jwt-vc/README.md)
 
+### @owf/mdoc
+
+[![@owf/mdoc version](https://img.shields.io/npm/v/@owf/mdoc)](https://npmjs.com/package/@owf/mdoc)
+
+ISO/IEC 18013-5 mDOC and mDL: issue, hold, present, and verify CBOR encoded documents, with support for ISO/IEC 18013-7 and OpenID4VP session transcripts.
+
+```bash
+npm install @owf/mdoc
+```
+
+📖 [View package documentation](./packages/mdoc/README.md)
+
 ---
 
 ## Getting Started
@@ -242,7 +262,7 @@ All build and test tasks run through **Turborepo**, which provides:
 | `build` | upstream `build` | Compiles each package with `tsdown` (ESM + CJS + `.d.ts`) |
 | `test` | upstream `build` | Runs `vitest` tests for each package |
 | `types:check` | upstream `build` | Type-checks the workspace with `tsc --noEmit` |
-| `esm:check` | local `build` | Validates ESM import paths |
+| `esm:check` | local `build` | Validates the built packages can be imported and required |
 | `lint` | — | Linting (no build prerequisite) |
 
 Run any task across all packages:

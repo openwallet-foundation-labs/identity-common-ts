@@ -6,20 +6,40 @@ import { join } from 'node:path'
 const rootDir = process.cwd()
 const packagesDir = join(rootDir, 'packages')
 
-const expectedRootFields = {
-  main: './dist/index.cjs',
-  module: './dist/index.mjs',
-  types: './dist/index.d.mts',
-}
-
-const expectedExports = {
-  '.': {
-    types: './dist/index.d.mts',
-    import: './dist/index.mjs',
-    require: './dist/index.cjs',
-    default: './dist/index.mjs',
+// Packages are either ESM-only, or ship both an ESM and a CommonJS build. ESM-only packages point `require`
+// to the ESM build through the `default` condition, which Node.js supports through `require(esm)` (Node.js 20.19 and later, or 22.12 and later).
+// Packages are being migrated to ESM-only.
+const conventions = {
+  'esm-only': {
+    rootFields: {
+      main: './dist/index.mjs',
+      module: './dist/index.mjs',
+      types: './dist/index.d.mts',
+    },
+    exports: {
+      '.': {
+        types: './dist/index.d.mts',
+        default: './dist/index.mjs',
+      },
+      './package.json': './package.json',
+    },
   },
-  './package.json': './package.json',
+  'esm-and-cjs': {
+    rootFields: {
+      main: './dist/index.cjs',
+      module: './dist/index.mjs',
+      types: './dist/index.d.mts',
+    },
+    exports: {
+      '.': {
+        types: './dist/index.d.mts',
+        import: './dist/index.mjs',
+        require: './dist/index.cjs',
+        default: './dist/index.mjs',
+      },
+      './package.json': './package.json',
+    },
+  },
 }
 
 function stableStringify(value) {
@@ -70,6 +90,10 @@ async function main() {
     const packageJson = JSON.parse(packageJsonRaw)
     const packageFailures = []
 
+    // A package with a CommonJS entrypoint is checked against the ESM and CommonJS convention
+    const conventionName = packageJson.main === './dist/index.cjs' ? 'esm-and-cjs' : 'esm-only'
+    const { rootFields: expectedRootFields, exports: expectedExports } = conventions[conventionName]
+
     for (const [field, expectedValue] of Object.entries(expectedRootFields)) {
       if (packageJson[field] !== expectedValue) {
         packageFailures.push(formatMismatch(field, expectedValue, packageJson[field]))
@@ -101,7 +125,7 @@ async function main() {
     }
 
     if (packageFailures.length > 0) {
-      failures.push(`${entry.name}\n${packageFailures.join('\n')}`)
+      failures.push(`${entry.name} (${conventionName})\n${packageFailures.join('\n')}`)
     }
   }
 

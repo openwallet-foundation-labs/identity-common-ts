@@ -1,0 +1,197 @@
+import {
+  type CoseKey,
+  type DigestAlgorithm,
+  ProtectedHeaders,
+  RegisteredCwtHeaderClaimKey,
+  type SignatureAlgorithm,
+  UnprotectedHeaders,
+} from '@owf/cose'
+import { stringToBytes } from '@owf/identity-common'
+import type { MdocContext } from '../../context'
+import { randomUnsignedInteger } from '../../utils/randomUnsignedInteger'
+import { x5chainHeaderValue } from '../../utils/x5chain'
+import {
+  AtLeastOneCertificateRequiredError,
+  DuplicateElementIdentifierError,
+  InvalidValidityInfoError,
+  MdlError,
+  SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError,
+} from '../errors'
+import {
+  DeviceKeyInfo,
+  type DeviceKeyInfoOptions,
+  type Digest,
+  type DigestId,
+  type DocType,
+  IssuerAuth,
+  IssuerNamespaces,
+  IssuerSigned,
+  IssuerSignedItem,
+  MobileSecurityObject,
+  type Namespace,
+  Status,
+  type StatusOptions,
+  ValidityInfo,
+  type ValidityInfoOptions,
+  ValueDigests,
+  type ValueDigestsStructure,
+} from '../models'
+
+export class IssuerSignedBuilder {
+  private docType: DocType
+  private namespaces: IssuerNamespaces
+  private ctx: Pick<MdocContext, 'cose' | 'crypto'>
+
+  public constructor(docType: DocType, ctx: Pick<MdocContext, 'cose' | 'crypto'>) {
+    this.docType = docType
+    this.ctx = ctx
+    this.namespaces = IssuerNamespaces.create({ issuerNamespaces: new Map() })
+  }
+
+  public addIssuerNamespace(namespace: Namespace, values: Record<string, unknown> | Map<string, unknown>) {
+    // Added to a copy, so that a call that throws leaves the namespace as it was.
+    const issuerNamespace = [...(this.namespaces.getIssuerNamespace(namespace) ?? [])]
+
+    const entries = values instanceof Map ? Array.from(values.entries()) : Object.entries(values)
+
+    for (const [elementIdentifier, elementValue] of entries) {
+      if (issuerNamespace.some((item) => item.elementIdentifier === elementIdentifier)) {
+        throw new DuplicateElementIdentifierError(
+          `Element '${elementIdentifier}' is already added to namespace '${namespace}'`
+        )
+      }
+
+      // Digest IDs identify the digests of a namespace in the MSO, so they must be unique (9.1.2.4)
+      const digestId = randomUnsignedInteger(this.ctx)
+      if (issuerNamespace.some((item) => item.digestId === digestId)) {
+        throw new MdlError(`Generated digest ID ${digestId} is already used in namespace '${namespace}'`)
+      }
+
+      issuerNamespace.push(
+        IssuerSignedItem.fromOptions({
+          digestId,
+          random: this.ctx.crypto.random(32),
+          elementIdentifier,
+          elementValue,
+        })
+      )
+    }
+
+    this.namespaces.setIssuerNamespace(namespace, issuerNamespace)
+
+    return this
+  }
+
+  private async convertIssuerNamespacesIntoValueDigests(digestAlgorithm: DigestAlgorithm): Promise<ValueDigests> {
+    const valueDigests: ValueDigestsStructure = new Map()
+
+    for (const [namespace, issuerSignedItems] of this.namespaces.issuerNamespaces) {
+      const digests = new Map<DigestId, Digest>()
+      for (const issuerSignedItem of issuerSignedItems) {
+        const digest = await this.ctx.crypto.digest({
+          digestAlgorithm,
+          bytes: issuerSignedItem.encode({ asDataItem: true }),
+        })
+
+        digests.set(issuerSignedItem.digestId, digest)
+      }
+      valueDigests.set(namespace, digests)
+    }
+
+    return ValueDigests.create({ digests: valueDigests })
+  }
+
+  public async sign(options: {
+    signingKey: CoseKey
+    algorithm: SignatureAlgorithm
+    digestAlgorithm: DigestAlgorithm
+    validityInfo: ValidityInfo | ValidityInfoOptions
+    deviceKeyInfo: DeviceKeyInfo | DeviceKeyInfoOptions
+    certificates: Uint8Array[]
+    /**
+     * Optional Status structure to embed in the MSO. See
+     * ISO/IEC 18013-5 second edition (CD), 12.3.6. Allows the issuer to
+     * publish revocation information via a status list and/or identifier
+     * list referenced from inside the signed MSO.
+     */
+    status?: Status | StatusOptions
+  }): Promise<IssuerSigned> {
+    if (options.signingKey.algorithm && options.signingKey.algorithm !== options.algorithm) {
+      throw new SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError(
+        `Signing key algorithm '${options.signingKey.algorithm}' does not match the supplied algorithm '${options.algorithm}'`
+      )
+    }
+
+    const validityInfo =
+      options.validityInfo instanceof ValidityInfo ? options.validityInfo : ValidityInfo.create(options.validityInfo)
+
+    if (validityInfo.validFrom.getTime() < validityInfo.signed.getTime()) {
+      throw new InvalidValidityInfoError(
+        `validFrom (${validityInfo.validFrom.toISOString()}) must be equal to or later than signed (${validityInfo.signed.toISOString()})`
+      )
+    }
+
+    if (validityInfo.validUntil.getTime() <= validityInfo.validFrom.getTime()) {
+      throw new InvalidValidityInfoError(
+        `validUntil (${validityInfo.validUntil.toISOString()}) must be later than validFrom (${validityInfo.validFrom.toISOString()})`
+      )
+    }
+
+    const deviceKeyInfo =
+      options.deviceKeyInfo instanceof DeviceKeyInfo
+        ? options.deviceKeyInfo
+        : DeviceKeyInfo.create(options.deviceKeyInfo)
+
+    if (options.certificates.length === 0) {
+      throw new AtLeastOneCertificateRequiredError(
+        'At least one certificate (the document signer certificate) must be provided.'
+      )
+    }
+
+    const status =
+      options.status === undefined
+        ? undefined
+        : options.status instanceof Status
+          ? options.status
+          : Status.create(options.status)
+
+    const mso = MobileSecurityObject.create({
+      docType: this.docType,
+      validityInfo,
+      digestAlgorithm: options.digestAlgorithm,
+      deviceKeyInfo,
+      valueDigests: await this.convertIssuerNamespacesIntoValueDigests(options.digestAlgorithm),
+      status,
+    })
+
+    const protectedHeaders = ProtectedHeaders.create({
+      protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, options.algorithm]]),
+    })
+
+    const unprotectedHeaders = UnprotectedHeaders.create({
+      unprotectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.X5Chain, x5chainHeaderValue(options.certificates)]]),
+    })
+
+    if (options.signingKey.keyId) {
+      // COSE label 4 (kid) is a bstr per RFC 8152; CoseKey.keyId is the
+      // text form, so we UTF-8 encode here at the header boundary.
+      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(options.signingKey.keyId))
+    }
+
+    const issuerAuth = await IssuerAuth.create({
+      payload: mso,
+      unprotectedHeaders,
+      protectedHeaders,
+    }).sign(
+      { signingKey: options.signingKey, algorithm: options.algorithm },
+      {
+        sign: this.ctx.cose.sign1.sign,
+      }
+    )
+
+    return IssuerSigned.create({
+      issuerNamespaces: this.namespaces,
+      issuerAuth,
+    })
+  }
+}
