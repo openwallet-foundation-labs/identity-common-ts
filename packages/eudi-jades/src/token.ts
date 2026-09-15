@@ -1,5 +1,5 @@
 /** JAdES signature builder for ETSI TS 119 182-1 V1.2.1. */
-import { uint8ArrayToBase64Url } from '@owf/identity-common'
+import { bytesToString, stringToBytes, uint8ArrayToBase64Url } from '@owf/identity-common'
 import { CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS } from './constants'
 import { JAdESException } from './jades-exception'
 import {
@@ -19,15 +19,12 @@ import type {
 } from './types'
 import { encodeJSON, getSigningTime } from './utils'
 
-const encoder = new TextEncoder()
-const decoder = new TextDecoder()
-
 function serializePayload(payload: unknown): { bytes: Uint8Array; text: string } {
-  if (payload instanceof Uint8Array) return { bytes: payload, text: decoder.decode(payload) }
-  if (typeof payload === 'string') return { bytes: encoder.encode(payload), text: payload }
+  if (payload instanceof Uint8Array) return { bytes: payload, text: bytesToString(payload) }
+  if (typeof payload === 'string') return { bytes: stringToBytes(payload), text: payload }
   const serialized = JSON.stringify(payload)
   if (serialized === undefined) throw new JAdESException('Payload is not JSON serializable')
-  return { bytes: encoder.encode(serialized), text: serialized }
+  return { bytes: stringToBytes(serialized), text: serialized }
 }
 
 function formatIssues(issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>): string {
@@ -168,7 +165,7 @@ export class Token<T = unknown> {
    */
   async getHash(options: { algorithm?: string }, ctx: Pick<TokenContext, 'hasher'>): Promise<Uint8Array> {
     this.validateBeforeSign()
-    const signingInput = encoder.encode(this.getSigningInput())
+    const signingInput = stringToBytes(this.getSigningInput())
     return await ctx.hasher(signingInput.buffer as ArrayBuffer, options.algorithm ?? this.getHashAlgorithm())
   }
 

@@ -1,0 +1,31 @@
+{
+  "claims": {
+    "recursive": [
+      "boring",
+      {
+        "foo": "bar",
+        "baz": {
+          "qux": "quxx"
+        }
+      },
+      ["foo", "bar"]
+    ],
+    "test2": ["foo", "bar"]
+  },
+  "disclosureFrame": {},
+  "presentationFrames": {},
+  "presentedClaims": {
+    "recursive": [
+      "boring",
+      {
+        "foo": "bar",
+        "baz": {
+          "qux": "quxx"
+        }
+      },
+      ["foo", "bar"]
+    ],
+    "test2": ["foo", "bar"]
+  },
+  "requiredClaimKeys": ["recursive.0", "recursive.1.baz.qux", "recursive.2.1", "test2.1"]
+}

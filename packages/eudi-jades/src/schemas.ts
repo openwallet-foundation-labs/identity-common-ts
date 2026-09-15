@@ -1,6 +1,6 @@
 /** Runtime schemas for ETSI TS 119 182-1 V1.2.1 JAdES components. */
 
-import { base64urlDecode } from '@owf/identity-common'
+import { base64urlDecodeJson } from '@owf/identity-common'
 import { z } from 'zod'
 import { DETACHED_MECHANISM_IDS } from './constants'
 
@@ -284,7 +284,7 @@ const EncodedEtsiUSchema = z
   .superRefine((items, context) => {
     items.forEach((item, index) => {
       try {
-        const result = EncodedEtsiUInstanceSchema.safeParse(JSON.parse(base64urlDecode(item)))
+        const result = EncodedEtsiUInstanceSchema.safeParse(base64urlDecodeJson(item))
         if (!result.success) context.addIssue({ code: 'custom', path: [index], message: 'Invalid encoded etsiU value' })
       } catch {
         context.addIssue({ code: 'custom', path: [index], message: 'Invalid encoded etsiU JSON value' })

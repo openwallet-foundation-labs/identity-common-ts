@@ -38,7 +38,7 @@ To avoid reinventing the wheel, many identity projects share common needs for da
 
 ### Project Categories
 
-The project is organized into two main categories:
+The project is organized into three main categories:
 
 #### Core Identity Utilities
 
@@ -65,6 +65,15 @@ Tools specific to the [European Digital Identity (EUDI) Wallet](https://ec.europ
 | [`@owf/eudi-attestation-schema`](./packages/eudi-attestation-schema) | TS11 Catalogue of Attestations SchemaMeta | ✅ Available |
 | `@owf/eudi-certificates` | Registration and access certificate verification | 📋 Planned |
 | `@owf/eudi-sca` | TS12 Strong Customer Authentication Payments according to the latest to-be-added ARF |  In Progess |
+
+#### SD-JWT
+
+Implementations of [Selective Disclosure for JWTs (SD-JWT)](https://www.rfc-editor.org/rfc/rfc9901.html) and [SD-JWT-based Verifiable Credentials (SD-JWT VC)](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/), previously developed in [sd-jwt-js](https://github.com/openwallet-foundation/sd-jwt-js). The `@sd-jwt/*` packages are versioned separately from the `@owf/*` packages.
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| [`@sd-jwt/core`](./packages/sd-jwt-core) | SD-JWT (RFC 9901) issuance, presentation, and verification | ✅ Available |
+| [`@sd-jwt/sd-jwt-vc`](./packages/sd-jwt-vc) | SD-JWT VC (draft-ietf-oauth-sd-jwt-vc) built on top of `@sd-jwt/core` | ✅ Available |
 
 > **Note**: While the EUDI Wallet is built on open standards (OpenID4VC, SD-JWT VC), it requires specific extensions for Trust, Payments, and document signing that are better suited in dedicated packages.
 
@@ -156,6 +165,30 @@ npm install @owf/eudi-attestation-schema
 
 📖 [View package documentation](./packages/eudi-attestation-schema/README.md)
 
+### @sd-jwt/core
+
+[![@sd-jwt/core version](https://img.shields.io/npm/v/@sd-jwt/core)](https://npmjs.com/package/@sd-jwt/core)
+
+Core library for SD-JWT (RFC 9901): encoding, decoding, selective disclosure, presentation, key binding, and verification.
+
+```bash
+npm install @sd-jwt/core
+```
+
+📖 [View package documentation](./packages/sd-jwt-core/README.md)
+
+### @sd-jwt/sd-jwt-vc
+
+[![@sd-jwt/sd-jwt-vc version](https://img.shields.io/npm/v/@sd-jwt/sd-jwt-vc)](https://npmjs.com/package/@sd-jwt/sd-jwt-vc)
+
+SD-JWT VC implementation built on top of `@sd-jwt/core`, with status list (revocation) and type metadata validation.
+
+```bash
+npm install @sd-jwt/sd-jwt-vc
+```
+
+📖 [View package documentation](./packages/sd-jwt-vc/README.md)
+
 ---
 
 ## Getting Started
@@ -237,7 +270,7 @@ The `.turbo/` directory is intentionally **not committed** (`.gitignore`) — ev
 
 This library is **platform agnostic** and supports:
 
-- ✅ **Node.js** (>=20)
+- ✅ **Node.js** (>=22)
 - ✅ **Browsers** (modern browsers with ES2020 support)
 - ✅ **React Native**
 
@@ -247,6 +280,15 @@ Your environment must provide:
 
 - `URL` and `URLSearchParams` implementations
 - A global `fetch` implementation (or provide it via callbacks)
+- Global `TextEncoder` and `TextDecoder` implementations
+
+### React Native
+
+When using these libraries in React Native you may need to add a polyfill for `TextDecoder`.
+
+You can confirm this by checking if `global.TextDecoder` is available. It should be available for React Native > 0.85 or Expo SDK > 52.
+
+If it is not available, make sure to add a polyfill like [this one](https://github.com/EvanBacon/text-decoder).
 
 ### Platform-Agnostic Design
 
@@ -271,7 +313,6 @@ const result = await someFunction({
 
 This library is designed to work with and support other OpenWallet Foundation projects:
 
-- [**sd-jwt-js**](https://github.com/openwallet-foundation-labs/sd-jwt-js) - SD-JWT implementation
 - [**oid4vc-ts**](https://github.com/openwallet-foundation-labs/oid4vc-ts) - OpenID4VC implementation
 - [**openid-federation-ts**](https://github.com/openwallet-foundation-labs/openid-federation-ts) - OpenID Federation implementation
 - [**credo-ts**](https://github.com/openwallet-foundation/credo-ts) - Aries Framework JavaScript

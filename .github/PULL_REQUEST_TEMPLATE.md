@@ -20,6 +20,8 @@ Fixes #
 ## Packages Affected
 
 - [ ] `@owf/identity-common`
+- [ ] `@sd-jwt/core`
+- [ ] `@sd-jwt/sd-jwt-vc`
 - [ ] Other: _____________
 
 ## Checklist

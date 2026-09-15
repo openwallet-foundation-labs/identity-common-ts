@@ -26,6 +26,12 @@ export type {
 } from './status-list-index'
 export { createStatusListIndexAllocator, StatusListIndexAllocator } from './status-list-index'
 export type { VerifyStatusListJwtClaimsOptions } from './status-list-jwt'
-export { createHeaderAndPayload, getListFromStatusListJWT, getStatusListFromJWT, verifyStatus } from './status-list-jwt'
+export {
+  createHeaderAndPayload,
+  getListFromStatusListJWT,
+  getStatusListFromJWT,
+  verifyStatus,
+  verifyStatusListJwtClaims,
+} from './status-list-jwt'
 export type { BitsPerStatus, StatusListEntry } from './types'
 export { MediaTypes, StatusType } from './types'

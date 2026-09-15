@@ -1,5 +1,5 @@
 import type { JwtPayload } from '@owf/identity-common'
-import { base64url, bytesToString } from '@owf/identity-common'
+import { base64url, decodeJwt } from '@owf/identity-common'
 import type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
 import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
@@ -10,9 +10,8 @@ import { type StatusListEntry, StatusType } from './types'
  * Decode a JWT and return the payload.
  * @param jwt JWT token in compact JWS serialization.
  */
-function decodeJwtPayload<T>(jwt: string): T {
-  const parts = jwt.split('.')
-  return JSON.parse(bytesToString(base64url.decode(parts[1])))
+function decodeJwtPayload<T extends Record<string, unknown>>(jwt: string): T {
+  return decodeJwt<Record<string, unknown>, T>(jwt).payload
 }
 
 /**
@@ -85,7 +84,7 @@ export type VerifyStatusListJwtClaimsOptions = {
  *
  * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5
  */
-function verifyStatusListJwtClaims(
+export function verifyStatusListJwtClaims(
   payload: StatusListJWTPayload,
   {
     uri,

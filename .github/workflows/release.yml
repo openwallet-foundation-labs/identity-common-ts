@@ -54,15 +54,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get current package version
+      - name: Get current package versions
         id: get_version
-        run: echo "current_package_version=$(node -p "require('./packages/identity-common/package.json').version")" >> $GITHUB_OUTPUT
+        run: |
+          echo "current_package_version=$(node -p "require('./packages/identity-common/package.json').version")" >> $GITHUB_OUTPUT
+          echo "sd_jwt_package_version=$(node -p "require('./packages/sd-jwt-core/package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Create Github Release
         if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.get_version.outputs.current_package_version }}
+
+      # @sd-jwt/* packages are versioned separately from @owf/*, so they get their own tag prefix
+      - name: Create SD-JWT Github Release
+        if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: sd-jwt-v${{ steps.get_version.outputs.sd_jwt_package_version }}
 
   release-unstable:
     runs-on: ubuntu-24.04
@@ -100,6 +109,7 @@ jobs:
           cat << 'EOF' > .changeset/snapshot-template-changeset.md
           ---
           '@owf/identity-common': patch
+          '@sd-jwt/core': patch
           ---
 
           snapshot release
@@ -113,7 +123,9 @@ jobs:
           pnpm changeset publish --tag alpha
 
           CURRENT_PACKAGE_VERSION=$(node -p "require('./packages/identity-common/package.json').version")
+          SD_JWT_PACKAGE_VERSION=$(node -p "require('./packages/sd-jwt-core/package.json').version")
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag v$CURRENT_PACKAGE_VERSION
-          git push origin v$CURRENT_PACKAGE_VERSION --no-verify
+          git tag sd-jwt-v$SD_JWT_PACKAGE_VERSION
+          git push origin v$CURRENT_PACKAGE_VERSION sd-jwt-v$SD_JWT_PACKAGE_VERSION --no-verify

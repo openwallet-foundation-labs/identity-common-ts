@@ -3,7 +3,7 @@
   "changelog": "@changesets/cli/changelog",
   "commit": "./commit.js",
   "privatePackages": false,
-  "fixed": [["@owf/*"]],
+  "fixed": [["@owf/*"], ["@sd-jwt/*"]],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",

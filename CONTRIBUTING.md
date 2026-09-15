@@ -64,7 +64,10 @@ identity-common-ts/
 │   ├── cose/                    # COSE/CWT implementation (planned)
 │   ├── x509/                    # X.509 certificate utilities (planned)
 │   ├── token-status-list/       # JWT/CWT Token Status List (planned)
+│   ├── sd-jwt-*/                # SD-JWT and SD-JWT VC packages (@sd-jwt/*)
 │   └── eudi-*/                  # EUDI-specific packages (planned)
+├── examples/                    # Runnable examples, grouped by topic (e.g. examples/sd-jwt)
+├── docs/sd-jwt/                 # sdjwt.js.org landing page (deployed to GitHub Pages)
 ├── tests/                       # Integration tests
 ├── .changeset/                  # Changeset configuration for versioning
 └── .github/                     # GitHub Actions workflows
@@ -72,7 +75,7 @@ identity-common-ts/
 
 ### Package Categories
 
-Packages are organized into two main categories:
+Packages are organized into three main categories:
 
 1. **Core Identity Utilities** (`@owf/identity-*`)
    - Generic, reusable utilities for any identity solution
@@ -83,6 +86,11 @@ Packages are organized into two main categories:
    - Tools specific to the European Digital Identity Wallet ecosystem
    - Built on top of core utilities
    - Implements ETSI and ARF specifications
+
+3. **SD-JWT** (`@sd-jwt/*`)
+   - SD-JWT (RFC 9901) and SD-JWT VC implementations
+   - Located in `packages/sd-jwt-<name>` (or `packages/sd-jwt-vc`)
+   - Versioned separately from the `@owf/*` packages (see `.changeset/config.json`)
 
 ## Development Workflow
 
@@ -166,6 +174,7 @@ Create `packages/my-package/package.json`:
 
 - Core utilities: `@owf/identity-<name>` or `@owf/<name>` (e.g., `@owf/jose`, `@owf/x509`)
 - EUDI-specific: `@owf/eudi-<name>` (e.g., `@owf/eudi-lote`, `@owf/eudi-payment`)
+- SD-JWT: `@sd-jwt/<name>` in `packages/sd-jwt-<name>` (e.g., `@sd-jwt/core` in `packages/sd-jwt-core`)
 
 ### 3. Create TypeScript Configuration
 
@@ -434,9 +443,6 @@ Maintainers will handle the release process.
 
 ## Questions?
 
-If you have questions, feel free to:
-
-- Open a [GitHub Discussion](https://github.com/openwallet-foundation-labs/identity-common-ts/discussions)
-- Join the [OpenWallet Foundation community](https://openwallet.foundation/community/)
+If you have questions, feel free to [open an issue](https://github.com/openwallet-foundation-labs/identity-common-ts/issues).
 
 Thank you for contributing! 🎉

@@ -20,6 +20,8 @@ Which package(s) would this feature belong to?
 - [ ] `@owf/x509` (planned)
 - [ ] `@owf/token-status-list` (planned)
 - [ ] `@owf/eudi-*` (EUDI-specific)
+- [ ] `@sd-jwt/core`
+- [ ] `@sd-jwt/sd-jwt-vc`
 - [ ] New package: _____________
 
 ## Problem Statement
