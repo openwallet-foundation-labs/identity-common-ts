@@ -164,6 +164,29 @@ function collectClaimsFromSchema(
   ancestors.delete(node)
 }
 
+function collectClaimsFromProperties(
+  properties: Record<string, unknown>,
+  path: DcqlClaimsPathComponent[],
+  claims: DcqlClaim[],
+  ancestors: Set<object>
+): void {
+  for (const [propertyName, propertySchema] of Object.entries(properties)) {
+    const propertyPath = [...path, propertyName]
+
+    if (isArraySchema(propertySchema)) {
+      collectClaimsFromArraySchema(propertySchema, propertyPath, claims, ancestors)
+      continue
+    }
+
+    if (isObjectSchema(propertySchema)) {
+      collectClaimsFromSchema(propertySchema, propertyPath, claims, ancestors)
+      continue
+    }
+
+    pushClaim(claims, propertyPath)
+  }
+}
+
 function collectClaimsFromSchemaNode(
   node: Record<string, unknown>,
   path: DcqlClaimsPathComponent[],
@@ -182,22 +205,7 @@ function collectClaimsFromSchemaNode(
 
   const properties = node.properties
   if (isPlainObject(properties)) {
-    for (const [propertyName, propertySchema] of Object.entries(properties)) {
-      const propertyPath = [...path, propertyName]
-
-      if (isArraySchema(propertySchema)) {
-        collectClaimsFromArraySchema(propertySchema, propertyPath, claims, ancestors)
-        continue
-      }
-
-      if (isObjectSchema(propertySchema)) {
-        collectClaimsFromSchema(propertySchema, propertyPath, claims, ancestors)
-        continue
-      }
-
-      pushClaim(claims, propertyPath)
-    }
-
+    collectClaimsFromProperties(properties, path, claims, ancestors)
     return
   }
 
@@ -209,16 +217,9 @@ function collectClaimsFromSchemaNode(
   pushClaim(claims, path)
 }
 
-function getClaimsFromSchema(schemaRef?: ResolvedSchemaReference): DcqlClaim[] {
-  const schema = schemaRef?.parsedSchema
-  if (!schema) {
-    return []
-  }
-
-  const claims: DcqlClaim[] = []
-  collectClaimsFromSchema(schema, [], claims, new Set<object>())
-
+function dedupeClaims(claims: DcqlClaim[]): DcqlClaim[] {
   const deduped = new Map<string, DcqlClaim>()
+
   for (const claim of claims) {
     const key = JSON.stringify(claim.path)
     if (!deduped.has(key)) {
@@ -227,6 +228,29 @@ function getClaimsFromSchema(schemaRef?: ResolvedSchemaReference): DcqlClaim[] {
   }
 
   return [...deduped.values()]
+}
+
+/**
+ * Claims for a resolved reference. SD-JWT VC Type Metadata already states every claim as a
+ * claims path pointer, so it is used verbatim; a JSON Schema has to be walked to infer the
+ * same paths.
+ */
+export function getClaimsFromSchema(schemaRef?: ResolvedSchemaReference): DcqlClaim[] {
+  const typeMetadataClaims = schemaRef?.typeMetadata?.claims
+
+  if (typeMetadataClaims && typeMetadataClaims.length > 0) {
+    return dedupeClaims(typeMetadataClaims.map((claim) => ({ path: claim.path as DcqlClaimsPath })))
+  }
+
+  const schema = schemaRef?.parsedSchema
+  if (!schema) {
+    return []
+  }
+
+  const claims: DcqlClaim[] = []
+  collectClaimsFromSchema(schema, [], claims, new Set<object>())
+
+  return dedupeClaims(claims)
 }
 
 export function toDcqlTrustedAuthorities(schemaMeta: SchemaMeta): DcqlTrustedAuthority[] {

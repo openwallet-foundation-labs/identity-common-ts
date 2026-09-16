@@ -16,6 +16,7 @@ export async function verifyResolveAndBuildDcql(options: {
   selectedFormats: AttestationFormat[]
   resolve: ResolveSchemaReferencesOptions['resolve']
   verifyIntegrity?: boolean
+  maxExtendsDepth?: number
   includeTrustedAuthorities?: boolean
   idPrefix?: string
 }): Promise<{
@@ -23,7 +24,16 @@ export async function verifyResolveAndBuildDcql(options: {
   resolvedReferences: ResolvedSchemaReference[]
   dcql: BuildDcqlFromSchemaMetaResult
 }> {
-  const { jws, verifier, selectedFormats, resolve, verifyIntegrity, includeTrustedAuthorities, idPrefix } = options
+  const {
+    jws,
+    verifier,
+    selectedFormats,
+    resolve,
+    verifyIntegrity,
+    maxExtendsDepth,
+    includeTrustedAuthorities,
+    idPrefix,
+  } = options
 
   const verified = await verifySchemaMeta({ jws, verifier })
 
@@ -32,6 +42,7 @@ export async function verifyResolveAndBuildDcql(options: {
     selectedFormats,
     resolve,
     verifyIntegrity,
+    maxExtendsDepth,
   })
 
   const dcql = buildDcqlFromSchemaMeta({

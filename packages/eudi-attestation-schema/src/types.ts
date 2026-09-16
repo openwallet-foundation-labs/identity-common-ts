@@ -15,12 +15,21 @@ import type {
   AttestationLoSSchema,
   BindingTypeSchema,
   FrameworkTypeSchema,
+  IssuanceProfileSchema,
   MsoMdocMetaSchema,
+  Oid4vciClaimDisplaySchema,
+  Oid4vciClaimSchema,
+  Oid4vciCredentialMetadataSchema,
+  Oid4vciDisplaySchema,
+  ProofTypeSchema,
   SchemaMetaSchema,
   SchemaURISchema,
   SdJwtMetaSchema,
+  SdJwtVcTypeMetadataSchema,
+  StatusMechanismSchema,
   TrustAuthoritySchema,
 } from './schemas'
+import type { TypeMetadata } from './type-metadata'
 
 // ============================================================================
 // Enum Types
@@ -38,8 +47,16 @@ export type FrameworkType = z.infer<typeof FrameworkTypeSchema>
 export type TrustAuthority = z.infer<typeof TrustAuthoritySchema>
 export type SdJwtMeta = z.infer<typeof SdJwtMetaSchema>
 export type MsoMdocMeta = z.infer<typeof MsoMdocMetaSchema>
+export type Oid4vciCredentialMetadata = z.infer<typeof Oid4vciCredentialMetadataSchema>
+export type Oid4vciDisplay = z.infer<typeof Oid4vciDisplaySchema>
+export type Oid4vciClaimDisplay = z.infer<typeof Oid4vciClaimDisplaySchema>
+export type Oid4vciClaim = z.infer<typeof Oid4vciClaimSchema>
+export type SdJwtVcTypeMetadata = z.infer<typeof SdJwtVcTypeMetadataSchema>
 export type SchemaURIMeta = SdJwtMeta | MsoMdocMeta
 export type SchemaURI = z.infer<typeof SchemaURISchema>
+export type ProofType = z.infer<typeof ProofTypeSchema>
+export type StatusMechanism = z.infer<typeof StatusMechanismSchema>
+export type IssuanceProfile = z.infer<typeof IssuanceProfileSchema>
 export type SchemaMeta = z.infer<typeof SchemaMetaSchema>
 
 // ============================================================================
@@ -96,14 +113,23 @@ export interface ResolvedSchemaReference {
   integrity: string
   meta?: SchemaURIMeta
   rawSchema: unknown
+  /** Present for `dc+sd-jwt` references that resolve to Type Metadata, merged over `extends`. */
+  typeMetadata?: TypeMetadata
+  /** The JSON Schema itself: embedded `schema`, resolved `schema_uri`, or the document. */
   parsedSchema?: Record<string, unknown>
 }
+
+/** Integrity can only be verified over `string` or `Uint8Array`, never over parsed content. */
+export type ResolverContent = string | Uint8Array | object
 
 export interface ResolveSchemaReferencesOptions {
   schemaMeta: SchemaMeta
   selectedFormats?: AttestationFormat[]
-  resolve: (uri: string) => Promise<{ content: string | object; contentType?: string }>
+  resolve: (uri: string) => Promise<{ content: ResolverContent; contentType?: string }>
+  /** Defaults to `true`. */
   verifyIntegrity?: boolean
+  /** Defaults to 10. */
+  maxExtendsDepth?: number
 }
 
 export interface DcqlTrustedAuthority {
@@ -129,4 +155,32 @@ export interface BuildDcqlFromSchemaMetaOptions {
 
 export interface BuildDcqlFromSchemaMetaResult {
   credentials: Array<Record<string, unknown>>
+}
+
+// ============================================================================
+// OID4VCI Issuer Metadata Mapping Types
+// ============================================================================
+
+export interface BuildCredentialConfigurationTemplateOptions {
+  schemaMeta: SchemaMeta
+  format: AttestationFormat
+  resolvedReferences?: ResolvedSchemaReference[]
+  credentialConfigurationId?: string
+}
+
+export interface CredentialConfigurationTemplate {
+  credentialConfigurationId: string
+  credentialConfiguration: Record<string, unknown>
+  /** Members no catalogue entry can supply, listed so an issuer knows what is left to fill in. */
+  deploymentFields: {
+    credentialConfiguration: string[]
+    issuerMetadata: string[]
+  }
+}
+
+export interface ValidateIssuerMetadataOptions {
+  issuerMetadata: unknown
+  schemaMeta: SchemaMeta
+  format: AttestationFormat
+  credentialConfigurationId?: string
 }

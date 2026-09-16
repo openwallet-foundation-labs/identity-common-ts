@@ -76,6 +76,26 @@ describe('SchemaURIBuilder', () => {
     expect(schema.meta).toEqual({ doctype_value: 'org.iso.18013.5.1.mDL' })
   })
 
+  it('adds portable OID4VCI metadata to an SD-JWT binding', () => {
+    const schema = schemaURI()
+      .format('dc+sd-jwt')
+      .uri('https://example.com/schema.json')
+      .integrity(SCHEMA_INTEGRITY)
+      .meta({ vct: 'eu.europa.ec.eudi.pid.1' })
+      .credentialMetadata({
+        display: [{ name: 'Personal Identity Data', locale: 'en' }],
+        claims: [
+          {
+            path: ['family_name'],
+            display: [{ name: 'Family name', locale: 'en' }],
+          },
+        ],
+      })
+      .build()
+
+    expect(schema.meta.credential_metadata?.display?.[0]?.name).toBe('Personal Identity Data')
+  })
+
   it('should throw when integrity is missing', () => {
     expect(() => {
       schemaURI().format('dc+sd-jwt').uri('https://example.com/schema.json').meta({ vct: 'example.1' }).build()

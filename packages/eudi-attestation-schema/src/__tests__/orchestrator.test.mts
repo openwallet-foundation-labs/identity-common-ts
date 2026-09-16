@@ -1,8 +1,13 @@
+import { createHash } from 'node:crypto'
 import { ES256 } from '@owf/crypto'
 import { describe, expect, it } from 'vitest'
 import { schemaMeta, schemaURI } from '../builders'
 import { verifyResolveAndBuildDcql } from '../orchestrator'
 import { signSchemaMeta } from '../signer'
+
+function withSri(content: string): string {
+  return `sha256-${createHash('sha256').update(Buffer.from(content, 'utf8')).digest('base64')}`
+}
 
 const TEST_CERT = `-----BEGIN CERTIFICATE-----
 MIIBczCCARmgAwIBAgIUZt2jkmAgIIiw/wpvJU/4yL7ek/YwCgYIKoZIzj0EAwIw
@@ -53,9 +58,10 @@ describe('verifyResolveAndBuildDcql', () => {
   it('executes verify -> resolve -> build happy path', async () => {
     const signer = await ES256.getSigner(TEST_PRIVATE_KEY)
     const verifier = await ES256.getVerifier(TEST_PUBLIC_KEY)
+    const content = '{"type":"object","properties":{"given_name":{"type":"string"},"family_name":{"type":"string"}}}'
 
     const signed = await signSchemaMeta({
-      schemaMeta: buildMetaWithIntegrity(),
+      schemaMeta: buildMetaWithIntegrity(withSri(content)),
       keyId: 'test-key',
       signer,
       certificates: [TEST_CERT],
@@ -65,9 +71,7 @@ describe('verifyResolveAndBuildDcql', () => {
       jws: signed.jws,
       verifier,
       selectedFormats: ['dc+sd-jwt'],
-      resolve: async () => ({
-        content: '{"type":"object","properties":{"given_name":{"type":"string"},"family_name":{"type":"string"}}}',
-      }),
+      resolve: async () => ({ content }),
       includeTrustedAuthorities: true,
     })
 

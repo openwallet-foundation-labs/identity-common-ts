@@ -167,9 +167,38 @@ console.log(result.dcql.credentials);
 
 Integrity notes:
 
-- `verifyIntegrity` supports SRI digests with `sha256`.
-- Integrity validation hashes UTF-8 bytes of the resolver content.
-- If resolver content is an object (not a string), integrity is computed over `JSON.stringify(content)`.
+- `verifyIntegrity` defaults to `true` and supports SRI digests with `sha256`.
+- SRI is defined over the bytes as transferred, so `resolve` must return the response body as a `string` or `Uint8Array`. Returning already-parsed content throws unless `verifyIntegrity` is `false`.
+- The same rule applies to the second-hop documents reached through `schema_uri` and `extends`.
+
+### SD-JWT VC Type Metadata
+
+A `dc+sd-jwt` reference resolves to an [SD-JWT VC Type Metadata](https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-18.html#name-sd-jwt-vc-type-metadata) document rather than to a bare JSON Schema:
+
+```json
+{
+  "vct": "https://example.com/credentials/education",
+  "extends": "https://example.com/credentials/base",
+  "extends#integrity": "sha256-…",
+  "claims": [
+    { "path": ["given_name"], "sd": "allowed" },
+    { "path": ["address", "country"], "sd": "always" },
+    { "path": ["degrees", null, "type"] }
+  ],
+  "schema_uri": "https://example.com/schemas/education.json",
+  "schema_uri#integrity": "sha256-…"
+}
+```
+
+`resolveSchemaReferences` handles this automatically:
+
+- The document is validated against `TypeMetadataSchema`. Unknown members are preserved, and `schema` and `schema_uri` are mutually exclusive.
+- Its `vct` is cross-checked against `meta.vct` from the catalogue entry; a mismatch throws.
+- The `extends` chain is followed and merged, with the extending document winning and claims merged per path. `extends#integrity` is verified on each hop. Cycles throw, and `maxExtendsDepth` (default 10) bounds the chain.
+- `schema_uri` is fetched as a second hop and its `schema_uri#integrity` verified; the result, or an embedded `schema`, becomes `parsedSchema`.
+- The merged document is available as `resolvedReference.typeMetadata`.
+
+A reference that is a plain JSON Schema (no `vct` member) is still supported and behaves as before.
 
 ### DCQL claims from referenced JSON Schemas
 
@@ -219,6 +248,8 @@ Every generated `path` is a DCQL claims path pointer: a non-empty array of strin
 
 Claim extraction rules:
 
+When a resolved reference carries Type Metadata with a non-empty `claims` array, those paths are used verbatim — Type Metadata states every claim as a claims path pointer already, so nothing has to be inferred. The rules below apply only when claims are derived from a JSON Schema instead.
+
 - **Primitive properties** (`string`, `number`, `boolean`, …) produce a single-element path.
 - **Nested object properties** are recursed into; each leaf produces a multi-element path.
 - **Array properties with primitive items** produce a single path entry for the array field itself.
@@ -228,13 +259,72 @@ Claim extraction rules:
 - Duplicate paths across combinators are deduplicated deterministically.
 - If no `parsedSchema` is available for a resolved reference, no `claims` key is added to the credential.
 
+### Issuance Profile and OID4VCI Issuer Metadata
+
+A catalogue entry may carry an optional `issuanceProfile` describing the policy constraints an issuer of this attestation type must satisfy. Every member is an **allowed set or a bound, not a deployment value**: the catalogue narrows the space, and each issuer picks a conformant point inside it.
+
+```typescript
+import { schemaMeta, schemaURI } from '@owf/eudi-attestation-schema';
+
+const meta = schemaMeta()
+  // …required fields…
+  .issuanceProfile({
+    credentialSigningAlgValuesSupported: ['ES256', 'ES384'],
+    cryptographicBindingMethodsSupported: ['jwk'],
+    proofTypesSupported: { jwt: { proof_signing_alg_values_supported: ['ES256'] } },
+    keyAttestationRequired: true,
+    statusMechanism: { type: 'token_status_list', required: true },
+    maxValidityPeriod: 7776000,
+    batchIssuanceAllowed: false,
+  })
+  .build();
+```
+
+A prospective issuer can derive an OID4VCI `credential_configurations_supported` entry from the catalogue entry rather than copying another issuer's published metadata:
+
+```typescript
+import { buildCredentialConfigurationTemplate } from '@owf/eudi-attestation-schema';
+
+const template = buildCredentialConfigurationTemplate({
+  schemaMeta: meta,
+  format: 'dc+sd-jwt',
+  resolvedReferences, // optional, populates `claims`
+});
+
+console.log(template.credentialConfigurationId); // 'eu.europa.ec.eudi.pid.1'
+console.log(template.credentialConfiguration);   // type- and policy-determined members only
+console.log(template.deploymentFields);          // members the issuer must supply itself
+```
+
+And a wallet, auditor, or scheme owner can check a published metadata document against the catalogue entry:
+
+```typescript
+import { validateIssuerMetadataAgainstProfile } from '@owf/eudi-attestation-schema';
+
+const result = validateIssuerMetadataAgainstProfile({
+  issuerMetadata, // fetched from {credential_issuer}/.well-known/openid-credential-issuer
+  schemaMeta: meta,
+  format: 'dc+sd-jwt',
+});
+
+if (!result.valid) {
+  console.error(result.errors);
+}
+```
+
+Scope notes:
+
+- Deployment-specific members (`credential_issuer`, `credential_endpoint`, `authorization_servers`, `scope`, `display`) are never emitted by the template and never checked.
+- `statusMechanism` and `maxValidityPeriod` have no expression in issuer metadata and are therefore not validated.
+- Technical conformance is not authorisation to issue — that remains governed by the trust list referenced in `trustedAuthorities`.
+
 ## SchemaURI `meta` Requirements
 
 `SchemaURI` uses `formatIdentifier` as a discriminator, and the `meta` object is validated per format.
 
 | `formatIdentifier` | Required `meta` shape | Notes |
 |---|---|---|
-| `dc+sd-jwt` | `{ vct: string }` | `vct` is required and must be a non-empty string |
+| `dc+sd-jwt` | `{ vct: string }` | `vct` is required and must be a non-empty string, and must match the `vct` of the resolved Type Metadata document |
 | `mso_mdoc` | `{ doctype_value: string }` | `doctype_value` is required and must be a non-empty string |
 
 Example with multiple formats:
@@ -283,6 +373,23 @@ const meta = schemaMeta()
 | `attestationLoS` | Yes | `AttestationLoS` | Level of security |
 | `bindingType` | Yes | `BindingType` | Cryptographic binding type |
 | `schemaURIs` | Yes | `SchemaURI[]` | Schema URIs per format |
+| `issuanceProfile` | No | `IssuanceProfile` | Policy constraints a conformant issuer must satisfy |
+
+### IssuanceProfile
+
+All members are optional — a catalogue entry that omits the profile simply expresses no policy constraint.
+
+| Field | Type | Description |
+|---|---|---|
+| `credentialSigningAlgValuesSupported` | `string[]` | Allowed credential signing algorithms |
+| `cryptographicBindingMethodsSupported` | `string[]` | Allowed binding methods (`jwk`, `cose_key`, …) |
+| `proofTypesSupported` | `Record<string, { proof_signing_alg_values_supported: string[] }>` | Allowed proof types and their algorithms |
+| `keyAttestationRequired` | `boolean` | Whether issuers must require key attestation |
+| `statusMechanism` | `{ type: 'token_status_list'; required: boolean }` | Required status mechanism |
+| `maxValidityPeriod` | `number` | Upper bound on credential validity, in seconds |
+| `batchIssuanceAllowed` | `boolean` | Whether batch issuance is permitted |
+
+A profile must not declare `cryptographicBindingMethodsSupported` or `proofTypesSupported` when `bindingType` is `none`.
 
 ### SchemaURI
 

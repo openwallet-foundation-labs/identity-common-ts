@@ -5,9 +5,12 @@ import type {
   AttestationLoS,
   BindingType,
   FrameworkType,
+  IssuanceProfile,
+  Oid4vciCredentialMetadata,
   SchemaMeta,
   SchemaURI,
   SchemaURIMeta,
+  SdJwtVcTypeMetadata,
   TrustAuthority,
 } from './types'
 
@@ -98,6 +101,29 @@ export class SchemaURIBuilder {
   }
 
   /**
+   * Set portable OID4VCI display and claim metadata for a schema binding.
+   */
+  credentialMetadata(metadata: Oid4vciCredentialMetadata): this {
+    const meta = this.data.meta as Record<string, unknown> | undefined
+    if (!meta || !this.data.formatIdentifier) {
+      throw new SchemaMetaException('OID4VCI credential metadata requires format and meta first')
+    }
+
+    this.data.meta = { ...meta, credential_metadata: metadata }
+    return this
+  }
+
+  /** Set SD-JWT VC Type Metadata for an SD-JWT VC binding. */
+  sdJwtVcMetadata(metadata: SdJwtVcTypeMetadata): this {
+    const meta = this.data.meta as Record<string, unknown> | undefined
+    if (!meta || this.data.formatIdentifier !== 'dc+sd-jwt') {
+      throw new SchemaMetaException('SD-JWT VC metadata requires dc+sd-jwt format and meta({ vct }) first')
+    }
+    this.data.meta = { ...meta, sd_jwt_vc_metadata: metadata }
+    return this
+  }
+
+  /**
    * Build the SchemaURI object
    */
   build(): SchemaURI {
@@ -181,6 +207,14 @@ export class SchemaMetaBuilder {
   addSchemaURI(schemaURI: SchemaURI): this {
     this.data.schemaURIs = this.data.schemaURIs ?? []
     this.data.schemaURIs.push(schemaURI)
+    return this
+  }
+
+  /**
+   * Set the optional issuance profile constraining how conformant issuers may issue this type
+   */
+  issuanceProfile(profile: IssuanceProfile): this {
+    this.data.issuanceProfile = profile
     return this
   }
 
