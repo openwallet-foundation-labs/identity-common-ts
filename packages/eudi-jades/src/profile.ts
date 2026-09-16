@@ -1,5 +1,5 @@
 /** Structural baseline-profile checks from ETSI TS 119 182-1 V1.2.1 clause 6.3. */
-import { base64urlDecode } from '@owf/identity-common'
+import { base64urlDecodeJson } from '@owf/identity-common'
 import { JAdESProfile } from './constants'
 import { ProtectedHeaderSchema, UnprotectedHeaderSchema } from './schemas'
 import type { ProtectedHeaderParams, UnprotectedHeaderParams } from './types'
@@ -23,7 +23,7 @@ function decodeEtsiU(header?: UnprotectedHeaderParams): EtsiUItem[] {
   return header.etsiU.flatMap((item) => {
     if (typeof item !== 'string') return [item as EtsiUItem]
     try {
-      const decoded = JSON.parse(base64urlDecode(item))
+      const decoded = base64urlDecodeJson(item)
       return typeof decoded === 'object' && decoded !== null ? [decoded as EtsiUItem] : []
     } catch {
       return []

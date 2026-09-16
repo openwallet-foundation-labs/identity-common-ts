@@ -1,21 +1,19 @@
 import { sha256 as nobleSha256, sha384 as nobleSha384, sha512 as nobleSha512 } from '@noble/hashes/sha2.js'
-import { base64 } from '@owf/identity-common'
+import { base64, stringToBytes } from '@owf/identity-common'
 import { CryptoException } from './crypto-exception'
 
-const textEncoder = new TextEncoder()
-
 export const sha256 = (text: string | ArrayBuffer): Uint8Array => {
-  const uint8Array = typeof text === 'string' ? textEncoder.encode(text) : new Uint8Array(text)
+  const uint8Array = typeof text === 'string' ? stringToBytes(text) : new Uint8Array(text)
   return nobleSha256(uint8Array)
 }
 
 export const sha384 = (text: string | ArrayBuffer): Uint8Array => {
-  const uint8Array = typeof text === 'string' ? textEncoder.encode(text) : new Uint8Array(text)
+  const uint8Array = typeof text === 'string' ? stringToBytes(text) : new Uint8Array(text)
   return nobleSha384(uint8Array)
 }
 
 export const sha512 = (text: string | ArrayBuffer): Uint8Array => {
-  const uint8Array = typeof text === 'string' ? textEncoder.encode(text) : new Uint8Array(text)
+  const uint8Array = typeof text === 'string' ? stringToBytes(text) : new Uint8Array(text)
   return nobleSha512(uint8Array)
 }
 

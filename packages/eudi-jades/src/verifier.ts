@@ -1,12 +1,15 @@
 /** JAdES JWS decoding and cryptographic verification. */
-import { base64UrlToUint8Array, base64urlDecode, uint8ArrayToBase64Url } from '@owf/identity-common'
+import {
+  base64UrlToUint8Array,
+  base64urlDecodeJson,
+  bytesToString,
+  stringToBytes,
+  uint8ArrayToBase64Url,
+} from '@owf/identity-common'
 import { CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS } from './constants'
 import { JAdESException } from './jades-exception'
 import { FlattenedJWSSchema, GeneralJWSSchema, ProtectedHeaderSchema, UnprotectedHeaderSchema } from './schemas'
 import type { FlattenedJWS, GeneralJWS, ProtectedHeader, UnprotectedHeaderParams, VerifyOptions } from './types'
-
-const decoder = new TextDecoder()
-const encoder = new TextEncoder()
 
 export interface VerifyResult<T = unknown> {
   header: ProtectedHeader
@@ -30,7 +33,7 @@ function parseProtected(encoded: string | undefined): ProtectedHeader {
   if (!encoded) throw new JAdESException('JAdES requires a JWS Protected Header')
   let raw: unknown
   try {
-    raw = JSON.parse(base64urlDecode(encoded))
+    raw = base64urlDecodeJson(encoded)
   } catch (error) {
     throw new JAdESException('Invalid protected header encoding', error)
   }
@@ -52,7 +55,7 @@ function parseUnprotected(raw: unknown): UnprotectedHeaderParams | undefined {
 
 function detachedBytes(payload: VerifyOptions['detachedPayload']): Uint8Array | undefined {
   if (payload === undefined) return undefined
-  return typeof payload === 'string' ? encoder.encode(payload) : payload
+  return typeof payload === 'string' ? stringToBytes(payload) : payload
 }
 
 function parsePayload<T>(value: string): T {
@@ -81,7 +84,7 @@ function parseSignature<T>(
     throw new JAdESException(`Unsupported critical header parameter: ${unsupportedCriticalParameter}`)
   }
   const suppliedBytes = detachedBytes(options.detachedPayload)
-  const suppliedPayload = suppliedBytes ? decoder.decode(suppliedBytes) : undefined
+  const suppliedPayload = suppliedBytes ? bytesToString(suppliedBytes) : undefined
   const objectDigest = header.sigD?.mId === DETACHED_MECHANISM_IDS.objectByUriHash
 
   if (serializedPayload === undefined && suppliedPayload === undefined && !objectDigest) {
@@ -101,9 +104,9 @@ function parseSignature<T>(
     (serializedPayload === undefined
       ? new Uint8Array()
       : header.b64 === false
-        ? encoder.encode(serializedPayload)
+        ? stringToBytes(serializedPayload)
         : base64UrlToUint8Array(serializedPayload))
-  const rawPayload = decoder.decode(rawPayloadBytes)
+  const rawPayload = bytesToString(rawPayloadBytes)
 
   return {
     header,

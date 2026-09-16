@@ -20,6 +20,14 @@ Fixes #
 ## Packages Affected
 
 - [ ] `@owf/identity-common`
+- [ ] `@sd-jwt/core`
+- [ ] `@sd-jwt/sd-jwt-vc`
+- [ ] `@owf/mdoc`
+- [ ] `dcql`
+- [ ] `@openid4vc/oauth2`
+- [ ] `@openid4vc/openid4vci`
+- [ ] `@openid4vc/openid4vp`
+- [ ] `@openid4vc/utils`
 - [ ] Other: _____________
 
 ## Checklist

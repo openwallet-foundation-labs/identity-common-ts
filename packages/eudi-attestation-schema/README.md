@@ -169,7 +169,7 @@ Integrity notes:
 
 - `verifyIntegrity` defaults to `true` and supports SRI digests with `sha256`.
 - SRI is defined over the bytes as transferred, so `resolve` must return the response body as a `string` or `Uint8Array`. Returning already-parsed content throws unless `verifyIntegrity` is `false`.
-- The same rule applies to the second-hop documents reached through `schema_uri` and `extends`.
+- The same rule applies to documents reached through `extends`.
 
 ### SD-JWT VC Type Metadata
 
@@ -184,19 +184,16 @@ A `dc+sd-jwt` reference resolves to an [SD-JWT VC Type Metadata](https://www.iet
     { "path": ["given_name"], "sd": "allowed" },
     { "path": ["address", "country"], "sd": "always" },
     { "path": ["degrees", null, "type"] }
-  ],
-  "schema_uri": "https://example.com/schemas/education.json",
-  "schema_uri#integrity": "sha256-…"
+  ]
 }
 ```
 
 `resolveSchemaReferences` handles this automatically:
 
-- The document is validated against `TypeMetadataSchema`. Unknown members are preserved, and `schema` and `schema_uri` are mutually exclusive.
+- The document is validated against the canonical `TypeMetadataFormatSchema` from `@sd-jwt/sd-jwt-vc`. Unknown members are preserved.
 - Its `vct` is cross-checked against `meta.vct` from the catalogue entry; a mismatch throws.
 - The `extends` chain is followed and merged, with the extending document winning and claims merged per path. `extends#integrity` is verified on each hop. Cycles throw, and `maxExtendsDepth` (default 10) bounds the chain.
-- `schema_uri` is fetched as a second hop and its `schema_uri#integrity` verified; the result, or an embedded `schema`, becomes `parsedSchema`.
-- The merged document is available as `resolvedReference.typeMetadata`.
+- The merged document is available as `resolvedReference.typeMetadata`; Type Metadata itself does not contain a JSON Schema.
 
 A reference that is a plain JSON Schema (no `vct` member) is still supported and behaves as before.
 

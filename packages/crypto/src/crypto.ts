@@ -1,4 +1,4 @@
-import { base64UrlToUint8Array, uint8ArrayToBase64Url } from '@owf/identity-common'
+import { base64UrlToUint8Array, stringToBytes, uint8ArrayToBase64Url } from '@owf/identity-common'
 
 export const generateSalt = (length: number): string => {
   if (length <= 0) {
@@ -14,8 +14,7 @@ export const generateSalt = (length: number): string => {
 }
 
 export async function digest(data: string | ArrayBuffer, algorithm = 'sha-256'): Promise<Uint8Array> {
-  const ec = new TextEncoder()
-  const result = await globalThis.crypto.subtle.digest(algorithm, typeof data === 'string' ? ec.encode(data) : data)
+  const result = await globalThis.crypto.subtle.digest(algorithm, typeof data === 'string' ? stringToBytes(data) : data)
   return new Uint8Array(result)
 }
 
@@ -47,8 +46,7 @@ export async function getSigner(privateKeyJWK: object, keyAlgorithm: ImportKeyAl
   const privateKey = await globalThis.crypto.subtle.importKey('jwk', privateKeyJWK, keyAlgorithm, true, ['sign'])
 
   return async (data: string) => {
-    const encoder = new TextEncoder()
-    const signature = await globalThis.crypto.subtle.sign(signAlgorithm, privateKey, encoder.encode(data))
+    const signature = await globalThis.crypto.subtle.sign(signAlgorithm, privateKey, stringToBytes(data))
 
     return uint8ArrayToBase64Url(new Uint8Array(signature))
   }
@@ -62,13 +60,12 @@ export async function getVerifier(
   const publicKey = await globalThis.crypto.subtle.importKey('jwk', publicKeyJWK, keyAlgorithm, true, ['verify'])
 
   return async (data: string, signatureBase64url: string) => {
-    const encoder = new TextEncoder()
     const signature = base64UrlToUint8Array(signatureBase64url)
     const isValid = await globalThis.crypto.subtle.verify(
       verifyAlgorithm,
       publicKey,
       signature.buffer as ArrayBuffer,
-      encoder.encode(data)
+      stringToBytes(data)
     )
 
     return isValid

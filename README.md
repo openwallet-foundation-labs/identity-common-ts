@@ -38,7 +38,7 @@ To avoid reinventing the wheel, many identity projects share common needs for da
 
 ### Project Categories
 
-The project is organized into two main categories:
+The project is organized into six main categories:
 
 #### Core Identity Utilities
 
@@ -65,6 +65,42 @@ Tools specific to the [European Digital Identity (EUDI) Wallet](https://ec.europ
 | [`@owf/eudi-attestation-schema`](./packages/eudi-attestation-schema) | TS11 Catalogue of Attestations SchemaMeta | ✅ Available |
 | `@owf/eudi-certificates` | Registration and access certificate verification | 📋 Planned |
 | `@owf/eudi-sca` | TS12 Strong Customer Authentication Payments according to the latest to-be-added ARF |  In Progess |
+
+#### SD-JWT
+
+Implementations of [Selective Disclosure for JWTs (SD-JWT)](https://www.rfc-editor.org/rfc/rfc9901.html) and [SD-JWT-based Verifiable Credentials (SD-JWT VC)](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/), previously developed in [sd-jwt-js](https://github.com/openwallet-foundation/sd-jwt-js). The `@sd-jwt/*` packages are versioned separately from the `@owf/*` packages.
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| [`@sd-jwt/core`](./packages/sd-jwt-core) | SD-JWT (RFC 9901) issuance, presentation, and verification | ✅ Available |
+| [`@sd-jwt/sd-jwt-vc`](./packages/sd-jwt-vc) | SD-JWT VC (draft-ietf-oauth-sd-jwt-vc) built on top of `@sd-jwt/core` | ✅ Available |
+
+#### mDOC
+
+Implementation of [ISO/IEC 18013-5](https://www.iso.org/standard/69084.html) mDOC and mDL (mobile driving licence) documents, including the ISO/IEC 18013-7 and OpenID4VP presentation flows, previously developed in [mdoc-ts](https://github.com/openwallet-foundation-labs/mdoc-ts). `@owf/mdoc` is versioned separately from the other `@owf/*` packages.
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| [`@owf/mdoc`](./packages/mdoc) | ISO/IEC 18013-5 mDOC and mDL issuance, presentation, and verification | ✅ Available |
+
+#### DCQL
+
+Implementation of the [Digital Credentials Query Language (DCQL)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-digital-credentials-query-l) from OpenID4VP, previously developed in [dcql-ts](https://github.com/openwallet-foundation-labs/dcql-ts). `dcql` is versioned separately from the other packages.
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| [`dcql`](./packages/dcql) | Create, validate, and execute DCQL queries, and validate presentations against them | ✅ Available |
+
+#### OpenID4VC
+
+Implementations of OAuth 2.0, [OpenID for Verifiable Credential Issuance (OpenID4VCI)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) and [OpenID for Verifiable Presentations (OpenID4VP)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html), previously developed in [oid4vc-ts](https://github.com/openwallet-foundation-labs/oid4vc-ts). The `@openid4vc/*` packages are versioned together, separately from the other packages.
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| [`@openid4vc/oauth2`](./packages/oauth2) | OAuth 2.0 client, authorization server and resource server, including PAR, PKCE, DPoP, JAR and attestation-based client authentication | ✅ Available |
+| [`@openid4vc/openid4vci`](./packages/openid4vci) | OpenID4VCI issuer and client, from draft 11 up to 1.0 | ✅ Available |
+| [`@openid4vc/openid4vp`](./packages/openid4vp) | OpenID4VP verifier and client, from draft 18 up to 1.0 | ✅ Available |
+| [`@openid4vc/utils`](./packages/openid4vc-utils) | Shared utilities for the `@openid4vc/*` packages | ✅ Available |
 
 > **Note**: While the EUDI Wallet is built on open standards (OpenID4VC, SD-JWT VC), it requires specific extensions for Trust, Payments, and document signing that are better suited in dedicated packages.
 
@@ -156,6 +192,90 @@ npm install @owf/eudi-attestation-schema
 
 📖 [View package documentation](./packages/eudi-attestation-schema/README.md)
 
+### @sd-jwt/core
+
+[![@sd-jwt/core version](https://img.shields.io/npm/v/@sd-jwt/core)](https://npmjs.com/package/@sd-jwt/core)
+
+Core library for SD-JWT (RFC 9901): encoding, decoding, selective disclosure, presentation, key binding, and verification.
+
+```bash
+npm install @sd-jwt/core
+```
+
+📖 [View package documentation](./packages/sd-jwt-core/README.md)
+
+### @sd-jwt/sd-jwt-vc
+
+[![@sd-jwt/sd-jwt-vc version](https://img.shields.io/npm/v/@sd-jwt/sd-jwt-vc)](https://npmjs.com/package/@sd-jwt/sd-jwt-vc)
+
+SD-JWT VC implementation built on top of `@sd-jwt/core`, with status list (revocation) and type metadata validation.
+
+```bash
+npm install @sd-jwt/sd-jwt-vc
+```
+
+📖 [View package documentation](./packages/sd-jwt-vc/README.md)
+
+### @owf/mdoc
+
+[![@owf/mdoc version](https://img.shields.io/npm/v/@owf/mdoc)](https://npmjs.com/package/@owf/mdoc)
+
+ISO/IEC 18013-5 mDOC and mDL: issue, hold, present, and verify CBOR encoded documents, with support for ISO/IEC 18013-7 and OpenID4VP session transcripts.
+
+```bash
+npm install @owf/mdoc
+```
+
+📖 [View package documentation](./packages/mdoc/README.md)
+
+### dcql
+
+[![dcql version](https://img.shields.io/npm/v/dcql)](https://npmjs.com/package/dcql)
+
+Digital Credentials Query Language (DCQL): create and validate queries, match them against credentials, and validate presentation results. Supports `mso_mdoc`, `dc+sd-jwt` and W3C VC formats, from OpenID4VP Draft 22 up to 1.0.
+
+```bash
+npm install dcql
+```
+
+📖 [View package documentation](./packages/dcql/README.md)
+
+### @openid4vc/oauth2
+
+[![@openid4vc/oauth2 version](https://img.shields.io/npm/v/@openid4vc/oauth2)](https://npmjs.com/package/@openid4vc/oauth2)
+
+OAuth 2.0 Authorization Framework implementation, including Pushed Authorization Requests, PKCE, DPoP, token introspection, JWT access tokens, resource indicators and attestation-based client authentication.
+
+```bash
+npm install @openid4vc/oauth2
+```
+
+📖 [View package documentation](./packages/oauth2/README.md)
+
+### @openid4vc/openid4vci
+
+[![@openid4vc/openid4vci version](https://img.shields.io/npm/v/@openid4vc/openid4vci)](https://npmjs.com/package/@openid4vc/openid4vci)
+
+OpenID for Verifiable Credential Issuance: authorization code and pre-authorized code flows, credential offers, signed issuer metadata, key attestations and presentation during issuance. Supports 1.0 with backwards compatibility down to draft 11.
+
+```bash
+npm install @openid4vc/openid4vci
+```
+
+📖 [View package documentation](./packages/openid4vci/README.md)
+
+### @openid4vc/openid4vp
+
+[![@openid4vc/openid4vp version](https://img.shields.io/npm/v/@openid4vc/openid4vp)](https://npmjs.com/package/@openid4vc/openid4vp)
+
+OpenID for Verifiable Presentations: signed and unsigned requests (JAR), `direct_post`, `direct_post.jwt`, `dc_api` and `dc_api.jwt` response modes, JARM and transaction data. Supports 1.0 with backwards compatibility down to draft 18.
+
+```bash
+npm install @openid4vc/openid4vp
+```
+
+📖 [View package documentation](./packages/openid4vp/README.md)
+
 ---
 
 ## Getting Started
@@ -177,7 +297,7 @@ yarn add @owf/identity-common
 
 ### Development Setup
 
-This monorepo uses [pnpm](https://pnpm.io) for package management and [Turborepo](https://turbo.build/repo) for task orchestration.
+This monorepo uses [pnpm workspaces](https://pnpm.io/workspaces).
 
 ```bash
 # Clone the repository
@@ -187,49 +307,18 @@ cd identity-common-ts
 # Install dependencies (requires pnpm)
 pnpm install
 
-# Build all packages
-pnpm build
-
-# Run all tests
+# Run all tests, or a subset
 pnpm test
+pnpm test packages/mdoc
+
+# Type-check the workspace
+pnpm types:check
+
+# Build all packages with tsdown
+pnpm build
 ```
 
-### Turborepo
-
-All build and test tasks run through **Turborepo**, which provides:
-
-- **Caching** — tasks whose inputs haven't changed are skipped entirely (a cached full run completes in ~15ms)
-- **Parallelism** — independent packages build and test concurrently
-- **Correct ordering** — packages are always built before the packages that depend on them
-
-#### Task pipeline
-
-| Task | Depends on | What it does |
-|------|-----------|--------------|
-| `build` | upstream `build` | Compiles each package with `tsdown` (ESM + CJS + `.d.ts`) |
-| `test` | upstream `build` | Runs `vitest` tests for each package |
-| `types:check` | upstream `build` | Type-checks the workspace with `tsc --noEmit` |
-| `esm:check` | local `build` | Validates ESM import paths |
-| `lint` | — | Linting (no build prerequisite) |
-
-Run any task across all packages:
-
-```bash
-pnpm build          # turbo run build
-pnpm test           # turbo run test
-
-# Scope to a single package
-npx turbo run build --filter=@owf/identity-common
-npx turbo run test  --filter=@owf/crypto
-```
-
-The first run executes everything. Subsequent runs that find no changed inputs print `FULL TURBO` and finish instantly.
-
-#### Cache details
-
-Turbo computes a hash for each task from its **input files** (`src/**`, `package.json`, `tsconfig.json`), the global config (`tsconfig.json`, `vite.config.js`), and the pnpm lockfile. If the hash matches a previously-stored result the task is restored from `.turbo/cache/` without re-running.
-
-The `.turbo/` directory is intentionally **not committed** (`.gitignore`) — every developer gets their own local cache.
+Within the workspace, packages export their TypeScript source, so tests, type checks, and examples run without a build. The built `dist` entrypoints are configured in `publishConfig` and only used for the published packages. See the [Contributing Guide](./CONTRIBUTING.md) for all available scripts.
 
 ---
 
@@ -237,7 +326,7 @@ The `.turbo/` directory is intentionally **not committed** (`.gitignore`) — ev
 
 This library is **platform agnostic** and supports:
 
-- ✅ **Node.js** (>=20)
+- ✅ **Node.js** (>=22)
 - ✅ **Browsers** (modern browsers with ES2020 support)
 - ✅ **React Native**
 
@@ -247,6 +336,15 @@ Your environment must provide:
 
 - `URL` and `URLSearchParams` implementations
 - A global `fetch` implementation (or provide it via callbacks)
+- Global `TextEncoder` and `TextDecoder` implementations
+
+### React Native
+
+When using these libraries in React Native you may need to add a polyfill for `TextDecoder`.
+
+You can confirm this by checking if `global.TextDecoder` is available. It should be available for React Native > 0.85 or Expo SDK > 52.
+
+If it is not available, make sure to add a polyfill like [this one](https://github.com/EvanBacon/text-decoder).
 
 ### Platform-Agnostic Design
 
@@ -271,8 +369,6 @@ const result = await someFunction({
 
 This library is designed to work with and support other OpenWallet Foundation projects:
 
-- [**sd-jwt-js**](https://github.com/openwallet-foundation-labs/sd-jwt-js) - SD-JWT implementation
-- [**oid4vc-ts**](https://github.com/openwallet-foundation-labs/oid4vc-ts) - OpenID4VC implementation
 - [**openid-federation-ts**](https://github.com/openwallet-foundation-labs/openid-federation-ts) - OpenID Federation implementation
 - [**credo-ts**](https://github.com/openwallet-foundation/credo-ts) - Aries Framework JavaScript
 - [**EUDIPLO**](https://github.com/openwallet-foundation-labs/eudiplo) - EUDI Wallet implementation
@@ -292,7 +388,7 @@ Please read our [Contributing Guide](./CONTRIBUTING.md) to get started.
 
 ### Adding a New Package
 
-A script is provided to scaffold a new package with the correct structure, build config, and Turborepo wiring already in place:
+A script is provided to scaffold a new package with the correct structure and build config already in place:
 
 ```bash
 pnpm create-package <name>           # e.g. jose

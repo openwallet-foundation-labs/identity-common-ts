@@ -20,6 +20,14 @@ Which package(s) would this feature belong to?
 - [ ] `@owf/x509` (planned)
 - [ ] `@owf/token-status-list` (planned)
 - [ ] `@owf/eudi-*` (EUDI-specific)
+- [ ] `@sd-jwt/core`
+- [ ] `@sd-jwt/sd-jwt-vc`
+- [ ] `@owf/mdoc`
+- [ ] `dcql`
+- [ ] `@openid4vc/oauth2`
+- [ ] `@openid4vc/openid4vci`
+- [ ] `@openid4vc/openid4vp`
+- [ ] `@openid4vc/utils`
 - [ ] New package: _____________
 
 ## Problem Statement

@@ -1,0 +1,47 @@
+{
+  "name": "@owf/mdoc",
+  "version": "0.7.0",
+  "description": "ISO 18013-5 Mdoc and MDL",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "author": "Animo Solutions",
+  "exports": "./src/index.ts",
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/mdoc",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/mdoc"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.mjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "keywords": [
+    "mdoc",
+    "mdl",
+    "iso-18013-5",
+    "iso-18013-7",
+    "cbor",
+    "cose"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+  },
+  "dependencies": {
+    "@owf/cose": "workspace:^",
+    "@owf/identity-common": "workspace:^",
+    "@owf/token-status-list": "workspace:^",
+    "zod": "catalog:"
+  }
+}

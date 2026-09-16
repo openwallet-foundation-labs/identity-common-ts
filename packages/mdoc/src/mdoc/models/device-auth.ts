@@ -1,0 +1,220 @@
+import { CborStructure, type CoseKey, MacAlgorithm, TypedMap, typedMap } from '@owf/cose'
+import { z } from 'zod'
+import type { MdocContext } from '../../context'
+import {
+  collectDeviceSignedElements,
+  describeUnauthorizedDeviceSignedElements,
+  findUnauthorizedDeviceSignedElements,
+} from '../../utils/keyAuthorizations'
+import {
+  defaultVerificationCallback,
+  onCategoryCheck,
+  type VerificationAssessment,
+  type VerificationCallback,
+} from '../check-callback'
+import { DeviceAuthentication } from './device-authentication'
+import { DeviceMac, type DeviceMacEncodedStructure } from './device-mac'
+import { DeviceSignature, type DeviceSignatureEncodedStructure } from './device-signature'
+import type { Document } from './document'
+import type { SessionTranscript } from './session-transcript'
+
+const deviceAuthSchema = typedMap([
+  ['deviceSignature', z.instanceof(DeviceSignature).exactOptional()],
+  ['deviceMac', z.instanceof(DeviceMac).exactOptional()],
+] as const)
+
+// ISO/IEC 18013-5 9.1.3.4: DeviceAuth = { "deviceSignature" : DeviceSignature // "deviceMac" : DeviceMac }
+// The refinement is applied to the decoded schema, as both decoding and `fromDecodedStructure` validate against it.
+const deviceAuthDecodedSchema = deviceAuthSchema.out.refine(
+  (map) => [map.get('deviceMac'), map.get('deviceSignature')].filter((i) => i !== undefined).length === 1,
+  { error: () => 'deviceAuth must contain either a deviceMac or deviceSignature, but not both or neither' }
+)
+
+export type DeviceAuthDecodedStructure = z.output<typeof deviceAuthSchema>
+export type DeviceAuthEncodedStructure = z.input<typeof deviceAuthSchema>
+
+export type DeviceAuthOptions = {
+  deviceSignature?: DeviceSignature
+  deviceMac?: DeviceMac
+}
+
+export class DeviceAuth extends CborStructure<DeviceAuthEncodedStructure, DeviceAuthDecodedStructure> {
+  public static override get encodingSchema() {
+    return z.codec(deviceAuthSchema.in, deviceAuthDecodedSchema, {
+      decode: (input) => {
+        const map: DeviceAuthDecodedStructure = TypedMap.fromMap(input)
+
+        if (input.has('deviceSignature')) {
+          map.set(
+            'deviceSignature',
+            DeviceSignature.fromEncodedStructure(input.get('deviceSignature') as DeviceSignatureEncodedStructure)
+          )
+        }
+        if (input.has('deviceMac')) {
+          map.set('deviceMac', DeviceMac.fromEncodedStructure(input.get('deviceMac') as DeviceMacEncodedStructure))
+        }
+        return map
+      },
+      encode: (output) => {
+        const map = output.toMap() as Map<unknown, unknown>
+        const deviceSignature = output.get('deviceSignature')
+        if (deviceSignature) {
+          map.set('deviceSignature', deviceSignature.encodedStructure)
+        }
+        const deviceMac = output.get('deviceMac')
+        if (deviceMac) {
+          map.set('deviceMac', deviceMac.encodedStructure)
+        }
+        return map
+      },
+    })
+  }
+
+  public get deviceSignature() {
+    return this.structure.get('deviceSignature')
+  }
+
+  public get deviceMac() {
+    return this.structure.get('deviceMac')
+  }
+
+  public async verify(
+    options: {
+      document: Document
+      verificationCallback?: VerificationCallback
+      ephemeralMacPrivateKey?: CoseKey
+      sessionTranscript: SessionTranscript | Uint8Array
+    },
+    ctx: Pick<MdocContext, 'crypto' | 'cose'>
+  ) {
+    const verificationCallback = options.verificationCallback ?? defaultVerificationCallback
+
+    const onCheck = onCategoryCheck(verificationCallback, 'DEVICE_AUTH')
+
+    const { deviceKey } = options.document.issuerSigned.issuerAuth.mobileSecurityObject.deviceKeyInfo
+
+    this.verifyKeyAuthorizations(options.document, onCheck)
+
+    const deviceMac = this.structure.get('deviceMac')
+    const deviceSignature = this.structure.get('deviceSignature')
+
+    // The schema already enforces this, but a signature must never be accepted while a MAC is also present
+    const hasExactlyOneAuthentication = (deviceSignature === undefined) !== (deviceMac === undefined)
+    onCheck({
+      status: hasExactlyOneAuthentication ? 'PASSED' : 'FAILED',
+      check: 'Device Auth must contain either a deviceSignature or deviceMac element, but not both',
+    })
+    if (!hasExactlyOneAuthentication) {
+      return
+    }
+
+    const deviceAuthenticationBytes = DeviceAuthentication.create({
+      sessionTranscript: options.sessionTranscript,
+      docType: options.document.docType,
+      deviceNamespaces: options.document.deviceSigned.deviceNamespaces,
+    }).encode({ asDataItem: true })
+
+    if (deviceSignature) {
+      try {
+        const verificationResult = await ctx.cose.sign1.verify({
+          toBeVerified: deviceSignature.toBeSigned({ detachedPayload: deviceAuthenticationBytes }),
+          key: deviceKey,
+          signature: deviceSignature.signature,
+        })
+
+        onCheck({
+          status: verificationResult ? 'PASSED' : 'FAILED',
+          check: 'Device signature must be valid',
+        })
+      } catch (err) {
+        onCheck({
+          status: 'FAILED',
+          check: 'Device signature must be valid',
+          reason: `Unable to verify deviceAuth signature (ECDSA/EdDSA): ${err instanceof Error ? err.message : 'Unknown error'}`,
+        })
+      }
+      return
+    }
+    if (deviceMac) {
+      if (deviceMac.algorithm !== MacAlgorithm.HS256) {
+        onCheck({
+          status: 'FAILED',
+          check: 'Device MAC must use alg 5 (HMAC 256/256)',
+        })
+        return
+      }
+
+      onCheck({
+        status: options.ephemeralMacPrivateKey ? 'PASSED' : 'FAILED',
+        check: 'Ephemeral private key must be present when using MAC authentication',
+      })
+
+      if (!options.ephemeralMacPrivateKey) {
+        return
+      }
+
+      try {
+        const isValid = await deviceMac.verify(
+          {
+            publicKey: deviceKey,
+            privateKey: options.ephemeralMacPrivateKey,
+            sessionTranscript: options.sessionTranscript,
+            info: 'EMacKey',
+            detachedPayload: deviceAuthenticationBytes,
+          },
+          ctx
+        )
+
+        onCheck({
+          status: isValid ? 'PASSED' : 'FAILED',
+          check: 'Device MAC must be valid',
+        })
+      } catch (err) {
+        onCheck({
+          status: 'FAILED',
+          check: 'Device MAC must be valid',
+          reason: `Unable to verify deviceAuth MAC: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        })
+      }
+    }
+  }
+
+  /**
+   * The mdoc reader half of the ISO/IEC 18013-5 9.1.3.4 key authorization rule, which
+   * {@link findUnauthorizedDeviceSignedElements} states in full. `DeviceResponse` enforces the
+   * mdoc half of the same rule when it creates a response.
+   */
+  private verifyKeyAuthorizations(
+    document: Document,
+    onCheck: (item: Omit<VerificationAssessment, 'category'>) => void
+  ) {
+    const { deviceNamespaces } = document.deviceSigned
+
+    // The check only applies when the mdoc actually authenticated device-signed elements.
+    if (collectDeviceSignedElements(deviceNamespaces).length === 0) return
+
+    const unauthorized = findUnauthorizedDeviceSignedElements({
+      deviceNamespaces,
+      keyAuthorizations: document.issuerSigned.issuerAuth.mobileSecurityObject.deviceKeyInfo.keyAuthorizations,
+    })
+
+    onCheck({
+      status: unauthorized.length === 0 ? 'PASSED' : 'FAILED',
+      check: 'Device signed elements must be authorized by the key authorizations in the mobile security object',
+      reason: unauthorized.length ? describeUnauthorizedDeviceSignedElements(unauthorized) : undefined,
+    })
+  }
+
+  public static create(options: DeviceAuthOptions): DeviceAuth {
+    const map: DeviceAuthDecodedStructure = new TypedMap([])
+    if (options.deviceSignature) {
+      map.set('deviceSignature', options.deviceSignature)
+    }
+    if (options.deviceMac) {
+      map.set('deviceMac', options.deviceMac)
+    }
+
+    // biome-ignore lint/complexity/noThisInStatic: this.fromDecodedStructure is intentional for subclass support
+    return this.fromDecodedStructure(map)
+  }
+}

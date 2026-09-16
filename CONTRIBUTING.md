@@ -40,17 +40,13 @@ This project follows the [OpenWallet Foundation Code of Conduct](https://tac.ope
    pnpm install
    ```
 
-3. Build all packages:
-
-   ```bash
-   pnpm build
-   ```
-
-4. Run tests:
+3. Run tests:
 
    ```bash
    pnpm test
    ```
+
+Within the workspace, packages export their TypeScript source (`src/index.ts`), so tests, type checks, and examples don't need a build. The built `dist` entrypoints are only used when publishing, through `publishConfig`.
 
 ## Project Structure
 
@@ -64,7 +60,14 @@ identity-common-ts/
 │   ├── cose/                    # COSE/CWT implementation (planned)
 │   ├── x509/                    # X.509 certificate utilities (planned)
 │   ├── token-status-list/       # JWT/CWT Token Status List (planned)
+│   ├── sd-jwt-*/                # SD-JWT and SD-JWT VC packages (@sd-jwt/*)
+│   ├── mdoc/                    # ISO/IEC 18013-5 mDOC and mDL (@owf/mdoc)
+│   ├── dcql/                    # Digital Credentials Query Language (dcql)
+│   ├── oauth2/                  # OAuth 2.0 (@openid4vc/oauth2)
+│   ├── openid4vc*/              # OpenID4VCI, OpenID4VP and shared utilities (@openid4vc/*)
 │   └── eudi-*/                  # EUDI-specific packages (planned)
+├── examples/                    # Runnable examples, grouped by topic (e.g. examples/sd-jwt)
+├── docs/sd-jwt/                 # sdjwt.js.org landing page (deployed to GitHub Pages)
 ├── tests/                       # Integration tests
 ├── .changeset/                  # Changeset configuration for versioning
 └── .github/                     # GitHub Actions workflows
@@ -72,7 +75,7 @@ identity-common-ts/
 
 ### Package Categories
 
-Packages are organized into two main categories:
+Packages are organized into six main categories:
 
 1. **Core Identity Utilities** (`@owf/identity-*`)
    - Generic, reusable utilities for any identity solution
@@ -84,6 +87,26 @@ Packages are organized into two main categories:
    - Built on top of core utilities
    - Implements ETSI and ARF specifications
 
+3. **SD-JWT** (`@sd-jwt/*`)
+   - SD-JWT (RFC 9901) and SD-JWT VC implementations
+   - Located in `packages/sd-jwt-<name>` (or `packages/sd-jwt-vc`)
+   - Versioned separately from the `@owf/*` packages (see `.changeset/config.json`)
+
+4. **mDOC** (`@owf/mdoc`)
+   - ISO/IEC 18013-5 mDOC and mDL implementation
+   - Located in `packages/mdoc`
+   - Versioned separately from the other `@owf/*` packages (see `.changeset/config.json`)
+
+5. **DCQL** (`dcql`)
+   - Digital Credentials Query Language (OpenID4VP) implementation
+   - Located in `packages/dcql`
+   - Published under the unscoped `dcql` name, so it is not part of a fixed version group and is versioned separately
+
+6. **OpenID4VC** (`@openid4vc/*`)
+   - OAuth 2.0, OpenID4VCI and OpenID4VP implementations
+   - Located in `packages/oauth2`, `packages/openid4vci`, `packages/openid4vp` and `packages/openid4vc-utils` (`@openid4vc/utils`)
+   - Versioned together, separately from the other packages (see `.changeset/config.json`)
+
 ## Development Workflow
 
 ### Available Scripts
@@ -93,8 +116,10 @@ From the root of the repository:
 | Command | Description |
 | ------- | ----------- |
 | `pnpm build` | Build all packages |
-| `pnpm test` | Run all tests |
+| `pnpm test` | Run all tests (`pnpm test packages/mdoc` to run a subset) |
 | `pnpm types:check` | Type-check all packages |
+| `pnpm packages:check` | Validate the `package.json` entrypoints of all packages |
+| `pnpm esm:check` | Validate the built packages can be imported and required (run `pnpm build` first) |
 | `pnpm style:check` | Check code style with Biome |
 | `pnpm style:fix` | Fix code style issues |
 | `pnpm md:check` | Check markdown files |
@@ -147,10 +172,14 @@ Create `packages/my-package/package.json`:
   },
   "publishConfig": {
     "access": "public",
+    "main": "./dist/index.mjs",
     "module": "./dist/index.mjs",
     "types": "./dist/index.d.mts",
     "exports": {
-      ".": "./dist/index.mjs",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -162,10 +191,16 @@ Create `packages/my-package/package.json`:
 }
 ```
 
+The top-level `exports` points to the TypeScript source, so other packages, tests, and examples in the workspace use the source directly. The published entrypoints are set in `publishConfig`, which pnpm applies when packing and publishing.
+
+New packages are ESM-only: `require` resolves to the ESM build through the `default` condition. Some existing packages also ship a CommonJS build (`dist/index.cjs`) while they are migrated. `pnpm packages:check` validates that each package follows one of these two layouts, and `pnpm esm:check` validates that each packed package can be imported and required.
+
 **Naming conventions:**
 
 - Core utilities: `@owf/identity-<name>` or `@owf/<name>` (e.g., `@owf/jose`, `@owf/x509`)
 - EUDI-specific: `@owf/eudi-<name>` (e.g., `@owf/eudi-lote`, `@owf/eudi-payment`)
+- SD-JWT: `@sd-jwt/<name>` in `packages/sd-jwt-<name>` (e.g., `@sd-jwt/core` in `packages/sd-jwt-core`)
+- OpenID4VC: `@openid4vc/<name>` in `packages/<name>` (e.g., `@openid4vc/openid4vp` in `packages/openid4vp`), except `@openid4vc/utils` in `packages/openid4vc-utils`
 
 ### 3. Create TypeScript Configuration
 
@@ -173,12 +208,7 @@ Create `packages/my-package/tsconfig.json`:
 
 ```json
 {
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src"
-  },
-  "include": ["src"]
+  "extends": "../../tsconfig.json"
 }
 ```
 
@@ -241,7 +271,9 @@ describe('my-package', () => {
 
 ### 7. Update Root Configuration (if needed)
 
-If your package needs to be available in the root `package.json` for testing:
+Dependencies that are only used in tests, examples, or scripts are shared across packages and go in the `devDependencies` of the root `package.json`, not in the package itself. Use [msw](https://mswjs.io) to mock HTTP requests.
+
+If your package needs to be available in the root `package.json` for examples or integration tests:
 
 ```json
 {
@@ -251,11 +283,11 @@ If your package needs to be available in the root `package.json` for testing:
 }
 ```
 
-### 8. Install and Build
+### 8. Install and Test
 
 ```bash
 pnpm install
-pnpm build
+pnpm test
 ```
 
 ## Coding Standards
@@ -396,8 +428,10 @@ When adding a new package to the monorepo:
 
    ```bash
    cd packages/your-new-package
-   npm publish --access public
+   pnpm publish --access public
    ```
+
+   Use `pnpm publish`, not `npm publish`: only pnpm applies the `main`, `types`, and `exports` fields from `publishConfig`. With `npm publish`, the package would point to the TypeScript source, which isn't included in the published files.
 
    You must be logged into npm (`npm login`) with an account that has publish access to the `@owf` scope.
 
@@ -434,9 +468,6 @@ Maintainers will handle the release process.
 
 ## Questions?
 
-If you have questions, feel free to:
-
-- Open a [GitHub Discussion](https://github.com/openwallet-foundation-labs/identity-common-ts/discussions)
-- Join the [OpenWallet Foundation community](https://openwallet.foundation/community/)
+If you have questions, feel free to [open an issue](https://github.com/openwallet-foundation-labs/identity-common-ts/issues).
 
 Thank you for contributing! 🎉

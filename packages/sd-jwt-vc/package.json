@@ -1,0 +1,40 @@
+{
+  "name": "@sd-jwt/sd-jwt-vc",
+  "version": "0.20.1",
+  "description": "SD-JWT VC (draft-ietf-oauth-sd-jwt-vc) implementation in TypeScript",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "exports": "./src/index.ts",
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/sd-jwt-vc",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/sd-jwt-vc"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs",
+        "default": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
+  },
+  "dependencies": {
+    "@owf/identity-common": "workspace:^",
+    "@owf/token-status-list": "workspace:^",
+    "@sd-jwt/core": "workspace:*",
+    "zod": "catalog:"
+  }
+}

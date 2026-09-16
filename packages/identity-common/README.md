@@ -38,6 +38,15 @@ Your environment must provide:
 
 - `URL` and `URLSearchParams` implementations
 - A global `fetch` implementation (or provide it via callbacks)
+- Global `TextEncoder` and `TextDecoder` implementations
+
+### React Native
+
+When using these libraries in React Native you may need to add a polyfill for `TextDecoder`.
+
+You can confirm this by checking if `global.TextDecoder` is available. It should be available for React Native > 0.85 or Expo SDK > 52.
+
+If it is not available, make sure to add a polyfill like [this one](https://github.com/EvanBacon/text-decoder).
 
 ## API Reference
 
@@ -47,9 +56,9 @@ Your environment must provide:
 
 This package is part of the Identity Common TypeScript project:
 
-- [`@owf/jose`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/jose) - JOSE/JWT implementation (planned)
+- `@owf/jose` - JOSE/JWT implementation (planned)
 - [`@owf/cose`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/cose) - COSE/CWT implementation (planned)
-- [`@owf/x509`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/x509) - X.509 certificate utilities (planned)
+- `@owf/x509` - X.509 certificate utilities (planned)
 
 ## Contributing
 

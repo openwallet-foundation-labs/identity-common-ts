@@ -36,18 +36,14 @@ function documentServer(documents: Record<string, string>) {
 }
 
 describe('TypeMetadataSchema', () => {
-  it('rejects schema and schema_uri together', () => {
+  it('accepts the SD-JWT VC Type Metadata format', () => {
     const result = TypeMetadataSchema.safeParse({
       vct: VCT,
-      schema: { type: 'object' },
-      schema_uri: 'https://example.com/schema.json',
+      claims: [{ path: ['given_name'], sd: 'allowed' }],
+      display: [{ locale: 'en', name: 'Education Credential' }],
     })
 
-    expect(result.success).toBe(false)
-  })
-
-  it('rejects an integrity sibling without its reference', () => {
-    expect(TypeMetadataSchema.safeParse({ vct: VCT, 'extends#integrity': RULEBOOK_INTEGRITY }).success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('preserves unknown members', () => {
@@ -78,7 +74,6 @@ describe('resolveSchemaReferences with Type Metadata', () => {
         { path: ['address', 'country'], sd: 'always' },
         { path: ['degrees', null, 'type'] },
       ],
-      schema: { type: 'object', properties: { unrelated: { type: 'string' } } },
     })
     const uri = 'https://example.com/type-metadata.json'
     const meta = buildMeta(uri, withSri(typeMetadata))
@@ -89,10 +84,7 @@ describe('resolveSchemaReferences with Type Metadata', () => {
     })
 
     expect(resolvedReferences[0].typeMetadata?.vct).toBe(VCT)
-    expect(resolvedReferences[0].parsedSchema).toEqual({
-      type: 'object',
-      properties: { unrelated: { type: 'string' } },
-    })
+    expect(resolvedReferences[0].parsedSchema).toBeUndefined()
 
     const dcql = buildDcqlFromSchemaMeta({
       schemaMeta: meta,
@@ -107,50 +99,11 @@ describe('resolveSchemaReferences with Type Metadata', () => {
     ])
   })
 
-  it('resolves schema_uri as a second hop and verifies its integrity', async () => {
-    const schemaDocument = '{"type":"object","properties":{"given_name":{"type":"string"}}}'
-    const schemaUri = 'https://example.com/schema.json'
-    const typeMetadata = JSON.stringify({
-      vct: VCT,
-      schema_uri: schemaUri,
-      'schema_uri#integrity': withSri(schemaDocument),
-    })
-    const uri = 'https://example.com/type-metadata.json'
-
-    const resolvedReferences = await resolveSchemaReferences({
-      schemaMeta: buildMeta(uri, withSri(typeMetadata)),
-      resolve: documentServer({ [uri]: typeMetadata, [schemaUri]: schemaDocument }),
-    })
-
-    expect(resolvedReferences[0].parsedSchema).toEqual({
-      type: 'object',
-      properties: { given_name: { type: 'string' } },
-    })
-  })
-
-  it('rejects a schema_uri whose integrity does not match', async () => {
-    const schemaUri = 'https://example.com/schema.json'
-    const typeMetadata = JSON.stringify({
-      vct: VCT,
-      schema_uri: schemaUri,
-      'schema_uri#integrity': withSri('{"other":true}'),
-    })
-    const uri = 'https://example.com/type-metadata.json'
-
-    await expect(
-      resolveSchemaReferences({
-        schemaMeta: buildMeta(uri, withSri(typeMetadata)),
-        resolve: documentServer({ [uri]: typeMetadata, [schemaUri]: '{"type":"object"}' }),
-      })
-    ).rejects.toThrow('schemaURIs[0].schema_uri.integrity mismatch')
-  })
-
   it('follows the extends chain and inherits claims', async () => {
     const parentUri = 'https://example.com/base.json'
     const parent = JSON.stringify({
       vct: PARENT_VCT,
       claims: [{ path: ['given_name'] }],
-      schema: { type: 'object' },
     })
     const child = JSON.stringify({
       vct: VCT,
@@ -167,7 +120,7 @@ describe('resolveSchemaReferences with Type Metadata', () => {
 
     expect(resolvedReferences[0].typeMetadata?.vct).toBe(VCT)
     expect(resolvedReferences[0].typeMetadata?.claims).toEqual([{ path: ['given_name'] }, { path: ['degree'] }])
-    expect(resolvedReferences[0].parsedSchema).toEqual({ type: 'object' })
+    expect(resolvedReferences[0].parsedSchema).toBeUndefined()
   })
 
   it('detects a cycle in the extends chain', async () => {

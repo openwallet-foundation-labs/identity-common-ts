@@ -1,6 +1,5 @@
-import { base64url, type Hasher } from '@owf/identity-common'
+import { base64url, type Hasher, type Signer } from '@owf/identity-common'
 import type { KBJwt } from '@sd-jwt/core'
-import type { Signer } from '@sd-jwt/types'
 import { type CreateResponseClaimsOptions, createResponseClaims } from './responseClaims'
 
 export type CreateKbJwtOptions = CreateResponseClaimsOptions & {

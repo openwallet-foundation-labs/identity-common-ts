@@ -1,8 +1,1 @@
 blank_issues_enabled: false
-contact_links:
-  - name: OpenWallet Foundation Community
-    url: https://openwallet.foundation/community/
-    about: Join the OpenWallet Foundation community for discussions
-  - name: GitHub Discussions
-    url: https://github.com/openwallet-foundation-labs/identity-common-ts/discussions
-    about: Ask questions and discuss ideas

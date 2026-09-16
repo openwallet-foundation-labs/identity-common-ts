@@ -1,4 +1,4 @@
-import { base64url, bytesToString } from '@owf/identity-common'
+import { base64urlDecodeJson } from '@owf/identity-common'
 import z from 'zod'
 import {
   type CredentialMetadata,
@@ -20,7 +20,7 @@ const TransactionDataSchema = z.object({
 export type TransactionData = z.infer<typeof TransactionDataSchema>
 
 export const parseTransactionData = (txnData: string) => {
-  const decoded = JSON.parse(bytesToString(base64url.decode(txnData)))
+  const decoded = base64urlDecodeJson(txnData)
   return TransactionDataSchema.parse(decoded)
 }
 

@@ -9,6 +9,7 @@
 
 import type { Signer } from '@owf/crypto'
 import type { Verifier } from '@owf/identity-common'
+import type { TypeMetadataFormat } from '@sd-jwt/sd-jwt-vc'
 import type { z } from 'zod'
 import type {
   AttestationFormatSchema,
@@ -29,7 +30,6 @@ import type {
   StatusMechanismSchema,
   TrustAuthoritySchema,
 } from './schemas'
-import type { TypeMetadata } from './type-metadata'
 
 // ============================================================================
 // Enum Types
@@ -114,8 +114,8 @@ export interface ResolvedSchemaReference {
   meta?: SchemaURIMeta
   rawSchema: unknown
   /** Present for `dc+sd-jwt` references that resolve to Type Metadata, merged over `extends`. */
-  typeMetadata?: TypeMetadata
-  /** The JSON Schema itself: embedded `schema`, resolved `schema_uri`, or the document. */
+  typeMetadata?: TypeMetadataFormat
+  /** The document when the reference is a plain JSON Schema. */
   parsedSchema?: Record<string, unknown>
 }
 

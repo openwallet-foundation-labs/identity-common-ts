@@ -6,18 +6,7 @@
     "dist"
   ],
   "license": "Apache-2.0",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs",
-      "default": "./dist/index.mjs"
-    },
-    "./package.json": "./package.json"
-  },
+  "exports": "./src/index.ts",
   "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-sca",
   "repository": {
     "type": "git",
@@ -46,20 +35,14 @@
     "wallet"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
-    "test": "vitest run"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
   },
   "dependencies": {
-    "@openid4vc/openid4vci": "^0.5.5",
-    "@owf/crypto": "workspace:",
-    "@owf/identity-common": "workspace:",
-    "@owf/mdoc": "^0.7.0",
-    "@sd-jwt/core": "^0.20.1",
-    "@sd-jwt/types": "^0.19.0",
+    "@openid4vc/openid4vci": "workspace:^",
+    "@owf/crypto": "workspace:^",
+    "@owf/identity-common": "workspace:^",
+    "@owf/mdoc": "workspace:^",
+    "@sd-jwt/core": "workspace:^",
     "zod": "catalog:"
-  },
-  "devDependencies": {
-    "nock": "^14.0.17",
-    "vitest": "catalog:"
   }
 }

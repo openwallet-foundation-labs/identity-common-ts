@@ -1,0 +1,147 @@
+import {
+  type AuthorizationServerMetadata,
+  type CallbackContext,
+  fetchAuthorizationServerMetadata,
+  Oauth2Error,
+  preAuthorizedCodeGrantIdentifier,
+  zAuthorizationServerMetadata,
+} from '@openid4vc/oauth2'
+
+import { parseWithErrorHandling } from '@openid4vc/utils'
+import type { Openid4vciVersion } from '../version'
+import {
+  type CredentialIssuerMetadataSigned,
+  extractKnownCredentialConfigurationSupportedFormats,
+  fetchCredentialIssuerMetadata,
+} from './credential-issuer/credential-issuer-metadata'
+import type {
+  CredentialConfigurationsSupportedWithFormats,
+  CredentialIssuerMetadata,
+} from './credential-issuer/z-credential-issuer-metadata'
+
+export interface ResolveIssuerMetadataOptions {
+  /**
+   * Only fetch metadata for authorization servers that are part of this list. This can help if you know beforehand
+   * which authorization servers will be used. The list is not validated to ensure all entries are also
+   * in the issuer metadata.
+   */
+  restrictToAuthorizationServers?: string[]
+
+  /**
+   * Allow extracting authorization server metadata from the credential issuer metadata. This is added for backwards
+   * compatibility with some implementations that did not host a separate authorization server metadata and will be removed
+   * in a future version.
+   *
+   * @default true
+   */
+  allowAuthorizationMetadataFromCredentialIssuerMetadata?: boolean
+
+  /**
+   * Callbacks for fetching the credential issuer metadata.
+   * If no `verifyJwt` callback is provided, the request
+   * will not include the `application/jwt` Accept header
+   * for signed metadata.
+   */
+  callbacks: Partial<Pick<CallbackContext, 'fetch' | 'verifyJwt' | 'getAuthorizationServerMetadata'>>
+
+  /**
+   * Only used for verifying signed issuer metadata. If not provided
+   * current time will be used
+   */
+  now?: Date
+}
+
+export interface IssuerMetadataResult {
+  originalDraftVersion: Openid4vciVersion
+  credentialIssuer: CredentialIssuerMetadata
+
+  /**
+   * Metadata about the signed credential issuer metadata,
+   * if the issuer metadata was signed
+   */
+  signedCredentialIssuer?: CredentialIssuerMetadataSigned
+
+  authorizationServers: AuthorizationServerMetadata[]
+
+  /**
+   * Known credential configurations includes all the credential configurations with a known credential format
+   * that pass the validation requirements from the OpenID4VCI specification. Recognized formats that do not
+   * adhere to the format specific metadata requirements are not included, but also won't result in an error, to
+   * to still allow interacting with issuers using invalid metadata for specific configurations.
+   */
+  knownCredentialConfigurations: CredentialConfigurationsSupportedWithFormats
+}
+
+export async function resolveIssuerMetadata(
+  credentialIssuer: string,
+  options?: ResolveIssuerMetadataOptions
+): Promise<IssuerMetadataResult> {
+  const allowAuthorizationMetadataFromCredentialIssuerMetadata =
+    options?.allowAuthorizationMetadataFromCredentialIssuerMetadata ?? true
+
+  const credentialIssuerMetadataWithDraftVersion = await fetchCredentialIssuerMetadata(credentialIssuer, {
+    callbacks: options?.callbacks,
+    now: options?.now,
+  })
+  if (!credentialIssuerMetadataWithDraftVersion) {
+    throw new Oauth2Error(`Well known credential issuer metadata for issuer '${credentialIssuer}' not found.`)
+  }
+
+  const { credentialIssuerMetadata, originalDraftVersion, signed } = credentialIssuerMetadataWithDraftVersion
+
+  // If no authorization servers are defined, use the credential issuer as the authorization server
+  const authorizationServers = credentialIssuerMetadata.authorization_servers ?? [credentialIssuer]
+
+  const authorizationServersMetadata: AuthorizationServerMetadata[] = []
+  for (const authorizationServer of authorizationServers) {
+    if (
+      options?.restrictToAuthorizationServers &&
+      !options.restrictToAuthorizationServers.includes(authorizationServer)
+    ) {
+      continue
+    }
+
+    let authorizationServerMetadata = await fetchAuthorizationServerMetadata(authorizationServer, options?.callbacks)
+    if (
+      !authorizationServerMetadata &&
+      authorizationServer === credentialIssuer &&
+      allowAuthorizationMetadataFromCredentialIssuerMetadata
+    ) {
+      authorizationServerMetadata = parseWithErrorHandling(
+        zAuthorizationServerMetadata,
+        {
+          token_endpoint: credentialIssuerMetadata.token_endpoint,
+          issuer: credentialIssuer,
+          // NOTE: we made grant_types_supported required, but this breaks a legacy fallback we have
+          // removing the fallback is a breaking change and will be done once we remove support for older
+          // draft versions. For now not having authorization server metadata means you only support
+          // pre authorized code flow
+          grant_types_supported: credentialIssuerMetadata.grant_types_supported ?? [preAuthorizedCodeGrantIdentifier],
+        },
+        `Well known authorization server metadata for authorization server '${authorizationServer}' not found, and could also not extract required values from the credential issuer metadata as a fallback.`
+      )
+    }
+
+    if (!authorizationServerMetadata) {
+      throw new Oauth2Error(
+        `Well known openid configuration or authorization server metadata for authorization server '${authorizationServer}' not found.`
+      )
+    }
+
+    authorizationServersMetadata.push(authorizationServerMetadata)
+  }
+
+  // Collect all known credential configurations with formats
+  const knownCredentialConfigurations = extractKnownCredentialConfigurationSupportedFormats(
+    credentialIssuerMetadata.credential_configurations_supported
+  )
+
+  return {
+    originalDraftVersion,
+    credentialIssuer: credentialIssuerMetadata,
+    signedCredentialIssuer: signed,
+
+    authorizationServers: authorizationServersMetadata,
+    knownCredentialConfigurations,
+  }
+}

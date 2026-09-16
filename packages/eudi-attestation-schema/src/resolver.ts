@@ -157,29 +157,6 @@ async function resolveExtendsChain(
   return chain.reduceRight((parent, child) => mergeTypeMetadata(parent, child))
 }
 
-async function resolveTypeMetadataSchema(
-  typeMetadata: TypeMetadata,
-  context: string,
-  options: FetchOptions
-): Promise<Record<string, unknown> | undefined> {
-  if (isPlainObject(typeMetadata.schema)) {
-    return typeMetadata.schema
-  }
-
-  if (typeMetadata.schema_uri === undefined) {
-    return undefined
-  }
-
-  const document = await fetchDocument(
-    typeMetadata.schema_uri,
-    typeMetadata['schema_uri#integrity'],
-    `${context}.schema_uri`,
-    options
-  )
-
-  return isPlainObject(document) ? document : undefined
-}
-
 async function resolveSdJwtReference(
   document: unknown,
   schemaURI: Extract<SchemaURI, { formatIdentifier: 'dc+sd-jwt' }>,
@@ -202,7 +179,7 @@ async function resolveSdJwtReference(
     )
   }
 
-  return { typeMetadata, parsedSchema: await resolveTypeMetadataSchema(typeMetadata, context, options) }
+  return { typeMetadata }
 }
 
 export async function resolveSchemaReferences(

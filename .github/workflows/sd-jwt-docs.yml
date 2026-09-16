@@ -1,0 +1,51 @@
+name: Deploy SD-JWT Docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - docs/sd-jwt/**
+      - packages/sd-jwt-vc/docs/**
+      - .github/workflows/sd-jwt-docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, but do not cancel in-progress deployments
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    name: Deploy
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v7
+
+      # Keep the guides available under their previous sdjwt.js.org/0.x/ URLs
+      - name: Assemble site
+        run: |
+          mkdir -p _site/0.x
+          cp -r docs/sd-jwt/. _site/
+          cp packages/sd-jwt-vc/docs/*.md _site/0.x/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

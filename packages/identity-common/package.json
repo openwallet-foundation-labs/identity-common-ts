@@ -5,18 +5,7 @@
     "dist"
   ],
   "license": "Apache-2.0",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs",
-      "default": "./dist/index.mjs"
-    },
-    "./package.json": "./package.json"
-  },
+  "exports": "./src/index.ts",
   "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/identity-common",
   "repository": {
     "type": "git",
@@ -39,10 +28,6 @@
     }
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap",
-    "test": "vitest run"
-  },
-  "devDependencies": {
-    "vitest": "catalog:"
+    "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
   }
 }
