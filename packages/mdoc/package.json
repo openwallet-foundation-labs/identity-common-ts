@@ -1,6 +1,6 @@
 {
   "name": "@owf/mdoc",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "ISO 18013-5 Mdoc and MDL",
   "files": [
     "dist"

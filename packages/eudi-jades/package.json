@@ -1,6 +1,6 @@
 {
   "name": "@owf/eudi-jades",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "JAdES (JSON Advanced Electronic Signatures) implementation based on ETSI TS 119 182-1 standard",
   "files": [
     "dist"
