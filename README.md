@@ -7,7 +7,7 @@
   <a href="https://github.com/openwallet-foundation-labs/identity-common-ts/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="Apache 2.0 License" />
   </a>
-  <a href="https://api.scorecard.dev/projects/github.com/openwallet-foundation-labs/identity-common-ts">
+  <a href="https://scorecard.dev/viewer/?uri=github.com/openwallet-foundation-labs/identity-common-ts">
     <img src="https://api.scorecard.dev/projects/github.com/openwallet-foundation-labs/identity-common-ts/badge" alt="OpenSSF Scorecard" />
   </a>
 
