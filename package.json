@@ -3,6 +3,12 @@
   "private": true,
   "description": "Environment agnostic TypeScript libraries and tools for working with digital identity",
   "packageManager": "pnpm@10.28.0+sha512.05df71d1421f21399e053fde567cea34d446fa02c76571441bfc1c7956e98e363088982d940465fd34480d4d90a0668bc12362f8aa88000a64e83d0b0e47be48",
+  "pnpm": {
+    "overrides": {
+      "smol-toml": "1.7.1",
+      "vite": "8.0.16"
+    }
+  },
   "repository": {
     "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
     "type": "git"
@@ -48,6 +54,7 @@
     "tsdown": "0.23.0",
     "tsx": "^4.23.13",
     "typescript": "catalog:",
+    "vite": "8.0.16",
     "vitest": "catalog:"
   },
   "engines": {

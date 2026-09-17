@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
@@ -21,18 +24,15 @@ jobs:
       published: ${{ steps.changesets.outputs.published }}
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           cache: "pnpm"
-
-      - name: Update npm
-        run: npm install -g npm@^11
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -44,7 +44,7 @@ jobs:
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
-        uses: changesets/action@v2
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           pr-title: "chore(release): new version"
           commit-message: "chore(release): new version"
@@ -65,35 +65,35 @@ jobs:
 
       - name: Create Github Release
         if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: v${{ steps.get_version.outputs.current_package_version }}
 
       # @sd-jwt/* packages are versioned separately from @owf/*, so they get their own tag prefix
       - name: Create SD-JWT Github Release
         if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: sd-jwt-v${{ steps.get_version.outputs.sd_jwt_package_version }}
 
       # @owf/mdoc is versioned separately from the other @owf/* packages, so it gets its own tag prefix
       - name: Create mDOC Github Release
         if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: mdoc-v${{ steps.get_version.outputs.mdoc_package_version }}
 
       # dcql is versioned separately from the other packages, so it gets its own tag prefix
       - name: Create DCQL Github Release
         if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: dcql-v${{ steps.get_version.outputs.dcql_package_version }}
 
       # @openid4vc/* packages are versioned separately from the other packages, so they get their own tag prefix
       - name: Create OpenID4VC Github Release
         if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: openid4vc-v${{ steps.get_version.outputs.openid4vc_package_version }}
 
@@ -109,18 +109,15 @@ jobs:
       id-token: write # Needed for npm trusted publishing
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           cache: "pnpm"
-
-      - name: Update npm
-        run: npm install -g npm@^11
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile

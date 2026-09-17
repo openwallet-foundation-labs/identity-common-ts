@@ -24,6 +24,8 @@
   &nbsp;|&nbsp;
   <a href="#contributing">Contributing</a>
   &nbsp;|&nbsp;
+  <a href="./SECURITY.md">Security</a>
+  &nbsp;|&nbsp;
   <a href="#license">License</a>
 </p>
 
