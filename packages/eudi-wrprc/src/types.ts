@@ -18,6 +18,7 @@ import type {
   LegalPersonSubjectSchema,
   MultiLangStringSchema,
   NaturalPersonSubjectSchema,
+  ProvidedAttestationSchema,
   StatusListSchema,
   StatusSchema,
   SupervisoryAuthoritySchema,
@@ -47,6 +48,9 @@ export type Claim = z.infer<typeof ClaimSchema>
 
 /** Credential specification for attestations (B.2.9 Class Credential) */
 export type Credential = z.infer<typeof CredentialSchema>
+
+/** Credential issued by the WRP for `provides_attestations` (Table 8) */
+export type ProvidedAttestation = z.infer<typeof ProvidedAttestationSchema>
 
 /** Status list reference for certificate validity */
 export type StatusList = z.infer<typeof StatusListSchema>

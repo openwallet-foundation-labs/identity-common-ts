@@ -14,7 +14,7 @@ Known defects that this library reproduces on purpose:
 | Where | What the spec says | Note |
 |-------|--------------------|------|
 | Tables 8 and 9, Annex B.2.9 | The array of claim queries inside a `Credential` is named `claim` (singular) | Reads as a typo for `claims`, but it is consistent across the normative tables, Annex B and the Annex C example, so `claim` is emitted and accepted |
-| Table 8 | `provides_attestations` holds `Credential` objects | A later edition is expected to allow an array of URLs pointing at the machine-readable scheme of each attestation, which carries more than the `Credential` object does. URLs are accepted on input; objects are emitted by default |
+| Table 8 | `provides_attestations` holds `Credential` objects with `format` and `meta` only | Claim queries are for requested credentials. Provided attestations describe what the WRP issues, so `claim` / `claims` is rejected there and wallets do not have to resolve external scheme documents to understand what is provided |
 | Table 10 vs. Annex C | Table 10 names the intermediary common name `sname`; the Annex C example uses `name` | Table 10 is normative, so `sname` is used |
 | Tables 5 and 6 | The header lists only `typ`, `alg` and `x5c` / `x5chain`, and the Annex C example header shows nothing else | Table 5 is a minimum set. GEN-5.2.1-04 additionally requires a JAdES B-B signature, whose protected header must carry `iat` as the claimed signing time, so signed WRPRCs have one |
 | Table 7 | The payload has no unique identifier for the certificate | An optional `jti` (RFC 7519) is accepted and can be set through the builder, but is never required |
@@ -23,7 +23,7 @@ When ETSI publishes a corrected edition, these names will be updated in a major 
 
 ### Reading and writing the anticipated corrections
 
-Parsing is deliberately more liberal than writing. `claims`, `intermediary.name`, and a `provides_attestations` array of scheme URLs are all accepted on input and normalized to the shape above, so certificates produced by an SDK that already applies the corrections still validate.
+Parsing is deliberately more liberal than writing for the two field renames. `claims` and `intermediary.name` are accepted on input and normalized to the shape above, so certificates produced by an SDK that already applies those corrections still validate.
 
 Writing stays on the published edition unless you ask for otherwise:
 
@@ -40,7 +40,7 @@ const signed = await signWRPRC({
 
 `WRPRC_DIALECTS.DRAFT` is **unstable**. No published edition defines it, so a certificate emitted this way may match neither the current specification nor its eventual correction. Leave the default in place unless you are testing against a counterpart that has already moved.
 
-The dialect covers the two renames only. It does not touch `provides_attestations`, because a scheme URL cannot be derived from a `Credential` object: choose that form when building the payload instead.
+The dialect covers the two renames only. It does not touch `provides_attestations`, which is always represented as `Credential` objects with `format` and `meta` only.
 
 `toWRPRCDialect(payload, dialect)` and `normalizeWRPRCPayload(value)` expose the same mapping if you need it outside the signer.
 
@@ -143,7 +143,7 @@ const payload = wrprc()
 
 ### Declaring Provided Attestations
 
-Attestation providers declare what they issue with `provides_attestations` (GEN-5.2.4-05). ETSI TS 119 475 v1.2.1 defines this as `Credential` objects:
+Attestation providers declare what they issue with `provides_attestations` (GEN-5.2.4-05). ETSI TS 119 475 v1.2.1 defines this as `Credential` objects containing `format` and `meta` only:
 
 ```typescript
 import { wrprc, credential, WRP_ENTITLEMENTS } from '@owf/eudi-wrprc'
@@ -161,13 +161,7 @@ const payload = wrprc()
   .build()
 ```
 
-The same method also accepts a URL pointing at the attestation's machine-readable scheme, the form anticipated for a later edition:
-
-```typescript
-  .addProvidedAttestation('https://catalogue.europa.eu/schemes/age_over_18')
-```
-
-A payload must use one form throughout; mixing objects and URLs throws.
+Scheme URLs are not accepted for `provides_attestations`: wallets should be able to inspect the declared credential format and metadata directly without resolving an external document first. Claim queries are not accepted either, because the WRP is declaring what it issues rather than what it requests.
 
 ### Signing a WRPRC
 
@@ -326,6 +320,7 @@ This library is **platform agnostic** and works in:
 - `WRPRCJWTHeader` - JWT header type
 - `SignedWRPRC` - Signed WRPRC with JWS string
 - `Credential` - Credential specification type
+- `ProvidedAttestation` - Provided attestation credential type with `format` and `meta` only
 - `Claim` - Claim specification type
 
 ### Builders

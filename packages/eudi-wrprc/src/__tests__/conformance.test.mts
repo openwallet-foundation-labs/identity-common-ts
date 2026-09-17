@@ -156,22 +156,27 @@ describe('wire dialects', () => {
     expect(decodeWRPRC(signed.jws).payload).toEqual(withNested())
   })
 
-  it('accepts provides_attestations as scheme URLs', () => {
-    const payload = base()
-      .addProvidedAttestation('https://catalogue.test/schemes/age-over-18')
-      .addPurpose('Issue attestations')
-      .build()
+  it('rejects provides_attestations as scheme URLs', () => {
+    const payload = {
+      ...base().build(),
+      provides_attestations: ['https://catalogue.test/schemes/age-over-18'],
+    }
 
-    expect(payload.provides_attestations).toEqual(['https://catalogue.test/schemes/age-over-18'])
-    expect(validateWRPRCPayload(payload).valid).toBe(true)
+    expect(validateWRPRCPayload(payload).valid).toBe(false)
   })
 
-  it('rejects mixing credential objects and scheme URLs', () => {
-    expect(() =>
-      base()
-        .addProvidedAttestation({ format: 'dc+sd-jwt', meta: {} })
-        .addProvidedAttestation('https://catalogue.test/schemes/age-over-18')
-    ).toThrow(/all credentials or all scheme URLs/)
+  it('rejects claim queries inside provides_attestations', () => {
+    const withClaim = {
+      ...base().build(),
+      provides_attestations: [{ format: 'dc+sd-jwt', meta: {}, claim: [{ path: ['given_name'] }] }],
+    }
+    const withDraftClaims = {
+      ...base().build(),
+      provides_attestations: [{ format: 'dc+sd-jwt', meta: {}, claims: [{ path: ['given_name'] }] }],
+    }
+
+    expect(validateWRPRCPayload(withClaim).valid).toBe(false)
+    expect(validateWRPRCPayload(withDraftClaims).valid).toBe(false)
   })
 })
 

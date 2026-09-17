@@ -54,9 +54,6 @@ function mapPayload(payload: unknown, claimFrom: string, claimTo: string, nameFr
   if ('credentials' in result) {
     result.credentials = renameInCredentials(result.credentials, claimFrom, claimTo)
   }
-  if ('provides_attestations' in result) {
-    result.provides_attestations = renameInCredentials(result.provides_attestations, claimFrom, claimTo)
-  }
   if ('intermediary' in result) {
     result.intermediary = renameKey(result.intermediary, nameFrom, nameTo)
   }

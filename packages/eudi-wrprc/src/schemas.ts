@@ -67,6 +67,9 @@ export const CredentialSchema = z.object({
   claim: z.array(ClaimSchema).optional(),
 })
 
+/** Credential issued by the WRP for `provides_attestations` (Table 8) */
+export const ProvidedAttestationSchema = CredentialSchema.omit({ claim: true }).strict()
+
 /**
  * Status list reference for certificate validity
  */
@@ -182,12 +185,9 @@ export const WRPRCPayloadSchema = z.object({
 
   /**
    * Set of credentials issued by the WRP (for attestation providers, Table 8).
-   *
-   * v1.2.1 defines this as `Credential` objects. An array of URLs pointing at the
-   * machine-readable schemes in the Catalogue of Attestations, anticipated for a later
-   * edition and already emitted by some SDKs, is accepted when parsing.
+   * These entries contain only `format` and `meta`; claim queries are not present.
    */
-  provides_attestations: z.union([z.array(CredentialSchema), z.array(z.url())]).optional(),
+  provides_attestations: z.array(ProvidedAttestationSchema).optional(),
 
   /** Intermediary information when WRP acts through an intermediary (Table 10) */
   intermediary: IntermediarySchema.optional(),

@@ -18,6 +18,7 @@ import type {
   LegalPersonWRPRCInput,
   MultiLangString,
   NaturalPersonWRPRCInput,
+  ProvidedAttestation,
   Status,
   SupervisoryAuthority,
   WRPRCPayload,
@@ -252,24 +253,11 @@ export class WRPRCBuilder {
   }
 
   /**
-   * Add a credential issued by the WRP (Table 8, `provides_attestations`), either as a
-   * `Credential` object or as a URL pointing at its machine-readable scheme.
-   *
-   * A payload must use one form throughout: all credentials or all URLs.
+   * Add a credential issued by the WRP (Table 8, `provides_attestations`).
    */
-  addProvidedAttestation(attestation: Credential | string): this {
-    const existing = this.payload.provides_attestations
-
-    if (!existing) {
-      this.payload.provides_attestations = [attestation] as Credential[] | string[]
-      return this
-    }
-
-    if (existing.length > 0 && (typeof existing[0] === 'string') !== (typeof attestation === 'string')) {
-      throw new WRPRCException('provides_attestations must be either all credentials or all scheme URLs')
-    }
-
-    ;(existing as unknown[]).push(attestation)
+  addProvidedAttestation(attestation: ProvidedAttestation): this {
+    this.payload.provides_attestations = this.payload.provides_attestations ?? []
+    this.payload.provides_attestations.push(attestation)
     return this
   }
 
