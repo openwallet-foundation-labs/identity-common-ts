@@ -27,7 +27,18 @@ describe('TrustAuthorityBuilder', () => {
       .verificationMethod(VERIFICATION_METHOD)
       .build()
 
+    expect(ta.frameworkType).toBe('etsi_tl')
+    if (ta.frameworkType !== 'etsi_tl') {
+      throw new Error('expected etsi_tl trust authority')
+    }
     expect(ta.verificationMethod.type).toBe('X509Certificate')
+  })
+
+  it('should create a trust authority with an x509 root CA certificate', () => {
+    const ta = trustAuthority().frameworkType('x509').value(VERIFICATION_METHOD.x509Certificate).build()
+
+    expect(ta.frameworkType).toBe('x509')
+    expect(ta.value).toBe(VERIFICATION_METHOD.x509Certificate)
   })
 
   it('should throw when frameworkType is missing', () => {
