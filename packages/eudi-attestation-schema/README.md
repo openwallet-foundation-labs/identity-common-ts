@@ -399,11 +399,16 @@ A profile must not declare `cryptographicBindingMethodsSupported` or `proofTypes
 
 ### TrustAuthority
 
+`TrustAuthority` is a discriminated union on `frameworkType`:
+
+- `etsi_tl`: `value` is a URI pointing to a hosted trust list, verified via `verificationMethod`.
+- `x509`: `value` is a base64-encoded DER X.509 certificate that itself acts as the root CA trust anchor, so no trust list needs to be hosted.
+
 | Field | Required | Type | Description |
 |---|---|---|---|
-| `frameworkType` | Yes | `FrameworkType` | Trust framework discriminator (`etsi_tl`) |
-| `value` | Yes | `string` | URI pointing to the trust list |
-| `verificationMethod` | Yes | object | Verification material for the trust list signature |
+| `frameworkType` | Yes | `FrameworkType` | Trust framework discriminator (`etsi_tl`, `x509`) |
+| `value` | Yes | `string` | Trust list URI (`etsi_tl`) or base64-encoded DER root CA certificate (`x509`) |
+| `verificationMethod` | Yes, `etsi_tl` only | object | Verification material for the trust list signature |
 
 #### TrustAuthority.verificationMethod
 
@@ -420,7 +425,7 @@ A profile must not declare `cryptographicBindingMethodsSupported` or `proofTypes
 
 **BindingType**: `claim`, `key`, `biometric`, `none`
 
-**FrameworkType**: `etsi_tl`
+**FrameworkType**: `etsi_tl`, `x509`
 
 ## License
 
