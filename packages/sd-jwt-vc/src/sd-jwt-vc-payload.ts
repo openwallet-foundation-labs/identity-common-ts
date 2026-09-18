@@ -8,6 +8,10 @@ export interface SdJwtVcPayload extends SdJwtPayload {
   nbf?: number
   // OPTIONAL. The expiry time of the Verifiable Credential after which the Verifiable Credential is no longer valid. See [RFC7519] for more information.
   exp?: number
+  // OPTIONAL. The Audience of the Verifiable Credential. The value is a case-sensitive string or an array of strings containing StringOrURI values. See [RFC7519] for more information.
+  aud?: string | string[]
+  // OPTIONAL. The JWT ID of the Verifiable Credential. The value is a case-sensitive string providing a unique identifier for the JWT. See [RFC7519] for more information.
+  jti?: string
   // OPTIONAL unless cryptographic Key Binding is to be supported, in which case it is REQUIRED. Contains the confirmation method identifying the proof of possession key as defined in [RFC7800]. It is RECOMMENDED that this contains a JWK as defined in Section 3.2 of [RFC7800]. For proof of cryptographic Key Binding, the Key Binding JWT in the presentation of the SD-JWT MUST be signed by the key identified in this claim.
   cnf?: unknown
   // REQUIRED. The type of the Verifiable Credential, e.g., https://credentials.example.com/identity_credential, as defined in Section 3.2.2.1.1.

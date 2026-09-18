@@ -119,7 +119,7 @@ export class SDJwt<
     Payload extends Record<string, unknown> = Record<string, unknown>,
     KBHeader extends kbHeader = kbHeader,
     KBPayload extends kbPayload = kbPayload,
-  >(encodedSdJwt: SDJWTCompact, hasher: Hasher): Promise<SDJwt<Header, Payload>> {
+  >(encodedSdJwt: SDJWTCompact, hasher: Hasher): Promise<SDJwt<Header, Payload, KBHeader, KBPayload>> {
     const { jwt, disclosures, kbJwt } = await SDJwt.decodeSDJwt<Header, Payload, KBHeader, KBPayload>(
       encodedSdJwt,
       hasher
@@ -193,7 +193,7 @@ export class SDJwt<
     return Object.keys(disclosureKeymap).sort()
   }
 
-  public async getClaims<T>(hasher: Hasher): Promise<T> {
+  public async getClaims<T = Payload>(hasher: Hasher): Promise<T> {
     if (!this.jwt?.payload || !this.disclosures) {
       throw new SDJWTException('Invalid sd-jwt: jwt or disclosures is missing')
     }

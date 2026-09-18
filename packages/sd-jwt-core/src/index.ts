@@ -496,18 +496,21 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     return sdJwt.encodeSDJwt()
   }
 
-  public decode(endcodedSDJwt: SDJWTCompact) {
+  public decode<Header extends Record<string, unknown> = Record<string, unknown>>(endcodedSDJwt: SDJWTCompact) {
     if (!this.userConfig.hasher) {
       throw new SDJWTException('Hasher not found')
     }
-    return SDJwt.fromEncode(endcodedSDJwt, this.userConfig.hasher)
+    return SDJwt.fromEncode<Header, ExtendedPayload>(endcodedSDJwt, this.userConfig.hasher)
   }
 
   public async keys(endcodedSDJwt: SDJWTCompact) {
     if (!this.userConfig.hasher) {
       throw new SDJWTException('Hasher not found')
     }
-    const sdjwt = await SDJwt.fromEncode(endcodedSDJwt, this.userConfig.hasher)
+    const sdjwt = await SDJwt.fromEncode<Record<string, unknown>, ExtendedPayload>(
+      endcodedSDJwt,
+      this.userConfig.hasher
+    )
     return sdjwt.keys(this.userConfig.hasher)
   }
 
@@ -515,16 +518,22 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     if (!this.userConfig.hasher) {
       throw new SDJWTException('Hasher not found')
     }
-    const sdjwt = await SDJwt.fromEncode(endcodedSDJwt, this.userConfig.hasher)
+    const sdjwt = await SDJwt.fromEncode<Record<string, unknown>, ExtendedPayload>(
+      endcodedSDJwt,
+      this.userConfig.hasher
+    )
     return sdjwt.presentableKeys(this.userConfig.hasher)
   }
 
-  public async getClaims(endcodedSDJwt: SDJWTCompact) {
+  public async getClaims(endcodedSDJwt: SDJWTCompact): Promise<ExtendedPayload> {
     if (!this.userConfig.hasher) {
       throw new SDJWTException('Hasher not found')
     }
-    const sdjwt = await SDJwt.fromEncode(endcodedSDJwt, this.userConfig.hasher)
-    return sdjwt.getClaims(this.userConfig.hasher)
+    const sdjwt = await SDJwt.fromEncode<Record<string, unknown>, ExtendedPayload>(
+      endcodedSDJwt,
+      this.userConfig.hasher
+    )
+    return sdjwt.getClaims<ExtendedPayload>(this.userConfig.hasher)
   }
 
   public toFlattenJSON(endcodedSDJwt: SDJWTCompact) {

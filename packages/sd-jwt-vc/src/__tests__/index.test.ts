@@ -203,3 +203,41 @@ describe('Revocation', () => {
     //TODO: needs to be implemented
   })
 })
+
+describe('Decode & Claims', () => {
+  const { signer, verifier } = createSignerVerifier()
+  const sdjwt = new SDJwtVcInstance({
+    signer,
+    signAlg: 'EdDSA',
+    verifier,
+    hasher: digest,
+    hashAlg: 'sha-256',
+    saltGenerator: generateSalt,
+  })
+
+  test('decode should return typed SdJwtVcPayload with jti and aud', async () => {
+    const payload: SdJwtVcPayload = {
+      iat,
+      iss,
+      vct,
+      aud: 'https://verifier.example.com',
+      jti: 'urn:uuid:12345-67890',
+      customClaim: 'value',
+    }
+
+    const encoded = await sdjwt.issue(payload)
+    const decoded = await sdjwt.decode(encoded)
+
+    expect(decoded.jwt?.payload).toBeDefined()
+    const decodedPayload: SdJwtVcPayload | undefined = decoded.jwt?.payload
+    expect(decodedPayload?.iss).toBe(iss)
+    expect(decodedPayload?.vct).toBe(vct)
+    expect(decodedPayload?.aud).toBe('https://verifier.example.com')
+    expect(decodedPayload?.jti).toBe('urn:uuid:12345-67890')
+
+    const claims = await sdjwt.getClaims(encoded)
+    expect(claims.vct).toBe(vct)
+    expect(claims.aud).toBe('https://verifier.example.com')
+    expect(claims.jti).toBe('urn:uuid:12345-67890')
+  })
+})
