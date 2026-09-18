@@ -31,7 +31,7 @@ export const BindingTypeValues = ['claim', 'key', 'biometric', 'none'] as const
 
 export const BindingTypeSchema = z.enum(BindingTypeValues)
 
-export const FrameworkTypeValues = ['etsi_tl'] as const
+export const FrameworkTypeValues = ['etsi_tl', 'x509'] as const
 
 export const FrameworkTypeSchema = z.enum(FrameworkTypeValues)
 
@@ -58,13 +58,33 @@ const X509CertificateVerificationMethodSchema = z
 // TrustAuthority Sub-class (Section 4.3.3)
 // ============================================================================
 
-export const TrustAuthoritySchema = z
+/**
+ * Trust list based authority: `value` identifies the list, `verificationMethod` is how the
+ * list itself is signed/verified.
+ */
+const EtsiTlTrustAuthoritySchema = z
   .object({
-    frameworkType: FrameworkTypeSchema,
+    frameworkType: z.literal('etsi_tl'),
     value: z.string().min(1),
     verificationMethod: X509CertificateVerificationMethodSchema,
   })
   .strict()
+
+/**
+ * Direct root CA trust anchor: `value` is the base64-encoded DER certificate itself, so no
+ * trust list needs to be hosted and no separate verificationMethod is required.
+ */
+const X509TrustAuthoritySchema = z
+  .object({
+    frameworkType: z.literal('x509'),
+    value: Base64DerCertificateSchema,
+  })
+  .strict()
+
+export const TrustAuthoritySchema = z.discriminatedUnion('frameworkType', [
+  EtsiTlTrustAuthoritySchema,
+  X509TrustAuthoritySchema,
+])
 
 // ============================================================================
 // SchemaURI Meta Sub-schemas

@@ -18,7 +18,7 @@ import type {
  * Builder for creating TrustAuthority objects with a fluent API
  */
 export class TrustAuthorityBuilder {
-  private data: Partial<TrustAuthority> = {}
+  private data: Record<string, unknown> = {}
 
   /**
    * Set the trust framework type
@@ -29,7 +29,9 @@ export class TrustAuthorityBuilder {
   }
 
   /**
-   * Set the trust authority value (URI for etsi_tl)
+   * Set the trust authority value.
+   * - etsi_tl: the trust list URI
+   * - x509: the base64-encoded DER root CA certificate acting as the trust anchor
    */
   value(value: string): this {
     this.data.value = value
@@ -37,9 +39,11 @@ export class TrustAuthorityBuilder {
   }
 
   /**
-   * Set the trust list verification method metadata
+   * Set the trust list verification method metadata (etsi_tl only)
    */
-  verificationMethod(verificationMethod: TrustAuthority['verificationMethod']): this {
+  verificationMethod(
+    verificationMethod: Extract<TrustAuthority, { frameworkType: 'etsi_tl' }>['verificationMethod']
+  ): this {
     this.data.verificationMethod = verificationMethod
     return this
   }
