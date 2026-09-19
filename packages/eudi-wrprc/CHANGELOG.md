@@ -1,5 +1,14 @@
 # @owf/eudi-wrprc
 
+## 0.4.1
+
+### Patch Changes
+
+- 31693aa: replace provides attatation to use only credential, not a link
+- @owf/crypto@0.4.1
+  - @owf/eudi-jades@0.4.1
+  - @owf/identity-common@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes

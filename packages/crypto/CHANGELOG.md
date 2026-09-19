@@ -1,5 +1,11 @@
 # @owf/crypto
 
+## 0.4.1
+
+### Patch Changes
+
+- @owf/identity-common@0.4.1
+
 ## 0.4.0
 
 ### Patch Changes
