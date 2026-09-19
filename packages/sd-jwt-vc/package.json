@@ -1,6 +1,6 @@
 {
   "name": "@sd-jwt/sd-jwt-vc",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "description": "SD-JWT VC (draft-ietf-oauth-sd-jwt-vc) implementation in TypeScript",
   "files": [
     "dist"

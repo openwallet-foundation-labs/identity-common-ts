@@ -1,5 +1,17 @@
 # @sd-jwt/sd-jwt-vc
 
+## 0.21.1
+
+### Patch Changes
+
+- a7b5b83: Propagate `ExtendedPayload` generic through `SDJwtInstance.decode`, `keys`, `presentableKeys`, and `getClaims`.
+  Add standard RFC 7519 `aud` and `jti` claims to `SdJwtVcPayload`.
+- Updated dependencies [833bfbc]
+- Updated dependencies [a7b5b83]
+  - @sd-jwt/core@0.21.1
+  - @owf/identity-common@0.4.1
+  - @owf/token-status-list@0.4.1
+
 ## 0.21.0
 
 ### Minor Changes
