@@ -54,6 +54,9 @@ importers:
       '@openid4vc/openid4vp':
         specifier: workspace:*
         version: link:packages/openid4vp
+      '@owf/cose':
+        specifier: workspace:*
+        version: link:packages/cose
       '@owf/crypto':
         specifier: workspace:*
         version: link:packages/crypto
@@ -78,6 +81,9 @@ importers:
       '@types/node':
         specifier: ^26.5.1
         version: 26.5.1
+      dcql:
+        specifier: workspace:*
+        version: link:packages/dcql
       hpke:
         specifier: ^1.1.7
         version: 1.1.7
