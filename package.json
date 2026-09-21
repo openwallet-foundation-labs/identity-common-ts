@@ -6,7 +6,7 @@
   "pnpm": {
     "overrides": {
       "smol-toml": "1.7.1",
-      "vite": "8.0.16"
+      "vite": "8.3.0"
     }
   },
   "repository": {
@@ -45,7 +45,7 @@
     "@peculiar/x509": "^2.1.0",
     "@sd-jwt/core": "workspace:*",
     "@sd-jwt/sd-jwt-vc": "workspace:*",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.1",
     "dcql": "workspace:*",
     "fast-check": "^4.10.1",
     "hpke": "^1.1.7",
@@ -58,7 +58,7 @@
     "tsdown": "0.23.0",
     "tsx": "^4.23.13",
     "typescript": "catalog:",
-    "vite": "8.0.16",
+    "vite": "8.3.0",
     "vitest": "catalog:"
   },
   "engines": {
