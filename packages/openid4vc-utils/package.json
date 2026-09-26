@@ -1,6 +1,6 @@
 {
   "name": "@openid4vc/utils",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "description": "Shared utilities for the @openid4vc packages",
   "files": [
     "dist"
