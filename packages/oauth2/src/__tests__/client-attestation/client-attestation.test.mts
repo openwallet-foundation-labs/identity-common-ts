@@ -1,6 +1,6 @@
 import * as jose from 'jose'
 import { beforeAll, describe, expect, test } from 'vitest'
-import { createClientAttestationJwt } from '../../client-attestation/client-attestation'
+import { createClientAttestationJwt, verifyClientAttestation } from '../../client-attestation/client-attestation'
 import {
   createClientAttestationPopJwt,
   verifyClientAttestationPopJwt,
@@ -144,5 +144,53 @@ describe('Client (Wallet) Attestation', () => {
         clientAttestationPopJwt: legacyPopJwt,
       })
     ).rejects.toThrow("'iss'")
+  })
+
+  describe('verifyClientAttestation', () => {
+    const invalidClient = { status: 401, errorResponse: { error: 'invalid_client' } }
+
+    test('reports a client attestation that fails schema validation as invalid_client', async () => {
+      const now = Math.floor(Date.now() / 1000)
+      const { jwt: clientAttestationWithoutSub } = await signJwt(
+        { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+        {
+          header: { typ: 'oauth-client-attestation+jwt', alg: 'ES256' },
+          payload: { iat: now, exp: now + 300, cnf: { jwk: instance.publicJwk } },
+        }
+      )
+      const clientAttestationPopJwt = await createClientAttestationPopJwt({
+        callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+        authorizationServer,
+        clientAttestation: clientAttestationJwt,
+      })
+
+      await expect(
+        verifyClientAttestation({
+          callbacks: { verifyJwt: callbacks.verifyJwt },
+          authorizationServer,
+          clientAttestationJwt: clientAttestationWithoutSub,
+          clientAttestationPopJwt,
+        })
+      ).rejects.toMatchObject(invalidClient)
+    })
+
+    test('reports a client attestation PoP that fails schema validation as invalid_client', async () => {
+      const { jwt: clientAttestationPopWithoutJti } = await signJwt(
+        { method: 'jwk', alg: 'ES256', publicJwk: instance.publicJwk },
+        {
+          header: { typ: 'oauth-client-attestation-pop+jwt', alg: 'ES256' },
+          payload: { aud: authorizationServer, iat: Math.floor(Date.now() / 1000) },
+        }
+      )
+
+      await expect(
+        verifyClientAttestation({
+          callbacks: { verifyJwt: callbacks.verifyJwt },
+          authorizationServer,
+          clientAttestationJwt,
+          clientAttestationPopJwt: clientAttestationPopWithoutJti,
+        })
+      ).rejects.toMatchObject(invalidClient)
+    })
   })
 })

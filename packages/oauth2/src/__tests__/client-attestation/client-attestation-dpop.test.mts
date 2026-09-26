@@ -124,7 +124,11 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
 
     function verify(
       dpopJwt: string,
-      extra?: { expectedNonce?: string; authorizationServerMetadata?: AuthorizationServerMetadata }
+      extra?: {
+        expectedNonce?: string
+        authorizationServerMetadata?: AuthorizationServerMetadata
+        clientAttestationJwt?: string
+      }
     ) {
       return verifyPreAuthorizedCodeAccessTokenRequest({
         authorizationServerMetadata: extra?.authorizationServerMetadata ?? authorizationServerMetadata,
@@ -137,7 +141,10 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
         expectedPreAuthorizedCode: 'code-123',
         request,
         dpop: { required: true, jwt: dpopJwt, allowedSigningAlgs: ['ES256'], expectedNonce: extra?.expectedNonce },
-        clientAttestation: { required: true, clientAttestationJwt },
+        clientAttestation: {
+          required: true,
+          clientAttestationJwt: extra?.clientAttestationJwt ?? clientAttestationJwt,
+        },
       })
     }
 
@@ -155,6 +162,23 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
       const dpopJwt = await createCombinedDpopProof(other)
 
       await expect(verify(dpopJwt)).rejects.toThrow('match the JWK thumbprint of the client attestation')
+    })
+
+    test('reports a client attestation that fails schema validation as invalid_client', async () => {
+      const now = Math.floor(Date.now() / 1000)
+      const { jwt: clientAttestationWithoutSub } = await signJwt(
+        { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+        {
+          header: { typ: 'oauth-client-attestation+jwt', alg: 'ES256' },
+          payload: { iat: now, exp: now + 300, cnf: { jwk: instance.publicJwk } },
+        }
+      )
+      const dpopJwt = await createCombinedDpopProof(instance)
+
+      await expect(verify(dpopJwt, { clientAttestationJwt: clientAttestationWithoutSub })).rejects.toMatchObject({
+        status: 401,
+        errorResponse: { error: 'invalid_client' },
+      })
     })
 
     test('rejects a combined-mode attestation without a DPoP proof', async () => {

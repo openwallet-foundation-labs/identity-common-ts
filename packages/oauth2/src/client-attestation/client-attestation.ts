@@ -1,4 +1,4 @@
-import { dateToSeconds, type FetchHeaders, parseWithErrorHandling } from '@openid4vc/utils'
+import { dateToSeconds, type FetchHeaders, parseWithErrorHandling, ValidationError } from '@openid4vc/utils'
 import type { CallbackContext } from '../callbacks'
 import { decodeJwt, jwtHeaderFromJwtSigner, jwtSignerFromJwt } from '../common/jwt/decode-jwt'
 import { verifyJwt } from '../common/jwt/verify-jwt'
@@ -230,7 +230,7 @@ export async function verifyClientAttestation({
       clientAttestationPop,
     }
   } catch (error) {
-    if (error instanceof Oauth2Error) {
+    if (error instanceof Oauth2Error || error instanceof ValidationError) {
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidClient,
