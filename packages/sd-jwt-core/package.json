@@ -1,6 +1,6 @@
 {
   "name": "@sd-jwt/core",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "description": "SD-JWT RFC 9901 implementation in TypeScript",
   "files": [
     "dist"
