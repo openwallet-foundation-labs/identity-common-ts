@@ -15,6 +15,7 @@ import {
   SDJWTException,
   SDJwt,
   SDJwtInstance,
+  unpack,
   type VerificationError,
   type VerificationErrorCode,
   type VerifierOptions,
@@ -29,6 +30,7 @@ import {
   type TypeMetadataFormat,
   TypeMetadataFormatSchema,
 } from './sd-jwt-vc-type-metadata-format'
+import { type TypeMetadataVerificationResult, verifyClaimsAgainstTypeMetadata } from './type-metadata-verification'
 import type { VerificationResult } from './verification-result'
 
 export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
@@ -117,6 +119,9 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
     if (this.userConfig.loadTypeMetadataFormat) {
       const resolvedTypeMetadata = await this.fetchVct(result)
       result.typeMetadata = resolvedTypeMetadata
+      if (resolvedTypeMetadata) {
+        result.typeMetadataVerification = await this.verifyTypeMetadata(encodedSDJwt, resolvedTypeMetadata)
+      }
     }
     return result
   }
@@ -190,6 +195,9 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
           const resolvedTypeMetadata = await this.fetchVct(result)
           if (result) {
             result.typeMetadata = resolvedTypeMetadata
+            if (resolvedTypeMetadata) {
+              result.typeMetadataVerification = await this.verifyTypeMetadata(encodedSDJwt, resolvedTypeMetadata)
+            }
           }
         } catch (e) {
           addError('VCT_VERIFICATION_FAILED', `VCT verification failed: ${ensureError(e).message}`, e)
@@ -218,6 +226,43 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
       success: true,
       data: result,
     }
+  }
+
+  /**
+   * Verifies the presented claims of an SD-JWT VC against a Type Metadata format object.
+   * Checks for extra claims, missing mandatory claims, and selective disclosure constraints (`sd: "always"`, `sd: "never"`).
+   * If `typeMetadata` is omitted, attempts to fetch and resolve it automatically via `getVct`.
+   *
+   * @param encodedSDJwt The encoded SD-JWT VC string
+   * @param typeMetadata Optional type metadata object (ResolvedTypeMetadata or TypeMetadataFormat)
+   * @returns TypeMetadataVerificationResult
+   */
+  async verifyTypeMetadata(
+    encodedSDJwt: string,
+    typeMetadata?: ResolvedTypeMetadata | TypeMetadataFormat
+  ): Promise<TypeMetadataVerificationResult> {
+    if (!this.userConfig.hasher) {
+      throw new SDJWTException('Hasher not found')
+    }
+    const hasher = this.userConfig.hasher
+
+    let resolvedMetadata = typeMetadata ?? (await this.getVct(encodedSDJwt))
+    if (!resolvedMetadata) {
+      throw new SDJWTException('Type metadata not found or could not be resolved')
+    }
+
+    if (!('mergedTypeMetadata' in resolvedMetadata) && resolvedMetadata.extends) {
+      resolvedMetadata = await this.resolveVctExtendsChain(resolvedMetadata)
+    }
+
+    const sdjwt = await SDJwt.fromEncode(encodedSDJwt, hasher)
+    if (!sdjwt.jwt?.payload) {
+      throw new SDJWTException('Invalid SD JWT: missing payload')
+    }
+
+    const { unpackedObj, disclosureKeymap } = await unpack(sdjwt.jwt.payload, sdjwt.disclosures ?? [], hasher)
+
+    return verifyClaimsAgainstTypeMetadata(resolvedMetadata, unpackedObj, disclosureKeymap)
   }
 
   /**
