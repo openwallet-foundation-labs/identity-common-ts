@@ -62,9 +62,9 @@ export class Oauth2ResourceUnauthorizedError extends Oauth2Error {
       this.wwwAuthenticateHeaders.map((header) => ({
         scheme: header.scheme,
         payload: {
-          error: header.error ?? null,
-          error_description: header.error_description ?? null,
-          scope: header.scope ?? null,
+          error: header.error,
+          error_description: header.error_description,
+          scope: header.scope,
           ...header.additionalPayload,
         },
       }))

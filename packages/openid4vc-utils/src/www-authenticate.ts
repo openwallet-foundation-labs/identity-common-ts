@@ -12,9 +12,9 @@ export interface WwwAuthenticateHeaderChallenge {
 
   /**
    * Record where the keys are the names, and the value can be 0 (null), 1 (string) or multiple (string[])
-   * entries
+   * entries. Entries with an `undefined` value are omitted when encoding.
    */
-  payload: Record<string, string | string[] | null>
+  payload: Record<string, string | string[] | null | undefined>
 }
 
 const parsePayload = (scheme: string, string: string): WwwAuthenticateHeaderChallenge => {
@@ -80,6 +80,8 @@ export function encodeWwwAuthenticateHeader(challenges: WwwAuthenticateHeaderCha
   for (const challenge of challenges) {
     // Encode each parameter according to RFC 7235
     const encodedParams = Object.entries(challenge.payload).flatMap(([key, value]) => {
+      if (value === undefined) return []
+
       const encode = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
       // Convert value to string and escape special characters
       if (Array.isArray(value)) {
