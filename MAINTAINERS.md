@@ -13,6 +13,7 @@ The project is maintained as a monorepo. Unless explicitly stated otherwise, mai
 | Lukas Han | [@lukasjhan](https://github.com/lukasjhan) | Hopae Inc. | Entire project |
 | Mirko Mollik | [@cre8](https://github.com/cre8) | Common Codes | Entire project |
 | Timo Glastra | [@TimoGlastra](https://github.com/TimoGlastra) | Animo | Entire project |
+| Alexis | [@marsouin](https://github.com/marsouin) | Verifiables | Entire project |
 
 ## Emeritus Maintainers
 
