@@ -175,13 +175,13 @@ describe('Entitlements', () => {
 describe('Validators', () => {
   describe('validateWRPRCPayload', () => {
     it('should validate valid payload', () => {
-      const result = validateWRPRCPayload(validLegalPersonPayload)
+      const result = validateWRPRCPayload(validLegalPersonPayload, validLegalPersonPayload.sub)
       expect(result.valid).toBe(true)
       expect(result.errors).toHaveLength(0)
     })
 
     it('should return errors for invalid payload', () => {
-      const result = validateWRPRCPayload({})
+      const result = validateWRPRCPayload({}, 'LEIXG-529900T8BM49AURSDO55')
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
     })
@@ -191,7 +191,7 @@ describe('Validators', () => {
         ...validLegalPersonPayload,
         entitlements: ['https://custom.example.com/entitlement'],
       }
-      const result = validateWRPRCPayload(payload)
+      const result = validateWRPRCPayload(payload, payload.sub)
       expect(result.warnings.some((w) => w.code === 'unknown_entitlement')).toBe(true)
     })
 
@@ -200,7 +200,7 @@ describe('Validators', () => {
         ...validLegalPersonPayload,
         entitlements: [PSP_SUB_ENTITLEMENTS.PAYMENT_INITIATION],
       }
-      const result = validateWRPRCPayload(payload)
+      const result = validateWRPRCPayload(payload, payload.sub)
       expect(result.valid).toBe(false)
       expect(result.errors.some((e) => e.code === 'missing_base_entitlement')).toBe(true)
     })
@@ -210,7 +210,7 @@ describe('Validators', () => {
         ...validLegalPersonPayload,
         entitlements: [WRP_ENTITLEMENTS.SERVICE_PROVIDER, PSP_SUB_ENTITLEMENTS.PAYMENT_INITIATION],
       }
-      const result = validateWRPRCPayload(payload)
+      const result = validateWRPRCPayload(payload, payload.sub)
       expect(result.errors.some((e) => e.code === 'missing_base_entitlement')).toBe(false)
     })
   })
@@ -229,7 +229,7 @@ describe('Validators', () => {
 
   describe('validateWRPRC', () => {
     it('should validate complete WRPRC', () => {
-      const result = validateWRPRC(validJWTHeader, validLegalPersonPayload)
+      const result = validateWRPRC(validJWTHeader, validLegalPersonPayload, validLegalPersonPayload.sub)
       expect(result.valid).toBe(true)
     })
   })
@@ -473,10 +473,13 @@ describe('Factory Functions', () => {
   describe('createWRPRCPayload', () => {
     it('should carry a provided jti through', () => {
       const jti_uuid = 'urn:uuid:0c1f7a2e-3d4b-4c5a-8e9f-1a2b3c4d5e6f'
-      const payload = createWRPRCPayload({
-        ...validLegalPersonPayload,
-        jti: jti_uuid,
-      })
+      const payload = createWRPRCPayload(
+        {
+          ...validLegalPersonPayload,
+          jti: jti_uuid,
+        },
+        validLegalPersonPayload.sub
+      )
 
       expect(payload.jti).toBe(jti_uuid)
     })

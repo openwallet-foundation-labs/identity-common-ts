@@ -29,6 +29,7 @@ import { WRPRCException } from './wrprc-exception'
 export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
   const {
     payload,
+    accessCertificateSub,
     algorithm = 'ES256',
     certificates,
     keyId,
@@ -38,7 +39,7 @@ export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
   } = options
 
   // Validate payload
-  assertValidWRPRCPayload(payload)
+  assertValidWRPRCPayload(payload, accessCertificateSub)
 
   if (!certificates || certificates.length === 0) {
     throw new WRPRCException('At least one certificate is required for x5c header')
@@ -77,7 +78,7 @@ export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
  * @param jws - The compact JWS string
  * @returns Decoded WRPRC with header and payload
  */
-export function decodeWRPRC(jws: string): SignedWRPRC {
+export function decodeWRPRC(jws: string, accessCertificateSub: string): SignedWRPRC {
   let decoded: ReturnType<typeof decode<WRPRCPayload>>
   try {
     decoded = decode<WRPRCPayload>(jws)
@@ -102,7 +103,7 @@ export function decodeWRPRC(jws: string): SignedWRPRC {
   }
 
   // Validate payload structure
-  const payload = parseWRPRCPayload(decoded.payload)
+  const payload = parseWRPRCPayload(decoded.payload, accessCertificateSub)
 
   return {
     jws,
@@ -141,8 +142,8 @@ export function parseWRPRC(jws: string): { header: unknown; payload: unknown; si
  * @param payload - Partial payload (iat will be set automatically if not provided)
  * @returns Complete payload with timestamp
  */
-export function createWRPRCPayload(payload: WRPRCPayload): WRPRCPayload {
-  assertValidWRPRCPayload(payload)
+export function createWRPRCPayload(payload: WRPRCPayload, accessCertificateSub: string): WRPRCPayload {
+  assertValidWRPRCPayload(payload, accessCertificateSub)
 
   return payload
 }

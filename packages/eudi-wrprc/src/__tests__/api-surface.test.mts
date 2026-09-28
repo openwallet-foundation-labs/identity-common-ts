@@ -70,7 +70,7 @@ describe('semantic identifier initial characters', () => {
   })
 
   it('warns about initial characters outside Tables 2 and 4 without failing', () => {
-    const result = validateWRPRCPayload(base().identifier('ZZZNL-12345').build())
+    const result = validateWRPRCPayload(base().identifier('ZZZNL-12345').build(), 'ZZZNL-12345')
 
     expect(result.valid).toBe(true)
     expect(result.warnings.map((w) => w.code)).toContain(WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
@@ -78,14 +78,14 @@ describe('semantic identifier initial characters', () => {
 
   it('does not warn for the corrected Table 2 and Table 4 characters', () => {
     for (const sub of ['EORNL-1', 'LEIXG-1', 'NTRNL-1', 'VATNL-1', 'EXCNL-1', 'TINIT-1', 'PASDE-1', 'IDCIT-1']) {
-      const result = validateWRPRCPayload(base().identifier(sub).build())
+      const result = validateWRPRCPayload(base().identifier(sub).build(), sub)
       const codes = result.warnings.map((w) => w.code)
       expect(codes, sub).not.toContain(WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
     }
   })
 
   it('rejects an identifier that does not follow the semantic format', () => {
-    const result = validateWRPRCPayload(base().identifier('not-a-semantic-id').build())
+    const result = validateWRPRCPayload(base().identifier('not-a-semantic-id').build(), 'not-a-semantic-id')
 
     expect(result.valid).toBe(false)
     expect(result.errors.map((e) => e.code)).toContain(WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER)
@@ -98,20 +98,31 @@ describe('semantic identifier initial characters', () => {
 
 describe('signWRPRC error paths', () => {
   it('requires at least one certificate', async () => {
-    await expect(signWRPRC({ payload: base().build(), certificates: [], signer: await signerFor() })).rejects.toThrow(
-      WRPRCException
-    )
+    await expect(
+      signWRPRC({
+        payload: base().build(),
+        accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
+        certificates: [],
+        signer: await signerFor(),
+      })
+    ).rejects.toThrow(WRPRCException)
   })
 
   it('rejects a malformed PEM certificate', async () => {
     await expect(
-      signWRPRC({ payload: base().build(), certificates: ['not a pem'], signer: await signerFor() })
+      signWRPRC({
+        payload: base().build(),
+        accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
+        certificates: ['not a pem'],
+        signer: await signerFor(),
+      })
     ).rejects.toThrow(/PEM/)
   })
 
   it('honours an explicit signing time and key id', async () => {
     const signed = await signWRPRC({
       payload: base().build(),
+      accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
       certificates: [TEST_CERT],
       signer: await signerFor(),
       signingTime: 1_780_000_000,
@@ -134,7 +145,7 @@ describe('decodeWRPRC and parseWRPRC', () => {
   it('rejects a token whose typ is not rc-wrp+jwt', () => {
     const jws = compact({ typ: 'JWT', alg: 'ES256', x5c: ['MIIBkDCB'], iat: 1_780_000_000 }, base().build())
 
-    expect(() => decodeWRPRC(jws)).toThrow(/rc-wrp\+jwt/)
+    expect(() => decodeWRPRC(jws, 'LEINL-529900T8BM49AURSDO55')).toThrow(/rc-wrp\+jwt/)
   })
 
   it('parses header and payload without validating them', () => {
@@ -159,12 +170,14 @@ describe('assertValidWRPRC', () => {
   const header = { typ: 'rc-wrp+jwt' as const, alg: 'ES256' as const, x5c: ['MIIBkDCB'], iat: 1_780_000_000 }
 
   it('passes for a valid header and payload', () => {
-    expect(() => assertValidWRPRC(header, base().build())).not.toThrow()
+    expect(() => assertValidWRPRC(header, base().build(), 'LEINL-529900T8BM49AURSDO55')).not.toThrow()
   })
 
   it('reports the offending side in the message', () => {
-    expect(() => assertValidWRPRC({ ...header, typ: 'JWT' }, base().build())).toThrow(/header/)
-    expect(() => assertValidWRPRC(header, { name: 'incomplete' })).toThrow(/payload/)
+    expect(() => assertValidWRPRC({ ...header, typ: 'JWT' }, base().build(), 'LEINL-529900T8BM49AURSDO55')).toThrow(
+      /header/
+    )
+    expect(() => assertValidWRPRC(header, { name: 'incomplete' }, 'LEINL-529900T8BM49AURSDO55')).toThrow(/payload/)
   })
 })
 

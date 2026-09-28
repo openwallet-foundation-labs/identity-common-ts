@@ -55,7 +55,7 @@ describe('localized values serialize as { lang, value }', () => {
 describe('entitlements accept OID form', () => {
   it('validates an entitlement given as an OID', () => {
     const payload = base().entitlements(['0.4.0.19475.1.1']).build()
-    expect(validateWRPRCPayload(payload).valid).toBe(true)
+    expect(validateWRPRCPayload(payload, payload.sub).valid).toBe(true)
   })
 })
 
@@ -64,32 +64,41 @@ describe('Table 10 fields', () => {
     const payload = base()
       .expiresAt(1_700_000_000 + 200 * 24 * 3600)
       .build()
-    expect(validateWRPRCPayload(payload).valid).toBe(true)
+    expect(validateWRPRCPayload(payload, payload.sub).valid).toBe(true)
   })
 
   it('rejects exp more than 12 months after iat', () => {
     const payload = base()
       .expiresAt(1_700_000_000 + 400 * 24 * 3600)
       .build()
-    const result = validateWRPRCPayload(payload)
+    const result = validateWRPRCPayload(payload, payload.sub)
     expect(result.valid).toBe(false)
     expect(result.errors.some((e) => e.code === 'exp_too_late')).toBe(true)
   })
 
-  it('requires act.sub to match intermediary.sub', () => {
-    const ok = base()
-      .intermediary({ sub: 'LEINL-INTERMEDIARY', sname: 'Intermediary BV' })
-      .act({ sub: 'LEINL-INTERMEDIARY' })
-      .build()
-    expect(validateWRPRCPayload(ok).valid).toBe(true)
+  it('checks intermediary.sub against the access certificate subject', () => {
+    const ok = base().intermediary({ sub: 'LEINL-INTERMEDIARY', sname: 'Intermediary BV' }).build()
+    expect(validateWRPRCPayload(ok, 'LEINL-INTERMEDIARY').valid).toBe(true)
 
-    const mismatch = base()
-      .intermediary({ sub: 'LEINL-INTERMEDIARY', sname: 'Intermediary BV' })
-      .act({ sub: 'LEINL-OTHER' })
-      .build()
-    const result = validateWRPRCPayload(mismatch)
+    const mismatch = base().intermediary({ sub: 'LEINL-INTERMEDIARY', sname: 'Intermediary BV' }).build()
+    const result = validateWRPRCPayload(mismatch, 'LEINL-OTHER')
     expect(result.valid).toBe(false)
-    expect(result.errors.some((e) => e.code === 'act_intermediary_mismatch')).toBe(true)
+    expect(result.errors.some((e) => e.code === WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH)).toBe(true)
+  })
+
+  it('checks sub against the access certificate subject when there is no intermediary', () => {
+    const payload = base().build()
+
+    expect(validateWRPRCPayload(payload, payload.sub).valid).toBe(true)
+
+    const result = validateWRPRCPayload(payload, 'LEINL-OTHER')
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        path: ['sub'],
+        code: WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
+      })
+    )
   })
 
   it('carries public_body and intended_use_id through the builder', () => {
@@ -101,11 +110,10 @@ describe('Table 10 fields', () => {
 
 describe('validation codes', () => {
   it('exposes codes a calling application can branch on', () => {
-    const result = validateWRPRCPayload(
-      base()
-        .expiresAt(1_700_000_000 + 400 * 24 * 3600)
-        .build()
-    )
+    const payload = base()
+      .expiresAt(1_700_000_000 + 400 * 24 * 3600)
+      .build()
+    const result = validateWRPRCPayload(payload, payload.sub)
 
     expect(result.errors.map((e) => e.code)).toContain(WRPRC_VALIDATION_CODES.EXP_TOO_LATE)
   })
@@ -120,7 +128,6 @@ describe('wire dialects', () => {
         claim: [{ path: ['given_name'] }],
       })
       .intermediary({ sub: 'LEINL-INTERMEDIARY', sname: 'Intermediary BV' })
-      .act({ sub: 'LEINL-INTERMEDIARY' })
       .build()
 
   it('accepts the anticipated claims and intermediary.name spellings when parsing', () => {
@@ -130,8 +137,8 @@ describe('wire dialects', () => {
     expect(draft.credentials[0]).not.toHaveProperty('claim')
     expect(draft.intermediary).toEqual({ sub: 'LEINL-INTERMEDIARY', name: 'Intermediary BV' })
 
-    expect(validateWRPRCPayload(draft).valid).toBe(true)
-    expect(parseWRPRCPayload(draft)).toEqual(withNested())
+    expect(validateWRPRCPayload(draft, 'LEINL-INTERMEDIARY').valid).toBe(true)
+    expect(parseWRPRCPayload(draft, 'LEINL-INTERMEDIARY')).toEqual(withNested())
   })
 
   it('emits the published spelling by default', () => {
@@ -143,6 +150,7 @@ describe('wire dialects', () => {
     const { privateKey } = await ES256.generateKeyPair()
     const signed = await signWRPRC({
       payload: withNested(),
+      accessCertificateSub: 'LEINL-INTERMEDIARY',
       certificates: [TEST_CERT],
       signer: await ES256.getSigner(privateKey),
       dialect: WRPRC_DIALECTS.DRAFT,
@@ -153,7 +161,7 @@ describe('wire dialects', () => {
     expect(onTheWire.intermediary).toHaveProperty('name')
 
     // decoding maps back to the canonical v1.2.1 shape
-    expect(decodeWRPRC(signed.jws).payload).toEqual(withNested())
+    expect(decodeWRPRC(signed.jws, 'LEINL-INTERMEDIARY').payload).toEqual(withNested())
   })
 
   it('rejects provides_attestations as scheme URLs', () => {
@@ -162,7 +170,7 @@ describe('wire dialects', () => {
       provides_attestations: ['https://catalogue.test/schemes/age-over-18'],
     }
 
-    expect(validateWRPRCPayload(payload).valid).toBe(false)
+    expect(validateWRPRCPayload(payload, payload.sub).valid).toBe(false)
   })
 
   it('rejects claim queries inside provides_attestations', () => {
@@ -175,8 +183,8 @@ describe('wire dialects', () => {
       provides_attestations: [{ format: 'dc+sd-jwt', meta: {}, claims: [{ path: ['given_name'] }] }],
     }
 
-    expect(validateWRPRCPayload(withClaim).valid).toBe(false)
-    expect(validateWRPRCPayload(withDraftClaims).valid).toBe(false)
+    expect(validateWRPRCPayload(withClaim, withClaim.sub).valid).toBe(false)
+    expect(validateWRPRCPayload(withDraftClaims, withDraftClaims.sub).valid).toBe(false)
   })
 })
 
@@ -185,6 +193,7 @@ describe('GEN-5.2.1-04 JAdES B-B signature', () => {
     const { privateKey } = await ES256.generateKeyPair()
     const signed = await signWRPRC({
       payload: base().build(),
+      accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
       certificates: [TEST_CERT],
       signer: await ES256.getSigner(privateKey),
     })
@@ -195,14 +204,14 @@ describe('GEN-5.2.1-04 JAdES B-B signature', () => {
     expect(signed.header.x5c).toHaveLength(1)
     expect(validateWRPRCJWTHeader(signed.header).valid).toBe(true)
 
-    expect(decodeWRPRC(signed.jws).payload).toEqual(signed.payload)
+    expect(decodeWRPRC(signed.jws, 'LEINL-529900T8BM49AURSDO55').payload).toEqual(signed.payload)
   })
 
   it('rejects a WRPRC whose header has no claimed signing time', () => {
     const header = base64urlEncode(JSON.stringify({ typ: 'rc-wrp+jwt', alg: 'ES256', x5c: ['MIIBkDCB'] }))
     const payload = base64urlEncode(JSON.stringify(base().build()))
 
-    expect(() => decodeWRPRC(`${header}.${payload}.AAAA`)).toThrow(/B-B/)
+    expect(() => decodeWRPRC(`${header}.${payload}.AAAA`, 'LEINL-529900T8BM49AURSDO55')).toThrow(/B-B/)
   })
 })
 
@@ -257,10 +266,9 @@ describe('Annex C example', () => {
       ],
       // Annex C spells the intermediary common name `name`; Table 10 is normative and says `sname`
       intermediary: { sub: 'LEIXG-INTERMEDIARY-1234567890', sname: 'Intermediary Services Ltd.' },
-      act: { sub: 'LEIXG-INTERMEDIARY-1234567890' },
     }
 
     expect(WRPRCPayloadSchema.safeParse(annexC).success).toBe(true)
-    expect(validateWRPRCPayload(annexC).valid).toBe(true)
+    expect(validateWRPRCPayload(annexC, annexC.intermediary.sub).valid).toBe(true)
   })
 })
