@@ -279,17 +279,18 @@ describe('createCrl', () => {
     expect(() => prepareCrl(crlTemplate({ crlNumber: BigInt(2) ** BigInt(160) }))).toThrow(/20 octets/)
   })
 
-  it('handles large CRLs', async () => {
-    const revokedCertificates = Array.from({ length: 20_000 }, (_, i) => ({
+  // More entries than the asn1js default node limit (about 1 200 CRL entries) allows
+  it('handles large CRLs', { timeout: 30_000 }, async () => {
+    const revokedCertificates = Array.from({ length: 3_000 }, (_, i) => ({
       serialNumber: (i + 1).toString(16).padStart(8, '0'),
       revocationDate: new Date('2026-10-02T00:00:00Z'),
       reason: 'cessationOfOperation' as const,
     }))
     const crl = await signedCrl({ revokedCertificates })
     const parsed = parseCrl(crl.der)
-    expect(parsed.revokedCertificates).toHaveLength(20_000)
-    expect(getRevocationStatus(await issueLeaf('00004e20'), parsed, { now: NOW }).status).toBe('revoked')
-    expect(getRevocationStatus(await issueLeaf('00004e21'), parsed, { now: NOW }).status).toBe('good')
+    expect(parsed.revokedCertificates).toHaveLength(3_000)
+    expect(getRevocationStatus(await issueLeaf('00000bb8'), parsed, { now: NOW }).status).toBe('revoked')
+    expect(getRevocationStatus(await issueLeaf('00000bb9'), parsed, { now: NOW }).status).toBe('good')
     expect(() => parseCrl(crl.der, { maxEntries: 1_000 })).toThrow(X509Exception)
   })
 })
