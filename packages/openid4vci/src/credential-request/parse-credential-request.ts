@@ -1,3 +1,4 @@
+import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { parseWithErrorHandling } from '@openid4vc/utils'
 import z from 'zod'
 import { attestationProofTypeIdentifier } from '../formats/proof-type/attestation/z-attestation-proof-type'
@@ -113,7 +114,18 @@ export function parseCredentialRequest(options: ParseCredentialRequestOptions): 
   const credentialResponseEncryption = credentialRequest.credential_response_encryption
 
   if (credentialRequest.credential_configuration_id) {
-    // This will throw an error if the credential configuration does not exist or is not valid
+    if (
+      !options.issuerMetadata.credentialIssuer.credential_configurations_supported[
+        credentialRequest.credential_configuration_id
+      ]
+    ) {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.UnknownCredentialConfiguration,
+        error_description: `Credential configuration with id '${credentialRequest.credential_configuration_id}' not found in credential configurations supported.`,
+      })
+    }
+
+    // This will throw an error if the credential configuration is not valid
     getKnownCredentialConfigurationSupportedById(options.issuerMetadata, credentialRequest.credential_configuration_id)
 
     const credentialConfigurations = options.issuerMetadata.knownCredentialConfigurations

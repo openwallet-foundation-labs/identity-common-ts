@@ -254,6 +254,8 @@ export class Openid4vciIssuer {
       // TODO: method should include reason for parsing - (e.g. unsupported format etc..)
       return parseCredentialRequest(options)
     } catch (error) {
+      if (error instanceof Oauth2ServerErrorResponseError) throw error
+
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidCredentialRequest,

@@ -101,15 +101,6 @@ export const IntermediarySchema = z.object({
   sname: z.string().min(1),
 })
 
-/**
- * The "actor" claim (Table 10, GEN-5.2.4-09): under intermediation, identifies
- * the intermediary acting on behalf of the subject. `act.sub` matches `intermediary.sub`.
- */
-export const ActSchema = z.object({
-  /** Semantic identifier of the acting intermediary */
-  sub: z.string().min(1),
-})
-
 // ============================================================================
 // WRPRC Payload Schema
 // ============================================================================
@@ -191,9 +182,6 @@ export const WRPRCPayloadSchema = z.object({
 
   /** Intermediary information when WRP acts through an intermediary (Table 10) */
   intermediary: IntermediarySchema.optional(),
-
-  /** Actor claim under intermediation (Table 10, GEN-5.2.4-09) */
-  act: ActSchema.optional(),
 
   /** Whether the WRP is a public sector body (Table 10) */
   public_body: z.boolean().optional(),

@@ -53,7 +53,12 @@ const decodeBase64 = (input: string, alphabet: Base64Alphabet): Uint8Array => {
   }
 
   const chars = ALPHABETS[alphabet]
-  const unpadded = input.replace(/=+$/, '')
+  let unpadded = input
+  if (input.endsWith('==')) {
+    unpadded = input.slice(0, -2)
+  } else if (input.endsWith('=')) {
+    unpadded = input.slice(0, -1)
+  }
   // A single trailing character can never encode a full byte
   if (unpadded.length % 4 === 1) {
     throw new IdentityCommonException(`Invalid ${alphabet} string: invalid length`)

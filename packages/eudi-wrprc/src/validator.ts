@@ -52,10 +52,8 @@ export const WRPRC_VALIDATION_CODES = {
   EXP_TOO_LATE: 'exp_too_late',
   /** exp at or before iat */
   EXP_BEFORE_IAT: 'exp_before_iat',
-  /** intermediary present without act (GEN-5.2.4-09) */
-  MISSING_ACT: 'missing_act',
-  /** act.sub does not match intermediary.sub (GEN-5.2.4-09) */
-  ACT_INTERMEDIARY_MISMATCH: 'act_intermediary_mismatch',
+  /** Selected WRPRC identity does not match the access certificate subject */
+  ACCESS_CERTIFICATE_IDENTITY_MISMATCH: 'access_certificate_identity_mismatch',
 } as const
 
 /** A semantic validation code emitted by this validator */
@@ -168,9 +166,11 @@ function validateEntitlementRequirements(
 }
 
 /**
- * Validate a WRPRC payload against the schema
+ * Validate a WRPRC payload against the schema and semantic rules.
+ *
+ * @param accessCertificateSub Required subject from the presented access certificate.
  */
-export function validateWRPRCPayload(payload: unknown): ValidationResult {
+export function validateWRPRCPayload(payload: unknown, accessCertificateSub: string): ValidationResult {
   const result = WRPRCPayloadSchema.safeParse(normalizeWRPRCPayload(payload))
   const errors: ValidationError[] = []
   const warnings: ValidationError[] = []
@@ -227,21 +227,15 @@ export function validateWRPRCPayload(payload: unknown): ValidationResult {
     }
   }
 
-  // GEN-5.2.4-09: under intermediation, act.sub must match intermediary.sub
-  if (validPayload.intermediary) {
-    if (!validPayload.act) {
-      errors.push({
-        path: ['act'],
-        message: 'act claim is required when an intermediary is present (GEN-5.2.4-09)',
-        code: WRPRC_VALIDATION_CODES.MISSING_ACT,
-      })
-    } else if (validPayload.act.sub !== validPayload.intermediary.sub) {
-      errors.push({
-        path: ['act', 'sub'],
-        message: 'act.sub must match intermediary.sub (GEN-5.2.4-09)',
-        code: WRPRC_VALIDATION_CODES.ACT_INTERMEDIARY_MISMATCH,
-      })
-    }
+  // The intermediary identity replaces the WRPRC subject for this cross-certificate check.
+  const expectedAccessCertificateSub = validPayload.intermediary?.sub ?? validPayload.sub
+  const identityPath = validPayload.intermediary ? ['intermediary', 'sub'] : ['sub']
+  if (accessCertificateSub !== expectedAccessCertificateSub) {
+    errors.push({
+      path: identityPath,
+      message: `${validPayload.intermediary ? 'intermediary.sub' : 'sub'} must match the access certificate subject`,
+      code: WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
+    })
   }
 
   return { valid: errors.length === 0, errors, warnings }
@@ -271,9 +265,9 @@ export function validateWRPRCJWTHeader(header: unknown): ValidationResult {
 /**
  * Validate a complete WRPRC (header + payload)
  */
-export function validateWRPRC(header: unknown, payload: unknown): ValidationResult {
+export function validateWRPRC(header: unknown, payload: unknown, accessCertificateSub: string): ValidationResult {
   const headerResult = validateWRPRCJWTHeader(header)
-  const payloadResult = validateWRPRCPayload(payload)
+  const payloadResult = validateWRPRCPayload(payload, accessCertificateSub)
 
   const errors = [
     ...headerResult.errors.map((e) => ({ ...e, path: ['header', ...e.path] })),
@@ -431,8 +425,11 @@ function validateSemanticIdentifier(identifier: string): {
 /**
  * Assert that a WRPRC payload is valid, throws WRPRCException if not
  */
-export function assertValidWRPRCPayload(payload: unknown): asserts payload is WRPRCPayload {
-  const result = validateWRPRCPayload(payload)
+export function assertValidWRPRCPayload(
+  payload: unknown,
+  accessCertificateSub: string
+): asserts payload is WRPRCPayload {
+  const result = validateWRPRCPayload(payload, accessCertificateSub)
   if (!result.valid) {
     const messages = result.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('\n')
     throw new WRPRCException(`Invalid WRPRC payload:\n${messages}`, result.errors)
@@ -444,16 +441,16 @@ export function assertValidWRPRCPayload(payload: unknown): asserts payload is WR
  *
  * @throws WRPRCException if the payload is invalid
  */
-export function parseWRPRCPayload(payload: unknown): WRPRCPayload {
-  assertValidWRPRCPayload(payload)
+export function parseWRPRCPayload(payload: unknown, accessCertificateSub: string): WRPRCPayload {
+  assertValidWRPRCPayload(payload, accessCertificateSub)
   return WRPRCPayloadSchema.parse(normalizeWRPRCPayload(payload))
 }
 
 /**
  * Assert that a WRPRC is valid (header + payload), throws WRPRCException if not
  */
-export function assertValidWRPRC(header: unknown, payload: unknown): void {
-  const result = validateWRPRC(header, payload)
+export function assertValidWRPRC(header: unknown, payload: unknown, accessCertificateSub: string): void {
+  const result = validateWRPRC(header, payload, accessCertificateSub)
   if (!result.valid) {
     const messages = result.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('\n')
     throw new WRPRCException(`Invalid WRPRC:\n${messages}`, result.errors)

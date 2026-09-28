@@ -35,7 +35,6 @@ export {
 } from './entitlements'
 // Schemas
 export {
-  ActSchema,
   ClaimSchema,
   CredentialSchema,
   IntermediarySchema,
@@ -54,7 +53,6 @@ export {
 export { createWRPRCPayload, decodeWRPRC, parseWRPRC, signWRPRC } from './signer'
 // Types
 export type {
-  Act,
   Claim,
   Credential,
   Intermediary,

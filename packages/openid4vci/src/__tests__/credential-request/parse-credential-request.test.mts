@@ -43,6 +43,31 @@ describe('Parse Credential Request', () => {
     )
   })
 
+  test('parse draft 15 credential request with unknown credential_configuration_id throws unknown_credential_configuration', () => {
+    expect(() =>
+      parseCredentialRequest({
+        issuerMetadata: {
+          authorizationServers: [],
+          credentialIssuer: issuerMetadata,
+          originalDraftVersion: Openid4vciVersion.Draft15,
+          knownCredentialConfigurations: {},
+        },
+        credentialRequest: {
+          credential_configuration_id: 'not-offered',
+          proof: {
+            proof_type: 'jwt',
+            jwt: 'ey.ey.S',
+          },
+        },
+      })
+    ).toThrow(
+      expect.objectContaining({
+        status: 400,
+        errorResponse: expect.objectContaining({ error: 'unknown_credential_configuration' }),
+      })
+    )
+  })
+
   test('parse draft 15 credential request with credential_configuration_id', () => {
     expect(
       parseCredentialRequest({

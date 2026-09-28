@@ -11,7 +11,6 @@ import type { Signer } from '@owf/crypto'
 import type { z } from 'zod'
 import type { WRPRCDialect } from './dialect'
 import type {
-  ActSchema,
   ClaimSchema,
   CredentialSchema,
   IntermediarySchema,
@@ -60,9 +59,6 @@ export type Status = z.infer<typeof StatusSchema>
 
 /** Intermediary information */
 export type Intermediary = z.infer<typeof IntermediarySchema>
-
-/** Actor claim under intermediation (Table 10) */
-export type Act = z.infer<typeof ActSchema>
 
 // ============================================================================
 // WRPRC Document Types
@@ -115,6 +111,8 @@ export interface SignedWRPRC {
 export interface SignOptions {
   /** The WRPRC payload to sign */
   payload: WRPRCPayload
+  /** Required subject of the access certificate the WRPRC is intended to authorize */
+  accessCertificateSub: string
   /** Algorithm (default: ES256) */
   algorithm?: WRPRCJWTHeader['alg']
   /** PEM-encoded certificates for x5c header (each element is a single PEM certificate) */
