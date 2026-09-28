@@ -96,6 +96,23 @@ const issuerMetadata = {
 } as const satisfies IssuerMetadataResult
 
 describe('Openid4vciIssuer', () => {
+  test('parseCredentialRequest keeps unknown_credential_configuration for an unknown credential_configuration_id', () => {
+    expect(() =>
+      issuer.parseCredentialRequest({
+        issuerMetadata: { ...issuerMetadata, originalDraftVersion: Openid4vciVersion.Draft15 },
+        credentialRequest: {
+          credential_configuration_id: 'not-offered',
+          proof: { proof_type: 'jwt', jwt: 'ey.ey.S' },
+        },
+      })
+    ).toThrow(
+      expect.objectContaining({
+        status: 400,
+        errorResponse: expect.objectContaining({ error: 'unknown_credential_configuration' }),
+      })
+    )
+  })
+
   test('create issuer metadata, create a credential offer, parse a credential request with jwt proof, create a credential response', async () => {
     const credentialOffer = await issuer.createCredentialOffer({
       credentialConfigurationIds: ['pidSdJwt'],
