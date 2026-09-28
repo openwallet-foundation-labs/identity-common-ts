@@ -65,20 +65,21 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
     )
   }
 
-  const [scheme, accessToken] = authorizationHeader.split(' ', 2)
-  if (!scheme || !accessToken) {
+  const [providedScheme, accessToken] = authorizationHeader.split(' ', 2)
+  if (!providedScheme || !accessToken) {
     throw new Oauth2ResourceUnauthorizedError(
       `Malformed 'Authorization' header provided in request.`,
       allowedAuthenticationSchemes.map((scheme) => ({ scheme }))
     )
   }
 
-  if (
-    !allowedAuthenticationSchemes.includes(scheme as SupportedAuthenticationScheme) ||
-    (scheme !== SupportedAuthenticationScheme.Bearer && scheme !== SupportedAuthenticationScheme.DPoP)
-  ) {
+  // RFC 9110 §11.1: the auth-scheme is case-insensitive, so resolve it to its canonical form
+  const scheme = allowedAuthenticationSchemes.find(
+    (allowedScheme) => allowedScheme.toLowerCase() === providedScheme.toLowerCase()
+  )
+  if (!scheme || (scheme !== SupportedAuthenticationScheme.Bearer && scheme !== SupportedAuthenticationScheme.DPoP)) {
     throw new Oauth2ResourceUnauthorizedError(
-      `Provided authentication scheme '${scheme}' is not allowed. Allowed authentication schemes are ${allowedAuthenticationSchemes.map((s) => `'${s}'`).join(', ')}.`,
+      `Provided authentication scheme '${providedScheme}' is not allowed. Allowed authentication schemes are ${allowedAuthenticationSchemes.map((s) => `'${s}'`).join(', ')}.`,
       allowedAuthenticationSchemes.map((scheme) => ({ scheme }))
     )
   }

@@ -108,4 +108,13 @@ describe('WWW-Authenticate Header', () => {
       'Custom Bearer="true", buzz="quoted \\"value!\\"", foo="bar", foo="fuzz", name, age, Bearer, Basic name="Timo", DPoP name="Timo", DPoP name="again", Bearer'
     )
   })
+
+  test('Omits undefined values but keeps null values when encoding', () => {
+    expect(
+      encodeWwwAuthenticateHeader([
+        { scheme: 'Bearer', payload: { error: undefined, scope: 'openid', name: null } },
+        { scheme: 'DPoP', payload: { error: undefined, error_description: undefined } },
+      ])
+    ).toEqual('Bearer scope="openid", name, DPoP')
+  })
 })

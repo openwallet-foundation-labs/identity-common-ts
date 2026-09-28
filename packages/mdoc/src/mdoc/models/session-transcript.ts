@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { MdocContext } from '../../context'
 import { DeviceEngagement, type DeviceEngagementEncodedStructure } from './device-engagement'
 import { EReaderKey, type EReaderKeyEncodedStructure } from './e-reader-key'
+import { EngagementToAppHandover } from './engagement-to-app-handover'
 import { Handover } from './handover'
 import { IsoMdocDcApiHandover, type IsoMdocDcApiHandoverOptions } from './iso-mdoc-dc-api-handover'
 import { NfcHandover } from './nfc-handover'
@@ -27,6 +28,10 @@ const supportedHandoverStructures = [
   NfcHandover,
   QrHandover,
   Oid4vpDraft18Handover,
+  // Last because it is the least specific: a bare bstr. None of the
+  // others can match one, so the position is a readability choice
+  // rather than a correctness one.
+  EngagementToAppHandover,
 ] as const
 
 export const sessionTranscriptEncodedSchema = z.tuple([
@@ -159,6 +164,28 @@ export class SessionTranscript extends CborStructure<
       deviceEngagement: options.deviceEngagement,
       eReaderKey: options.eReaderKey,
       handover: QrHandover.create(),
+    })
+  }
+
+  /**
+   * Create a SessionTranscript for ISO/IEC TS 18013-7 Annex A, device
+   * retrieval to a website.
+   *
+   * `readerEngagementBytesHash` is SHA-256 of
+   * `#6.24(bstr .cbor ReaderEngagement)`, per A.8. As with QR handover the
+   * exact CBOR bytes matter for session key derivation, so pass a
+   * DeviceEngagement and an EReaderKey obtained through `decode()`.
+   */
+  public static forEngagementToApp(options: {
+    deviceEngagement: DeviceEngagement
+    eReaderKey: EReaderKey
+    readerEngagementBytesHash: Uint8Array
+  }) {
+    // biome-ignore lint/complexity/noThisInStatic: this.fromDecodedStructure is intentional for subclass support
+    return this.fromDecodedStructure({
+      deviceEngagement: options.deviceEngagement,
+      eReaderKey: options.eReaderKey,
+      handover: EngagementToAppHandover.create(options.readerEngagementBytesHash),
     })
   }
 

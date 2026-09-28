@@ -1,3 +1,4 @@
+import { ValidationError } from '@openid4vc/utils'
 import { type CallbackContext, HashAlgorithm } from '../callbacks'
 import {
   type VerifiedClientAttestationJwt,
@@ -416,7 +417,7 @@ async function verifyAccessTokenRequestClientAttestationDpop(
       now,
     })
   } catch (error) {
-    if (error instanceof Oauth2Error) {
+    if (error instanceof Oauth2Error || error instanceof ValidationError) {
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidClient,

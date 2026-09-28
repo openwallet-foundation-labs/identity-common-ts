@@ -133,6 +133,90 @@ describe('Oauth2ResourceServer', () => {
     })
   })
 
+  test('matches the authentication scheme case-insensitively', async () => {
+    server.resetHandlers(
+      http.get(authorizationServerMetadata.jwks_uri, () =>
+        HttpResponse.json({ keys: [accessTokenSignerJwkPublic] } satisfies JwkSet, {
+          headers: { 'Content-Type': ContentType.JwkSet },
+        })
+      )
+    )
+
+    const resourceServer = new Oauth2ResourceServer({
+      callbacks: {
+        ...callbacks,
+        fetch,
+      },
+    })
+
+    const { jwt } = await createAccessTokenJwt({
+      audience: 'https://resource-server.com',
+      authorizationServer: authorizationServerMetadata.issuer,
+      callbacks: {
+        ...callbacks,
+        signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+      },
+      expiresInSeconds: 300,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: accessTokenSignerJwkPublic,
+      },
+      subject: 'pre-auth-code',
+      dpop: {
+        jwk: dpopSignerJwkPublic,
+      },
+      now: new Date('2024-10-01'),
+    })
+
+    const dpopJwt = await createDpopJwt({
+      callbacks: {
+        ...callbacks,
+        signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+      },
+      request: {
+        method: 'POST',
+        url: 'https://resource-server.com/endpoint',
+      },
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: dpopSignerJwkPublic,
+      },
+      accessToken: jwt,
+    })
+
+    const { scheme, dpop } = await resourceServer.verifyResourceRequest({
+      authorizationServers: [authorizationServerMetadata],
+      request: {
+        method: 'POST',
+        url: 'https://resource-server.com/endpoint',
+        headers: new Headers({
+          Authorization: `dpOp ${jwt}`,
+          DPoP: dpopJwt,
+        }),
+      },
+      now: new Date('2024-10-01'),
+      resourceServer: 'https://resource-server.com',
+    })
+
+    expect(scheme).toEqual('DPoP')
+    expect(dpop?.jwk).toEqual(dpopSignerJwkPublic)
+
+    await expect(
+      resourceServer.verifyResourceRequest({
+        authorizationServers: [authorizationServerMetadata],
+        request: {
+          method: 'POST',
+          url: 'https://resource-server.com/endpoint',
+          headers: new Headers({ Authorization: `Basic ${jwt}` }),
+        },
+        now: new Date('2024-10-01'),
+        resourceServer: 'https://resource-server.com',
+      })
+    ).rejects.toThrow(`Provided authentication scheme 'Basic' is not allowed.`)
+  })
+
   test('verifies resource request using the getJwks callback, without fetching the jwks_uri', async () => {
     let jwksRequestCount = 0
     server.resetHandlers(
