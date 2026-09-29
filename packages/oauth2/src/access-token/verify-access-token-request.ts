@@ -516,7 +516,8 @@ async function verifyAccessTokenRequestPkce(
 ) {
   if (options.codeChallenge && !options.codeVerifier) {
     throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
+      // RFC 7636 §4.6: a missing code_verifier results in an invalid_grant error
+      error: Oauth2ErrorCodes.InvalidGrant,
       error_description: `Missing required 'code_verifier' in access token request`,
     })
   }

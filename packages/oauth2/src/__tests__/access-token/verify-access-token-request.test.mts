@@ -4,6 +4,7 @@ import {
   verifyPreAuthorizedCodeAccessTokenRequest,
   verifyRefreshTokenAccessTokenRequest,
 } from '../../access-token/verify-access-token-request'
+import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
 import { createDpopJwt } from '../../dpop/dpop'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
 import { PkceCodeChallengeMethod } from '../../pkce'
@@ -408,7 +409,7 @@ describe('Verify Authorization Code Access Token Request', () => {
     ).rejects.toThrow(`Missing required 'code_verifier' in access token request`)
   })
 
-  test('handles code_verifier expected but not provided', async () => {
+  test('returns invalid_grant when code_verifier expected but not provided', async () => {
     await expect(
       verifyAuthorizationCodeAccessTokenRequest({
         authorizationServerMetadata,
@@ -428,7 +429,12 @@ describe('Verify Authorization Code Access Token Request', () => {
           codeChallengeMethod: PkceCodeChallengeMethod.Plain,
         },
       })
-    ).rejects.toThrow(`Missing required 'code_verifier' in access token request`)
+    ).rejects.toMatchObject({
+      errorResponse: {
+        error: Oauth2ErrorCodes.InvalidGrant,
+        error_description: `Missing required 'code_verifier' in access token request`,
+      },
+    })
   })
 
   test('handles code_verifier not matching with code_challenge', async () => {
