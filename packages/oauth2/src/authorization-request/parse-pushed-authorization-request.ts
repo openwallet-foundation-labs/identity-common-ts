@@ -6,7 +6,7 @@ import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { Oauth2ServerErrorResponseError } from '../error/Oauth2ServerErrorResponseError'
 import { parseJarRequest } from '../jar/handle-jar-request/verify-jar-request'
-import { isJarAuthorizationRequest, zJarAuthorizationRequest } from '../jar/z-jar-authorization-request'
+import { hasRequestUri, isJarAuthorizationRequest, zJarAuthorizationRequest } from '../jar/z-jar-authorization-request'
 import { type ParseAuthorizationRequestResult, parseAuthorizationRequest } from './parse-authorization-request'
 import {
   type AuthorizationRequest,
@@ -37,6 +37,15 @@ export interface ParsePushedAuthorizationRequestResult extends ParseAuthorizatio
 export async function parsePushedAuthorizationRequest(
   options: ParsePushedAuthorizationRequestOptions
 ): Promise<ParsePushedAuthorizationRequestResult> {
+  // RFC 9126 section 2.1: the request_uri parameter must not be provided in a pushed authorization request.
+  // We check this before parsing the JAR, as otherwise the request_uri would be fetched.
+  if (hasRequestUri(options.authorizationRequest)) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequest,
+      error_description: `The 'request_uri' parameter must not be provided in a pushed authorization request.`,
+    })
+  }
+
   const parsed = parseWithErrorHandling(
     z.union([zAuthorizationRequest, zJarAuthorizationRequest]),
     options.authorizationRequest,
@@ -46,7 +55,11 @@ export async function parsePushedAuthorizationRequest(
   let authorizationRequest: AuthorizationRequest
   let authorizationRequestJwt: string | undefined
   if (isJarAuthorizationRequest(parsed)) {
-    const parsedJar = await parseJarRequest({ jarRequestParams: parsed, callbacks: options.callbacks })
+    const parsedJar = await parseJarRequest({
+      jarRequestParams: parsed,
+      callbacks: options.callbacks,
+      allowRequestUri: false,
+    })
     const jwt = decodeJwt({ jwt: parsedJar.authorizationRequestJwt })
 
     const parsedAuthorizationRequest = zAuthorizationRequest.safeParse(jwt.payload)
