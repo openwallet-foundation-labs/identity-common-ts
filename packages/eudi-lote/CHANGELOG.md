@@ -1,5 +1,12 @@
 # @owf/eudi-lote
 
+## 0.4.1
+
+### Patch Changes
+
+- @owf/crypto@0.4.1
+  - @owf/identity-common@0.4.1
+
 ## 0.4.0
 
 ### Patch Changes

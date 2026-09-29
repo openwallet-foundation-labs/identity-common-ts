@@ -1,5 +1,21 @@
 # @openid4vc/openid4vci
 
+## 0.6.0
+
+### Patch Changes
+
+- 2a28c82: Reject a pushed authorization request or interactive authorization request containing a `request_uri` parameter with an `invalid_request` error, instead of fetching the `request_uri`.
+- 28fb188: Return the `unknown_credential_configuration` error (OpenID4VCI 1.0 §8.3.1) when a credential request references a `credential_configuration_id` that is not in the issuer's `credential_configurations_supported`. Previously `parseCredentialRequest` threw a generic `Oauth2Error` and `Openid4vciIssuer.parseCredentialRequest` reported it as `invalid_credential_request`.
+- Updated dependencies [0d30e2d]
+- Updated dependencies [f3efa25]
+- Updated dependencies [83123e8]
+- Updated dependencies [2a28c82]
+- Updated dependencies [83123e8]
+- Updated dependencies [18f267c]
+- Updated dependencies [019f316]
+  - @openid4vc/oauth2@0.6.0
+  - @openid4vc/utils@0.6.0
+
 ## 0.5.6
 
 ### Patch Changes

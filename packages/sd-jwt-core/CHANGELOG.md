@@ -1,5 +1,14 @@
 # @sd-jwt/core
 
+## 0.21.1
+
+### Patch Changes
+
+- 833bfbc: Fix nested disclosure value mutation during `unpack` by cloning disclosure values before recursive unpacking.
+- a7b5b83: Propagate `ExtendedPayload` generic through `SDJwtInstance.decode`, `keys`, `presentableKeys`, and `getClaims`.
+  Add standard RFC 7519 `aud` and `jti` claims to `SdJwtVcPayload`.
+- @owf/identity-common@0.4.1
+
 ## 0.21.0
 
 ### Minor Changes

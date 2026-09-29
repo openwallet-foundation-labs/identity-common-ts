@@ -1,5 +1,15 @@
 # @owf/eudi-attestation-schema
 
+## 0.4.1
+
+### Patch Changes
+
+- 0a3916b: add x509 as a trust anchor
+- Updated dependencies [a7b5b83]
+  - @sd-jwt/sd-jwt-vc@0.21.1
+  - @owf/crypto@0.4.1
+  - @owf/identity-common@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
