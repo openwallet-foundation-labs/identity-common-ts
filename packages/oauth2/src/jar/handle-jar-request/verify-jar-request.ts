@@ -23,7 +23,7 @@ export interface ParsedJarRequestOptions {
    * the `request_uri` will be fetched, so only enable this if the request is expected to be
    * passed by reference.
    *
-   * @default true
+   * @default false
    */
   allowRequestUri?: boolean
 }
