@@ -177,6 +177,31 @@ describe('Verify Pre Authorized Code Access Token Request', () => {
     ).rejects.toThrow(`Missing required 'code_verifier' in access token request`)
   })
 
+  test('returns invalid_grant when code_verifier provided but no code_challenge bound to the grant', async () => {
+    await expect(
+      verifyPreAuthorizedCodeAccessTokenRequest({
+        authorizationServerMetadata,
+        accessTokenRequest: {
+          grant_type: preAuthorizedCodeGrantIdentifier,
+          'pre-authorized_code': 'hello2',
+          code_verifier: 'something',
+        },
+        grant: {
+          grantType: preAuthorizedCodeGrantIdentifier,
+          preAuthorizedCode: 'hello2',
+        },
+        callbacks,
+        expectedPreAuthorizedCode: 'hello2',
+        request,
+      })
+    ).rejects.toMatchObject({
+      errorResponse: {
+        error: Oauth2ErrorCodes.InvalidGrant,
+        error_description: `Unexpected 'code_verifier' in access token request, no code challenge is bound to the grant`,
+      },
+    })
+  })
+
   test('handles code_verifier not matching with code_challenge', async () => {
     await expect(
       verifyPreAuthorizedCodeAccessTokenRequest({
@@ -437,6 +462,31 @@ describe('Verify Authorization Code Access Token Request', () => {
     })
   })
 
+  test('returns invalid_grant when code_verifier provided but no code_challenge bound to the grant', async () => {
+    await expect(
+      verifyAuthorizationCodeAccessTokenRequest({
+        authorizationServerMetadata,
+        accessTokenRequest: {
+          grant_type: authorizationCodeGrantIdentifier,
+          code: 'hello2',
+          code_verifier: 'something',
+        },
+        grant: {
+          grantType: authorizationCodeGrantIdentifier,
+          code: 'hello2',
+        },
+        callbacks,
+        expectedCode: 'hello2',
+        request,
+      })
+    ).rejects.toMatchObject({
+      errorResponse: {
+        error: Oauth2ErrorCodes.InvalidGrant,
+        error_description: `Unexpected 'code_verifier' in access token request, no code challenge is bound to the grant`,
+      },
+    })
+  })
+
   test('handles code_verifier not matching with code_challenge', async () => {
     await expect(
       verifyAuthorizationCodeAccessTokenRequest({
@@ -668,6 +718,31 @@ describe('Verify Refresh Token Access Token Request', () => {
         },
       })
     ).rejects.toThrow(`Missing required 'code_verifier' in access token request`)
+  })
+
+  test('returns invalid_grant when code_verifier provided but no code_challenge bound to the grant', async () => {
+    await expect(
+      verifyRefreshTokenAccessTokenRequest({
+        authorizationServerMetadata,
+        accessTokenRequest: {
+          grant_type: refreshTokenGrantIdentifier,
+          refresh_token: 'hello2',
+          code_verifier: 'something',
+        },
+        grant: {
+          grantType: refreshTokenGrantIdentifier,
+          refreshToken: 'hello2',
+        },
+        callbacks,
+        expectedRefreshToken: 'hello2',
+        request,
+      })
+    ).rejects.toMatchObject({
+      errorResponse: {
+        error: Oauth2ErrorCodes.InvalidGrant,
+        error_description: `Unexpected 'code_verifier' in access token request, no code challenge is bound to the grant`,
+      },
+    })
   })
 
   test('handles code_verifier not matching with code_challenge', async () => {
