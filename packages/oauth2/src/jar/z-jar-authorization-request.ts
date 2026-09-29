@@ -16,7 +16,7 @@ export function validateJarRequestParams(options: {
   jarRequestParams: JarAuthorizationRequest
   allowRequestUri?: boolean
 }) {
-  const { jarRequestParams, allowRequestUri = true } = options
+  const { jarRequestParams, allowRequestUri = false } = options
 
   if (jarRequestParams.request && jarRequestParams.request_uri) {
     throw new Oauth2ServerErrorResponseError({

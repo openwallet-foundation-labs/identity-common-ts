@@ -13,10 +13,23 @@ describe('parseJarRequest', () => {
     const error = await parseJarRequest({
       jarRequestParams: { client_id: 'x', request_uri: requestUri },
       callbacks: { fetch },
+      allowRequestUri: true,
     }).catch((error) => error)
 
     expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
     expect(error.errorResponse.error).toEqual('invalid_request_uri')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  test('does not fetch request_uri by default', async () => {
+    const fetch = vi.fn()
+
+    await expect(
+      parseJarRequest({
+        jarRequestParams: { client_id: 'x', request_uri: 'https://attacker.example.com/request.jwt' },
+        callbacks: { fetch },
+      })
+    ).rejects.toThrow('request_uri is not allowed')
     expect(fetch).not.toHaveBeenCalled()
   })
 
