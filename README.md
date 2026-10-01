@@ -67,7 +67,7 @@ Tools specific to the [European Digital Identity (EUDI) Wallet](https://ec.europ
 |---------|-------------|--------|
 | [`@owf/eudi-lote`](./packages/eudi-lote) | ETSI TS 119 602 Lists of Trusted Entities (LoTE) | ✅ Available |
 | [`@owf/eudi-tl`](./packages/eudi-tl) | ETSI TS 119 612 XML Trusted Lists parsing and verification | ✅ Available |
-| [`@owf/eudi-wrprc`](./packages/eudi-wrprc) | ETSI TS 119 475 Wallet-Relying Party Registration Certificates | ✅ Available |
+| [`@owf/eudi-registration-certificate`](./packages/eudi-registration-certificate) | ETSI TS 119 475 Wallet-Relying Party Registration Certificates | ✅ Available |
 | [`@owf/eudi-attestation-schema`](./packages/eudi-attestation-schema) | TS11 Catalogue of Attestations SchemaMeta | ✅ Available |
 | `@owf/eudi-certificates` | Registration and access certificate verification | 📋 Planned |
 | `@owf/eudi-sca` | TS12 Strong Customer Authentication Payments according to the latest to-be-added ARF |  In Progess |
@@ -174,17 +174,17 @@ npm install @owf/eudi-tl
 
 📖 [View package documentation](./packages/eudi-tl/README.md)
 
-### @owf/eudi-wrprc
+### @owf/eudi-registration-certificate
 
-[![@owf/eudi-wrprc version](https://img.shields.io/npm/v/@owf/eudi-wrprc)](https://npmjs.com/package/@owf/eudi-wrprc)
+[![@owf/eudi-registration-certificate version](https://img.shields.io/npm/v/@owf/eudi-registration-certificate)](https://npmjs.com/package/@owf/eudi-registration-certificate)
 
 SDK for creating, signing, and validating Wallet-Relying Party Registration Certificates (WRPRC) per ETSI TS 119 475 v1.2.1.
 
 ```bash
-npm install @owf/eudi-wrprc
+npm install @owf/eudi-registration-certificate
 ```
 
-📖 [View package documentation](./packages/eudi-wrprc/README.md)
+📖 [View package documentation](./packages/eudi-registration-certificate/README.md)
 
 ### @owf/eudi-attestation-schema
 
