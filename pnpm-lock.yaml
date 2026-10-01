@@ -241,7 +241,7 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
 
-  packages/eudi-wrprc:
+  packages/eudi-registration-certificate:
     dependencies:
       '@owf/crypto':
         specifier: workspace:*
