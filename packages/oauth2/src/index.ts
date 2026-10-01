@@ -183,6 +183,7 @@ export type {
 export { parseJarRequest, verifyJarRequest } from './jar/handle-jar-request/verify-jar-request'
 export type { JarAuthorizationRequest } from './jar/z-jar-authorization-request'
 export {
+  hasRequestUri,
   isJarAuthorizationRequest,
   validateJarRequestParams,
   zJarAuthorizationRequest,

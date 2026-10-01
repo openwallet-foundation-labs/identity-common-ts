@@ -39,7 +39,7 @@ export interface VerifyJarRequestOptions {
    * If set to false and the JAR request contains a
    * `request_uri` parameter the method will throw an error
    *
-   * @default true
+   * @default false
    */
   allowRequestUri?: boolean
 

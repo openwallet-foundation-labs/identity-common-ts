@@ -1,6 +1,7 @@
 import {
   type CallbackContext,
   decodeJwt,
+  hasRequestUri,
   isJarAuthorizationRequest,
   Oauth2ErrorCodes,
   Oauth2ServerErrorResponseError,
@@ -39,7 +40,7 @@ export interface ParseInteractiveAuthorizationRequestOptions {
   interactiveAuthorizationRequest: unknown
 
   /**
-   * Callbacks for fetching JAR request objects from request_uri
+   * Callbacks. JAR request objects passed by reference (`request_uri`) are not supported.
    */
   callbacks: Pick<CallbackContext, 'fetch'>
 }
@@ -118,6 +119,15 @@ export interface ParseInteractiveAuthorizationFollowUpRequestResult {
 export async function parseInteractiveAuthorizationRequest(
   options: ParseInteractiveAuthorizationRequestOptions
 ): Promise<ParseInteractiveAuthorizationFollowUpRequestResult | ParseInteractiveAuthorizationInitialRequestResult> {
+  // The request_uri parameter must not be provided, as the request is pushed directly to the authorization server.
+  // We check this before parsing the JAR, as otherwise the request_uri would be fetched.
+  if (hasRequestUri(options.interactiveAuthorizationRequest)) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequest,
+      error_description: `The 'request_uri' parameter must not be provided in an interactive authorization request.`,
+    })
+  }
+
   const parsed = parseWithErrorHandling(
     z.union([
       zInteractiveAuthorizationInitialRequest,
@@ -142,7 +152,11 @@ export async function parseInteractiveAuthorizationRequest(
   let interactiveAuthorizationRequestJwt: string | undefined
   if (isJarAuthorizationRequest(parsed)) {
     // Parse the JAR request to get the JWT
-    const parsedJar = await parseJarRequest({ jarRequestParams: parsed, callbacks: options.callbacks })
+    const parsedJar = await parseJarRequest({
+      jarRequestParams: parsed,
+      callbacks: options.callbacks,
+      allowRequestUri: false,
+    })
     const jwt = decodeJwt({ jwt: parsedJar.authorizationRequestJwt })
 
     const parsedInteractiveAuthorizationRequest = zInteractiveAuthorizationInitialRequest.safeParse(jwt.payload)

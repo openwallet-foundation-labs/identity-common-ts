@@ -16,7 +16,7 @@ export function validateJarRequestParams(options: {
   jarRequestParams: JarAuthorizationRequest
   allowRequestUri?: boolean
 }) {
-  const { jarRequestParams, allowRequestUri = true } = options
+  const { jarRequestParams, allowRequestUri = false } = options
 
   if (jarRequestParams.request && jarRequestParams.request_uri) {
     throw new Oauth2ServerErrorResponseError({
@@ -45,4 +45,12 @@ export function validateJarRequestParams(options: {
 
 export function isJarAuthorizationRequest(request: JarAuthorizationRequest): request is JarAuthorizationRequest {
   return 'request' in request || 'request_uri' in request
+}
+
+/**
+ * Whether the (unparsed) request contains a `request_uri` parameter. Use this to reject requests
+ * passed by reference before parsing, as parsing a JAR request with `request_uri` will fetch it.
+ */
+export function hasRequestUri(request: unknown): request is { request_uri: unknown } {
+  return typeof request === 'object' && request !== null && 'request_uri' in request
 }

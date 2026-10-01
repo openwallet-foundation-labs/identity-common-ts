@@ -144,6 +144,50 @@ describe('verifyDpopJwt', () => {
     ).rejects.toThrow("expected htu value 'https://authorization-server.com/another-endpoint'")
   })
 
+  test.each([
+    'https://authorization-server.com/token?query=value',
+    'https://authorization-server.com/token#fragment',
+    'https://AUTHORIZATION-SERVER.COM/token',
+    'https://authorization-server.com:443/token',
+    'HTTPS://authorization-server.com/token',
+  ])('accepts proofs with htu %s that is equivalent to the request url', async (htu) => {
+    const dpopJwt = await createDpopJwt({
+      callbacks: {
+        ...callbacks,
+        signJwt: getSignJwtCallback([dpopSignerJwk]),
+      },
+      request,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: dpopSignerPublicJwk,
+      },
+      additionalPayload: { htu },
+    })
+
+    await expect(verifyDpopJwt({ callbacks, dpopJwt, request })).resolves.toBeDefined()
+  })
+
+  test('rejects proofs with htu that differs in path case', async () => {
+    const dpopJwt = await createDpopJwt({
+      callbacks: {
+        ...callbacks,
+        signJwt: getSignJwtCallback([dpopSignerJwk]),
+      },
+      request,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: dpopSignerPublicJwk,
+      },
+      additionalPayload: { htu: 'https://authorization-server.com/TOKEN' },
+    })
+
+    await expect(verifyDpopJwt({ callbacks, dpopJwt, request })).rejects.toThrow(
+      "Dpop jwt contains htu value 'https://authorization-server.com/TOKEN'"
+    )
+  })
+
   test('rejects stale proofs when maxProofAgeSeconds is exceeded', async () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {

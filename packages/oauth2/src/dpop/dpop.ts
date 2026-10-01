@@ -217,8 +217,9 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
       )
     }
 
+    // RFC 9449 §4.3: query and fragment are ignored, and both sides are normalized (RFC 3986 §6.2.2, §6.2.3)
     const expectedHtu = htuFromRequestUrl(options.request.url)
-    if (expectedHtu !== payload.htu) {
+    if (expectedHtu !== htuFromRequestUrl(payload.htu)) {
       throw new Oauth2Error(`Dpop jwt contains htu value '${payload.htu}', but expected htu value '${expectedHtu}'.`)
     }
 
