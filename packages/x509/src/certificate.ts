@@ -21,6 +21,7 @@ import {
   UserNotice,
   Certificate as X509Certificate,
 } from '@peculiar/asn1-x509'
+import { QCStatements } from '@peculiar/asn1-x509-qualified'
 import {
   ACCESS_METHODS,
   POLICY_QUALIFIERS,
@@ -103,7 +104,7 @@ export function parseCertificate(input: CertificateInput, options?: IAsnParseOpt
   const aki = decode(id_ce_authorityKeyIdentifier, AuthorityKeyIdentifier, 'authorityKeyIdentifier')
   const crlDps = decode(id_ce_cRLDistributionPoints, CRLDistributionPoints, 'cRLDistributionPoints')
   const aia = decode(id_pe_authorityInfoAccess, AuthorityInfoAccessSyntax, 'authorityInfoAccess') ?? []
-  const qcExtension = extensions.find((e) => e.oid === QC_STATEMENTS.extension)
+  const qcStatements = decode(QC_STATEMENTS.extension, QCStatements, 'qcStatements')
   const accessUrls = (method: string) =>
     aia
       .filter((a) => a.accessMethod === method)
@@ -137,7 +138,7 @@ export function parseCertificate(input: CertificateInput, options?: IAsnParseOpt
     crlDistributionPoints: (crlDps ?? []).flatMap((dp) => urisOf(dp.distributionPoint?.fullName)),
     ocspUrls: accessUrls(ACCESS_METHODS.ocsp),
     caIssuersUrls: accessUrls(ACCESS_METHODS.caIssuers),
-    qcStatements: qcExtension ? parseQcStatements(qcExtension.value) : undefined,
+    qcStatements: qcStatements ? parseQcStatements(qcStatements) : undefined,
 
     extensions,
   }

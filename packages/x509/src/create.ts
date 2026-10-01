@@ -42,7 +42,7 @@ import { ACCESS_METHODS, POLICY_QUALIFIERS, QC_STATEMENTS } from './constants'
 import { describePublicKey, publicJwkToSpki } from './der'
 import { type CertificateInput, PEM_LABELS, toArrayBuffer, toDer } from './encoding'
 import { buildName } from './name'
-import { encodeQcStatements } from './qc-statements'
+import { toQcStatements } from './qc-statements'
 import { assembleSignedStructure, signatureAlgorithmIdentifier, toSerialNumber } from './signature'
 import type {
   Certificate,
@@ -213,14 +213,8 @@ export async function prepareCertificate(template: CertificateTemplate): Promise
   }
 
   if (template.qcStatements) {
-    const qcStatements = encodeQcStatements({ ...template.qcStatements, qcTypes: template.qcStatements.qcTypes ?? [] })
-    extensions.push(
-      new Extension({
-        extnID: QC_STATEMENTS.extension,
-        critical: false,
-        extnValue: new OctetString(toArrayBuffer(qcStatements)),
-      })
-    )
+    const qcStatements = toQcStatements({ ...template.qcStatements, qcTypes: template.qcStatements.qcTypes ?? [] })
+    extensions.push(extension(QC_STATEMENTS.extension, qcStatements))
   }
 
   for (const custom of template.extensions ?? []) {

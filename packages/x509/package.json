@@ -35,6 +35,8 @@
     "@owf/identity-common": "workspace:*",
     "@peculiar/asn1-schema": "catalog:",
     "@peculiar/asn1-x509": "catalog:",
+    "@peculiar/asn1-x509-qualified": "catalog:",
+    "@peculiar/asn1-x509-qualified-etsi": "catalog:",
     "asn1js": "^3.0.10"
   },
   "keywords": [

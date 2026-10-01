@@ -1,3 +1,15 @@
+import { id_pe_qcStatements } from '@peculiar/asn1-x509-qualified'
+import {
+  id_etsi_qcs_qcCClegislation,
+  id_etsi_qcs_qcCompliance,
+  id_etsi_qcs_qcPDS,
+  id_etsi_qcs_qcSSCD,
+  id_etsi_qcs_qcType,
+  id_etsi_qct_eseal,
+  id_etsi_qct_esign,
+  id_etsi_qct_web,
+} from '@peculiar/asn1-x509-qualified-etsi'
+
 /** X.520 attribute types and PKCS#9 emailAddress, as used in distinguished names */
 export const ATTRIBUTE_TYPES = {
   commonName: '2.5.4.3',
@@ -36,24 +48,19 @@ export const ACCESS_METHODS = {
 
 /** QCStatements extension (RFC 3739) and statements from ETSI EN 319 412-5 */
 export const QC_STATEMENTS = {
-  extension: '1.3.6.1.5.5.7.1.3',
-  /** id-etsi-qcs-QcCompliance */
-  qcCompliance: '0.4.0.1862.1.1',
-  /** id-etsi-qcs-QcSSCD */
-  qcSSCD: '0.4.0.1862.1.4',
-  /** id-etsi-qcs-QcPDS */
-  qcPDS: '0.4.0.1862.1.5',
-  /** id-etsi-qcs-QcType */
-  qcType: '0.4.0.1862.1.6',
-  /** id-etsi-qcs-QcCClegislation */
-  qcCClegislation: '0.4.0.1862.1.7',
+  extension: id_pe_qcStatements,
+  qcCompliance: id_etsi_qcs_qcCompliance,
+  qcSSCD: id_etsi_qcs_qcSSCD,
+  qcPDS: id_etsi_qcs_qcPDS,
+  qcType: id_etsi_qcs_qcType,
+  qcCClegislation: id_etsi_qcs_qcCClegislation,
 } as const
 
 /** QcType values (ETSI EN 319 412-5 clause 4.2.3) */
 export const QC_TYPES = {
-  esign: '0.4.0.1862.1.6.1',
-  eseal: '0.4.0.1862.1.6.2',
-  web: '0.4.0.1862.1.6.3',
+  esign: id_etsi_qct_esign,
+  eseal: id_etsi_qct_eseal,
+  web: id_etsi_qct_web,
 } as const
 
 export type QcType = keyof typeof QC_TYPES
