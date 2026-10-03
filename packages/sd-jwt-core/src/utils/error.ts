@@ -1,11 +1,19 @@
+import type { VerificationErrorCode } from '../types/verification-error'
+
 export class SDJWTException extends Error {
   public details?: unknown
 
-  constructor(message: string, details?: unknown) {
+  /**
+   * The verification error code, used by `safeVerify` to classify the error.
+   */
+  public code?: VerificationErrorCode
+
+  constructor(message: string, details?: unknown, code?: VerificationErrorCode) {
     super(message)
     Object.setPrototypeOf(this, SDJWTException.prototype)
     this.name = 'SDJWTException'
     this.details = details
+    this.code = code
   }
 
   getFullMessage(): string {

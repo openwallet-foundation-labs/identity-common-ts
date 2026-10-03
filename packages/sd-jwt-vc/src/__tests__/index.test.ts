@@ -1,7 +1,7 @@
 import Crypto from 'node:crypto'
 import { hasher as digest, generateSalt } from '@owf/crypto'
 import { createHeaderAndPayload, StatusList, type StatusListJWTHeaderParameters } from '@owf/token-status-list'
-import type { DisclosureFrame, JwtPayload, Signer, Verifier } from '@sd-jwt/core'
+import { type DisclosureFrame, type JwtPayload, SDJWTException, type Signer, type Verifier } from '@sd-jwt/core'
 import { SignJWT } from 'jose'
 import { describe, expect, test } from 'vitest'
 import { SDJwtVcInstance } from '..'
@@ -125,6 +125,58 @@ describe('Revocation', () => {
     const encodedSdjwt = await sdjwt.issue(expectedPayload)
     const result = sdjwt.verify(encodedSdjwt)
     await expect(result).rejects.toThrowError('Status is not valid')
+  })
+
+  test('safeVerify reports a revoked credential as STATUS_INVALID', async () => {
+    const claims = {
+      firstname: 'John',
+      status: {
+        status_list: {
+          uri: 'https://example.com/status-list',
+          idx: 1,
+        },
+      },
+    }
+    const encodedSdjwt = await sdjwt.issue({ iat, iss, vct, ...claims })
+    const result = await sdjwt.safeVerify(encodedSdjwt)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.map((e) => e.code)).toEqual(['STATUS_INVALID'])
+    }
+  })
+
+  test('safeVerify uses the error code from a custom status validator', async () => {
+    const sdjwtWithValidator = new SDJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      statusListFetcher: () => Promise.resolve(statusListJWT),
+      statusVerifier: async (data: string, sig: string) =>
+        Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
+      statusValidator: async (status: number) => {
+        if (status !== 0) throw new SDJWTException('Credential has been revoked', { status }, 'STATUS_INVALID')
+      },
+    })
+    const claims = {
+      firstname: 'John',
+      status: {
+        status_list: {
+          uri: 'https://example.com/status-list',
+          idx: 1,
+        },
+      },
+    }
+    const encodedSdjwt = await sdjwtWithValidator.issue({ iat, iss, vct, ...claims })
+    const result = await sdjwtWithValidator.safeVerify(encodedSdjwt)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.map((e) => e.code)).toEqual(['STATUS_INVALID'])
+    }
   })
 
   test('Test with a revoked credential but status verification disabled', async () => {

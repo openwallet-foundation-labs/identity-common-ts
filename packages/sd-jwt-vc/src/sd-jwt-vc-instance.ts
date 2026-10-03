@@ -95,7 +95,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
    * @returns
    */
   private async statusValidator(status: number): Promise<void> {
-    if (status !== 0) throw new SDJWTException('Status is not valid')
+    if (status !== 0) throw new SDJWTException('Status is not valid', undefined, 'STATUS_INVALID')
     return Promise.resolve()
   }
 
@@ -176,11 +176,10 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
         await this.verifyStatus(result, options)
       } catch (e) {
         const error = ensureError(e)
-        const errorMessage = error.message
-        if (errorMessage.includes('Status is not valid')) {
-          addError('STATUS_INVALID', errorMessage, error)
+        if (error instanceof SDJWTException && error.code === 'STATUS_INVALID') {
+          addError('STATUS_INVALID', error.message, error)
         } else {
-          addError('STATUS_VERIFICATION_FAILED', `Status verification failed: ${errorMessage}`, error)
+          addError('STATUS_VERIFICATION_FAILED', `Status verification failed: ${error.message}`, error)
         }
       }
 
