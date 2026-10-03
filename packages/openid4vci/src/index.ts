@@ -94,8 +94,11 @@ export {
   parseKeyAttestationJwt,
   type VerifyKeyAttestationJwtOptions,
   type VerifyKeyAttestationJwtReturn,
+  type VerifyKeyAttestationRequirementsOptions,
   verifyKeyAttestationJwt,
+  verifyKeyAttestationRequirements,
 } from './key-attestation/key-attestation'
+export type { KeyAttestationsRequired } from './key-attestation/z-key-attestation'
 export {
   credentialsSupportedToCredentialConfigurationsSupported,
   type ExtractScopesForCredentialConfigurationIdsOptions,

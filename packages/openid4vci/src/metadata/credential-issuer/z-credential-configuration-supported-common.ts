@@ -1,6 +1,6 @@
 import { zDataUrl, zHttpsUrl } from '@openid4vc/utils'
 import z from 'zod'
-import { zIso18045OrStringArray } from '../../key-attestation/z-key-attestation'
+import { zKeyAttestationsRequired } from '../../key-attestation/z-key-attestation'
 
 const zCredentialConfigurationSupportedDisplayEntry = z
   .object({
@@ -44,13 +44,7 @@ export const zCredentialConfigurationSupportedCommon = z
         z.union([z.literal('jwt'), z.literal('attestation'), z.string()]),
         z.object({
           proof_signing_alg_values_supported: z.array(z.string()),
-          key_attestations_required: z
-            .object({
-              key_storage: zIso18045OrStringArray.optional(),
-              user_authentication: zIso18045OrStringArray.optional(),
-            })
-            .loose()
-            .optional(),
+          key_attestations_required: zKeyAttestationsRequired.optional(),
         })
       )
       .optional(),
@@ -70,13 +64,7 @@ export const zCredentialConfigurationSupportedCommonDraft15 = z
         z.union([z.literal('jwt'), z.literal('attestation'), z.string()]),
         z.object({
           proof_signing_alg_values_supported: z.array(z.string()),
-          key_attestations_required: z
-            .object({
-              key_storage: zIso18045OrStringArray.optional(),
-              user_authentication: zIso18045OrStringArray.optional(),
-            })
-            .loose()
-            .optional(),
+          key_attestations_required: zKeyAttestationsRequired.optional(),
         })
       )
       .optional(),

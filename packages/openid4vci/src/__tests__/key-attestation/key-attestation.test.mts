@@ -6,6 +6,7 @@ import {
   createKeyAttestationJwt,
   parseKeyAttestationJwt,
   verifyKeyAttestationJwt,
+  verifyKeyAttestationRequirements,
 } from '../../key-attestation/key-attestation'
 import { zKeyAttestationJwtHeader, zKeyAttestationJwtPayloadForUse } from '../../key-attestation/z-key-attestation'
 
@@ -92,5 +93,60 @@ describe('Key Attestation', () => {
       attested_keys: [attested.publicJwk],
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('verifyKeyAttestationRequirements', () => {
+  test('does not require a key attestation if the issuer has no requirements', () => {
+    expect(() => verifyKeyAttestationRequirements({})).not.toThrow()
+    expect(() =>
+      verifyKeyAttestationRequirements({ keyAttestation: { key_storage: ['iso_18045_basic'] } })
+    ).not.toThrow()
+  })
+
+  test('requires a key attestation if the issuer defines key_attestations_required', () => {
+    expect(() => verifyKeyAttestationRequirements({ keyAttestationsRequired: {} })).toThrow(
+      'A key attestation is required by the credential issuer, but no key attestation was provided'
+    )
+
+    // An empty object means a key attestation is needed, without additional constraints
+    expect(() => verifyKeyAttestationRequirements({ keyAttestation: {}, keyAttestationsRequired: {} })).not.toThrow()
+  })
+
+  test('accepts a key attestation that contains one of the accepted values', () => {
+    expect(() =>
+      verifyKeyAttestationRequirements({
+        keyAttestation: {
+          key_storage: ['iso_18045_moderate', 'iso_18045_high'],
+          user_authentication: ['iso_18045_high'],
+        },
+        keyAttestationsRequired: {
+          key_storage: ['iso_18045_high'],
+          user_authentication: ['iso_18045_high', 'iso_18045_moderate'],
+        },
+      })
+    ).not.toThrow()
+  })
+
+  test('rejects a key attestation whose key_storage does not match', () => {
+    expect(() =>
+      verifyKeyAttestationRequirements({
+        keyAttestation: { key_storage: ['iso_18045_basic'], user_authentication: ['iso_18045_high'] },
+        keyAttestationsRequired: { key_storage: ['iso_18045_high', 'iso_18045_moderate'] },
+      })
+    ).toThrow(
+      "Key attestation 'key_storage' values 'iso_18045_basic' do not match any of the values accepted by the credential issuer: 'iso_18045_high', 'iso_18045_moderate'"
+    )
+  })
+
+  test('rejects a key attestation that does not define a required claim', () => {
+    expect(() =>
+      verifyKeyAttestationRequirements({
+        keyAttestation: { key_storage: ['iso_18045_high'] },
+        keyAttestationsRequired: { key_storage: ['iso_18045_high'], user_authentication: ['iso_18045_high'] },
+      })
+    ).toThrow(
+      "Key attestation 'user_authentication' is not defined and does not match any of the values accepted by the credential issuer: 'iso_18045_high'"
+    )
   })
 })
