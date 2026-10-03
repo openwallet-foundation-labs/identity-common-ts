@@ -1,4 +1,4 @@
-import { Tag } from 'cbor-x'
+import { Tag } from './cbor-x'
 import { DataItem } from './data-item'
 
 const MAX_DESCRIBED_STRING_LENGTH = 40
