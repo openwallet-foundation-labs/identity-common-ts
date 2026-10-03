@@ -32,6 +32,7 @@ import { signWRPRC, WRPRC_DIALECTS } from '@owf/eudi-registration-certificate'
 
 const signed = await signWRPRC({
   payload,
+  accessCertificateSub,
   certificates: [certificatePEM],
   signer,
   dialect: WRPRC_DIALECTS.DRAFT, // emits claims and intermediary.name
@@ -190,6 +191,7 @@ const certificatePEM = `-----BEGIN CERTIFICATE-----
 
 const signed = await signWRPRC({
   payload,
+  accessCertificateSub,
   algorithm: 'ES256',
   certificates: [certificatePEM],
   signer,
@@ -206,7 +208,7 @@ Pass `signingTime` to pin the claimed signing time; it defaults to now.
 import { decodeWRPRC } from '@owf/eudi-registration-certificate'
 
 const jwsString = 'eyJ0eXAiOiJyYy13cnArand0Ii...'
-const decoded = decodeWRPRC(jwsString)
+const decoded = decodeWRPRC(jwsString, accessCertificateSub)
 
 console.log(decoded.header)  // { typ: 'rc-wrp+jwt', alg: 'ES256', ... }
 console.log(decoded.payload) // { name: '...', sub: '...', ... }
@@ -217,7 +219,7 @@ console.log(decoded.payload) // { name: '...', sub: '...', ... }
 ```typescript
 import { validateWRPRCPayload } from '@owf/eudi-registration-certificate'
 
-const result = validateWRPRCPayload(payload)
+const result = validateWRPRCPayload(payload, accessCertificateSub)
 
 if (result.valid) {
   console.log('WRPRC is valid')
@@ -230,6 +232,8 @@ if (result.warnings.length > 0) {
   console.log('Warnings:', result.warnings)
 }
 ```
+
+`accessCertificateSub` is required for payload validation, parsing, signing, and decoding. It is compared with `intermediary.sub` when the WRPRC has an intermediary, and with `sub` otherwise.
 
 ### Entitlement Constants
 
@@ -269,7 +273,7 @@ This implementation follows ETSI TS 119 475 v1.2.1 requirements:
 - **GEN-5.2.4-05**: Attestation providers should specify `provides_attestations`
 - **GEN-5.2.4-06**: Service providers should specify `credentials` and `purpose`
 - **GEN-5.2.4-08**: `exp` at most 12 months after `iat`
-- **GEN-5.2.4-09**: Under intermediation, `act.sub` matches `intermediary.sub`
+- Under intermediation, `intermediary.sub` is checked against the supplied access-certificate subject
 
 ### Semantic Identifiers
 
@@ -332,11 +336,11 @@ This library is **platform agnostic** and works in:
 
 ### Validators
 
-- `validateWRPRCPayload(payload)` - Validate WRPRC payload
+- `validateWRPRCPayload(payload, accessCertificateSub)` - Validate payload and access-certificate identity
 - `validateWRPRCJWTHeader(header)` - Validate JWT header
-- `validateWRPRC(header, payload)` - Validate complete WRPRC
-- `assertValidWRPRCPayload(payload)` - Assert or throw
-- `parseWRPRCPayload(payload)` - Validate and return the canonical payload
+- `validateWRPRC(header, payload, accessCertificateSub)` - Validate complete WRPRC and access-certificate identity
+- `assertValidWRPRCPayload(payload, accessCertificateSub)` - Assert or throw
+- `parseWRPRCPayload(payload, accessCertificateSub)` - Validate and return the canonical payload
 
 ### Dialects
 
@@ -347,7 +351,7 @@ This library is **platform agnostic** and works in:
 ### Signer
 
 - `signWRPRC(options)` - Sign a WRPRC payload to JWT
-- `decodeWRPRC(jws)` - Decode a signed WRPRC
+- `decodeWRPRC(jws, accessCertificateSub)` - Decode and validate a signed WRPRC
 - `parseWRPRC(jws)` - Parse without validation
 
 ## Contributing

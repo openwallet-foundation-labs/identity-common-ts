@@ -53,6 +53,14 @@ export interface VerifyAuthorizationRequestClientAttestation {
 
   clientAttestationJwt?: string
   clientAttestationPopJwt?: string
+
+  /**
+   * Allowed skew time in seconds for validity of the client attestation and client attestation pop
+   * jwts. Used for `exp` and `nbf` verification.
+   *
+   * @default 0
+   */
+  allowedSkewInSeconds?: number
 }
 
 export interface VerifyAuthorizationRequestReturn {
@@ -154,6 +162,7 @@ async function verifyAuthorizationRequestClientAttestation(
     clientAttestationJwt: options.clientAttestationJwt,
     clientAttestationPopJwt: options.clientAttestationPopJwt,
     now,
+    allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
 
   if (requestClientId && requestClientId !== verifiedClientAttestation.clientAttestation.payload.sub) {

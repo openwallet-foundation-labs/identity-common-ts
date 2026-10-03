@@ -1,4 +1,4 @@
-import { ContentType, createFetcher, type Fetch } from '@openid4vc/utils'
+import { ContentType, createFetcher, type Fetch, zHttpsUrl } from '@openid4vc/utils'
 import type { CallbackContext } from '../../callbacks'
 import { decodeJwt } from '../../common/jwt/decode-jwt'
 import { verifyJwt } from '../../common/jwt/verify-jwt'
@@ -17,6 +17,15 @@ import {
 export interface ParsedJarRequestOptions {
   jarRequestParams: JarAuthorizationRequest
   callbacks: Pick<CallbackContext, 'fetch'>
+
+  /**
+   * Whether the request object may be passed by reference using `request_uri`. If allowed,
+   * the `request_uri` will be fetched, so only enable this if the request is expected to be
+   * passed by reference.
+   *
+   * @default false
+   */
+  allowRequestUri?: boolean
 }
 
 export interface VerifyJarRequestOptions {
@@ -123,6 +132,13 @@ export async function verifyJarRequest(options: VerifyJarRequestOptions): Promis
 
 async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetch }): Promise<string> {
   const { requestUri, fetch } = options
+
+  if (!zHttpsUrl.safeParse(requestUri).success) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequestUri,
+      error_description: `The 'request_uri' must be an https url.`,
+    })
+  }
 
   const response = await createFetcher(fetch)(requestUri, {
     method: 'get',

@@ -8,22 +8,39 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: Europe/Amsterdam
+    # Wait before proposing freshly published versions (supply-chain safety,
+    # and avoids PRs that get superseded by a quick follow-up release).
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
     open-pull-requests-limit: 10
-    # Group updates
+    # A dependency lands in the first group it matches, so order matters.
     groups:
-      # Group patch updates together
-      patch-updates:
+      # All security fixes in one PR
+      npm-security:
+        applies-to: security-updates
         patterns:
           - "*"
-        update-types:
-          - "patch"
-      # Group minor updates together
-      minor-updates:
+      # All non-breaking updates in one PR
+      npm-minor-patch:
         patterns:
           - "*"
         update-types:
           - "minor"
-      # Major updates will be created individually by default
+          - "patch"
+      # Major updates of packages that must move together
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "vite"
+      noble:
+        patterns:
+          - "@noble/*"
+      peculiar:
+        patterns:
+          - "@peculiar/*"
+      # Remaining major updates are created individually
 
     # Enable version updates for all severity levels
     allow:
@@ -42,7 +59,7 @@ updates:
       prefix-development: "chore"
       include: "scope"
 
-  # GitHub Actions dependencies
+  # GitHub Actions dependencies (pinned by commit SHA with a "# vX.Y.Z" comment)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -50,6 +67,24 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: Europe/Amsterdam
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    # A dependency lands in the first group it matches, so order matters.
+    groups:
+      # CodeQL sub-actions (init/analyze/upload-sarif) must share one version,
+      # otherwise the analyze step fails, so they are always bumped together.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
+      # All other non-breaking updates in one PR
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Remaining major updates are created individually
     labels:
       - "dependencies"
       - "github-actions"

@@ -77,6 +77,14 @@ export interface VerifyAccessTokenRequestClientAttestation {
    * provided in the authorization request to the client used for the access token request.
    */
   expectedClientId?: string
+
+  /**
+   * Allowed skew time in seconds for validity of the client attestation and client attestation pop
+   * jwts. Used for `exp` and `nbf` verification.
+   *
+   * @default 0
+   */
+  allowedSkewInSeconds?: number
 }
 
 export interface VerifyAccessTokenRequestPkce {
@@ -130,9 +138,7 @@ export interface VerifyPreAuthorizedCodeAccessTokenRequestOptions {
 export async function verifyPreAuthorizedCodeAccessTokenRequest(
   options: VerifyPreAuthorizedCodeAccessTokenRequestOptions
 ): Promise<VerifyAccessTokenRequestReturn> {
-  if (options.pkce) {
-    await verifyAccessTokenRequestPkce(options.pkce, options.callbacks)
-  }
+  await verifyAccessTokenRequestPkce(options.pkce, options.accessTokenRequest, options.callbacks)
 
   const dpopResult = options.dpop
     ? await verifyAccessTokenRequestDpop(options.dpop, options.request, options.callbacks)
@@ -222,9 +228,7 @@ export interface VerifyAuthorizationCodeAccessTokenRequestOptions {
 export async function verifyAuthorizationCodeAccessTokenRequest(
   options: VerifyAuthorizationCodeAccessTokenRequestOptions
 ): Promise<VerifyAccessTokenRequestReturn> {
-  if (options.pkce) {
-    await verifyAccessTokenRequestPkce(options.pkce, options.callbacks)
-  }
+  await verifyAccessTokenRequestPkce(options.pkce, options.accessTokenRequest, options.callbacks)
 
   const dpopResult = options.dpop
     ? await verifyAccessTokenRequestDpop(options.dpop, options.request, options.callbacks)
@@ -288,9 +292,7 @@ export interface VerifyRefreshTokenAccessTokenRequestOptions {
 export async function verifyRefreshTokenAccessTokenRequest(
   options: VerifyRefreshTokenAccessTokenRequestOptions
 ): Promise<VerifyAccessTokenRequestReturn> {
-  if (options.pkce) {
-    await verifyAccessTokenRequestPkce(options.pkce, options.callbacks)
-  }
+  await verifyAccessTokenRequestPkce(options.pkce, options.accessTokenRequest, options.callbacks)
 
   const dpopResult = options.dpop
     ? await verifyAccessTokenRequestDpop(options.dpop, options.request, options.callbacks)
@@ -368,6 +370,7 @@ async function verifyAccessTokenRequestClientAttestation(
     clientAttestationJwt: options.clientAttestationJwt,
     clientAttestationPopJwt: options.clientAttestationPopJwt,
     now,
+    allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
 
   // Ensure the client id matches with the client id from the session
@@ -415,6 +418,7 @@ async function verifyAccessTokenRequestClientAttestationDpop(
       callbacks,
       clientAttestationJwt: options.clientAttestationJwt,
       now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
   } catch (error) {
     if (error instanceof Oauth2Error || error instanceof ValidationError) {
@@ -511,12 +515,27 @@ async function verifyAccessTokenRequestDpop(
 }
 
 async function verifyAccessTokenRequestPkce(
-  options: VerifyAccessTokenRequestPkce,
+  options: VerifyAccessTokenRequestPkce | undefined,
+  accessTokenRequest: AccessTokenRequest,
   callbacks: Pick<CallbackContext, 'hash'>
 ) {
+  if (!options) {
+    // RFC 9700 §4.8.2: a code_verifier for a grant that is not bound to a code_challenge must be rejected,
+    // otherwise a code obtained without PKCE can be injected into the flow of a client that does use PKCE
+    if (accessTokenRequest.code_verifier) {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidGrant,
+        error_description: `Unexpected 'code_verifier' in access token request, no code challenge is bound to the grant`,
+      })
+    }
+
+    return null
+  }
+
   if (options.codeChallenge && !options.codeVerifier) {
     throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
+      // RFC 7636 §4.6: a missing code_verifier results in an invalid_grant error
+      error: Oauth2ErrorCodes.InvalidGrant,
       error_description: `Missing required 'code_verifier' in access token request`,
     })
   }

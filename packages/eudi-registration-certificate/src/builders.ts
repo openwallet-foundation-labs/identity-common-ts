@@ -11,7 +11,6 @@ import type { z } from 'zod'
 import { ENTITLEMENT_SERVICE_PROVIDER, type WRP_ENTITLEMENTS } from './entitlements'
 import { WRPRCPayloadSchema } from './schemas'
 import type {
-  Act,
   Claim,
   Credential,
   Intermediary,
@@ -266,14 +265,6 @@ export class WRPRCBuilder {
    */
   intermediary(intermediary: Intermediary): this {
     this.payload.intermediary = intermediary
-    return this
-  }
-
-  /**
-   * Set the actor claim under intermediation (Table 10, GEN-5.2.4-09)
-   */
-  act(act: Act): this {
-    this.payload.act = act
     return this
   }
 
