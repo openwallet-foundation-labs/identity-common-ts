@@ -111,6 +111,33 @@ describe('Revocation', () => {
     expect(result).toBeDefined()
   })
 
+  test.each([
+    ['issuer', { expectedIssuer: iss }],
+    ['subject', { expectedSubject: 'alice' }],
+    ['audience', { expectedAudience: 'credential-audience' }],
+    ['VCT', { expectedVct: vct }],
+    [
+      'combined options',
+      {
+        expectedIssuer: iss,
+        expectedSubject: 'alice',
+        expectedAudience: 'credential-audience',
+        expectedVct: vct,
+      },
+    ],
+  ])('applies expected %s only to the credential, not the status list token', async (_name, expected) => {
+    const encoded = await sdjwt.issue({
+      iat,
+      iss,
+      sub: 'alice',
+      aud: 'credential-audience',
+      vct,
+      status: { status_list: { uri: 'https://example.com/status-list', idx: 0 } },
+    })
+
+    await expect(sdjwt.verify(encoded, expected)).resolves.toBeDefined()
+  })
+
   test('Test with a revoked credential', async () => {
     const claims = {
       firstname: 'John',

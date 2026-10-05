@@ -10,6 +10,7 @@ import {
 import {
   type DisclosureFrame,
   ensureError,
+  getJwtTimeValidationOptions,
   Jwt,
   type SafeVerifyResult,
   SDJWTException,
@@ -546,7 +547,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
         if (!statusListVerifier) {
           throw new SDJWTException('Verifier not found for status list JWT')
         }
-        await slJWT.verify(statusListVerifier, options).catch((err: SLException) => {
+        await slJWT.verify(statusListVerifier, getJwtTimeValidationOptions(options)).catch((err: SLException) => {
           throw new SLException(`Status List JWT verification failed: ${err.message}`, err.details)
         })
 
