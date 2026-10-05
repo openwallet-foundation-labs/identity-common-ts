@@ -2,7 +2,8 @@ import Crypto, { type KeyLike } from 'node:crypto'
 import { hasher as digest, ES256, generateSalt } from '@owf/crypto'
 import { exportJWK, importJWK, type JWK } from 'jose'
 import { describe, expect, test } from 'vitest'
-import { SDJwtInstance, type SdJwtPayload } from '../index'
+import { SDJwtGeneralJSONInstance, SDJwtInstance, type SdJwtPayload } from '../index'
+import type { VerifierOptions } from '../jwt'
 import type { JwtPayload, KbVerifier, Signer, Verifier } from '../types'
 import { Disclosure } from '../utils'
 
@@ -18,7 +19,54 @@ const createSignerVerifier = () => {
   const verifier: Verifier = async (data: string, sig: string) => {
     return Crypto.verify(null, Buffer.from(data), publicKey, Buffer.from(sig, 'base64url'))
   }
-  return { signer, verifier }
+  return { signer, verifier, publicKey }
+}
+
+const createKeyBoundPresentation = async (settings?: {
+  credentialIat?: number
+  keyBindingIat?: number
+  keyBindingAlgorithm?: 'EdDSA' | 'ES256'
+}) => {
+  const { signer, verifier } = createSignerVerifier()
+  const algorithm = settings?.keyBindingAlgorithm ?? 'EdDSA'
+  const holder = createSignerVerifier()
+  const es256Keys = algorithm === 'ES256' ? await ES256.generateKeyPair() : undefined
+  const kbSigner = es256Keys ? await ES256.getSigner(es256Keys.privateKey) : holder.signer
+  const kbVerifier = es256Keys ? await ES256.getVerifier(es256Keys.publicKey) : holder.verifier
+  const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    signer,
+    signAlg: 'EdDSA',
+    verifier,
+    hasher: digest,
+    saltGenerator: generateSalt,
+    kbSigner,
+    kbVerifier,
+    kbSignAlg: algorithm,
+  })
+  const now = Math.floor(Date.now() / 1000)
+  const credential = await sdjwt.issue({
+    iss: 'Issuer',
+    sub: 'alice',
+    aud: 'credential-audience',
+    vct: 'urn:vct',
+    iat: settings?.credentialIat ?? now - 10,
+    cnf: { jwk: es256Keys?.publicKey ?? (await exportJWK(holder.publicKey)) },
+  })
+  const presentation = await sdjwt.present(
+    credential,
+    {},
+    {
+      kb: {
+        payload: {
+          aud: 'key-binding-audience',
+          iat: settings?.keyBindingIat ?? now - 10,
+          nonce: 'nonce',
+        },
+      },
+    }
+  )
+  const options: VerifierOptions = { currentDate: now, keyBindingNonce: 'nonce' }
+  return { sdjwt, presentation, options, verifier, kbVerifier }
 }
 
 describe('index', () => {
@@ -1000,5 +1048,127 @@ describe('index', () => {
     if (!resultVct.success) {
       expect(resultVct.errors.some((e) => e.code === 'INVALID_VCT')).toBe(true)
     }
+  })
+
+  describe('issuer options on key-bound presentations', () => {
+    const expectKeyBoundVerification = async (expected: VerifierOptions) => {
+      const { sdjwt, presentation, options, verifier, kbVerifier } = await createKeyBoundPresentation()
+      const verificationOptions = { ...options, ...expected }
+
+      await expect(sdjwt.verify(presentation, verificationOptions)).resolves.toHaveProperty('kb')
+      await expect(sdjwt.safeVerify(presentation, verificationOptions)).resolves.toMatchObject({ success: true })
+
+      const general = new SDJwtGeneralJSONInstance<SdJwtPayload>({ verifier, kbVerifier, hasher: digest })
+      await expect(general.verify(sdjwt.toGeneralJSON(presentation), verificationOptions)).resolves.toHaveProperty('kb')
+    }
+
+    test('expectedIssuer constrains the credential, not the key binding JWT', async () => {
+      await expectKeyBoundVerification({ expectedIssuer: 'Issuer' })
+    })
+
+    test('expectedSubject constrains the credential, not the key binding JWT', async () => {
+      await expectKeyBoundVerification({ expectedSubject: 'alice' })
+    })
+
+    test('expectedVct constrains the credential, not the key binding JWT', async () => {
+      await expectKeyBoundVerification({ expectedVct: 'urn:vct' })
+    })
+
+    test('maxAgeSeconds constrains the credential, not the key binding JWT', async () => {
+      await expectKeyBoundVerification({ maxAgeSeconds: 60 })
+    })
+
+    test('safeVerify accepts matching issuer with key binding', async () => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation()
+      await expect(sdjwt.safeVerify(presentation, { ...options, expectedIssuer: 'Issuer' })).resolves.toMatchObject({
+        success: true,
+      })
+    })
+
+    test('General JSON verification accepts matching issuer with key binding', async () => {
+      const { sdjwt, presentation, options, verifier, kbVerifier } = await createKeyBoundPresentation()
+      const general = new SDJwtGeneralJSONInstance<SdJwtPayload>({ verifier, kbVerifier, hasher: digest })
+      await expect(
+        general.verify(sdjwt.toGeneralJSON(presentation), { ...options, expectedIssuer: 'Issuer' })
+      ).resolves.toHaveProperty('kb')
+    })
+
+    const expectCredentialRejection = async (expected: VerifierOptions, code: string, message: string) => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation()
+      const verificationOptions = { ...options, ...expected }
+
+      await expect(sdjwt.verify(presentation, verificationOptions)).rejects.toThrow(message)
+      const result = await sdjwt.safeVerify(presentation, verificationOptions)
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.errors).toContainEqual(expect.objectContaining({ code }))
+        expect(result.errors.some((error) => error.code === 'KEY_BINDING_SIGNATURE_INVALID')).toBe(false)
+      }
+    }
+
+    test('rejects a mismatching credential issuer', async () => {
+      await expectCredentialRejection({ expectedIssuer: 'other' }, 'INVALID_ISSUER', 'Invalid issuer')
+    })
+
+    test('rejects a mismatching credential subject', async () => {
+      await expectCredentialRejection({ expectedSubject: 'other' }, 'INVALID_SUBJECT', 'Invalid subject')
+    })
+
+    test('rejects a mismatching credential VCT', async () => {
+      await expectCredentialRejection({ expectedVct: 'other' }, 'INVALID_VCT', 'Invalid VCT')
+    })
+
+    test('rejects a credential older than maxAgeSeconds', async () => {
+      await expectCredentialRejection({ maxAgeSeconds: 5 }, 'JWT_TOO_OLD', 'JWT is too old')
+    })
+
+    test('uses credential maxAgeSeconds independently of keyBindingMaxAgeSeconds', async () => {
+      const now = Math.floor(Date.now() / 1000)
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation({
+        credentialIat: now - 10,
+        keyBindingIat: now - 200,
+      })
+      const verificationOptions = { ...options, maxAgeSeconds: 60, keyBindingMaxAgeSeconds: 300 }
+
+      await expect(sdjwt.verify(presentation, verificationOptions)).resolves.toHaveProperty('kb')
+      await expect(sdjwt.safeVerify(presentation, verificationOptions)).resolves.toMatchObject({ success: true })
+    })
+
+    test('still rejects a stale key binding JWT with a generous credential age', async () => {
+      const now = Math.floor(Date.now() / 1000)
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation({
+        keyBindingIat: now - 200,
+      })
+
+      await expect(
+        sdjwt.verify(presentation, { ...options, maxAgeSeconds: 3600, keyBindingMaxAgeSeconds: 60 })
+      ).rejects.toThrow('Key Binding JWT is too old')
+    })
+
+    test('does not apply the credential audience to the key binding JWT', async () => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation()
+      await expect(
+        sdjwt.verify(presentation, {
+          ...options,
+          expectedAudience: 'credential-audience',
+          expectedKeyBindingAudience: 'key-binding-audience',
+        })
+      ).resolves.toHaveProperty('kb')
+    })
+
+    test('verifies an ES256 key binding JWT with an EdDSA issuer', async () => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation({ keyBindingAlgorithm: 'ES256' })
+      await expect(sdjwt.verify(presentation, options)).resolves.toHaveProperty('kb')
+    })
+
+    test('does not apply the issuer algorithm to the key binding JWT', async () => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation({ keyBindingAlgorithm: 'ES256' })
+      await expect(
+        sdjwt.verify(presentation, {
+          ...options,
+          allowedIssuerAlgorithms: ['EdDSA'],
+        })
+      ).resolves.toHaveProperty('kb')
+    })
   })
 })
