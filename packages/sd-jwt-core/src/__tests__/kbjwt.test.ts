@@ -312,7 +312,12 @@ describe('KB JWT', () => {
         nonce: 'nonce',
         options: { currentDate: 5000 },
       })
-    ).rejects.toThrow('Verify Error: JWT is expired')
+    ).rejects.toMatchObject({
+      message:
+        'Verify Error: Key Binding JWT is expired: exp is 1970-01-01T00:16:40.000Z, current time is 1970-01-01T01:23:20.000Z (4000s after exp, allowed clock skew 0s)',
+      code: 'KEY_BINDING_JWT_EXPIRED',
+      details: { claim: 'exp', value: 1000, currentDate: 5000, skewSeconds: 0 },
+    })
   })
 
   test('verify failed with iat in the future', async () => {
@@ -360,7 +365,12 @@ describe('KB JWT', () => {
         // iat (5000) is after the current date (1000)
         options: { currentDate: 1000 },
       })
-    ).rejects.toThrow('Verify Error: JWT is not yet valid')
+    ).rejects.toMatchObject({
+      message:
+        'Verify Error: Key Binding JWT is not yet valid: iat is 1970-01-01T01:23:20.000Z, current time is 1970-01-01T00:16:40.000Z (4000s before iat, allowed clock skew 0s)',
+      code: 'KEY_BINDING_JWT_NOT_YET_VALID',
+      details: { claim: 'iat', value: 5000, currentDate: 1000, skewSeconds: 0 },
+    })
   })
 
   test('verify failed with nbf in the future', async () => {
@@ -408,7 +418,12 @@ describe('KB JWT', () => {
         nonce: 'nonce',
         options: { currentDate: 1000 },
       })
-    ).rejects.toThrow('Verify Error: JWT is not yet valid')
+    ).rejects.toMatchObject({
+      message:
+        'Verify Error: Key Binding JWT is not yet valid: nbf is 1970-01-01T01:23:20.000Z, current time is 1970-01-01T00:16:40.000Z (4000s before nbf, allowed clock skew 0s)',
+      code: 'KEY_BINDING_JWT_NOT_YET_VALID',
+      details: { claim: 'nbf', value: 5000, currentDate: 1000, skewSeconds: 0 },
+    })
   })
 
   test('verify succeeds for expired exp within the allowed skew', async () => {

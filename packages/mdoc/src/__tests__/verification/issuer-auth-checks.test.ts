@@ -105,6 +105,29 @@ describe('issuer auth checks', () => {
     ).resolves.toBeDefined()
   })
 
+  test('the MSO validity check reports the validity period it compared against', async () => {
+    const issuerSigned = await createIssuerSigned()
+    const { validFrom, validUntil } = issuerSigned.issuerAuth.mobileSecurityObject.validityInfo
+    const now = new Date(validUntil.getTime() + 60 * 60 * 1000)
+
+    const checks: Array<VerificationAssessment> = []
+    await Holder.verifyIssuerSigned(
+      {
+        issuerSigned,
+        disableCertificateChainValidation: true,
+        now,
+        skewSeconds: 30,
+        verificationCallback: (check) => checks.push(check),
+      },
+      mdocContext
+    )
+
+    expect(checks.find((check) => check.check === 'The MSO must be valid at the time of verification')).toMatchObject({
+      status: 'FAILED',
+      reason: `The MSO must be valid at the time of verification (${now.toUTCString()}); its validity period is ${validFrom.toUTCString()} to ${validUntil.toUTCString()} (allowed clock skew 30s)`,
+    })
+  })
+
   test('issuing_country is checked against the subject of the DS certificate, not its issuer', async () => {
     const checks = await collectIssuerChecks({
       iacaName: 'CN=IACA, C=NL',

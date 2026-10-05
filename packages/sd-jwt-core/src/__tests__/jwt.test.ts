@@ -188,15 +188,16 @@ describe('JWT', () => {
 
     const jwt = new Jwt({
       header: { alg: 'EdDSA' },
-      payload: { iat: Math.floor(Date.now() / 1000) + 100 },
+      payload: { iat: 1100 },
     })
 
-    try {
-      await jwt.verify(testVerifier)
-    } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
-      expect((e as SDJWTException).message).toBe('Verify Error: JWT is not yet valid')
-    }
+    const error = await jwt.verify(testVerifier, { currentDate: 1000 }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(SDJWTException)
+    expect((error as SDJWTException).message).toBe(
+      'Verify Error: JWT is not yet valid: iat is 1970-01-01T00:18:20.000Z, current time is 1970-01-01T00:16:40.000Z (100s before iat, allowed clock skew 0s)'
+    )
+    expect((error as SDJWTException).code).toBe('JWT_NOT_YET_VALID')
+    expect((error as SDJWTException).details).toEqual({ claim: 'iat', value: 1100, currentDate: 1000, skewSeconds: 0 })
   })
 
   test('verify with not before in the future', async () => {
@@ -207,15 +208,16 @@ describe('JWT', () => {
 
     const jwt = new Jwt({
       header: { alg: 'EdDSA' },
-      payload: { nbf: Math.floor(Date.now() / 1000) + 100 },
+      payload: { nbf: 1100 },
     })
 
-    try {
-      await jwt.verify(testVerifier)
-    } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
-      expect((e as SDJWTException).message).toBe('Verify Error: JWT is not yet valid')
-    }
+    const error = await jwt.verify(testVerifier, { currentDate: 1000 }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(SDJWTException)
+    expect((error as SDJWTException).message).toBe(
+      'Verify Error: JWT is not yet valid: nbf is 1970-01-01T00:18:20.000Z, current time is 1970-01-01T00:16:40.000Z (100s before nbf, allowed clock skew 0s)'
+    )
+    expect((error as SDJWTException).code).toBe('JWT_NOT_YET_VALID')
+    expect((error as SDJWTException).details).toEqual({ claim: 'nbf', value: 1100, currentDate: 1000, skewSeconds: 0 })
   })
 
   test('verify with expired', async () => {
@@ -226,17 +228,40 @@ describe('JWT', () => {
 
     const jwt = new Jwt({
       header: { alg: 'EdDSA' },
-      payload: { exp: Math.floor(Date.now() / 1000) },
+      payload: { exp: 1000 },
     })
 
-    try {
-      await jwt.verify(testVerifier, {
-        currentDate: Math.floor(Date.now() / 1000) + 100,
-      })
-    } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
-      expect((e as SDJWTException).message).toBe('Verify Error: JWT is expired')
-    }
+    const error = await jwt.verify(testVerifier, { currentDate: 1100 }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(SDJWTException)
+    expect((error as SDJWTException).message).toBe(
+      'Verify Error: JWT is expired: exp is 1970-01-01T00:16:40.000Z, current time is 1970-01-01T00:18:20.000Z (100s after exp, allowed clock skew 0s)'
+    )
+    expect((error as SDJWTException).code).toBe('JWT_EXPIRED')
+    expect((error as SDJWTException).details).toEqual({ claim: 'exp', value: 1000, currentDate: 1100, skewSeconds: 0 })
+  })
+
+  test('verify with expired reports the allowed skew', async () => {
+    const jwt = new Jwt({
+      header: { alg: 'EdDSA' },
+      payload: { exp: 1000 },
+    })
+
+    const error = await jwt.verify(async () => true, { currentDate: 1100, skewSeconds: 30 }).catch((e: unknown) => e)
+    expect((error as SDJWTException).message).toBe(
+      'Verify Error: JWT is expired: exp is 1970-01-01T00:16:40.000Z, current time is 1970-01-01T00:18:20.000Z (100s after exp, allowed clock skew 30s)'
+    )
+    expect((error as SDJWTException).details).toEqual({ claim: 'exp', value: 1000, currentDate: 1100, skewSeconds: 30 })
+  })
+
+  test('verify with a time claim beyond the range of a Date', async () => {
+    const jwt = new Jwt({
+      header: { alg: 'EdDSA' },
+      payload: { iat: 1e16 },
+    })
+
+    await expect(jwt.verify(async () => true, { currentDate: 1000 })).rejects.toThrow(
+      'Verify Error: JWT is not yet valid: iat is 10000000000000000, current time is 1970-01-01T00:16:40.000Z'
+    )
   })
 
   test('verify with skew', async () => {
@@ -360,9 +385,12 @@ describe('JWT', () => {
     await expect(jwt.verify(testVerifier, { currentDate: 1060, maxAgeSeconds: 60 })).resolves.toBeDefined()
 
     // exceeded maxAge
-    await expect(jwt.verify(testVerifier, { currentDate: 1061, maxAgeSeconds: 60 })).rejects.toThrow(
-      'Verify Error: JWT is too old'
-    )
+    await expect(jwt.verify(testVerifier, { currentDate: 1061, maxAgeSeconds: 60 })).rejects.toMatchObject({
+      message:
+        'Verify Error: JWT is too old: iat is 1970-01-01T00:16:40.000Z, current time is 1970-01-01T00:17:41.000Z (age 61s, maximum age 60s, allowed clock skew 0s)',
+      code: 'JWT_TOO_OLD',
+      details: { claim: 'iat', value: 1000, currentDate: 1061, skewSeconds: 0, maxAgeSeconds: 60 },
+    })
 
     // exceeded maxAge but saved by skew
     await expect(

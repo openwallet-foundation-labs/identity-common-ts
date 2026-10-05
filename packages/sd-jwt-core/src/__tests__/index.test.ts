@@ -342,7 +342,15 @@ describe('index', () => {
         requiredClaimKeys: ['foo'],
         keyBindingNonce: '342',
       })
-    ).rejects.toThrow('Verify Error: JWT is expired')
+    ).rejects.toMatchObject({
+      code: 'KEY_BINDING_JWT_EXPIRED',
+      message: expect.stringContaining('Verify Error: Key Binding JWT is expired: exp is'),
+    })
+
+    // safeVerify reports the time check's own code rather than an invalid key binding signature
+    const result = await sdjwt.safeVerify(presentation, { keyBindingNonce: '342' })
+    expect(result.success).toBe(false)
+    expect(result.errors?.map((e) => e.code)).toEqual(['KEY_BINDING_JWT_EXPIRED'])
   })
 
   test('verify accepts a kbJwt with a future exp during full verification', async () => {

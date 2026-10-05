@@ -2,7 +2,15 @@ import type { SDJWTConfig, Verifier } from '@sd-jwt/core'
 import type { VCTFetcher } from './sd-jwt-vc-vct'
 
 export type StatusListFetcher = (uri: string) => Promise<string>
-export type StatusValidator = (status: number) => Promise<void>
+/** Where the status passed to a {@link StatusValidator} was read from. */
+export type StatusValidatorContext = {
+  /** URI of the status list. */
+  uri: string
+  /** Index of the credential in the status list. */
+  idx: number
+}
+
+export type StatusValidator = (status: number, context: StatusValidatorContext) => Promise<void>
 
 /**
  * Configuration for SD-JWT-VC
