@@ -141,8 +141,7 @@ describe('RFC 9901 audit fixes', () => {
         options: { currentDate: 1000, keyBindingMaxAgeSeconds: 50 },
       })
     ).rejects.toMatchObject({
-      message:
-        'Verify Error: Key Binding JWT is too old: iat is 1970-01-01T00:15:00.000Z, current time is 1970-01-01T00:16:40.000Z (age 100s, maximum age 50s, allowed clock skew 0s)',
+      message: 'Verify Error: Key Binding JWT is too old',
       code: 'KEY_BINDING_JWT_TOO_OLD',
       details: { claim: 'iat', value: 900, currentDate: 1000, skewSeconds: 0, maxAgeSeconds: 50 },
     })

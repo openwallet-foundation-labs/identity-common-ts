@@ -6,7 +6,7 @@ import {
   StatusList,
   type StatusListJWTHeaderParameters,
 } from '@owf/token-status-list'
-import type { DisclosureFrame, JwtPayload, Signer, Verifier } from '@sd-jwt/core'
+import { type DisclosureFrame, type JwtPayload, JwtTimeClaimException, type Signer, type Verifier } from '@sd-jwt/core'
 import { SignJWT } from 'jose'
 import { describe, expect, test, vi } from 'vitest'
 import { SDJwtVcInstance } from '..'
@@ -130,7 +130,7 @@ describe('Revocation', () => {
     const encodedSdjwt = await sdjwt.issue(expectedPayload)
     const result = sdjwt.verify(encodedSdjwt)
     await expect(result).rejects.toMatchObject({
-      message: 'Status is not valid: index 1 of status list https://example.com/status-list has status 1 (Invalid)',
+      message: 'Status is not valid',
       code: 'STATUS_INVALID',
       details: { uri: 'https://example.com/status-list', idx: 1, status: 1 },
     })
@@ -268,10 +268,18 @@ describe('Revocation', () => {
 
     const error = await sdjwtWithExpiredList.verify(encodedSdjwt, { currentDate: 5000 }).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(SLException)
-    expect((error as SLException).message).toBe(
-      'Status List JWT verification failed for https://example.com/status-list: Verify Error: JWT is expired: exp is 1970-01-01T00:33:20.000Z, current time is 1970-01-01T01:23:20.000Z (3000s after exp, allowed clock skew 0s)'
-    )
-    expect((error as SLException).details).toEqual({ claim: 'exp', value: 2000, currentDate: 5000, skewSeconds: 0 })
+    expect(error).toMatchObject({
+      message: 'Status List JWT verification failed: Verify Error: JWT is expired',
+      details: { uri: 'https://example.com/status-list' },
+    })
+
+    // the rejected claim is on the original exception
+    const cause = (error as { cause?: unknown }).cause
+    expect(cause).toBeInstanceOf(JwtTimeClaimException)
+    expect(cause).toMatchObject({
+      code: 'JWT_EXPIRED',
+      details: { claim: 'exp', value: 2000, currentDate: 5000, skewSeconds: 0 },
+    })
   })
 })
 

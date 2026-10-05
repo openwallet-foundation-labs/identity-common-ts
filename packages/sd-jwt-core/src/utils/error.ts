@@ -1,4 +1,8 @@
-import type { VerificationErrorCode } from '../types/verification-error'
+import type {
+  JwtTimeClaimErrorCode,
+  JwtTimeClaimErrorDetails,
+  VerificationErrorCode,
+} from '../types/verification-error'
 
 export class SDJWTException extends Error {
   public details?: unknown
@@ -19,6 +23,22 @@ export class SDJWTException extends Error {
 
   getFullMessage(): string {
     return `${this.name}: ${this.message} ${this.details ? `- ${JSON.stringify(this.details)}` : ''}`
+  }
+}
+
+/**
+ * Thrown when an `iat`, `nbf`, `exp` or maximum age check fails. `details` holds the values the
+ * check compared: a token a few seconds past the allowed skew points to clock drift, one far past
+ * it to an expired or stale token.
+ */
+export class JwtTimeClaimException extends SDJWTException {
+  declare details: JwtTimeClaimErrorDetails
+  declare code: JwtTimeClaimErrorCode
+
+  constructor(message: string, details: JwtTimeClaimErrorDetails, code: JwtTimeClaimErrorCode) {
+    super(message, details, code)
+    Object.setPrototypeOf(this, JwtTimeClaimException.prototype)
+    this.name = 'JwtTimeClaimException'
   }
 }
 

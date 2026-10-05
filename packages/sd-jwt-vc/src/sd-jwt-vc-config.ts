@@ -12,6 +12,18 @@ export type StatusValidatorContext = {
 
 export type StatusValidator = (status: number, context: StatusValidatorContext) => Promise<void>
 
+/** `details` of the exception with code `STATUS_INVALID` that the default status validator throws. */
+export type StatusInvalidErrorDetails = StatusValidatorContext & {
+  /** The status of the credential, e.g. `1` for invalid (revoked) or `2` for suspended. */
+  status: number
+}
+
+/** `details` of the `SLException` thrown when the status list token fails verification. */
+export type StatusListVerificationErrorDetails = {
+  /** URI of the status list. */
+  uri: string
+}
+
 /**
  * Configuration for SD-JWT-VC
  */

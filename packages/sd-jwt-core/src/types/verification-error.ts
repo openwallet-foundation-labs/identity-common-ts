@@ -28,6 +28,18 @@ export type VerificationErrorCode =
   | 'UNKNOWN_ERROR'
 
 /**
+ * Codes of a failed `iat`, `nbf`, `exp` or maximum age check, for the issuer-signed JWT and for the
+ * Key Binding JWT.
+ */
+export type JwtTimeClaimErrorCode =
+  | 'JWT_NOT_YET_VALID'
+  | 'JWT_EXPIRED'
+  | 'JWT_TOO_OLD'
+  | 'KEY_BINDING_JWT_NOT_YET_VALID'
+  | 'KEY_BINDING_JWT_EXPIRED'
+  | 'KEY_BINDING_JWT_TOO_OLD'
+
+/**
  * Represents a single verification error.
  */
 export type VerificationError = {
@@ -63,9 +75,8 @@ export type SafeVerifyResult<T> =
     }
 
 /**
- * `details` of the `SDJWTException` thrown when an `iat`, `nbf`, `exp` or maximum age check fails.
- * Comparing `value`, `currentDate` and `skewSeconds` tells clock drift apart from an expired or
- * not yet valid token without parsing the message. Times are in seconds since the epoch.
+ * The values a failed `iat`, `nbf`, `exp` or maximum age check compared, in the `details` of a
+ * `JwtTimeClaimException`. Times are in seconds since the epoch.
  */
 export type JwtTimeClaimErrorDetails = {
   /** The claim that failed the check. */

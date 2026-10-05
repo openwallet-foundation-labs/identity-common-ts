@@ -344,7 +344,7 @@ describe('index', () => {
       })
     ).rejects.toMatchObject({
       code: 'KEY_BINDING_JWT_EXPIRED',
-      message: expect.stringContaining('Verify Error: Key Binding JWT is expired: exp is'),
+      message: 'Verify Error: Key Binding JWT is expired',
     })
 
     // safeVerify reports the time check's own code rather than an invalid key binding signature

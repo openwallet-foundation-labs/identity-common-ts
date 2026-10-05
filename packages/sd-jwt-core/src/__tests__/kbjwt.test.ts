@@ -3,7 +3,7 @@ import { exportJWK, importJWK, type JWK } from 'jose'
 import { describe, expect, test } from 'vitest'
 import { KBJwt } from '../kbjwt'
 import { type JwtPayload, KB_JWT_TYP, type KbVerifier, type kbPayload, type Signer } from '../types'
-import type { SDJWTException } from '../utils'
+import { JwtTimeClaimException, type SDJWTException } from '../utils'
 
 describe('KB JWT', () => {
   test('create', async () => {
@@ -312,9 +312,17 @@ describe('KB JWT', () => {
         nonce: 'nonce',
         options: { currentDate: 5000 },
       })
+    ).rejects.toBeInstanceOf(JwtTimeClaimException)
+
+    await expect(
+      decoded.verifyKB({
+        verifier: testVerifier,
+        payload,
+        nonce: 'nonce',
+        options: { currentDate: 5000 },
+      })
     ).rejects.toMatchObject({
-      message:
-        'Verify Error: Key Binding JWT is expired: exp is 1970-01-01T00:16:40.000Z, current time is 1970-01-01T01:23:20.000Z (4000s after exp, allowed clock skew 0s)',
+      message: 'Verify Error: Key Binding JWT is expired',
       code: 'KEY_BINDING_JWT_EXPIRED',
       details: { claim: 'exp', value: 1000, currentDate: 5000, skewSeconds: 0 },
     })
@@ -366,8 +374,7 @@ describe('KB JWT', () => {
         options: { currentDate: 1000 },
       })
     ).rejects.toMatchObject({
-      message:
-        'Verify Error: Key Binding JWT is not yet valid: iat is 1970-01-01T01:23:20.000Z, current time is 1970-01-01T00:16:40.000Z (4000s before iat, allowed clock skew 0s)',
+      message: 'Verify Error: Key Binding JWT is not yet valid',
       code: 'KEY_BINDING_JWT_NOT_YET_VALID',
       details: { claim: 'iat', value: 5000, currentDate: 1000, skewSeconds: 0 },
     })
@@ -419,8 +426,7 @@ describe('KB JWT', () => {
         options: { currentDate: 1000 },
       })
     ).rejects.toMatchObject({
-      message:
-        'Verify Error: Key Binding JWT is not yet valid: nbf is 1970-01-01T01:23:20.000Z, current time is 1970-01-01T00:16:40.000Z (4000s before nbf, allowed clock skew 0s)',
+      message: 'Verify Error: Key Binding JWT is not yet valid',
       code: 'KEY_BINDING_JWT_NOT_YET_VALID',
       details: { claim: 'nbf', value: 5000, currentDate: 1000, skewSeconds: 0 },
     })

@@ -21,7 +21,14 @@ import {
   type VerifierOptions,
 } from '@sd-jwt/core'
 import z from 'zod'
-import type { SDJWTVCConfig, StatusListFetcher, StatusValidator, StatusValidatorContext } from './sd-jwt-vc-config'
+import type {
+  SDJWTVCConfig,
+  StatusInvalidErrorDetails,
+  StatusListFetcher,
+  StatusListVerificationErrorDetails,
+  StatusValidator,
+  StatusValidatorContext,
+} from './sd-jwt-vc-config'
 import type { SdJwtVcPayload } from './sd-jwt-vc-payload'
 import {
   type Claim,
@@ -98,12 +105,8 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
    */
   private async statusValidator(status: number, { uri, idx }: StatusValidatorContext): Promise<void> {
     if (status !== StatusType.Valid) {
-      const name = StatusType[status] ?? 'Unknown'
-      throw new SDJWTException(
-        `Status is not valid: index ${idx} of status list ${uri} has status ${status} (${name})`,
-        { uri, idx, status },
-        'STATUS_INVALID'
-      )
+      const details: StatusInvalidErrorDetails = { uri, idx, status }
+      throw new SDJWTException('Status is not valid', details, 'STATUS_INVALID')
     }
     return Promise.resolve()
   }
@@ -559,8 +562,14 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
         if (!statusListVerifier) {
           throw new SDJWTException('Verifier not found for status list JWT')
         }
-        await slJWT.verify(statusListVerifier, options).catch((err: SLException) => {
-          throw new SLException(`Status List JWT verification failed for ${uri}: ${err.message}`, err.details)
+        await slJWT.verify(statusListVerifier, options).catch((err: unknown) => {
+          const details: StatusListVerificationErrorDetails = { uri }
+          // The original exception stays reachable as `cause`, e.g. a JwtTimeClaimException with the
+          // exp the status list token was rejected for.
+          throw Object.assign(
+            new SLException(`Status List JWT verification failed: ${ensureError(err).message}`, details),
+            { cause: err }
+          )
         })
 
         // check the claims required for a Status List Token, e.g. that `sub` matches the referenced uri
