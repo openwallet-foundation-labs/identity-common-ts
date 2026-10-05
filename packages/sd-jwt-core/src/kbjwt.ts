@@ -38,6 +38,13 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
       throw new SDJWTException('Invalid Key Binding Jwt')
     }
 
+    if (
+      values.options?.allowedKeyBindingAlgorithms &&
+      !values.options.allowedKeyBindingAlgorithms.includes(this.header.alg)
+    ) {
+      throw new SDJWTException(`Verify Error: Disallowed Key Binding alg ${this.header.alg}`)
+    }
+
     if (this.payload.nonce !== values.nonce) {
       throw new SDJWTException('Verify Error: Invalid Nonce')
     }

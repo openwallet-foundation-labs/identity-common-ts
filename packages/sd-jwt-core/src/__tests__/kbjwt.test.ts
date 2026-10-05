@@ -510,4 +510,51 @@ describe('KB JWT', () => {
       })
     ).rejects.toThrow('Invalid Key Binding Jwt')
   })
+
+  test('verify checks allowedKeyBindingAlgorithms instead of allowedIssuerAlgorithms', async () => {
+    const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
+    const testSigner: Signer = async (data: string) => {
+      const sig = Crypto.sign(null, Buffer.from(data), privateKey)
+      return Buffer.from(sig).toString('base64url')
+    }
+
+    const payload = {
+      cnf: {
+        jwk: await exportJWK(publicKey),
+      },
+    }
+    const testVerifier: KbVerifier = async (data: string, sig: string, payload: JwtPayload) => {
+      const publicKey = payload.cnf?.jwk
+      return Crypto.verify(
+        null,
+        Buffer.from(data),
+        (await importJWK(publicKey as JWK, 'EdDSA')) as KeyLike,
+        Buffer.from(sig, 'base64url')
+      )
+    }
+
+    const kbJwt = new KBJwt({
+      header: {
+        typ: KB_JWT_TYP,
+        alg: 'EdDSA',
+      },
+      payload: {
+        iat: 1,
+        aud: 'aud',
+        nonce: 'nonce',
+        sd_hash: 'hash',
+      },
+    })
+    const encodedKbJwt = await kbJwt.sign(testSigner)
+    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const verifyKB = (options: Record<string, unknown>) =>
+      decoded.verifyKB({ verifier: testVerifier, payload, nonce: 'nonce', options })
+
+    // The holder may use other algorithms than the issuer
+    await expect(verifyKB({ allowedIssuerAlgorithms: ['ES256'] })).resolves.toBeDefined()
+    await expect(verifyKB({ allowedKeyBindingAlgorithms: ['EdDSA'] })).resolves.toBeDefined()
+    await expect(verifyKB({ allowedKeyBindingAlgorithms: ['ES256'] })).rejects.toThrow(
+      'Verify Error: Disallowed Key Binding alg EdDSA'
+    )
+  })
 })
