@@ -11,6 +11,7 @@ import {
 import {
   type DisclosureFrame,
   ensureError,
+  getJwtTimeValidationOptions,
   Jwt,
   type SafeVerifyResult,
   SDJWTException,
@@ -562,7 +563,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
         if (!statusListVerifier) {
           throw new SDJWTException('Verifier not found for status list JWT')
         }
-        await slJWT.verify(statusListVerifier, options).catch((err: unknown) => {
+        await slJWT.verify(statusListVerifier, getJwtTimeValidationOptions(options)).catch((err: unknown) => {
           const details: StatusListVerificationErrorDetails = { uri }
           // The original exception stays reachable as `cause`, e.g. a JwtTimeClaimException with the
           // exp the status list token was rejected for.

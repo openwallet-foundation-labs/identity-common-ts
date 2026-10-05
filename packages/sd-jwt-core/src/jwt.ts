@@ -97,6 +97,11 @@ export type VerifierOptions = {
   [key: string]: unknown
 }
 
+export const getJwtTimeValidationOptions = (
+  options?: VerifierOptions
+): Pick<VerifierOptions, 'currentDate' | 'skewSeconds'> | undefined =>
+  options ? { currentDate: options.currentDate, skewSeconds: options.skewSeconds } : undefined
+
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string')
 
