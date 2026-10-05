@@ -77,6 +77,14 @@ export interface VerifyAccessTokenRequestClientAttestation {
    * provided in the authorization request to the client used for the access token request.
    */
   expectedClientId?: string
+
+  /**
+   * Allowed skew time in seconds for validity of the client attestation and client attestation pop
+   * jwts. Used for `exp` and `nbf` verification.
+   *
+   * @default 0
+   */
+  allowedSkewInSeconds?: number
 }
 
 export interface VerifyAccessTokenRequestPkce {
@@ -362,6 +370,7 @@ async function verifyAccessTokenRequestClientAttestation(
     clientAttestationJwt: options.clientAttestationJwt,
     clientAttestationPopJwt: options.clientAttestationPopJwt,
     now,
+    allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
 
   // Ensure the client id matches with the client id from the session
@@ -409,6 +418,7 @@ async function verifyAccessTokenRequestClientAttestationDpop(
       callbacks,
       clientAttestationJwt: options.clientAttestationJwt,
       now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
   } catch (error) {
     if (error instanceof Oauth2Error || error instanceof ValidationError) {
