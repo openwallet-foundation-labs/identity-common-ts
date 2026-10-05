@@ -547,9 +547,13 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
         if (!statusListVerifier) {
           throw new SDJWTException('Verifier not found for status list JWT')
         }
-        await slJWT.verify(statusListVerifier, getJwtTimeValidationOptions(options)).catch((err: SLException) => {
-          throw new SLException(`Status List JWT verification failed: ${err.message}`, err.details)
-        })
+        // The status list verifier gets the verification options, e.g. to resolve the key of the status list
+        // issuer. Only the time options are applied to the claims of the Status List Token.
+        await slJWT
+          .verify((data, sig) => statusListVerifier(data, sig, options), getJwtTimeValidationOptions(options))
+          .catch((err: SLException) => {
+            throw new SLException(`Status List JWT verification failed: ${err.message}`, err.details)
+          })
 
         // check the claims required for a Status List Token, e.g. that `sub` matches the referenced uri
         verifyStatusListJwtClaims(slJWT.payload as StatusListJWTPayload, {
