@@ -1156,6 +1156,17 @@ describe('index', () => {
       ).resolves.toHaveProperty('kb')
     })
 
+    test('rejects a mismatching key binding audience even when the credential audience matches', async () => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation()
+      await expect(
+        sdjwt.verify(presentation, {
+          ...options,
+          expectedAudience: 'credential-audience',
+          expectedKeyBindingAudience: 'other-audience',
+        })
+      ).rejects.toThrow('Verify Error: Invalid Key Binding audience')
+    })
+
     test('verifies an ES256 key binding JWT with an EdDSA issuer', async () => {
       const { sdjwt, presentation, options } = await createKeyBoundPresentation({ keyBindingAlgorithm: 'ES256' })
       await expect(sdjwt.verify(presentation, options)).resolves.toHaveProperty('kb')
