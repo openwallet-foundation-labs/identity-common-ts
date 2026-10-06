@@ -314,6 +314,42 @@ describe('Revocation', () => {
     )
   })
 
+  test('Test with a status list token whose typ header is not statuslist+jwt', async () => {
+    const { header, payload } = createHeaderAndPayload(
+      new StatusList([0, 0], 1),
+      { iss: 'https://example.com', sub: 'https://example.com/status-list', iat },
+      { alg: 'EdDSA', typ: 'statuslist+jwt' }
+    )
+    // `createHeaderAndPayload` always sets the typ, so the wrong typ is set on the protected header instead
+    const wrongTypStatusListJWT = await new SignJWT(payload)
+      .setProtectedHeader({ ...header, typ: 'JWT' })
+      .sign(statusListPrivateKey)
+
+    const { signer, verifier } = createSignerVerifier()
+    const sdjwtWithWrongTyp = new SDJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      statusListFetcher: () => Promise.resolve(wrongTypStatusListJWT),
+      statusVerifier: async (data: string, sig: string) =>
+        Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
+    })
+
+    const expectedPayload: SdJwtVcPayload = {
+      iat,
+      iss,
+      vct,
+      status: { status_list: { uri: 'https://example.com/status-list', idx: 0 } },
+    }
+    const encodedSdjwt = await sdjwtWithWrongTyp.issue(expectedPayload)
+    await expect(sdjwtWithWrongTyp.verify(encodedSdjwt)).rejects.toThrowError(
+      "The typ header 'JWT' must be equal to 'statuslist+jwt'"
+    )
+  })
+
   test('Test with the verifier used for the status list when no status verifier is provided', async () => {
     // the status list is signed with the same key as the credential
     const statusList = new StatusList([0, 1], 1)

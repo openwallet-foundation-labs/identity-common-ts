@@ -32,6 +32,7 @@ export {
   getStatusListFromJWT,
   verifyStatus,
   verifyStatusListJwtClaims,
+  verifyStatusListJwtHeader,
 } from './status-list-jwt'
 export type { BitsPerStatus, StatusListEntry } from './types'
 export { MediaTypes, StatusType } from './types'

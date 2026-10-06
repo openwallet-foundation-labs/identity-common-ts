@@ -7,6 +7,7 @@ import {
   type StatusListJWTPayload,
   StatusType,
   verifyStatusListJwtClaims,
+  verifyStatusListJwtHeader,
 } from '@owf/token-status-list'
 import {
   type DisclosureFrame,
@@ -561,6 +562,8 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
         const statusListJWT = await fetcher(uri)
 
         const slJWT = Jwt.fromEncode<StatusListJWTHeaderParameters, StatusListJWTPayload>(statusListJWT)
+        // check that the token is a Status List Token before its signature is verified
+        verifyStatusListJwtHeader(slJWT.header ?? {})
         // check if the status list has a valid signature. Falls back to the verifier of the SD-JWT-VC.
         const statusListVerifier = this.userConfig.statusVerifier ?? this.userConfig.verifier
         if (!statusListVerifier) {
