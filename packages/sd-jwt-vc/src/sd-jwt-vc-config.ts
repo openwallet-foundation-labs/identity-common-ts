@@ -2,7 +2,27 @@ import type { SDJWTConfig, Verifier } from '@sd-jwt/core'
 import type { VCTFetcher } from './sd-jwt-vc-vct'
 
 export type StatusListFetcher = (uri: string) => Promise<string>
-export type StatusValidator = (status: number) => Promise<void>
+/** Where the status passed to a {@link StatusValidator} was read from. */
+export type StatusValidatorContext = {
+  /** URI of the status list. */
+  uri: string
+  /** Index of the credential in the status list. */
+  idx: number
+}
+
+export type StatusValidator = (status: number, context: StatusValidatorContext) => Promise<void>
+
+/** `details` of the exception with code `STATUS_INVALID` that the default status validator throws. */
+export type StatusInvalidErrorDetails = StatusValidatorContext & {
+  /** The status of the credential, e.g. `1` for invalid (revoked) or `2` for suspended. */
+  status: number
+}
+
+/** `details` of the `SLException` thrown when the status list token fails verification. */
+export type StatusListVerificationErrorDetails = {
+  /** URI of the status list. */
+  uri: string
+}
 
 /**
  * Configuration for SD-JWT-VC

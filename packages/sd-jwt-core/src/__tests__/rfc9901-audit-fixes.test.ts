@@ -140,7 +140,11 @@ describe('RFC 9901 audit fixes', () => {
         nonce: 'nonce',
         options: { currentDate: 1000, keyBindingMaxAgeSeconds: 50 },
       })
-    ).rejects.toThrow('Verify Error: Key Binding JWT is too old')
+    ).rejects.toMatchObject({
+      message: 'Verify Error: Key Binding JWT is too old',
+      code: 'KEY_BINDING_JWT_TOO_OLD',
+      details: { claim: 'iat', value: 900, currentDate: 1000, skewSeconds: 0, maxAgeSeconds: 50 },
+    })
 
     ;(kbJwt.payload as Record<string, unknown>).iat = '900'
     await expect(kbJwt.verifyKB({ verifier: () => true, payload: {}, nonce: 'nonce' })).rejects.toThrow(

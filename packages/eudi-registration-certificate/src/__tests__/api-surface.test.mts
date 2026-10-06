@@ -84,6 +84,24 @@ describe('semantic identifier initial characters', () => {
     }
   })
 
+  it('accepts a national scheme (two letters and a colon) as initial characters', () => {
+    for (const sub of ['HR:DE-HRA-6445', 'EI:SE-5567971433']) {
+      const result = validateWRPRCPayload(base().identifier(sub).build(), sub)
+
+      expect(result.valid, sub).toBe(true)
+      expect(
+        result.warnings.map((w) => w.code),
+        sub
+      ).toContain(WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
+    }
+  })
+
+  it('rejects a colon in a three-character initial', () => {
+    const result = validateWRPRCPayload(base().identifier('HRN:DE-1').build(), 'HRN:DE-1')
+
+    expect(result.errors.map((e) => e.code)).toContain(WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER)
+  })
+
   it('rejects an identifier that does not follow the semantic format', () => {
     const result = validateWRPRCPayload(base().identifier('not-a-semantic-id').build(), 'not-a-semantic-id')
 

@@ -3,7 +3,7 @@ import { exportJWK, importJWK, type JWK } from 'jose'
 import { describe, expect, test } from 'vitest'
 import { KBJwt } from '../kbjwt'
 import { type JwtPayload, KB_JWT_TYP, type KbVerifier, type kbPayload, type Signer } from '../types'
-import type { SDJWTException } from '../utils'
+import { JwtTimeClaimException, type SDJWTException } from '../utils'
 
 describe('KB JWT', () => {
   test('create', async () => {
@@ -312,7 +312,20 @@ describe('KB JWT', () => {
         nonce: 'nonce',
         options: { currentDate: 5000 },
       })
-    ).rejects.toThrow('Verify Error: JWT is expired')
+    ).rejects.toBeInstanceOf(JwtTimeClaimException)
+
+    await expect(
+      decoded.verifyKB({
+        verifier: testVerifier,
+        payload,
+        nonce: 'nonce',
+        options: { currentDate: 5000 },
+      })
+    ).rejects.toMatchObject({
+      message: 'Verify Error: Key Binding JWT is expired',
+      code: 'KEY_BINDING_JWT_EXPIRED',
+      details: { claim: 'exp', value: 1000, currentDate: 5000, skewSeconds: 0 },
+    })
   })
 
   test('verify failed with iat in the future', async () => {
@@ -360,7 +373,11 @@ describe('KB JWT', () => {
         // iat (5000) is after the current date (1000)
         options: { currentDate: 1000 },
       })
-    ).rejects.toThrow('Verify Error: JWT is not yet valid')
+    ).rejects.toMatchObject({
+      message: 'Verify Error: Key Binding JWT is not yet valid',
+      code: 'KEY_BINDING_JWT_NOT_YET_VALID',
+      details: { claim: 'iat', value: 5000, currentDate: 1000, skewSeconds: 0 },
+    })
   })
 
   test('verify failed with nbf in the future', async () => {
@@ -408,7 +425,11 @@ describe('KB JWT', () => {
         nonce: 'nonce',
         options: { currentDate: 1000 },
       })
-    ).rejects.toThrow('Verify Error: JWT is not yet valid')
+    ).rejects.toMatchObject({
+      message: 'Verify Error: Key Binding JWT is not yet valid',
+      code: 'KEY_BINDING_JWT_NOT_YET_VALID',
+      details: { claim: 'nbf', value: 5000, currentDate: 1000, skewSeconds: 0 },
+    })
   })
 
   test('verify succeeds for expired exp within the allowed skew', async () => {
