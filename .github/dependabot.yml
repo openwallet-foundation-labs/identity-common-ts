@@ -67,9 +67,9 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: Europe/Amsterdam
+    # The semver-*-days options are not supported for github-actions.
     cooldown:
       default-days: 3
-      semver-major-days: 7
     # A dependency lands in the first group it matches, so order matters.
     groups:
       # CodeQL sub-actions (init/analyze/upload-sarif) must share one version,

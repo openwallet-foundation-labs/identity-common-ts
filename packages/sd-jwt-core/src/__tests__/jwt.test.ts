@@ -2,7 +2,7 @@ import Crypto from 'node:crypto'
 import { describe, expect, test } from 'vitest'
 import { Jwt } from '../jwt'
 import type { Signer, Verifier } from '../types'
-import { base64urlEncode, SDJWTException } from '../utils'
+import { base64urlEncode, JwtTimeClaimException, SDJWTException } from '../utils'
 
 describe('JWT', () => {
   test('create', async () => {
@@ -188,15 +188,16 @@ describe('JWT', () => {
 
     const jwt = new Jwt({
       header: { alg: 'EdDSA' },
-      payload: { iat: Math.floor(Date.now() / 1000) + 100 },
+      payload: { iat: 1100 },
     })
 
-    try {
-      await jwt.verify(testVerifier)
-    } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
-      expect((e as SDJWTException).message).toBe('Verify Error: JWT is not yet valid')
-    }
+    const error = await jwt.verify(testVerifier, { currentDate: 1000 }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(JwtTimeClaimException)
+    expect(error).toMatchObject({
+      message: 'Verify Error: JWT is not yet valid',
+      code: 'JWT_NOT_YET_VALID',
+      details: { claim: 'iat', value: 1100, currentDate: 1000, skewSeconds: 0 },
+    })
   })
 
   test('verify with not before in the future', async () => {
@@ -207,15 +208,16 @@ describe('JWT', () => {
 
     const jwt = new Jwt({
       header: { alg: 'EdDSA' },
-      payload: { nbf: Math.floor(Date.now() / 1000) + 100 },
+      payload: { nbf: 1100 },
     })
 
-    try {
-      await jwt.verify(testVerifier)
-    } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
-      expect((e as SDJWTException).message).toBe('Verify Error: JWT is not yet valid')
-    }
+    const error = await jwt.verify(testVerifier, { currentDate: 1000 }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(JwtTimeClaimException)
+    expect(error).toMatchObject({
+      message: 'Verify Error: JWT is not yet valid',
+      code: 'JWT_NOT_YET_VALID',
+      details: { claim: 'nbf', value: 1100, currentDate: 1000, skewSeconds: 0 },
+    })
   })
 
   test('verify with expired', async () => {
@@ -226,17 +228,33 @@ describe('JWT', () => {
 
     const jwt = new Jwt({
       header: { alg: 'EdDSA' },
-      payload: { exp: Math.floor(Date.now() / 1000) },
+      payload: { exp: 1000 },
     })
 
-    try {
-      await jwt.verify(testVerifier, {
-        currentDate: Math.floor(Date.now() / 1000) + 100,
-      })
-    } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
-      expect((e as SDJWTException).message).toBe('Verify Error: JWT is expired')
-    }
+    const error = await jwt.verify(testVerifier, { currentDate: 1100 }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(JwtTimeClaimException)
+    expect(error).toBeInstanceOf(SDJWTException)
+    expect(error).toMatchObject({
+      name: 'JwtTimeClaimException',
+      message: 'Verify Error: JWT is expired',
+      code: 'JWT_EXPIRED',
+      details: { claim: 'exp', value: 1000, currentDate: 1100, skewSeconds: 0 },
+    })
+  })
+
+  test('verify with expired reports the allowed skew in the details', async () => {
+    const jwt = new Jwt({
+      header: { alg: 'EdDSA' },
+      payload: { exp: 1000 },
+    })
+
+    const error = await jwt.verify(async () => true, { currentDate: 1100, skewSeconds: 30 }).catch((e: unknown) => e)
+    expect((error as JwtTimeClaimException).details).toEqual({
+      claim: 'exp',
+      value: 1000,
+      currentDate: 1100,
+      skewSeconds: 30,
+    })
   })
 
   test('verify with skew', async () => {
@@ -360,9 +378,11 @@ describe('JWT', () => {
     await expect(jwt.verify(testVerifier, { currentDate: 1060, maxAgeSeconds: 60 })).resolves.toBeDefined()
 
     // exceeded maxAge
-    await expect(jwt.verify(testVerifier, { currentDate: 1061, maxAgeSeconds: 60 })).rejects.toThrow(
-      'Verify Error: JWT is too old'
-    )
+    await expect(jwt.verify(testVerifier, { currentDate: 1061, maxAgeSeconds: 60 })).rejects.toMatchObject({
+      message: 'Verify Error: JWT is too old',
+      code: 'JWT_TOO_OLD',
+      details: { claim: 'iat', value: 1000, currentDate: 1061, skewSeconds: 0, maxAgeSeconds: 60 },
+    })
 
     // exceeded maxAge but saved by skew
     await expect(

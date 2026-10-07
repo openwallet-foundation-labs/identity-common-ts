@@ -1,7 +1,10 @@
 import { nowInSeconds } from '@owf/identity-common'
 import { decodeJwt } from './decode'
+import { type JwtRole, timeClaimException } from './time-claim-error'
 import type { Base64urlString, Signer, Verifier } from './types'
 import { base64urlEncode, SDJWTException } from './utils'
+
+export type { JwtRole } from './time-claim-error'
 
 export type JwtData<Header extends Record<string, unknown>, Payload extends Record<string, unknown>> = {
   header?: Header
@@ -112,7 +115,7 @@ const validateNumericDate = (payload: Record<string, unknown>, claim: 'iat' | 'n
   const value = payload[claim]
   if (value === undefined) return undefined
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new SDJWTException(`Verify Error: JWT ${claim} must be a number`)
+    throw new SDJWTException(`Verify Error: JWT ${claim} must be a number`, { code: 'INVALID_JWT_FORMAT' })
   }
   return value
 }
@@ -130,7 +133,7 @@ const validateAudience = (payload: Record<string, unknown>, expectedAudience: st
   const audiences = getAudiences(payload.aud)
 
   if (!audiences || !expectedAudiences.some((expected) => audiences.includes(expected))) {
-    throw new SDJWTException('Verify Error: Invalid audience')
+    throw new SDJWTException('Verify Error: Invalid audience', { code: 'INVALID_AUDIENCE' })
   }
 }
 
@@ -141,7 +144,7 @@ const validateIssuer = (payload: Record<string, unknown>, expectedIssuer: string
   const iss = payload.iss
 
   if (typeof iss !== 'string' || !expectedIssuers.includes(iss)) {
-    throw new SDJWTException('Verify Error: Invalid issuer')
+    throw new SDJWTException('Verify Error: Invalid issuer', { code: 'INVALID_ISSUER' })
   }
 }
 
@@ -152,7 +155,7 @@ const validateSubject = (payload: Record<string, unknown>, expectedSubject: stri
   const sub = payload.sub
 
   if (typeof sub !== 'string' || !expectedSubjects.includes(sub)) {
-    throw new SDJWTException('Verify Error: Invalid subject')
+    throw new SDJWTException('Verify Error: Invalid subject', { code: 'INVALID_SUBJECT' })
   }
 }
 
@@ -163,11 +166,12 @@ const validateVct = (payload: Record<string, unknown>, expectedVct: string | str
   const vct = payload.vct
 
   if (typeof vct !== 'string' || !expectedVcts.includes(vct)) {
-    throw new SDJWTException('Verify Error: Invalid VCT')
+    throw new SDJWTException('Verify Error: Invalid VCT', { code: 'INVALID_VCT' })
   }
 }
 
 const validateMaxAge = (
+  role: JwtRole,
   iat: number | undefined,
   currentDate: number,
   skew: number,
@@ -176,17 +180,34 @@ const validateMaxAge = (
   if (maxAgeSeconds === undefined) return
 
   if (iat === undefined) {
-    throw new SDJWTException('Verify Error: JWT iat claim is missing')
+    throw new SDJWTException('Verify Error: JWT iat claim is missing', { code: 'MISSING_REQUIRED_CLAIMS' })
   }
 
   if (iat + maxAgeSeconds + skew < currentDate) {
-    throw new SDJWTException('Verify Error: JWT is too old')
+    throw timeClaimException(role, 'tooOld', {
+      claim: 'iat',
+      value: iat,
+      currentDate,
+      skewSeconds: skew,
+      maxAgeSeconds,
+    })
   }
 }
 
-export const validateJwtPayload = (payload: Record<string, unknown> | undefined, options?: VerifierOptions) => {
+/**
+ * Validate the registered claims of a JWT payload: the `iat`, `nbf` and `exp` times and, when the
+ * options ask for them, the maximum age, audience, issuer, subject and vct.
+ *
+ * @param role - the JWT the payload belongs to, used to name it in error messages and to pick the
+ * error codes of failed time checks. Defaults to an issuer-signed JWT.
+ */
+export const validateJwtPayload = (
+  payload: Record<string, unknown> | undefined,
+  options?: VerifierOptions,
+  role: JwtRole = 'jwt'
+) => {
   if (!payload) {
-    throw new SDJWTException('Verify Error: JWT payload is missing')
+    throw new SDJWTException('Verify Error: JWT payload is missing', { code: 'INVALID_SD_JWT' })
   }
 
   const skew = options?.skewSeconds ? options.skewSeconds : 0
@@ -196,18 +217,18 @@ export const validateJwtPayload = (payload: Record<string, unknown> | undefined,
   const exp = validateNumericDate(payload, 'exp')
 
   if (iat !== undefined && iat - skew > currentDate) {
-    throw new SDJWTException('Verify Error: JWT is not yet valid')
+    throw timeClaimException(role, 'notYetValid', { claim: 'iat', value: iat, currentDate, skewSeconds: skew })
   }
 
   if (nbf !== undefined && nbf - skew > currentDate) {
-    throw new SDJWTException('Verify Error: JWT is not yet valid')
+    throw timeClaimException(role, 'notYetValid', { claim: 'nbf', value: nbf, currentDate, skewSeconds: skew })
   }
 
   if (exp !== undefined && exp + skew <= currentDate) {
-    throw new SDJWTException('Verify Error: JWT is expired')
+    throw timeClaimException(role, 'expired', { claim: 'exp', value: exp, currentDate, skewSeconds: skew })
   }
 
-  validateMaxAge(iat, currentDate, skew, options?.maxAgeSeconds)
+  validateMaxAge(role, iat, currentDate, skew, options?.maxAgeSeconds)
   validateAudience(payload, options?.expectedAudience)
   validateIssuer(payload, options?.expectedIssuer)
   validateSubject(payload, options?.expectedSubject)
@@ -275,7 +296,7 @@ export class Jwt<
     if (this.encoded) {
       const parts = this.encoded.split('.')
       if (parts.length !== 3) {
-        throw new SDJWTException(`Invalid JWT format: ${this.encoded}`)
+        throw new SDJWTException(`Invalid JWT format: ${this.encoded}`, { code: 'INVALID_JWT_FORMAT' })
       }
       const unsignedToken = parts.slice(0, 2).join('.')
       return unsignedToken
@@ -324,10 +345,10 @@ export class Jwt<
   public async verify<T>(verifier: Verifier<T>, options?: T & VerifierOptions) {
     const alg = this.header?.alg
     if (typeof alg !== 'string' || alg === 'none') {
-      throw new SDJWTException('Verify Error: alg "none" is not allowed')
+      throw new SDJWTException('Verify Error: alg "none" is not allowed', { code: 'INVALID_JWT_SIGNATURE' })
     }
     if (options?.allowedIssuerAlgorithms && !options.allowedIssuerAlgorithms.includes(alg)) {
-      throw new SDJWTException(`Verify Error: Disallowed alg ${alg}`)
+      throw new SDJWTException(`Verify Error: Disallowed alg ${alg}`, { code: 'INVALID_JWT_SIGNATURE' })
     }
 
     if (!options?.skipJwtClaimValidation) {
@@ -335,13 +356,13 @@ export class Jwt<
     }
 
     if (!this.signature) {
-      throw new SDJWTException('Verify Error: no signature in JWT')
+      throw new SDJWTException('Verify Error: no signature in JWT', { code: 'INVALID_JWT_SIGNATURE' })
     }
     const data = this.getUnsignedToken()
 
     const verified = await verifier(data, this.signature, options)
     if (!verified) {
-      throw new SDJWTException('Verify Error: Invalid JWT Signature')
+      throw new SDJWTException('Verify Error: Invalid JWT Signature', { code: 'INVALID_JWT_SIGNATURE' })
     }
     return { payload: this.payload, header: this.header }
   }

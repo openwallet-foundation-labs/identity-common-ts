@@ -1,10 +1,10 @@
 import type { JwtPayload } from '@owf/identity-common'
-import { base64url, decodeJwt } from '@owf/identity-common'
+import { base64url, decodeJwt, isMediaType } from '@owf/identity-common'
 import type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
 import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
 import { SLException } from './status-list-exception'
-import { type StatusListEntry, StatusType } from './types'
+import { MediaTypes, type StatusListEntry, StatusType } from './types'
 
 /**
  * Decode a JWT and return the payload.
@@ -142,7 +142,32 @@ export function verifyStatusListJwtClaims(
 }
 
 /**
- * Verify the claims of a `token` and the status of an `idx` in it.
+ * Verify the JOSE header of a Status List Token in JWT format.
+ *
+ * The `typ` header is REQUIRED and MUST be `statuslist+jwt`. Without that check a JWT the issuer
+ * signed for another purpose with the same key can be presented as a status list.
+ *
+ * RFC 7515 section 4.1.9 lets a producer omit the `application/` prefix of a media type in `typ`,
+ * and requires a recipient to treat a value without a `/` as if the prefix were present. So
+ * `application/statuslist+jwt` is accepted too.
+ *
+ * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5.1
+ */
+export function verifyStatusListJwtHeader(header: { typ?: unknown }): void {
+  const typ = header.typ
+
+  if (typeof typ !== 'string') {
+    throw new SLException('The status list token has no typ header, which is required')
+  }
+
+  const mediaType = typ.includes('/') ? typ : `application/${typ}`
+  if (!isMediaType(mediaType, MediaTypes.StatusListJwt)) {
+    throw new SLException(`The typ header '${typ}' must be equal to '${JWT_STATUS_LIST_TYPE}'`)
+  }
+}
+
+/**
+ * Verify the header and the claims of a `token` and the status of an `idx` in it.
  *
  * @todo properly validate the JWT with zod + signature
  */
@@ -151,10 +176,11 @@ export function verifyStatus({
   idx,
   ...claimsOptions
 }: { token: string; idx: number } & VerifyStatusListJwtClaimsOptions) {
-  const payload = decodeJwtPayload<StatusListJWTPayload>(token)
+  const { header, payload } = decodeJwt<Record<string, unknown>, StatusListJWTPayload>(token)
   const compressed = base64url.decode(payload.status_list.lst)
   const statusList = StatusList.decompressStatusListFromBytes(compressed, payload.status_list.bits)
 
+  verifyStatusListJwtHeader(header)
   verifyStatusListJwtClaims(payload, claimsOptions)
 
   if (statusList.getStatus(idx) !== StatusType.Valid) {

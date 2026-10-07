@@ -327,8 +327,8 @@ export function validateLegalPersonWRPRC(payload: unknown): ValidationResult {
   if (result.success) {
     const sub: string = result.data.sub
     // Legal person identifiers should follow ETSI EN 319 412-1 clause 5.1.4
-    // Format: 3-letter prefix + 2-letter country code + hyphen + identifier
-    if (!/^[A-Z]{3}[A-Z]{2}-.+$/.test(sub)) {
+    // Format: 3-character prefix (or national scheme `XX:`) + 2-letter country code + hyphen + identifier
+    if (!/^(?:[A-Z]{3}|[A-Z]{2}:)[A-Z]{2}-.+$/.test(sub)) {
       warnings.push({
         path: ['sub'],
         message:
@@ -363,8 +363,8 @@ export function validateNaturalPersonWRPRC(payload: unknown): ValidationResult {
   if (result.success) {
     const sub: string = result.data.sub
     // Natural person identifiers should follow ETSI EN 319 412-1 clause 5.1.3
-    // Format: 3-letter prefix + 2-letter country code + hyphen + identifier
-    if (!/^[A-Z]{3}[A-Z]{2}-.+$/.test(sub)) {
+    // Format: 3-character prefix (or national scheme `XX:`) + 2-letter country code + hyphen + identifier
+    if (!/^(?:[A-Z]{3}|[A-Z]{2}:)[A-Z]{2}-.+$/.test(sub)) {
       warnings.push({
         path: ['sub'],
         message:
@@ -401,8 +401,9 @@ function validateSemanticIdentifier(identifier: string): {
   message: string
   unknownPrefix?: string
 } {
-  // Format: PREFIX (3 chars) + COUNTRY (2 chars) + "-" + ID
-  const match = identifier.match(/^([A-Z]{3})([A-Z]{2})-(.+)$/)
+  // Format: PREFIX (3 chars, or 2 letters + ":" for a national scheme, EN 319 412-1 LEG-5.1.4-03 (7)
+  // and NAT-5.1.3-03 (7)) + COUNTRY (2 chars) + "-" + ID
+  const match = identifier.match(/^([A-Z]{3}|[A-Z]{2}:)([A-Z]{2})-(.+)$/)
 
   if (!match) {
     return {

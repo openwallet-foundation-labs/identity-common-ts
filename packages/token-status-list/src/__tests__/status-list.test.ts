@@ -213,3 +213,39 @@ describe('StatusList', () => {
     })
   })
 })
+
+describe('status values', () => {
+  it('rejects the values from the bug report instead of corrupting neighbouring entries', () => {
+    expect(() => new StatusList([0, 0, 2, 0, 0, 1, 0, 1], 1)).toThrow(
+      'Status value out of range at index 2 with value 2, expected an integer from 0 to 1 for 1 bits per status'
+    )
+    expect(() => new StatusList([4, 0, 0, 0], 2)).toThrow('Status value out of range at index 0 with value 4')
+  })
+
+  it.each([1, 2, 4, 8] as BitsPerStatus[])('accepts 2^%i - 1 and rejects 2^bits', (bitsPerStatus) => {
+    const max = 2 ** bitsPerStatus - 1
+    expect(() => new StatusList([0, max], bitsPerStatus)).not.toThrow()
+    expect(() => new StatusList([0, max + 1], bitsPerStatus)).toThrow('Status value out of range at index 1')
+  })
+
+  it.each([-1, 1.5, Number.NaN])('rejects %d in the constructor and in setStatus', (value) => {
+    expect(() => new StatusList([0, value], 2)).toThrow('Status value out of range at index 1')
+
+    const list = new StatusList([0, 0], 2)
+    expect(() => list.setStatus(1, value)).toThrow('Status value out of range at index 1')
+    expect(list.getStatus(1)).toBe(0)
+    expect(list.isModified).toBe(false)
+  })
+
+  it('rejects a value wider than bitsPerStatus in setStatus', () => {
+    const list = new StatusList([0, 0, 0, 0, 0, 0, 0, 1], 1)
+    expect(() => list.setStatus(2, 2)).toThrow('Status value out of range at index 2 with value 2')
+    expect(StatusList.decompressStatusListFromBytes(list.compressStatusListToBytes(), 1).getStatus(7)).toBe(1)
+  })
+
+  it('rejects an invalid value written directly to the exposed list when encoding', () => {
+    const list = new StatusList([0, 0, 0, 0], 2)
+    list.statusList[1] = 4
+    expect(() => list.encodeStatusListIntoByteArray()).toThrow('Status value out of range at index 1 with value 4')
+  })
+})

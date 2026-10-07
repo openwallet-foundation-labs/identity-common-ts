@@ -10,7 +10,7 @@ export const zHttpsUrl = z.url().refine(
   { message: 'url must be an https:// url' }
 )
 
-export const zDataUrl = z.string().regex(/data:[\w/\-.]+;\w+,.*/, 'url must be a data URL')
+export const zDataUrl = z.string().regex(/data:[\w/\-.]+(\+[\w/\-.]+)?;\w+,.*/, 'url must be a data URL')
 
 export const zInteger = z.number().int()
 

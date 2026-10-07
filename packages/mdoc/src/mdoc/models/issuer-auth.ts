@@ -269,7 +269,7 @@ export class IssuerAuth extends Sign1 {
           ? 'PASSED'
           : 'FAILED',
       check: 'The MSO must be valid at the time of verification',
-      reason: `The MSO must be valid at the time of verification (${now.toUTCString()})`,
+      reason: `The MSO must be valid at the time of verification (${now.toUTCString()}); its validity period is ${validityInfo.validFrom.toUTCString()} to ${validityInfo.validUntil.toUTCString()} (allowed clock skew ${skewSeconds}s)`,
     })
 
     if (!disableCertificateChainValidation) {
