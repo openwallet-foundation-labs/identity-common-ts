@@ -14,6 +14,7 @@ import {
   type KeyAttestationJwtHeader,
   type KeyAttestationJwtPayload,
   type KeyAttestationJwtUse,
+  type KeyAttestationsRequired,
   zKeyAttestationJwtHeader,
   zKeyAttestationJwtPayloadForUse,
 } from './z-key-attestation'
@@ -160,6 +161,12 @@ export interface VerifyKeyAttestationJwtOptions {
   now?: Date
 
   /**
+   * The `key_attestations_required` value of the proof type from the credential configuration in the
+   * credential issuer metadata. If provided, the key attestation is verified against these requirements.
+   */
+  keyAttestationsRequired?: KeyAttestationsRequired
+
+  /**
    * Callbacks required for the key attestation jwt verification
    */
   callbacks: Pick<CallbackContext, 'verifyJwt'>
@@ -187,9 +194,63 @@ export async function verifyKeyAttestationJwt(options: VerifyKeyAttestationJwtOp
     now: options.now,
   })
 
+  verifyKeyAttestationRequirements({
+    keyAttestation: payload,
+    keyAttestationsRequired: options.keyAttestationsRequired,
+  })
+
   return {
     header,
     payload,
     signer,
+  }
+}
+
+export interface VerifyKeyAttestationRequirementsOptions {
+  /**
+   * The payload of the (verified) key attestation jwt that was provided in the credential request.
+   * Can be left `undefined` if no key attestation was provided.
+   */
+  keyAttestation?: Pick<KeyAttestationJwtPayload, 'key_storage' | 'user_authentication'>
+
+  /**
+   * The `key_attestations_required` value of the proof type from the credential configuration in the
+   * credential issuer metadata. If `undefined` the credential issuer does not require a key attestation.
+   */
+  keyAttestationsRequired?: KeyAttestationsRequired
+}
+
+/**
+ * Verify that a key attestation meets the requirements from the credential issuer metadata.
+ *
+ * - If `keyAttestationsRequired` is not defined, no key attestation is required
+ * - If it is defined, a key attestation MUST be provided
+ * - For `key_storage` and `user_authentication`, if the credential issuer defines accepted values the
+ *   key attestation MUST contain at least one of these values.
+ *
+ * @throws {Openid4vciError} if the key attestation does not meet the requirements
+ */
+export function verifyKeyAttestationRequirements(options: VerifyKeyAttestationRequirementsOptions) {
+  const { keyAttestation, keyAttestationsRequired } = options
+  if (!keyAttestationsRequired) return
+
+  if (!keyAttestation) {
+    throw new Openid4vciError(
+      'A key attestation is required by the credential issuer, but no key attestation was provided'
+    )
+  }
+
+  for (const claim of ['key_storage', 'user_authentication'] as const) {
+    const acceptedValues = keyAttestationsRequired[claim]
+    if (!acceptedValues) continue
+
+    const attestedValues = keyAttestation[claim] ?? []
+    if (!attestedValues.some((value) => acceptedValues.includes(value))) {
+      throw new Openid4vciError(
+        `Key attestation '${claim}' ${
+          attestedValues.length > 0 ? `values '${attestedValues.join("', '")}' do` : 'is not defined and does'
+        } not match any of the values accepted by the credential issuer: '${acceptedValues.join("', '")}'`
+      )
+    }
   }
 }

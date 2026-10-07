@@ -30,6 +30,18 @@ export const zIso18045 = z.enum(['iso_18045_high', 'iso_18045_moderate', 'iso_18
 export type Iso18045 = z.infer<typeof zIso18045>
 export const zIso18045OrStringArray = z.array(z.union([zIso18045, z.string()]))
 
+/**
+ * The `key_attestations_required` parameter of a proof type in the credential issuer metadata.
+ */
+export const zKeyAttestationsRequired = z
+  .object({
+    key_storage: zIso18045OrStringArray.optional(),
+    user_authentication: zIso18045OrStringArray.optional(),
+  })
+  .loose()
+
+export type KeyAttestationsRequired = z.infer<typeof zKeyAttestationsRequired>
+
 export const zKeyAttestationJwtPayload = z
   .object({
     ...zJwtPayload.shape,

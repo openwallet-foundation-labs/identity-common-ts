@@ -4,6 +4,24 @@ import type {
   VerificationErrorCode,
 } from '../types/verification-error'
 
+export interface SDJWTExceptionOptions {
+  /**
+   * Additional information about the failure, for example the values a failed check compared.
+   */
+  details?: unknown
+
+  /**
+   * Machine-readable reason, set for failures that callers commonly need to tell apart (for example
+   * an expired JWT), so they do not have to parse the message.
+   */
+  code?: VerificationErrorCode
+
+  /**
+   * The error that caused this one.
+   */
+  cause?: unknown
+}
+
 export class SDJWTException extends Error {
   public details?: unknown
 
@@ -13,12 +31,18 @@ export class SDJWTException extends Error {
    */
   public code?: VerificationErrorCode
 
-  constructor(message: string, details?: unknown, code?: VerificationErrorCode) {
+  /**
+   * The error that caused this one, when there is one.
+   */
+  public cause?: unknown
+
+  constructor(message: string, options: SDJWTExceptionOptions = {}) {
     super(message)
     Object.setPrototypeOf(this, SDJWTException.prototype)
     this.name = 'SDJWTException'
-    this.details = details
-    this.code = code
+    this.details = options.details
+    this.code = options.code
+    if (options.cause !== undefined) this.cause = options.cause
   }
 
   getFullMessage(): string {
@@ -35,8 +59,11 @@ export class JwtTimeClaimException extends SDJWTException {
   declare details: JwtTimeClaimErrorDetails
   declare code: JwtTimeClaimErrorCode
 
-  constructor(message: string, details: JwtTimeClaimErrorDetails, code: JwtTimeClaimErrorCode) {
-    super(message, details, code)
+  constructor(
+    message: string,
+    options: SDJWTExceptionOptions & { details: JwtTimeClaimErrorDetails; code: JwtTimeClaimErrorCode }
+  ) {
+    super(message, options)
     Object.setPrototypeOf(this, JwtTimeClaimException.prototype)
     this.name = 'JwtTimeClaimException'
   }

@@ -6,7 +6,14 @@ import {
   StatusList,
   type StatusListJWTHeaderParameters,
 } from '@owf/token-status-list'
-import { type DisclosureFrame, type JwtPayload, JwtTimeClaimException, type Signer, type Verifier } from '@sd-jwt/core'
+import {
+  type DisclosureFrame,
+  type JwtPayload,
+  JwtTimeClaimException,
+  SDJWTException,
+  type Signer,
+  type Verifier,
+} from '@sd-jwt/core'
 import { SignJWT } from 'jose'
 import { describe, expect, test, vi } from 'vitest'
 import { SDJwtVcInstance } from '..'
@@ -192,6 +199,85 @@ describe('Revocation', () => {
     expect(statusValidator).toHaveBeenCalledWith(1, { uri: 'https://example.com/status-list', idx: 6 })
   })
 
+  test('safeVerify reports a revoked credential as STATUS_INVALID', async () => {
+    const claims = {
+      firstname: 'John',
+      status: {
+        status_list: {
+          uri: 'https://example.com/status-list',
+          idx: 1,
+        },
+      },
+    }
+    const encodedSdjwt = await sdjwt.issue({ iat, iss, vct, ...claims })
+    const result = await sdjwt.safeVerify(encodedSdjwt)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.map((e) => e.code)).toEqual(['STATUS_INVALID'])
+    }
+  })
+
+  test('safeVerify uses the error code from a custom status validator', async () => {
+    const sdjwtWithValidator = new SDJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      statusListFetcher: () => Promise.resolve(statusListJWT),
+      statusVerifier: async (data: string, sig: string) =>
+        Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
+      statusValidator: async (status: number) => {
+        if (status !== 0)
+          throw new SDJWTException('Credential has been revoked', { details: { status }, code: 'STATUS_INVALID' })
+      },
+    })
+    const claims = {
+      firstname: 'John',
+      status: {
+        status_list: {
+          uri: 'https://example.com/status-list',
+          idx: 1,
+        },
+      },
+    }
+    const encodedSdjwt = await sdjwtWithValidator.issue({ iat, iss, vct, ...claims })
+    const result = await sdjwtWithValidator.safeVerify(encodedSdjwt)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.map((e) => e.code)).toEqual(['STATUS_INVALID'])
+    }
+  })
+
+  test.each([
+    [new SDJWTException('Type metadata does not match', { code: 'INVALID_VCT' }), 'INVALID_VCT'],
+    [new Error('Type metadata could not be fetched'), 'VCT_VERIFICATION_FAILED'],
+  ])('safeVerify keeps the code of a failed type metadata check: %s', async (error, expectedCode) => {
+    const { signer, verifier } = createSignerVerifier()
+    const sdjwtWithVct = new SDJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      loadTypeMetadataFormat: true,
+      vctFetcher: async () => {
+        throw error
+      },
+    })
+    const encodedSdjwt = await sdjwtWithVct.issue({ iat, iss, vct, firstname: 'John' })
+    const result = await sdjwtWithVct.safeVerify(encodedSdjwt)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.map((e) => e.code)).toEqual([expectedCode])
+    }
+  })
+
   test('Test with a revoked credential but status verification disabled', async () => {
     const claims = {
       firstname: 'John',
@@ -228,6 +314,42 @@ describe('Revocation', () => {
     )
   })
 
+  test('Test with a status list token whose typ header is not statuslist+jwt', async () => {
+    const { header, payload } = createHeaderAndPayload(
+      new StatusList([0, 0], 1),
+      { iss: 'https://example.com', sub: 'https://example.com/status-list', iat },
+      { alg: 'EdDSA', typ: 'statuslist+jwt' }
+    )
+    // `createHeaderAndPayload` always sets the typ, so the wrong typ is set on the protected header instead
+    const wrongTypStatusListJWT = await new SignJWT(payload)
+      .setProtectedHeader({ ...header, typ: 'JWT' })
+      .sign(statusListPrivateKey)
+
+    const { signer, verifier } = createSignerVerifier()
+    const sdjwtWithWrongTyp = new SDJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      statusListFetcher: () => Promise.resolve(wrongTypStatusListJWT),
+      statusVerifier: async (data: string, sig: string) =>
+        Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
+    })
+
+    const expectedPayload: SdJwtVcPayload = {
+      iat,
+      iss,
+      vct,
+      status: { status_list: { uri: 'https://example.com/status-list', idx: 0 } },
+    }
+    const encodedSdjwt = await sdjwtWithWrongTyp.issue(expectedPayload)
+    await expect(sdjwtWithWrongTyp.verify(encodedSdjwt)).rejects.toThrowError(
+      "The typ header 'JWT' must be equal to 'statuslist+jwt'"
+    )
+  })
+
   test('Test with the verifier used for the status list when no status verifier is provided', async () => {
     // the status list is signed with the same key as the credential
     const statusList = new StatusList([0, 1], 1)
@@ -258,6 +380,35 @@ describe('Revocation', () => {
     const encodedSdjwt = await sdjwtWithoutStatusVerifier.issue(expectedPayload)
     const result = await sdjwtWithoutStatusVerifier.verify(encodedSdjwt)
     expect(result).toBeDefined()
+  })
+
+  test('Test with the verification options passed to the status verifier', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    // the key of the status list issuer is passed with the verification options
+    const sdjwtWithKeyFromOptions = new SDJwtVcInstance<{ statusListKey: Crypto.KeyObject }>({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      statusListFetcher: () => Promise.resolve(statusListJWT),
+      statusVerifier: async (data, sig, options) => {
+        if (!options) return false
+        return Crypto.verify(null, Buffer.from(data), options.statusListKey, Buffer.from(sig, 'base64url'))
+      },
+    })
+
+    const expectedPayload: SdJwtVcPayload = {
+      iat,
+      iss,
+      vct,
+      status: { status_list: { uri: 'https://example.com/status-list', idx: 0 } },
+    }
+    const encodedSdjwt = await sdjwtWithKeyFromOptions.issue(expectedPayload)
+    await expect(
+      sdjwtWithKeyFromOptions.verify(encodedSdjwt, { statusListKey: statusListPublicKey })
+    ).resolves.toBeDefined()
   })
 
   test('test to fetch the statuslist', async () => {

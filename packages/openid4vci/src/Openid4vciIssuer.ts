@@ -140,7 +140,7 @@ export class Openid4vciIssuer {
   public async verifyCredentialRequestJwtProof(
     options: Pick<
       VerifyCredentialRequestJwtProofOptions,
-      'clientId' | 'jwt' | 'now' | 'expectedNonce' | 'nonceExpiresAt'
+      'clientId' | 'jwt' | 'now' | 'expectedNonce' | 'nonceExpiresAt' | 'keyAttestationsRequired'
     > & {
       issuerMetadata: IssuerMetadataResult
     }
@@ -154,6 +154,7 @@ export class Openid4vciIssuer {
         jwt: options.jwt,
         clientId: options.clientId,
         now: options.now,
+        keyAttestationsRequired: options.keyAttestationsRequired,
       })
     } catch (error) {
       throw new Oauth2ServerErrorResponseError(
@@ -181,7 +182,7 @@ export class Openid4vciIssuer {
   public async verifyCredentialRequestAttestationProof(
     options: Pick<
       VerifyCredentialRequestAttestationProofOptions,
-      'keyAttestationJwt' | 'expectedNonce' | 'nonceExpiresAt' | 'now'
+      'keyAttestationJwt' | 'expectedNonce' | 'nonceExpiresAt' | 'now' | 'keyAttestationsRequired'
     > & {
       issuerMetadata: IssuerMetadataResult
     }
@@ -193,6 +194,7 @@ export class Openid4vciIssuer {
         keyAttestationJwt: options.keyAttestationJwt,
         nonceExpiresAt: options.nonceExpiresAt,
         now: options.now,
+        keyAttestationsRequired: options.keyAttestationsRequired,
       })
     } catch (error) {
       throw new Oauth2ServerErrorResponseError(
@@ -285,6 +287,8 @@ export class Openid4vciIssuer {
     try {
       return parseDeferredCredentialRequest(options)
     } catch (error) {
+      if (error instanceof Oauth2ServerErrorResponseError) throw error
+
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidCredentialRequest,

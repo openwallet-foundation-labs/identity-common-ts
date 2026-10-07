@@ -29,5 +29,8 @@ export const timeClaimException = (
   details: JwtTimeClaimErrorDetails
 ): JwtTimeClaimException => {
   const errors = TIME_CLAIM_ERRORS[role]
-  return new JwtTimeClaimException(`Verify Error: ${errors.name} ${PROBLEMS[failure]}`, details, errors[failure])
+  return new JwtTimeClaimException(`Verify Error: ${errors.name} ${PROBLEMS[failure]}`, {
+    details,
+    code: errors[failure],
+  })
 }

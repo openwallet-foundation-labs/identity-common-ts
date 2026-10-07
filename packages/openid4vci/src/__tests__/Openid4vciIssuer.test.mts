@@ -256,6 +256,94 @@ describe('Openid4vciIssuer', () => {
       },
     })
 
+    // Key attestation meets the requirements from the issuer metadata
+    await expect(
+      issuer.verifyCredentialRequestJwtProof({
+        expectedNonce: 'some-nonce',
+        issuerMetadata,
+        jwt: credentialRequestJwt,
+        keyAttestationsRequired: { key_storage: ['iso_18045_high'], user_authentication: ['iso_18045_high'] },
+      })
+    ).resolves.toBeDefined()
+
+    // Key attestation does not meet the requirements from the issuer metadata
+    await expect(
+      issuer.verifyCredentialRequestJwtProof({
+        expectedNonce: 'some-nonce',
+        issuerMetadata,
+        jwt: credentialRequestJwt,
+        keyAttestationsRequired: { key_storage: ['iso_18045_moderate'] },
+      })
+    ).rejects.toMatchObject({
+      errorResponse: {
+        error: 'invalid_proof',
+        error_description:
+          "Key attestation 'key_storage' values 'iso_18045_high' do not match any of the values accepted by the credential issuer: 'iso_18045_moderate'",
+      },
+    })
+
+    // Key attestation is required, but the proof does not contain one
+    const credentialRequestJwtWithoutKeyAttestation = await createCredentialRequestJwtProof({
+      callbacks: {
+        ...callbacks,
+        signJwt: getSignJwtCallback([credentialRequestProofJwk]),
+      },
+      credentialIssuer: credentialIssuerMetadata.credential_issuer,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: credentialRequestProofJwkPublic,
+      },
+      nonce: 'some-nonce',
+    })
+    await expect(
+      issuer.verifyCredentialRequestJwtProof({
+        expectedNonce: 'some-nonce',
+        issuerMetadata,
+        jwt: credentialRequestJwtWithoutKeyAttestation,
+        keyAttestationsRequired: {},
+      })
+    ).rejects.toMatchObject({
+      errorResponse: {
+        error: 'invalid_proof',
+        error_description:
+          'A key attestation is required by the credential issuer, but no key attestation was provided',
+      },
+    })
+
+    // The requirements are also verified for the attestation proof type
+    const attestationProof = await createKeyAttestationJwt({
+      callbacks: {
+        ...callbacks,
+        signJwt: getSignJwtCallback([keyAttestationJwk]),
+      },
+      attestedKeys: [credentialRequestProofJwkPublic],
+      use: 'proof_type.attestation',
+      keyStorage: ['iso_18045_basic'],
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: keyAttestationJwkPublic,
+      },
+      nonce: 'some-nonce',
+    })
+    await expect(
+      issuer.verifyCredentialRequestAttestationProof({
+        expectedNonce: 'some-nonce',
+        issuerMetadata,
+        keyAttestationJwt: attestationProof,
+        keyAttestationsRequired: { key_storage: ['iso_18045_basic'] },
+      })
+    ).resolves.toBeDefined()
+    await expect(
+      issuer.verifyCredentialRequestAttestationProof({
+        expectedNonce: 'some-nonce',
+        issuerMetadata,
+        keyAttestationJwt: attestationProof,
+        keyAttestationsRequired: { key_storage: ['iso_18045_high'] },
+      })
+    ).rejects.toMatchObject({ errorResponse: { error: 'invalid_proof' } })
+
     const { credentialResponse } = await issuer.createCredentialResponse({
       cNonce: 'some-new-nonce',
       cNonceExpiresInSeconds: 500,
