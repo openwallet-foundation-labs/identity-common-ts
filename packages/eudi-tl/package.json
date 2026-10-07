@@ -43,7 +43,7 @@
     "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
   },
   "dependencies": {
-    "@owf/identity-common": "workspace:*",
+    "@owf/identity-common": "workspace:^",
     "@peculiar/asn1-schema": "catalog:",
     "@peculiar/asn1-x509": "catalog:",
     "@xmldom/xmldom": "^0.9.12",

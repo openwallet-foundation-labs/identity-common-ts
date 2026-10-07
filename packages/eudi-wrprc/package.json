@@ -42,9 +42,9 @@
     "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
   },
   "dependencies": {
-    "@owf/crypto": "workspace:*",
+    "@owf/crypto": "workspace:^",
     "@owf/eudi-jades": "workspace:*",
-    "@owf/identity-common": "workspace:*",
+    "@owf/identity-common": "workspace:^",
     "zod": "catalog:"
   }
 }
