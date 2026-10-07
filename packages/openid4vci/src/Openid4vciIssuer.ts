@@ -285,6 +285,8 @@ export class Openid4vciIssuer {
     try {
       return parseDeferredCredentialRequest(options)
     } catch (error) {
+      if (error instanceof Oauth2ServerErrorResponseError) throw error
+
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidCredentialRequest,

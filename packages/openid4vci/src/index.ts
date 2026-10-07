@@ -21,6 +21,7 @@ export type {
   RetrieveCredentialsResponseNotOk,
   RetrieveCredentialsResponseOk,
 } from './credential-request/retrieve-credentials'
+export { verifyCredentialResponseEncryption } from './credential-request/verify-credential-response-encryption'
 export type {
   CredentialRequest,
   CredentialRequestFormatSpecific,
