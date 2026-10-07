@@ -1,11 +1,24 @@
 import 'reflect-metadata'
 import nodeCrypto from 'node:crypto'
+import { DataItem } from '@owf/cose'
+import { hex } from '@owf/identity-common'
 import * as x509 from '@peculiar/x509'
 import { describe, expect, test } from 'vitest'
-import { CoseKey, DeviceKey, Holder, Issuer, SignatureAlgorithm, type VerificationAssessment } from '../..'
-import { DEVICE_JWK_PUBLIC } from '../config'
+import {
+  CoseKey,
+  cborDecode,
+  cborEncode,
+  DeviceKey,
+  Holder,
+  Issuer,
+  IssuerAuth,
+  IssuerSigned,
+  SignatureAlgorithm,
+  type VerificationAssessment,
+} from '../..'
+import { DEVICE_JWK_PUBLIC, ISSUER_PRIVATE_KEY_JWK } from '../config'
 import { mdocContext } from '../context'
-import { createIssuerSigned, mdlDocType, mdlNamespace } from '../iso-mdoc-dc-api/fixtures'
+import { createIssuerSigned, issuerCertificate, mdlDocType, mdlNamespace } from '../iso-mdoc-dc-api/fixtures'
 
 x509.cryptoProvider.set(nodeCrypto.webcrypto as unknown as Crypto)
 
@@ -126,6 +139,31 @@ describe('issuer auth checks', () => {
       status: 'FAILED',
       reason: `The MSO must be valid at the time of verification (${now.toUTCString()}); its validity period is ${validFrom.toUTCString()} to ${validUntil.toUTCString()} (allowed clock skew 30s)`,
     })
+  })
+
+  test('an MSO with a null status verifies as signed', async () => {
+    const { issuerAuth, issuerNamespaces } = await createIssuerSigned()
+    const mobileSecurityObject = cborDecode<Map<string, unknown>>(issuerAuth.mobileSecurityObject.encode())
+    const issuerSignedBytes = IssuerSigned.create({
+      issuerNamespaces,
+      issuerAuth: await IssuerAuth.create({
+        protectedHeaders: issuerAuth.protectedHeaders,
+        unprotectedHeaders: issuerAuth.unprotectedHeaders,
+        payload: cborEncode(DataItem.fromData(mobileSecurityObject.set('status', null))),
+      }).sign(
+        { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+        mdocContext.cose.sign1
+      ),
+    }).encode()
+
+    const issuerSigned = IssuerSigned.decode(issuerSignedBytes)
+    expect(issuerSigned.issuerAuth.mobileSecurityObject.status).toBeUndefined()
+    await expect(
+      Holder.verifyIssuerSigned({ issuerSigned, trustedCertificates: [{ issuance: [issuerCertificate] }] }, mdocContext)
+    ).resolves.toBeDefined()
+
+    // Forwarding the decoded issuer signed keeps the null the issuer signed.
+    expect(hex.encode(issuerSigned.encode())).toBe(hex.encode(issuerSignedBytes))
   })
 
   test('issuing_country is checked against the subject of the DS certificate, not its issuer', async () => {

@@ -55,8 +55,13 @@ export class MobileSecurityObject extends CborStructure<
           ValidityInfo.fromEncodedStructure(input.get('validityInfo') as ValidityInfoEncodedStructure)
         )
 
-        if (input.has('status')) {
-          map.set('status', Status.fromEncodedStructure(input.get('status') as StatusEncodedStructure))
+        const status = input.get('status')
+        if (status === null) {
+          // NOTE: null is NOT allowed, but Apple Wallet's developer mDLs send it. Status is optional, so we
+          // read null as absent and drop the entry TypedMap.fromMap copied.
+          map.delete('status')
+        } else if (input.has('status')) {
+          map.set('status', Status.fromEncodedStructure(status as StatusEncodedStructure))
         }
 
         return map
