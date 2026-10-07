@@ -86,6 +86,11 @@ const credentialIssuerMetadata = issuer.createCredentialIssuerMetadata({
   credential_endpoint: 'https://oid4vc-ts-issuer.com/credential',
   deferred_credential_endpoint: 'https://oid4vc-ts-issuer.com/deferred-credential',
   credential_configurations_supported: credentialConfigurationsSupported,
+  credential_response_encryption: {
+    alg_values_supported: ['RSA-OAEP'],
+    enc_values_supported: ['A256GCM'],
+    encryption_required: false,
+  },
 })
 
 const issuerMetadata = {

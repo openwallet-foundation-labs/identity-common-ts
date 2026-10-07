@@ -1,5 +1,21 @@
 # @openid4vc/openid4vci
 
+## 0.7.0
+
+### Minor Changes
+
+- 736fc56: BREAKING: `parseCredentialRequest` now checks the `credential_response_encryption` of the request against the `credential_response_encryption` of the issuer metadata, and rejects it with `invalid_encryption_parameters` when encryption is required but missing, when the issuer does not advertise encryption, or when the `alg`, `enc` or `zip` value is not supported. Issuers that encrypt credential responses must advertise `credential_response_encryption` in their metadata. `parseDeferredCredentialRequest` (and `Openid4vciIssuer.parseDeferredCredentialRequest`) now requires `issuerMetadata` and performs the same check. The check is also exported as `verifyCredentialResponseEncryption`, and the issuer metadata schema accepts `zip_values_supported`.
+
+### Patch Changes
+
+- c6a2562: Verify that a key attestation meets the `key_attestations_required` (`key_storage` and `user_authentication`) from the credential issuer metadata. Pass `keyAttestationsRequired` to the jwt and attestation proof verification (also on `Openid4vciIssuer`), or call `verifyKeyAttestationRequirements` directly.
+- Updated dependencies [1beaa04]
+- Updated dependencies [5d2179b]
+- Updated dependencies [222ed67]
+- Updated dependencies [c0107e4]
+  - @openid4vc/oauth2@0.7.0
+  - @openid4vc/utils@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

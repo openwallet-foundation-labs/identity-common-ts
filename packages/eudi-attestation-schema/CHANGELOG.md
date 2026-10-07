@@ -1,5 +1,18 @@
 # @owf/eudi-attestation-schema
 
+## 0.4.2
+
+### Patch Changes
+
+- Updated dependencies [b020b40]
+- Updated dependencies [1dd14dc]
+- Updated dependencies [1cd910e]
+- Updated dependencies [f599719]
+- Updated dependencies [3b15c07]
+  - @sd-jwt/sd-jwt-vc@0.22.0
+  - @owf/crypto@0.4.2
+  - @owf/identity-common@0.4.2
+
 ## 0.4.1
 
 ### Patch Changes

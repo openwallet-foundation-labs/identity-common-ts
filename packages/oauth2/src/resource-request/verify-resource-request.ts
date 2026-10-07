@@ -188,7 +188,7 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
         expectedJwkThumbprint: tokenPayload.cnf?.jkt,
         allowedSigningAlgs: authorizationServer.dpop_signing_alg_values_supported,
         maxProofAgeSeconds: options.dpop?.maxProofAgeSeconds,
-        allowedClockSkewSeconds: options.dpop?.allowedClockSkewSeconds,
+        allowedSkewInSeconds: options.dpop?.allowedSkewInSeconds,
         assertJtiUniqueness: options.dpop?.assertJtiUniqueness,
       })
       dpopJwk = decodedDpopJwt.header.jwk

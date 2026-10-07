@@ -3,7 +3,7 @@ import { exportJWK, importJWK, type JWK } from 'jose'
 import { describe, expect, test } from 'vitest'
 import { KBJwt } from '../kbjwt'
 import { type JwtPayload, KB_JWT_TYP, type KbVerifier, type kbPayload, type Signer } from '../types'
-import type { SDJWTException } from '../utils'
+import { JwtTimeClaimException, type SDJWTException } from '../utils'
 
 describe('KB JWT', () => {
   test('create', async () => {
@@ -312,7 +312,20 @@ describe('KB JWT', () => {
         nonce: 'nonce',
         options: { currentDate: 5000 },
       })
-    ).rejects.toThrow('Verify Error: JWT is expired')
+    ).rejects.toBeInstanceOf(JwtTimeClaimException)
+
+    await expect(
+      decoded.verifyKB({
+        verifier: testVerifier,
+        payload,
+        nonce: 'nonce',
+        options: { currentDate: 5000 },
+      })
+    ).rejects.toMatchObject({
+      message: 'Verify Error: Key Binding JWT is expired',
+      code: 'KEY_BINDING_JWT_EXPIRED',
+      details: { claim: 'exp', value: 1000, currentDate: 5000, skewSeconds: 0 },
+    })
   })
 
   test('verify failed with iat in the future', async () => {
@@ -360,7 +373,11 @@ describe('KB JWT', () => {
         // iat (5000) is after the current date (1000)
         options: { currentDate: 1000 },
       })
-    ).rejects.toThrow('Verify Error: JWT is not yet valid')
+    ).rejects.toMatchObject({
+      message: 'Verify Error: Key Binding JWT is not yet valid',
+      code: 'KEY_BINDING_JWT_NOT_YET_VALID',
+      details: { claim: 'iat', value: 5000, currentDate: 1000, skewSeconds: 0 },
+    })
   })
 
   test('verify failed with nbf in the future', async () => {
@@ -408,7 +425,11 @@ describe('KB JWT', () => {
         nonce: 'nonce',
         options: { currentDate: 1000 },
       })
-    ).rejects.toThrow('Verify Error: JWT is not yet valid')
+    ).rejects.toMatchObject({
+      message: 'Verify Error: Key Binding JWT is not yet valid',
+      code: 'KEY_BINDING_JWT_NOT_YET_VALID',
+      details: { claim: 'nbf', value: 5000, currentDate: 1000, skewSeconds: 0 },
+    })
   })
 
   test('verify succeeds for expired exp within the allowed skew', async () => {
@@ -509,5 +530,52 @@ describe('KB JWT', () => {
         nonce: 'nonce',
       })
     ).rejects.toThrow('Invalid Key Binding Jwt')
+  })
+
+  test('verify checks allowedKeyBindingAlgorithms instead of allowedIssuerAlgorithms', async () => {
+    const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
+    const testSigner: Signer = async (data: string) => {
+      const sig = Crypto.sign(null, Buffer.from(data), privateKey)
+      return Buffer.from(sig).toString('base64url')
+    }
+
+    const payload = {
+      cnf: {
+        jwk: await exportJWK(publicKey),
+      },
+    }
+    const testVerifier: KbVerifier = async (data: string, sig: string, payload: JwtPayload) => {
+      const publicKey = payload.cnf?.jwk
+      return Crypto.verify(
+        null,
+        Buffer.from(data),
+        (await importJWK(publicKey as JWK, 'EdDSA')) as KeyLike,
+        Buffer.from(sig, 'base64url')
+      )
+    }
+
+    const kbJwt = new KBJwt({
+      header: {
+        typ: KB_JWT_TYP,
+        alg: 'EdDSA',
+      },
+      payload: {
+        iat: 1,
+        aud: 'aud',
+        nonce: 'nonce',
+        sd_hash: 'hash',
+      },
+    })
+    const encodedKbJwt = await kbJwt.sign(testSigner)
+    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const verifyKB = (options: Record<string, unknown>) =>
+      decoded.verifyKB({ verifier: testVerifier, payload, nonce: 'nonce', options })
+
+    // The holder may use other algorithms than the issuer
+    await expect(verifyKB({ allowedIssuerAlgorithms: ['ES256'] })).resolves.toBeDefined()
+    await expect(verifyKB({ allowedKeyBindingAlgorithms: ['EdDSA'] })).resolves.toBeDefined()
+    await expect(verifyKB({ allowedKeyBindingAlgorithms: ['ES256'] })).rejects.toThrow(
+      'Verify Error: Disallowed Key Binding alg EdDSA'
+    )
   })
 })

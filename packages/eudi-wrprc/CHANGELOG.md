@@ -1,5 +1,14 @@
 # @owf/eudi-wrprc
 
+## 0.4.2
+
+### Patch Changes
+
+- e6fdf57: Accept national schemes (two letters and `:`, e.g. `HR:DE-...`) as semantic identifier initial characters in `sub`, as allowed by ETSI EN 319 412-1 LEG-5.1.4-03 (7) and NAT-5.1.3-03 (7). They produce the existing unknown-prefix warning instead of an error.
+- @owf/eudi-jades@0.4.2
+  - @owf/crypto@0.4.2
+  - @owf/identity-common@0.4.2
+
 ## 0.4.1
 
 ### Patch Changes

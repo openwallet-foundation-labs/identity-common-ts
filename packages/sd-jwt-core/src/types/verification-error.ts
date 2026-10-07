@@ -19,10 +19,25 @@ export type VerificationErrorCode =
   | 'KEY_BINDING_VERIFIER_NOT_FOUND'
   | 'KEY_BINDING_SIGNATURE_INVALID'
   | 'KEY_BINDING_SD_HASH_INVALID'
+  | 'KEY_BINDING_JWT_NOT_YET_VALID'
+  | 'KEY_BINDING_JWT_EXPIRED'
+  | 'KEY_BINDING_JWT_TOO_OLD'
   | 'STATUS_VERIFICATION_FAILED'
   | 'STATUS_INVALID'
   | 'VCT_VERIFICATION_FAILED'
   | 'UNKNOWN_ERROR'
+
+/**
+ * Codes of a failed `iat`, `nbf`, `exp` or maximum age check, for the issuer-signed JWT and for the
+ * Key Binding JWT.
+ */
+export type JwtTimeClaimErrorCode =
+  | 'JWT_NOT_YET_VALID'
+  | 'JWT_EXPIRED'
+  | 'JWT_TOO_OLD'
+  | 'KEY_BINDING_JWT_NOT_YET_VALID'
+  | 'KEY_BINDING_JWT_EXPIRED'
+  | 'KEY_BINDING_JWT_TOO_OLD'
 
 /**
  * Represents a single verification error.
@@ -58,3 +73,20 @@ export type SafeVerifyResult<T> =
       data?: never
       errors: VerificationError[]
     }
+
+/**
+ * The values a failed `iat`, `nbf`, `exp` or maximum age check compared, in the `details` of a
+ * `JwtTimeClaimException`. Times are in seconds since the epoch.
+ */
+export type JwtTimeClaimErrorDetails = {
+  /** The claim that failed the check. */
+  claim: 'iat' | 'nbf' | 'exp'
+  /** The claim value. */
+  value: number
+  /** The time the claim was compared against. */
+  currentDate: number
+  /** The clock skew that was allowed. */
+  skewSeconds: number
+  /** The maximum age, set when the JWT was rejected for being older than that. */
+  maxAgeSeconds?: number
+}

@@ -1,5 +1,17 @@
 # @owf/token-status-list
 
+## 0.4.2
+
+### Patch Changes
+
+- f599719: Verify the `typ` header of a Status List Token in JWT format. Token Status List requires the header to be `statuslist+jwt`, and requires a relying party to check it. `application/statuslist+jwt` is accepted too, as RFC 7515 section 4.1.9 requires of a recipient.
+  
+  - `@owf/token-status-list`: new `verifyStatusListJwtHeader`, which `verifyStatus` now calls before the claims.
+  - `@sd-jwt/sd-jwt-vc`: `verify` and `safeVerify` reject a status list token with a missing or wrong `typ` header, before its signature is verified.
+- f2aaf3e: `StatusList` rejects status values that do not fit in `bitsPerStatus` bits instead of encoding them into the neighbouring entries. The constructor, `setStatus` and the encoder accept only integers from 0 to `2 ** bitsPerStatus - 1`, so for example a suspension (`2`) on a list with 1 bit per status now throws an `SLException`. Previously the constructor accepted `2 ** bitsPerStatus`, and negative or non-integer values were not checked at all.
+- @owf/cose@0.4.2
+  - @owf/identity-common@0.4.2
+
 ## 0.4.1
 
 ### Patch Changes

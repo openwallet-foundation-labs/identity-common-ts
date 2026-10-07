@@ -1,6 +1,6 @@
 {
   "name": "@openid4vc/openid4vci",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "OpenID for Verifiable Credential Issuance (OpenID4VCI) implementation",
   "files": [
     "dist"

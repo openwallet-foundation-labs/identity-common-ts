@@ -152,6 +152,7 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
       .object({
         alg_values_supported: z.array(z.string()),
         enc_values_supported: z.array(z.string()),
+        zip_values_supported: z.array(z.string()).optional(),
         encryption_required: z.boolean(),
       })
       .loose()

@@ -9,18 +9,22 @@ const uri = 'https://example.com/statuslists/1'
 const seconds = (date: number) => Math.floor(date / 1000)
 
 /**
- * A Status List Token in JWT format. `claims` is merged over the claims a conformant token carries,
- * so a claim can be overridden, or dropped by setting it to `undefined`.
+ * A Status List Token in JWT format. `claims` and `header` are merged over the claims and the header
+ * a conformant token carries, so a claim can be overridden, or dropped by setting it to `undefined`.
  *
  * The signature is not inspected by `verifyStatus`; callers verify it separately.
  */
-const statusListToken = (claims: Record<string, unknown> = {}, revokedIndexes: Array<number> = []) => {
+const statusListToken = (
+  claims: Record<string, unknown> = {},
+  revokedIndexes: Array<number> = [],
+  header: Record<string, unknown> = {}
+) => {
   const statusList = new StatusList(new Array(10).fill(StatusType.Valid), 1)
   for (const index of revokedIndexes) statusList.setStatus(index, StatusType.Invalid)
 
   const encode = (value: unknown) => base64url.encode(stringToBytes(JSON.stringify(value)))
 
-  return `${encode({ alg: 'ES256', typ: JWT_STATUS_LIST_TYPE })}.${encode({
+  return `${encode({ alg: 'ES256', typ: JWT_STATUS_LIST_TYPE, ...header })}.${encode({
     sub: uri,
     iat: seconds(Date.now() - 60_000),
     ...claims,
@@ -37,6 +41,25 @@ describe('verifyStatus (JWT)', () => {
   // different uri.
   it('accepts a token whose claims are in order', () => {
     expect(verifyStatus({ uri, idx: 0, token: statusListToken() })).toStrictEqual(true)
+  })
+
+  it('rejects a token without a typ header', () => {
+    expect(() => verifyStatus({ uri, idx: 0, token: statusListToken({}, [], { typ: undefined }) })).toThrow(
+      'has no typ header'
+    )
+  })
+
+  it('rejects a token whose typ header is not statuslist+jwt', () => {
+    expect(() => verifyStatus({ uri, idx: 0, token: statusListToken({}, [], { typ: 'JWT' }) })).toThrow(
+      "The typ header 'JWT' must be equal to 'statuslist+jwt'"
+    )
+  })
+
+  // RFC 7515 section 4.1.9: a recipient treats a `typ` without a `/` as if `application/` were prepended
+  it('accepts a typ header with the application/ prefix', () => {
+    const token = statusListToken({}, [], { typ: 'application/statuslist+jwt' })
+
+    expect(verifyStatus({ uri, idx: 0, token })).toStrictEqual(true)
   })
 
   it('rejects a token without a subject', () => {

@@ -3,6 +3,19 @@ import { SLException } from './status-list-exception'
 import type { BitsPerStatus, StatusType } from './types'
 
 /**
+ * A status takes exactly `bitsPerStatus` bits, so it must be an integer from 0 to 2^bitsPerStatus - 1.
+ * A wider value would shift the neighbouring entries of the same byte when encoded.
+ */
+function assertStatusValue(value: number, bitsPerStatus: BitsPerStatus, index: number): void {
+  const max = 2 ** bitsPerStatus - 1
+  if (!Number.isInteger(value) || value < 0 || value > max) {
+    throw new SLException(
+      `Status value out of range at index ${index} with value ${value}, expected an integer from 0 to ${max} for ${bitsPerStatus} bits per status`
+    )
+  }
+}
+
+/**
  * StatusList is a class that manages a list of statuses with variable bit size.
  */
 export class StatusList {
@@ -17,9 +30,7 @@ export class StatusList {
       throw new SLException('bitsPerStatus must be 1, 2, 4, or 8')
     }
     for (let i = 0; i < statusList.length; i++) {
-      if (statusList[i] > 2 ** bitsPerStatus) {
-        throw new SLException(`Status value out of range at index ${i} with value ${statusList[i]}`)
-      }
+      assertStatusValue(statusList[i], bitsPerStatus, i)
     }
     this._statusList = statusList
     this.bitsPerStatus = bitsPerStatus
@@ -59,6 +70,7 @@ export class StatusList {
     if (index < 0 || index >= this.totalStatuses) {
       throw new Error('Index out of bounds')
     }
+    assertStatusValue(value, this.bitsPerStatus, index)
     this._statusList[index] = value
     this.#isModified = true
   }
@@ -94,6 +106,8 @@ export class StatusList {
     let currentByte = ''
     for (let i = 0; i < this.totalStatuses; i++) {
       const status = this._statusList[i]
+      // The list is exposed through `statusList`, so values may have changed since construction
+      assertStatusValue(status, numBits, i)
       currentByte = status.toString(2).padStart(numBits, '0') + currentByte
       bitIndex += numBits
 

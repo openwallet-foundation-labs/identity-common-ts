@@ -7,6 +7,7 @@ import { jwtProofTypeIdentifier } from '../formats/proof-type/jwt/z-jwt-proof-ty
 import { getKnownCredentialConfigurationSupportedById } from '../metadata/credential-issuer/credential-issuer-metadata'
 import type { CredentialConfigurationSupportedWithFormats } from '../metadata/credential-issuer/z-credential-issuer-metadata'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
+import { verifyCredentialResponseEncryption } from './verify-credential-response-encryption'
 import {
   allCredentialRequestFormatIdentifiers,
   allCredentialRequestFormats,
@@ -80,6 +81,8 @@ export interface ParseCredentialRequestReturn {
    * If the request includes `credential_response_encryption`, this contains the
    * encryption parameters the client expects the issuer to use for encrypting the response.
    *
+   * The parameters are checked against the `credential_response_encryption` of the issuer metadata.
+   *
    * When defined, the issuer should encrypt the credential response using the provided
    * JWK, algorithm, and content encryption algorithm, and return it with
    * `Content-Type: application/jwt`.
@@ -112,6 +115,7 @@ export function parseCredentialRequest(options: ParseCredentialRequestOptions): 
   }
 
   const credentialResponseEncryption = credentialRequest.credential_response_encryption
+  verifyCredentialResponseEncryption(credentialResponseEncryption, options.issuerMetadata.credentialIssuer)
 
   if (credentialRequest.credential_configuration_id) {
     if (

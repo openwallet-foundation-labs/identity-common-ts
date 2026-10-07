@@ -21,6 +21,7 @@ export type {
   RetrieveCredentialsResponseNotOk,
   RetrieveCredentialsResponseOk,
 } from './credential-request/retrieve-credentials'
+export { verifyCredentialResponseEncryption } from './credential-request/verify-credential-response-encryption'
 export type {
   CredentialRequest,
   CredentialRequestFormatSpecific,
@@ -94,8 +95,11 @@ export {
   parseKeyAttestationJwt,
   type VerifyKeyAttestationJwtOptions,
   type VerifyKeyAttestationJwtReturn,
+  type VerifyKeyAttestationRequirementsOptions,
   verifyKeyAttestationJwt,
+  verifyKeyAttestationRequirements,
 } from './key-attestation/key-attestation'
+export type { KeyAttestationsRequired } from './key-attestation/z-key-attestation'
 export {
   credentialsSupportedToCredentialConfigurationsSupported,
   type ExtractScopesForCredentialConfigurationIdsOptions,

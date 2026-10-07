@@ -222,7 +222,7 @@ async function verifyAuthorizationRequestDpop(
         request,
         allowedSigningAlgs: options.allowedSigningAlgs,
         maxProofAgeSeconds: options.maxProofAgeSeconds,
-        allowedClockSkewSeconds: options.allowedClockSkewSeconds,
+        allowedSkewInSeconds: options.allowedSkewInSeconds,
         assertJtiUniqueness: options.assertJtiUniqueness,
         now,
       })

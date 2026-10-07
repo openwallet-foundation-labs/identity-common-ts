@@ -46,6 +46,8 @@ To avoid reinventing the wheel, many identity projects share common needs for da
 
 The project is organized into six main categories:
 
+> **Note**: All packages within a category are versioned and published together, so they always share the same version. Each category is versioned independently of the other categories.
+
 #### Core Identity Utilities
 
 Generic, reusable utilities that can be used across any identity solution:

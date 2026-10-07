@@ -390,7 +390,15 @@ describe('index', () => {
         requiredClaimKeys: ['foo'],
         keyBindingNonce: '342',
       })
-    ).rejects.toThrow('Verify Error: JWT is expired')
+    ).rejects.toMatchObject({
+      code: 'KEY_BINDING_JWT_EXPIRED',
+      message: 'Verify Error: Key Binding JWT is expired',
+    })
+
+    // safeVerify reports the time check's own code rather than an invalid key binding signature
+    const result = await sdjwt.safeVerify(presentation, { keyBindingNonce: '342' })
+    expect(result.success).toBe(false)
+    expect(result.errors?.map((e) => e.code)).toEqual(['KEY_BINDING_JWT_EXPIRED'])
   })
 
   test('verify accepts a kbJwt with a future exp during full verification', async () => {
@@ -921,6 +929,60 @@ describe('index', () => {
     }
   })
 
+  test('safeVerify - uses the error code instead of matching the error message', async () => {
+    const { signer } = createSignerVerifier()
+    // A verifier callback whose message happens to contain words like 'expired' and 'signature'
+    const throwingVerifier: Verifier = async () => {
+      throw new Error('signature key for issuer has expired in the key store')
+    }
+
+    const issuer = new SDJwtInstance<SdJwtPayload>({
+      signer,
+      signAlg: 'EdDSA',
+      hasher: digest,
+      saltGenerator: generateSalt,
+    })
+    const verifierInstance = new SDJwtInstance<SdJwtPayload>({
+      verifier: throwingVerifier,
+      hasher: digest,
+    })
+
+    const credential = await issuer.issue(
+      { foo: 'bar', iss: 'Issuer', iat: Math.floor(Date.now() / 1000) },
+      { _sd: ['foo'] }
+    )
+
+    const result = await verifierInstance.safeVerify(credential)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.map((e) => e.code)).toEqual(['UNKNOWN_ERROR'])
+    }
+  })
+
+  test('safeVerify - disallowed algorithm error', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      saltGenerator: generateSalt,
+    })
+
+    const credential = await sdjwt.issue(
+      { foo: 'bar', iss: 'Issuer', iat: Math.floor(Date.now() / 1000) },
+      { _sd: ['foo'] }
+    )
+
+    const result = await sdjwt.safeVerify(credential, { allowedIssuerAlgorithms: ['ES256'] })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.map((e) => e.code)).toEqual(['INVALID_JWT_SIGNATURE'])
+    }
+  })
+
   test('safeVerify - expired JWT error', async () => {
     const { signer, verifier } = createSignerVerifier()
     const sdjwt = new SDJwtInstance<SdJwtPayload>({
@@ -1179,6 +1241,31 @@ describe('index', () => {
           ...options,
           allowedIssuerAlgorithms: ['EdDSA'],
         })
+      ).resolves.toHaveProperty('kb')
+    })
+
+    test('applies allowedKeyBindingAlgorithms to the key binding JWT', async () => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation({ keyBindingAlgorithm: 'ES256' })
+      await expect(
+        sdjwt.verify(presentation, {
+          ...options,
+          allowedIssuerAlgorithms: ['EdDSA'],
+          allowedKeyBindingAlgorithms: ['ES256'],
+        })
+      ).resolves.toHaveProperty('kb')
+      await expect(
+        sdjwt.verify(presentation, {
+          ...options,
+          allowedIssuerAlgorithms: ['EdDSA'],
+          allowedKeyBindingAlgorithms: ['EdDSA'],
+        })
+      ).rejects.toThrow('Verify Error: Disallowed Key Binding alg ES256')
+    })
+
+    test('does not apply allowedKeyBindingAlgorithms to the issuer-signed JWT', async () => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation({ keyBindingAlgorithm: 'ES256' })
+      await expect(
+        sdjwt.verify(presentation, { ...options, allowedKeyBindingAlgorithms: ['ES256'] })
       ).resolves.toHaveProperty('kb')
     })
   })
