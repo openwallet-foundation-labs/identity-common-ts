@@ -41,15 +41,15 @@ import {
 } from './sd-jwt-vc-type-metadata-format'
 import type { VerificationResult } from './verification-result'
 
-export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
+export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, T> {
   /**
    * The type of the SD-JWT-VC set in the header.typ field.
    */
   protected type = 'dc+sd-jwt'
 
-  protected userConfig: SDJWTVCConfig = {}
+  protected userConfig: SDJWTVCConfig<T> = {}
 
-  constructor(userConfig?: SDJWTVCConfig) {
+  constructor(userConfig?: SDJWTVCConfig<T>) {
     super(userConfig)
     if (userConfig) {
       this.userConfig = userConfig
@@ -117,7 +117,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
    * Verifies the SD-JWT-VC. It will validate the signature, the keybindings when required, the status, and the VCT.
    * @param currentDate current time in seconds
    */
-  async verify(encodedSDJwt: string, options?: VerifierOptions) {
+  async verify(encodedSDJwt: string, options?: T & VerifierOptions) {
     // Call the parent class's verify method
     const result: VerificationResult = await super.verify(encodedSDJwt, options).then((res) => {
       return {
@@ -144,7 +144,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
    * @param options - Verification options
    * @returns A SafeVerifyResult containing either success data or collected errors
    */
-  async safeVerify(encodedSDJwt: string, options?: VerifierOptions): Promise<SafeVerifyResult<VerificationResult>> {
+  async safeVerify(encodedSDJwt: string, options?: T & VerifierOptions): Promise<SafeVerifyResult<VerificationResult>> {
     const errors: VerificationError[] = []
 
     // Helper to add errors
@@ -547,7 +547,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
    * @param result
    * @param options
    */
-  private async verifyStatus(result: VerificationResult, options?: VerifierOptions): Promise<void> {
+  private async verifyStatus(result: VerificationResult, options?: T & VerifierOptions): Promise<void> {
     if (options?.disableStatusVerification) {
       return
     }
@@ -601,7 +601,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
     }
   }
 
-  public config(newConfig: SDJWTVCConfig) {
+  public config(newConfig: SDJWTVCConfig<T>) {
     super.config(newConfig)
   }
 }
