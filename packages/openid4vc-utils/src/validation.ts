@@ -15,14 +15,6 @@ export const zDataUrl = z.string().regex(/data:[\w/\-.]+(\+[\w/\-.]+)?;\w+,.*/, 
 export const zInteger = z.number().int()
 
 /**
- * NumericDate as defined in RFC 7519 Section 2
- * A JSON numeric value representing the number of seconds from
- * 1970-01-01T00:00:00Z UTC until the specified UTC date/time,
- * ignoring leap seconds. Non-integer values can be represented.
- */
-export const zNumericDate = z.number()
-
-/**
  * Whether `value` is the JWT `typ` header value for the media type `application/<typ>`. Pass `typ` in its
  * short lowercase form.
  *

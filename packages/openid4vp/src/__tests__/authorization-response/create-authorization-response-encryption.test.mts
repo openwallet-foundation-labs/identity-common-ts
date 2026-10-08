@@ -38,7 +38,7 @@ async function createResponse(clientMetadata: Record<string, unknown>) {
         encryptor = { alg: jweEncryptor.alg, enc: jweEncryptor.enc }
         return { encryptionJwk: encJwk, jwe: 'jwe' }
       },
-      signJwt: () => {
+      signJws: () => {
         throw new Error('Not implemented')
       },
       fetch,

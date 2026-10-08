@@ -1,4 +1,4 @@
-import { zCompactJwt } from '@openid4vc/oauth2'
+import { zCompactJwt } from '@owf/jose'
 import z from 'zod'
 import {
   type KeyAttestationJwtHeader,

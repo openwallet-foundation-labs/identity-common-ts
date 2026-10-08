@@ -1,5 +1,5 @@
-import { zJwk } from '@openid4vc/oauth2'
 import type { InferOutputUnion, Simplify } from '@openid4vc/utils'
+import { zJwk } from '@owf/jose'
 import z from 'zod'
 import {
   zAttestationProofTypeIdentifier,

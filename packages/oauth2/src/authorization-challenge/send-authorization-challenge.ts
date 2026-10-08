@@ -5,8 +5,8 @@ import {
   InvalidFetchResponseError,
   objectToQueryParams,
   parseWithErrorHandling,
-  ValidationError,
 } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
 import { authorizationServerRequestWithDpopRetry } from '../dpop/dpop-retry'
@@ -25,7 +25,7 @@ export interface SendAuthorizationChallengeRequestOptions {
   /**
    * Callback context
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'hash' | 'generateRandom' | 'signJwt' | 'clientAuthentication'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'hash' | 'generateRandom' | 'signJws' | 'clientAuthentication'>
 
   /**
    * Metadata of the authorization server where to perform the authorization challenge

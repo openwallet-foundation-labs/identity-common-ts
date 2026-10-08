@@ -1,6 +1,5 @@
 import {
   type CallbackContext,
-  type JweEncryptor,
   Oauth2Error,
   type RequestDpopOptions,
   type ResourceRequestResponseNotOk,
@@ -15,6 +14,7 @@ import {
   parseWithErrorHandling,
   stringToJsonWithErrorHandling,
 } from '@openid4vc/utils'
+import type { JweEncryptor } from '@owf/jose'
 import type z from 'zod'
 import { Openid4vciError } from '../error/Openid4vciError'
 import { getKnownCredentialConfigurationSupportedById } from '../metadata/credential-issuer/credential-issuer-metadata'
@@ -110,7 +110,7 @@ interface RetrieveCredentialsBaseOptions {
   /**
    * Callbacks used in retrieve credentials endpoints.
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJwt' | 'decryptJwe'> &
+  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJws' | 'decryptJwe'> &
     Partial<Pick<CallbackContext, 'encryptJwe'>>
 
   /**

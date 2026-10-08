@@ -9,8 +9,8 @@ describe('Interoperability | Provicis', () => {
     // update this once the metadata has been updated.
     expect(() =>
       parseWithErrorHandling(zCredentialIssuerMetadataWithDraftVersion, findyProvicisCredentialIssuerMetadataJson)
-    ).toThrowError(
-      '✖ Expected object, received null at "credential_configurations_supported.https://alennusperuste.todiste.fi/credentials/v1/PensionCredential.proof_types_supported.jwt.key_attestations_required" or Expected array, received undefined at "credentials_supported"'
+    ).toThrow(
+      '✖ Expected object, received null at "credential_configurations_supported.https://alennusperuste.todiste.fi/credentials/v1/PensionCredential.proof_types_supported.jwt.key_attestations_required"\n    OR ✖ Expected array, received undefined at "credentials_supported"'
     )
   })
 })

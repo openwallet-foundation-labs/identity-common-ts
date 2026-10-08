@@ -1,8 +1,8 @@
 import {
   type CallbackContext,
+  JoseVerificationError,
   Oauth2AuthorizationServer,
   Oauth2ErrorCodes,
-  Oauth2JwtVerificationError,
   Oauth2ServerErrorResponseError,
   type VerifyClientAttestationOptions,
 } from '@openid4vc/oauth2'
@@ -161,7 +161,7 @@ export class Openid4vciIssuer {
           error: Oauth2ErrorCodes.InvalidProof,
           error_description:
             // TODO: error should have a internalErrorMessage and a publicErrorMessage
-            error instanceof Oauth2JwtVerificationError || error instanceof Openid4vciError
+            error instanceof JoseVerificationError || error instanceof Openid4vciError
               ? error.message
               : 'Invalid proof',
         },
@@ -201,7 +201,7 @@ export class Openid4vciIssuer {
           error: Oauth2ErrorCodes.InvalidProof,
           error_description:
             // TODO: error should have a internalErrorMessage and a publicErrorMessage
-            error instanceof Oauth2JwtVerificationError || error instanceof Openid4vciError
+            error instanceof JoseVerificationError || error instanceof Openid4vciError
               ? error.message
               : 'Invalid proof',
         },

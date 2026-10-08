@@ -38,10 +38,10 @@ export interface ResolveIssuerMetadataOptions {
   allowAuthorizationMetadataFromCredentialIssuerMetadata?: boolean
 
   /**
-   * Callbacks for fetching the credential issuer metadata. The `verifyJwt` callback is
+   * Callbacks for fetching the credential issuer metadata. The `verifyJws` callback is
    * required unless `signedMetadata` is `disallowed`.
    */
-  callbacks: Partial<Pick<CallbackContext, 'fetch' | 'verifyJwt' | 'getAuthorizationServerMetadata'>>
+  callbacks: Partial<Pick<CallbackContext, 'fetch' | 'verifyJws' | 'getAuthorizationServerMetadata'>>
 
   /**
    * Whether the credential issuer metadata must be signed. This is sent as the `Accept` header.
@@ -51,7 +51,7 @@ export interface ResolveIssuerMetadataOptions {
    *   Signed metadata that fails verification results in an error, without falling back to unsigned metadata.
    * - `disallowed`: only accept unsigned metadata
    *
-   * @default 'preferred' if a `verifyJwt` callback is provided, otherwise 'disallowed'
+   * @default 'preferred' if a `verifyJws` callback is provided, otherwise 'disallowed'
    */
   signedMetadata?: FetchCredentialIssuerMetadataOptions['signedMetadata']
 

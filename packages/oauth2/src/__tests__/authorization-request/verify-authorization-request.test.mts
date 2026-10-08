@@ -1,12 +1,12 @@
+import type { Jwk } from '@owf/jose'
 import * as jose from 'jose'
 import { describe, expect, test } from 'vitest'
 import { verifyAuthorizationRequest } from '../../authorization-request/verify-authorization-request'
 import { createClientAttestationJwt } from '../../client-attestation/client-attestation'
 import { createClientAttestationPopJwt } from '../../client-attestation/client-attestation-pop'
-import type { Jwk } from '../../common/jwk/z-jwk'
 import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
-import { callbacks, getSignJwtCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback } from '../util.mjs'
 
 const authorizationServerMetadata = {
   issuer: 'https://server.com',
@@ -23,16 +23,16 @@ async function generateEs256Key() {
 
 async function createClientAttestation(instance: Awaited<ReturnType<typeof generateEs256Key>>) {
   const attester = await generateEs256Key()
-  const signJwt = getSignJwtCallback([attester.privateJwk, instance.privateJwk])
+  const signJws = getSignJwsCallback([attester.privateJwk, instance.privateJwk])
   const clientAttestationJwt = await createClientAttestationJwt({
-    callbacks: { signJwt },
+    callbacks: { signJws },
     clientId: 'wallet',
     confirmation: { jwk: instance.publicJwk },
     expiresAt: new Date(Date.now() + 3600 * 1000),
     signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
   })
   const clientAttestationPopJwt = await createClientAttestationPopJwt({
-    callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+    callbacks: { signJws, generateRandom: callbacks.generateRandom },
     authorizationServer: authorizationServerMetadata.issuer,
     clientAttestation: clientAttestationJwt,
   })

@@ -1,6 +1,6 @@
+import { ValidationError, zodErrorMap } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
 import z from 'zod'
-import { ValidationError } from '../error/ValidationError.js'
 
 describe('Validation error', () => {
   test('basic formatting', () => {
@@ -18,9 +18,12 @@ describe('Validation error', () => {
       }),
     })
 
-    const result = schema.safeParse({
-      object: { foo: { bar: { type: 'z', a: 123 } } },
-    })
+    const result = schema.safeParse(
+      {
+        object: { foo: { bar: { type: 'z', a: 123 } } },
+      },
+      { error: zodErrorMap }
+    )
 
     const error = new ValidationError('Validation failed', result.error)
     expect(error.message).toMatchInlineSnapshot(`

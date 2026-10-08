@@ -18,7 +18,7 @@ export interface ParseOpenid4vpAuthorizationResponseOptions {
   authorizationResponse: Record<string, unknown>
 
   authorizationRequestPayload: Openid4vpAuthorizationRequest | Openid4vpAuthorizationRequestDcApi
-  callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJws'>
 
   origin?: string
 }

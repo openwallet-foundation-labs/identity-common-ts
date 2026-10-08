@@ -2,8 +2,6 @@ import {
   type AuthorizationServerMetadata,
   type CallbackContext,
   createJarAuthorizationRequest,
-  type Jwk,
-  type JwtSigner,
   Oauth2ErrorCodes,
   Oauth2ServerErrorResponseError,
 } from '@openid4vc/oauth2'
@@ -15,13 +13,14 @@ import {
   validateOpenid4vpAuthorizationRequestIaePayload,
   validateOpenid4vpAuthorizationResponsePayload,
 } from '@openid4vc/openid4vp'
+import type { Jwk, JwsSigner } from '@owf/jose'
 import * as jose from 'jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import {
-  getSignJwtCallback,
-  getVerifyJwtCallback,
+  getSignJwsCallback,
+  getVerifyJwsCallback,
   callbacks as partialCallbacks,
 } from '../../../oauth2/src/__tests__/util.mjs'
 import {
@@ -42,7 +41,7 @@ const server = setupServer()
 const callbacks = {
   ...partialCallbacks,
   fetch,
-  signJwt: getSignJwtCallback([]),
+  signJws: getSignJwsCallback([]),
   decryptJwe: async () => {
     throw new Error('decryptJwe not implemented in tests')
   },
@@ -88,7 +87,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
 
   test('should send initial interactive authorization request', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
 
     server.resetHandlers(
       http.post('https://example.com/interactive-authorization', async ({ request }) => {
@@ -116,7 +115,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
     const client = new Openid4vciClient({
       callbacks: {
         ...callbacks,
-        signJwt,
+        signJws,
         fetch,
       },
     })
@@ -148,7 +147,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
 
   test('should send follow-up interactive authorization request with openid4vp response', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
 
     server.resetHandlers(
       http.post('https://example.com/interactive-authorization', async ({ request }) => {
@@ -168,7 +167,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
     const client = new Openid4vciClient({
       callbacks: {
         ...callbacks,
-        signJwt,
+        signJws,
         fetch,
       },
     })
@@ -192,7 +191,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
 
   test('should send follow-up request with redirect_to_web (PKCE)', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
 
     server.resetHandlers(
       http.post('https://example.com/interactive-authorization', async ({ request }) => {
@@ -210,7 +209,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
     const client = new Openid4vciClient({
       callbacks: {
         ...callbacks,
-        signJwt,
+        signJws,
         fetch,
       },
     })
@@ -234,7 +233,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
 
   test('should handle error response', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
 
     server.resetHandlers(
       http.post('https://example.com/interactive-authorization', () => {
@@ -254,7 +253,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
     const client = new Openid4vciClient({
       callbacks: {
         ...callbacks,
-        signJwt,
+        signJws,
         fetch,
       },
     })
@@ -279,7 +278,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
 
   test('should handle redirect_to_web interaction type', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
 
     server.resetHandlers(
       http.post('https://example.com/interactive-authorization', () => {
@@ -296,7 +295,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
     const client = new Openid4vciClient({
       callbacks: {
         ...callbacks,
-        signJwt,
+        signJws,
         fetch,
       },
     })
@@ -325,12 +324,12 @@ describe('Interactive Authorization Endpoint - Client', () => {
 
   test('should throw error when interactive_authorization_endpoint is not supported', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
 
     const client = new Openid4vciClient({
       callbacks: {
         ...callbacks,
-        signJwt,
+        signJws,
         fetch,
       },
     })
@@ -358,9 +357,9 @@ describe('Interactive Authorization Endpoint - Client', () => {
   test('should support DPoP binding', async () => {
     const keyPair = await generateJwkKeyPair()
     const dpopKeyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey, dpopKeyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey, dpopKeyPair.privateKey])
 
-    const dpopSigner: JwtSigner = { method: 'jwk', alg: 'ES256', publicJwk: dpopKeyPair.publicKey }
+    const dpopSigner: JwsSigner = { method: 'jwk', alg: 'ES256', publicJwk: dpopKeyPair.publicKey }
 
     let dpopHeaderReceived = false
 
@@ -381,7 +380,7 @@ describe('Interactive Authorization Endpoint - Client', () => {
     const client = new Openid4vciClient({
       callbacks: {
         ...callbacks,
-        signJwt,
+        signJws,
         fetch,
       },
     })
@@ -479,7 +478,7 @@ describe('Interactive Authorization Endpoint - Server', () => {
 
   test('should verify initial interactive authorization request', async () => {
     const keyPair = await generateJwkKeyPair()
-    const _signJwt = getSignJwtCallback([keyPair.privateKey])
+    const _signJwt = getSignJwsCallback([keyPair.privateKey])
 
     const requestBody: InteractiveAuthorizationInitialRequest = {
       response_type: 'code',
@@ -601,7 +600,7 @@ describe('Interactive Authorization Endpoint - Server', () => {
 
   test('should parse request with client attestation headers', async () => {
     const keyPair = await generateJwkKeyPair()
-    const _signJwt = getSignJwtCallback([keyPair.privateKey])
+    const _signJwt = getSignJwsCallback([keyPair.privateKey])
 
     const requestBody: InteractiveAuthorizationInitialRequest = {
       response_type: 'code',
@@ -645,7 +644,7 @@ describe('Interactive Authorization Endpoint - Server', () => {
 describe('Interactive Authorization Endpoint - Integration', () => {
   test('should complete full openid4vp_presentation flow', async () => {
     const keyPair = await generateJwkKeyPair()
-    const _signJwt = getSignJwtCallback([keyPair.privateKey])
+    const _signJwt = getSignJwsCallback([keyPair.privateKey])
 
     // Step 1: Client sends initial request
     const initialRequest: InteractiveAuthorizationInitialRequest = {
@@ -743,7 +742,7 @@ describe('Interactive Authorization Endpoint - Integration', () => {
 
   test('should complete full redirect_to_web flow', async () => {
     const keyPair = await generateJwkKeyPair()
-    const _signJwt = getSignJwtCallback([keyPair.privateKey])
+    const _signJwt = getSignJwsCallback([keyPair.privateKey])
 
     // Step 1: Client sends initial request
     const initialRequest: InteractiveAuthorizationInitialRequest = {
@@ -812,7 +811,7 @@ describe('Interactive Authorization Endpoint - Integration', () => {
 describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Request)', () => {
   test('should create JAR interactive authorization request by value', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
     const encryptJwe = async () => {
       throw new Error('encryptJwe not implemented in tests')
     }
@@ -825,7 +824,7 @@ describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Re
         scope: 'openid',
       },
       jwtSigner: { method: 'jwk', alg: 'ES256', publicJwk: keyPair.publicKey },
-      callbacks: { signJwt, encryptJwe },
+      callbacks: { signJws, encryptJwe },
       expiresInSeconds: 300,
     })
 
@@ -846,7 +845,7 @@ describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Re
 
   test('should create JAR interactive authorization request by reference', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
     const encryptJwe = async () => {
       throw new Error('encryptJwe not implemented in tests')
     }
@@ -859,7 +858,7 @@ describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Re
       },
       requestUri: 'https://example.com/request/abc123',
       jwtSigner: { method: 'jwk', alg: 'ES256', publicJwk: keyPair.publicKey },
-      callbacks: { signJwt, encryptJwe },
+      callbacks: { signJws, encryptJwe },
       expiresInSeconds: 600,
     })
 
@@ -874,7 +873,7 @@ describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Re
 
   test('should parse and verify JAR interactive authorization request', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
     const encryptJwe = async () => {
       throw new Error('encryptJwe not implemented in tests')
     }
@@ -891,7 +890,7 @@ describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Re
         scope: 'openid',
       },
       jwtSigner: { method: 'jwk', alg: 'ES256', publicJwk: keyPair.publicKey },
-      callbacks: { signJwt, encryptJwe },
+      callbacks: { signJws, encryptJwe },
       expiresInSeconds: 300,
     })
 
@@ -922,8 +921,8 @@ describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Re
 
   test('should verify JAR interactive authorization request signature', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
-    const _verifyJwt = callbacks.verifyJwt
+    const signJws = getSignJwsCallback([keyPair.privateKey])
+    const _verifyJwt = callbacks.verifyJws
     const encryptJwe = async () => {
       throw new Error('encryptJwe not implemented in tests')
     }
@@ -939,7 +938,7 @@ describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Re
         redirect_uri: 'https://example.com/callback',
       },
       jwtSigner: { method: 'jwk', alg: 'ES256', publicJwk: keyPair.publicKey },
-      callbacks: { signJwt, encryptJwe },
+      callbacks: { signJws, encryptJwe },
       expiresInSeconds: 300,
     })
 
@@ -992,7 +991,7 @@ describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Re
     // 1. Validating client_id during parsing, or
     // 2. Preserving the original JAR request parameters in the parse result
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
     const encryptJwe = async () => {
       throw new Error('encryptJwe not implemented in tests')
     }
@@ -1007,7 +1006,7 @@ describe('Interactive Authorization Endpoint - JAR (JWT-secured Authorization Re
         interaction_types_supported: 'openid4vp_presentation',
       },
       jwtSigner: { method: 'jwk', alg: 'ES256', publicJwk: keyPair.publicKey },
-      callbacks: { signJwt, encryptJwe },
+      callbacks: { signJws, encryptJwe },
       expiresInSeconds: 300,
     })
 
@@ -1059,7 +1058,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
 
   test('should create openid4vp authorization request with IAE response mode', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
 
     const authorizationRequestPayload = {
       response_type: 'vp_token',
@@ -1080,7 +1079,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
     const result = await createOpenid4vpAuthorizationRequest({
       authorizationRequestPayload,
       callbacks: {
-        signJwt,
+        signJws,
         encryptJwe,
       },
     })
@@ -1094,7 +1093,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
 
   test('should create signed openid4vp authorization request with expected_url', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
 
     const authorizationRequestPayload = {
       response_type: 'vp_token',
@@ -1113,7 +1112,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
         expiresInSeconds: 300,
       },
       callbacks: {
-        signJwt,
+        signJws,
         encryptJwe,
       },
     })
@@ -1228,7 +1227,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
 
   test('should complete full E2E flow: issuance with openid4vp presentation', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
+    const signJws = getSignJwsCallback([keyPair.privateKey])
 
     // --- STEP 1: Client initiates interactive authorization flow ---
     const initialRequest: InteractiveAuthorizationInitialRequest = {
@@ -1298,7 +1297,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
         expiresInSeconds: 600,
       },
       callbacks: {
-        signJwt,
+        signJws,
         encryptJwe,
       },
     })
@@ -1382,8 +1381,8 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
 
   test('should complete E2E flow with iae_post.jwt response mode', async () => {
     const keyPair = await generateJwkKeyPair()
-    const signJwt = getSignJwtCallback([keyPair.privateKey])
-    const verifyJwt = getVerifyJwtCallback({ publicJwks: [keyPair.publicKey] })
+    const signJws = getSignJwsCallback([keyPair.privateKey])
+    const verifyJws = getVerifyJwsCallback({ publicJwks: [keyPair.publicKey] })
 
     // Create signed OpenID4VP request with JARM response mode
     const openid4vpAuthRequest = await createOpenid4vpAuthorizationRequest({
@@ -1401,7 +1400,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
         expiresInSeconds: 300,
       },
       callbacks: {
-        signJwt,
+        signJws,
         encryptJwe,
       },
     })
@@ -1419,7 +1418,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
       authorizationRequestPayload: openid4vpAuthRequest.jar.jarAuthorizationRequest,
       callbacks: {
         ...callbacks,
-        verifyJwt,
+        verifyJws,
       },
       responseMode: {
         type: 'iae',

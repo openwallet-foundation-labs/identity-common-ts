@@ -1,5 +1,5 @@
-import { zJwkSet } from '@openid4vc/oauth2'
 import { zDataUrl, zHttpsUrl } from '@openid4vc/utils'
+import { zJwkSet } from '@owf/jose'
 import { z } from 'zod'
 import { zJarmClientMetadata } from '../jarm/metadata/z-jarm-client-metadata'
 import { zLegacyVpFormats, zVpFormatsSupported } from './z-vp-formats-supported'

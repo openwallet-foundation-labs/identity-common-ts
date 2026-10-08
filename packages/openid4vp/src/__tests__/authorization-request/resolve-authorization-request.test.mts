@@ -19,7 +19,7 @@ describe('Resolve Authorization Request', () => {
       resolveOpenid4vpAuthorizationRequest({
         authorizationRequestPayload: insecureRequest,
         responseMode: { type: 'direct_post' },
-        callbacks: { ...callbacks, verifyJwt: () => Promise.reject(), decryptJwe: () => Promise.reject() },
+        callbacks: { ...callbacks, verifyJws: () => Promise.reject(), decryptJwe: () => Promise.reject() },
       })
     ).rejects.toThrow('Invalid authorization request')
   })

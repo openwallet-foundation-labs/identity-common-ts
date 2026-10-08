@@ -4,10 +4,10 @@ import {
   type Fetch,
   InvalidFetchResponseError,
   parseWithErrorHandling,
-  ValidationError,
 } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
+import { type JwkSet, zJwkSet } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
-import { type JwkSet, zJwkSet } from '../common/jwk/z-jwk'
 
 /**
  * Fetch JWKs from a provided JWKs URI.

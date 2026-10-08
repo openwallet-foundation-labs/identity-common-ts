@@ -1,4 +1,4 @@
-import type { JwtSigner } from '../common/jwt/z-jwt'
+import type { JwsSigner } from '@owf/jose'
 import { type VerifiedJarRequest, verifyJarRequest } from '../jar/handle-jar-request/verify-jar-request'
 import {
   type VerifyAuthorizationRequestOptions,
@@ -20,7 +20,7 @@ export interface VerifyPushedAuthorizationRequestOptions extends VerifyAuthoriza
    */
   authorizationRequestJwt?: {
     jwt: string
-    signer: JwtSigner
+    signer: JwsSigner
   }
 }
 
@@ -34,6 +34,7 @@ export async function verifyPushedAuthorizationRequest(
       jarRequestParams: options.authorizationRequest,
       callbacks: options.callbacks,
       jwtSigner: options.authorizationRequestJwt.signer,
+      now: options.now,
     })
   }
 

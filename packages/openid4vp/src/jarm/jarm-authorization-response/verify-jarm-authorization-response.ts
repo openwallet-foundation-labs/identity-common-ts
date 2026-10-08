@@ -1,17 +1,16 @@
+import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
+import { parseWithErrorHandling, stringToJsonWithErrorHandling } from '@openid4vc/utils'
 import {
-  type CallbackContext,
   decodeJwt,
   decodeJwtHeader,
+  JoseAlgorithmNotAllowedError,
+  JoseSignerError,
   type Jwk,
-  jwtSignerFromJwt,
-  Oauth2ErrorCodes,
-  Oauth2ServerErrorResponseError,
+  verifyJwt,
   zCompactJwe,
   zCompactJwt,
   zJwtHeader,
-} from '@openid4vc/oauth2'
-import { stringToJsonWithErrorHandling } from '@openid4vc/utils'
-import z from 'zod'
+} from '@owf/jose'
 import type { Openid4vpAuthorizationRequest } from '../../authorization-request/z-authorization-request'
 import type { Openid4vpAuthorizationRequestDcApi } from '../../authorization-request/z-authorization-request-dc-api'
 import { extractEncryptionJwkFromJwks } from '../jarm-extract-jwks'
@@ -27,6 +26,28 @@ export enum JarmMode {
   Signed = 'Signed',
   Encrypted = 'Encrypted',
   SignedEncrypted = 'SignedEncrypted',
+}
+
+/**
+ * The header of a signed response has to identify the key that signed it: by the `jwk` or `x5c` it
+ * carries, or otherwise by its `kid`, which is resolved together with the `iss` of the response.
+ */
+const zSignedJarmAuthorizationResponseHeader = zJwtHeader.refine(
+  ({ kid, jwk, x5c }) => kid !== undefined || jwk !== undefined || x5c !== undefined,
+  { message: `The header must identify the signing key with a 'kid', 'jwk' or 'x5c' parameter` }
+)
+
+/** Why the signature of a signed response was not accepted, as reported in the error response. */
+function signatureVerificationErrorDescription(error: unknown) {
+  if (error instanceof JoseAlgorithmNotAllowedError) {
+    return 'The JARM authorization response is signed with an algorithm that is not allowed.'
+  }
+
+  if (error instanceof JoseSignerError) {
+    return 'The signer of the JARM authorization response could not be established.'
+  }
+
+  return 'The signature of the JARM authorization response is not valid.'
 }
 
 /**
@@ -92,7 +113,7 @@ export interface VerifyJarmAuthorizationResponseOptions {
    */
   expectedClientId: string
 
-  callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJws'>
 }
 
 export type VerifiedJarmAuthorizationResponse = Awaited<ReturnType<typeof verifyJarmAuthorizationResponse>>
@@ -100,7 +121,14 @@ export type VerifiedJarmAuthorizationResponse = Awaited<ReturnType<typeof verify
 /**
  * Validate a JARM direct_post.jwt compliant authentication response
  * * The decryption key should be resolvable using the the protected header's 'kid' field
- * * The signature verification jwk should be resolvable using the jws protected header's 'kid' field and the payload's 'iss' field.
+ * * The signature verification jwk should be resolvable using the jws protected header's 'jwk' or 'x5c' field, or
+ *   otherwise its 'kid' field and the payload's 'iss' field.
+ *
+ * @throws Oauth2ServerErrorResponseError with error `invalid_request` when the response cannot be decrypted, its
+ *   signature does not verify, or its `aud`, `exp`, `nbf` or `iat` is not valid. When `@owf/jose` rejected the
+ *   signature or a time claim, its error is the `cause`.
+ * @throws JoseValidationError when the header or the claims of a signed response do not validate, and the
+ *   `ValidationError` of `@owf/identity-common` when the parameters of a response that is only encrypted do not.
  */
 export async function verifyJarmAuthorizationResponse(options: VerifyJarmAuthorizationResponseOptions) {
   const { jarmAuthorizationResponseJwt, callbacks, expectedClientId, authorizationRequestPayload } = options
@@ -125,34 +153,44 @@ export async function verifyJarmAuthorizationResponse(options: VerifyJarmAuthori
   let jarmAuthorizationResponse: JarmAuthorizationResponse | JarmAuthorizationResponseEncryptedOnly
 
   if (responseIsSigned) {
-    const { header: jwsProtectedHeader, payload: jwsPayload } = decodeJwt({
+    const decodedJwt = decodeJwt({
       jwt: decryptedRequestData.payload,
-      headerSchema: z.object({ ...zJwtHeader.shape, kid: z.string() }),
+      headerSchema: zSignedJarmAuthorizationResponseHeader,
+      payloadSchema: zJarmAuthorizationResponse,
     })
 
-    const response = zJarmAuthorizationResponse.parse(jwsPayload)
-    const jwtSigner = jwtSignerFromJwt({ header: jwsProtectedHeader, payload: jwsPayload })
-
-    const verificationResult = await options.callbacks.verifyJwt(jwtSigner, {
-      compact: decryptedRequestData.payload,
-      header: jwsProtectedHeader,
-      payload: jwsPayload,
-    })
-
-    if (!verificationResult.verified) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: 'The signature of the JARM authorization response is not valid.',
+    try {
+      await verifyJwt({
+        jwt: decodedJwt,
+        verifyJwsCallback: options.callbacks.verifyJws,
+        // The time claims are verified below together with the other claims, the same way for a
+        // response that is signed as for one that is only encrypted
+        checkExpirationTime: false,
+        checkNotBefore: false,
+        checkIssuedAt: false,
       })
+    } catch (error) {
+      // The jose error, which says what did not verify, is kept as the cause
+      throw new Oauth2ServerErrorResponseError(
+        {
+          error: Oauth2ErrorCodes.InvalidRequest,
+          error_description: signatureVerificationErrorDescription(error),
+        },
+        { cause: error }
+      )
     }
 
-    jarmAuthorizationResponse = response
+    jarmAuthorizationResponse = decodedJwt.payload
   } else {
     const jsonRequestData = stringToJsonWithErrorHandling(
       decryptedRequestData.payload,
       'Unable to parse decrypted JARM JWE body to JSON'
     )
-    jarmAuthorizationResponse = zJarmAuthorizationResponseEncryptedOnly.parse(jsonRequestData)
+    jarmAuthorizationResponse = parseWithErrorHandling(
+      zJarmAuthorizationResponseEncryptedOnly,
+      jsonRequestData,
+      'Invalid JARM authorization response'
+    )
   }
 
   jarmAuthorizationResponseValidate({

@@ -59,12 +59,13 @@ export interface Oauth2AuthorizationServerOptions {
   /**
    * Default allowed clock skew in seconds for DPoP and client attestation verification.
    *
-   * Applied to the `nbf` and `exp` checks of client attestation and client attestation PoP JWTs, and to the
-   * `iat` checks of DPoP proofs (which are only performed when `maxProofAgeSeconds` is provided).
+   * Applied to the `exp`, `nbf` and `iat` checks of client attestation and client attestation PoP JWTs and of
+   * DPoP proofs, and to the `iat` checks of DPoP proofs against `maxProofAgeSeconds`.
    *
    * A per-call `allowedSkewInSeconds` in the client attestation or DPoP options takes precedence, including `0`.
    *
-   * @default 0
+   * If not provided, the `exp`, `nbf` and `iat` checks allow a skew of 30 seconds, and the checks against
+   * `maxProofAgeSeconds` allow none.
    */
   allowedSkewInSeconds?: number
 }

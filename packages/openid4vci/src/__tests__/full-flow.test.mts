@@ -1,10 +1,7 @@
 import {
   authorizationCodeGrantIdentifier,
-  calculateJwkThumbprint,
   clientAuthenticationClientAttestationJwt,
   HashAlgorithm,
-  type Jwk,
-  type JwkSet,
   Oauth2AuthorizationServer,
   Oauth2Client,
   Oauth2ResourceServer,
@@ -14,11 +11,12 @@ import {
   SupportedClientAuthenticationMethod,
 } from '@openid4vc/oauth2'
 import { addSecondsToDate, ContentType, decodeUtf8String, encodeToBase64Url, type HttpMethod } from '@openid4vc/utils'
+import { calculateJwkThumbprint, type Jwk, type JwkSet } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import {
-  getSignJwtCallback,
+  getSignJwsCallback,
   parseXwwwFormUrlEncoded,
   callbacks as partialCallbacks,
 } from '../../../oauth2/src/__tests__/util.mjs'
@@ -73,7 +71,7 @@ const server = setupServer()
 const callbacks = {
   ...partialCallbacks,
   fetch,
-  signJwt: getSignJwtCallback([credentialRequestProofJwk, dpopJwk, accessTokenJwk, walletProviderJwk]),
+  signJws: getSignJwsCallback([credentialRequestProofJwk, dpopJwk, accessTokenJwk, walletProviderJwk]),
 }
 
 const issuer = new Openid4vciIssuer({

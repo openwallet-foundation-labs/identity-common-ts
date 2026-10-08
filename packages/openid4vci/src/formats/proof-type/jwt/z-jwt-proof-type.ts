@@ -1,5 +1,6 @@
-import { zCompactJwt, zJwtHeader, zJwtPayload } from '@openid4vc/oauth2'
-import { zHttpsUrl, zNumericDate, zTyp } from '@openid4vc/utils'
+import { zHttpsUrl } from '@openid4vc/utils'
+import { zNumericDate } from '@owf/identity-common'
+import { zCompactJwt, zJoseType, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
 
 export const zJwtProofTypeIdentifier = z.literal('jwt')
@@ -14,7 +15,7 @@ export const zCredentialRequestProofJwt = z.object({
 export const zCredentialRequestJwtProofTypeHeader = zJwtHeader
   .extend({
     key_attestation: z.optional(zCompactJwt),
-    typ: zTyp('openid4vci-proof+jwt'),
+    typ: zJoseType('openid4vci-proof+jwt'),
   })
   .loose()
   .refine(({ kid, jwk }) => jwk === undefined || kid === undefined, {

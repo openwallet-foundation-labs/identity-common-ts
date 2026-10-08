@@ -1,6 +1,6 @@
-import { zNumericDate } from '@openid4vc/utils'
+import { zNumericDate } from '@owf/identity-common'
+import { zJwtConfirmation } from '@owf/jose'
 import z from 'zod'
-import { zJwtConfirmationPayload } from '../common/jwt/z-jwt'
 
 export const zTokenIntrospectionRequest = z
   .object({
@@ -29,7 +29,7 @@ export const zTokenIntrospectionResponse = z
     iss: z.optional(z.string()),
     jti: z.optional(z.string()),
 
-    cnf: z.optional(zJwtConfirmationPayload),
+    cnf: z.optional(zJwtConfirmation),
   })
   .loose()
 

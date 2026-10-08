@@ -3,7 +3,7 @@ import type { CallbackContext } from '../callbacks'
 import { type AccessTokenResponse, zAccessTokenResponse } from './z-access-token'
 
 export interface CreateAccessTokenResponseOptions {
-  callbacks: Pick<CallbackContext, 'signJwt' | 'generateRandom' | 'hash'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'generateRandom' | 'hash'>
 
   /**
    * The access token

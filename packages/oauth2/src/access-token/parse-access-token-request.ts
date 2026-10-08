@@ -1,4 +1,4 @@
-import { formatZodError } from '@openid4vc/utils'
+import { formatZodError } from '@owf/identity-common'
 import { extractClientAttestationJwtsFromHeaders } from '../client-attestation/client-attestation'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'

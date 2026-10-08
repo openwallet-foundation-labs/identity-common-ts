@@ -41,7 +41,7 @@ export interface SendNotificationOptions {
   /**
    * Callback used in notification endpoint
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJwt'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJws'>
 
   /**
    * Access token authorized to retrieve the credential(s)

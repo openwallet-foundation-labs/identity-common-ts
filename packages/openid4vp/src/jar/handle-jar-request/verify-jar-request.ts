@@ -1,22 +1,25 @@
 import {
   type CallbackContext,
-  type DecodeJwtResult,
-  decodeJwt,
   type JarRequestObjectPayload,
-  type Jwk,
-  type JwtSigner,
-  type JwtSignerWithJwk,
-  jwtSignerFromJwt,
   Oauth2ErrorCodes,
-  Oauth2JwtVerificationError,
   Oauth2ServerErrorResponseError,
   signedAuthorizationRequestJwtHeaderTyp,
   validateJarRequestParams,
+  zJarRequestObjectPayload,
+} from '@openid4vc/oauth2'
+import {
+  type DecodeJwtResult,
+  decodeJwt,
+  decodeJwtHeader,
+  JoseVerificationError,
+  type Jwk,
+  type JwsSigner,
+  type JwsSignerWithJwk,
+  jwsSignerFromHeader,
   verifyJwt,
   zCompactJwe,
   zCompactJwt,
-  zJarRequestObjectPayload,
-} from '@openid4vc/oauth2'
+} from '@owf/jose'
 import { Openid4vpAuthorizationRequestError } from '../../authorization-request/Openid4vpAuthorizationRequestError'
 import { isOpenid4vpResponseModeDcApi } from '../../authorization-request/z-authorization-request-dc-api'
 import { isOpenid4vpResponseModeIae } from '../../authorization-request/z-authorization-request-iae'
@@ -46,7 +49,7 @@ export interface VerifyJarRequestOptions {
    */
   allowRequestUri?: boolean
 
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'decryptJwe' | 'fetch'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'decryptJwe' | 'fetch'>
   wallet?: {
     metadata?: WalletMetadata
     nonce?: string
@@ -57,7 +60,7 @@ export interface VerifiedJarRequest {
   authorizationRequestPayload: JarRequestObjectPayload
   sendBy: 'value' | 'reference'
   decryptionJwk?: Jwk
-  signer: JwtSignerWithJwk
+  signer: JwsSignerWithJwk
   jwt: DecodeJwtResult<undefined, typeof zJarRequestObjectPayload>
 }
 
@@ -168,7 +171,7 @@ function withUnverifiedAuthorizationRequest(error: unknown, requestObject: strin
   const serverError =
     error instanceof Oauth2ServerErrorResponseError
       ? error
-      : error instanceof Oauth2JwtVerificationError
+      : error instanceof JoseVerificationError
         ? new Oauth2ServerErrorResponseError(
             {
               error: Oauth2ErrorCodes.InvalidRequestObject,
@@ -195,7 +198,9 @@ function withUnverifiedAuthorizationRequest(error: unknown, requestObject: strin
 async function decryptJarRequest(options: { jwe: string; callbacks: Pick<CallbackContext, 'decryptJwe'> }) {
   const { jwe, callbacks } = options
 
-  const { header } = decodeJwt({ jwt: jwe })
+  // NOTE: `decodeJwtHeader`, not `decodeJwt`: this is a compact JWE, which has five parts rather
+  // than the three a JWS has, and only its header can be read before it is decrypted.
+  const { header } = decodeJwtHeader({ jwt: jwe })
   if (!header.kid) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequestObject,
@@ -216,13 +221,13 @@ async function decryptJarRequest(options: { jwe: string; callbacks: Pick<Callbac
 
 async function verifyJarRequestObject(options: {
   decryptedRequestObject: string
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'verifyJws'>
 }) {
   const { decryptedRequestObject, callbacks } = options
 
   const jwt = decodeJwt({ jwt: decryptedRequestObject, payloadSchema: zJarRequestObjectPayload })
 
-  let jwtSigner: JwtSigner
+  let jwtSigner: JwsSigner
 
   const { clientIdPrefix } = getOpenid4vpClientId({
     responseMode: jwt.payload.response_mode,
@@ -231,7 +236,7 @@ async function verifyJarRequestObject(options: {
   })
 
   // Allowed signer methods for each of the client id schemes
-  const clientIdToSignerMethod: Record<UniformClientIdPrefix, JwtSigner['method'][]> = {
+  const clientIdToSignerMethod: Record<UniformClientIdPrefix, JwsSigner['method'][]> = {
     decentralized_identifier: ['did'],
 
     'pre-registered': ['custom', 'did', 'jwk'],
@@ -265,14 +270,16 @@ async function verifyJarRequestObject(options: {
       kid: jwt.header.kid,
     }
   } else {
-    jwtSigner = jwtSignerFromJwt({ ...jwt, allowedSignerMethods: clientIdToSignerMethod[clientIdPrefix] })
+    jwtSigner = jwsSignerFromHeader({
+      header: jwt.header,
+      issuer: jwt.payload.iss,
+      allowedSignerMethods: clientIdToSignerMethod[clientIdPrefix],
+    })
   }
 
   const { signer } = await verifyJwt({
-    verifyJwtCallback: callbacks.verifyJwt,
-    compact: decryptedRequestObject,
-    header: jwt.header,
-    payload: jwt.payload,
+    verifyJwsCallback: callbacks.verifyJws,
+    jwt,
     signer: jwtSigner,
   })
 

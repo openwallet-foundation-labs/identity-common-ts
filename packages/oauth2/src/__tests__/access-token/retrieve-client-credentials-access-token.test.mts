@@ -7,7 +7,7 @@ import {
   retrieveClientCredentialsAccessToken,
 } from '../../access-token/retrieve-access-token'
 import type { AccessTokenResponse } from '../../access-token/z-access-token'
-import type { SignJwtCallback } from '../../callbacks'
+import type { SignJwsCallback } from '../../callbacks'
 import { Oauth2ClientErrorResponseError } from '../../error/Oauth2ClientErrorResponseError'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
 import { clientCredentialsGrantIdentifier } from '../../z-grant-type'
@@ -22,9 +22,9 @@ const mockAuthorizationServerMetadata: AuthorizationServerMetadata = {
   grant_types_supported: [clientCredentialsGrantIdentifier],
 }
 
-// Mock signJwt callback that's not actually used in client credentials flow
-const mockSignJwt: SignJwtCallback = async () => {
-  throw new Error('signJwt should not be called in client credentials flow')
+// Mock signJws callback that's not actually used in client credentials flow
+const mockSignJwt: SignJwsCallback = async () => {
+  throw new Error('signJws should not be called in client credentials flow')
 }
 
 describe('retrieveClientCredentialsAccessToken', () => {
@@ -65,7 +65,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       scope: 'read write',
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -98,7 +98,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -132,7 +132,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       resource: 'https://api.example.com',
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -162,7 +162,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -184,7 +184,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -218,7 +218,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       },
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -255,7 +255,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       resource: 'https://api.example.com',
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -292,7 +292,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
         clientAuthentication: async ({ body }) => {
           body.client_id = clientId
@@ -343,7 +343,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
         clientAuthentication: async ({ headers }) => {
           const credentials = btoa(`${clientId}:${clientSecret}`)

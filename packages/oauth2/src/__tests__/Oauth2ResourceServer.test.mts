@@ -1,13 +1,14 @@
 import { ContentType } from '@openid4vc/utils'
+import { JoseValidationError, type Jwk, type JwkSet, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { createAccessTokenJwt } from '../access-token/create-access-token'
-import type { Jwk, JwkSet } from '../common/jwk/z-jwk'
+import { verifyJwtProfileAccessToken } from '../access-token/verify-access-token'
 import { createDpopJwt } from '../dpop/dpop'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
 import { Oauth2ResourceServer } from '../Oauth2ResourceServer'
-import { callbacks, getSignJwtCallback } from './util.mjs'
+import { callbacks, getSignJwsCallback } from './util.mjs'
 
 const server = setupServer()
 
@@ -71,7 +72,7 @@ describe('Oauth2ResourceServer', () => {
       authorizationServer: authorizationServerMetadata.issuer,
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk, accessTokenSignerJwk]),
       },
       expiresInSeconds: 300,
       signer: {
@@ -90,7 +91,7 @@ describe('Oauth2ResourceServer', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk, accessTokenSignerJwk]),
       },
       request: {
         method: 'POST',
@@ -102,6 +103,9 @@ describe('Oauth2ResourceServer', () => {
         publicJwk: dpopSignerJwkPublic,
       },
       accessToken: jwt,
+      // The request is verified at this same moment, and a dpop proof issued in the future is not
+      // valid — `iat` is compared against `now` like `exp` and `nbf` are.
+      issuedAt: new Date('2024-10-01'),
     })
 
     const { dpop, tokenPayload } = await resourceServer.verifyResourceRequest({
@@ -154,7 +158,7 @@ describe('Oauth2ResourceServer', () => {
       authorizationServer: authorizationServerMetadata.issuer,
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk, accessTokenSignerJwk]),
       },
       expiresInSeconds: 300,
       signer: {
@@ -172,7 +176,7 @@ describe('Oauth2ResourceServer', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk, accessTokenSignerJwk]),
       },
       request: {
         method: 'POST',
@@ -184,6 +188,8 @@ describe('Oauth2ResourceServer', () => {
         publicJwk: dpopSignerJwkPublic,
       },
       accessToken: jwt,
+      // The request is verified at this same moment, and a dpop proof issued in the future is not valid
+      issuedAt: new Date('2024-10-01'),
     })
 
     const { scheme, dpop } = await resourceServer.verifyResourceRequest({
@@ -245,7 +251,7 @@ describe('Oauth2ResourceServer', () => {
       authorizationServer: authorizationServerMetadata.issuer,
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([accessTokenSignerJwk]),
+        signJws: getSignJwsCallback([accessTokenSignerJwk]),
       },
       expiresInSeconds: 300,
       signer: {
@@ -298,7 +304,7 @@ describe('Oauth2ResourceServer', () => {
       authorizationServer: authorizationServerMetadata.issuer,
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([accessTokenSignerJwk]),
+        signJws: getSignJwsCallback([accessTokenSignerJwk]),
       },
       expiresInSeconds: 300,
       signer: {
@@ -351,7 +357,7 @@ describe('Oauth2ResourceServer', () => {
       authorizationServer: authorizationServerMetadata.issuer,
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([accessTokenSignerJwk]),
+        signJws: getSignJwsCallback([accessTokenSignerJwk]),
       },
       expiresInSeconds: 300,
       signer: {
@@ -457,6 +463,65 @@ describe('Oauth2ResourceServer', () => {
       ])
       expect(tokenPayload.sub).toEqual('pre-auth-code')
       expect(authorizationServer).toEqual(secondAuthorizationServer.issuer)
+    })
+  })
+
+  describe('access token typ', () => {
+    const accessTokenSigner = { method: 'jwk', alg: 'ES256', publicJwk: accessTokenSignerJwkPublic } as const
+    const getJwks = () => ({ keys: [accessTokenSignerJwkPublic] })
+
+    // An access token as `createAccessTokenJwt` creates it, but with the given typ
+    const createAccessTokenWithTyp = async (typ: string) => {
+      const { jwt } = await signJwt({
+        header: { ...jwsHeaderFromSigner(accessTokenSigner), typ },
+        payload: {
+          iss: authorizationServerMetadata.issuer,
+          aud: 'https://resource-server.com',
+          sub: 'pre-auth-code',
+          iat: 1727740800,
+          exp: 1727741100,
+          jti: 'access-token-jti',
+        },
+        signer: accessTokenSigner,
+        signJwsCallback: getSignJwsCallback([accessTokenSignerJwk]),
+      })
+
+      return jwt
+    }
+
+    test.each(['application/at+jwt', 'AT+JWT', 'Application/AT+JWT'])(
+      'verifies a resource request with an access token whose typ is %s',
+      async (typ) => {
+        const resourceServer = new Oauth2ResourceServer({ callbacks: { ...callbacks, getJwks } })
+
+        const { tokenPayload } = await resourceServer.verifyResourceRequest({
+          authorizationServers: [authorizationServerMetadata],
+          request: {
+            method: 'POST',
+            url: 'https://resource-server.com/endpoint',
+            headers: new Headers({ Authorization: `Bearer ${await createAccessTokenWithTyp(typ)}` }),
+          },
+          now: new Date('2024-10-01'),
+          resourceServer: 'https://resource-server.com',
+        })
+
+        expect(tokenPayload.sub).toEqual('pre-auth-code')
+      }
+    )
+
+    test('rejects a jwt whose typ is not at+jwt with a JoseValidationError for the typ', async () => {
+      // A resource server takes a jwt that is not an access token for an opaque token, so the reason is
+      // only visible when verifying it as an access token
+      const error = await verifyJwtProfileAccessToken({
+        accessToken: await createAccessTokenWithTyp('JWT'),
+        callbacks: { ...callbacks, getJwks },
+        authorizationServers: [authorizationServerMetadata],
+        resourceServer: 'https://resource-server.com',
+        now: new Date('2024-10-01'),
+      }).catch((e) => e)
+
+      expect(error).toBeInstanceOf(JoseValidationError)
+      expect(error.message).toContain(`Expected the media type to be 'at+jwt' at "typ"`)
     })
   })
 })

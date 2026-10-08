@@ -1,9 +1,15 @@
-import { dateToSeconds, type FetchHeaders, parseWithErrorHandling, ValidationError } from '@openid4vc/utils'
+import { dateToSeconds, type FetchHeaders, parseWithErrorHandling } from '@openid4vc/utils'
+import { IdentityError } from '@owf/identity-common'
+import {
+  calculateJwkThumbprint,
+  decodeJwt,
+  type JwsSigner,
+  jwsHeaderFromSigner,
+  signJwt,
+  verifyJwt,
+  zCompactJwt,
+} from '@owf/jose'
 import { type CallbackContext, HashAlgorithm } from '../callbacks'
-import { calculateJwkThumbprint } from '../common/jwk/jwk-thumbprint'
-import { decodeJwt, jwtHeaderFromJwtSigner, jwtSignerFromJwt } from '../common/jwt/decode-jwt'
-import { verifyJwt } from '../common/jwt/verify-jwt'
-import { type JwtSigner, zCompactJwt } from '../common/jwt/z-jwt'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { Oauth2Error } from '../error/Oauth2Error'
 import { Oauth2ServerErrorResponseError } from '../error/Oauth2ServerErrorResponseError'
@@ -29,10 +35,10 @@ export interface VerifyClientAttestationJwtOptions {
   now?: Date
 
   /**
-   * Allowed skew time in seconds for validity of token. Used for `exp` and `nbf`
+   * Allowed skew time in seconds for validity of token. Used for `exp`, `nbf` and `iat`
    * verification.
    *
-   * @default 0
+   * @default 30
    */
   allowedSkewInSeconds?: number
 
@@ -51,28 +57,27 @@ export interface VerifyClientAttestationJwtOptions {
   /**
    * Callbacks used for verifying client attestation jwt, and calculating the thumbprint of the `cnf` key.
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>
 
   // TODO: expectedIssuer?
 }
 
 export type VerifiedClientAttestationJwt = Awaited<ReturnType<typeof verifyClientAttestationJwt>>
 export async function verifyClientAttestationJwt(options: VerifyClientAttestationJwtOptions) {
-  const { header, payload } = decodeJwt({
+  const decodedJwt = decodeJwt({
     jwt: options.clientAttestationJwt,
     headerSchema: zClientAttestationJwtHeader,
     payloadSchema: zClientAttestationJwtPayload,
   })
+  const { header, payload } = decodedJwt
 
+  // No `signer`: it is established from the header and `iss`, as `jwsSignerFromHeader` does.
   const { signer } = await verifyJwt({
-    signer: jwtSignerFromJwt({ header, payload }),
+    jwt: decodedJwt,
     now: options.now,
-    header,
-    payload,
-    compact: options.clientAttestationJwt,
-    verifyJwtCallback: options.callbacks.verifyJwt,
+    verifyJwsCallback: options.callbacks.verifyJws,
     errorMessage: 'client attestation jwt verification failed.',
-    allowedSkewInSeconds: options.allowedSkewInSeconds,
+    skewSeconds: options.allowedSkewInSeconds,
   })
 
   if (options.expectedClientId && options.expectedClientId !== payload.sub) {
@@ -149,18 +154,18 @@ export interface CreateClientAttestationJwtOptions {
   /**
    * Callback used for client attestation
    */
-  callbacks: Pick<CallbackContext, 'signJwt'>
+  callbacks: Pick<CallbackContext, 'signJws'>
 
   /**
    * The signer of the client attestation jwt.
    */
-  signer: JwtSigner
+  signer: JwsSigner
 }
 
 export async function createClientAttestationJwt(options: CreateClientAttestationJwtOptions) {
   const header = parseWithErrorHandling(zClientAttestationJwtHeader, {
     typ: 'oauth-client-attestation+jwt',
-    ...jwtHeaderFromJwtSigner(options.signer),
+    ...jwsHeaderFromSigner(options.signer),
   } satisfies ClientAttestationJwtHeader)
 
   const payload = parseWithErrorHandling(zClientAttestationJwtPayload, {
@@ -174,10 +179,7 @@ export async function createClientAttestationJwt(options: CreateClientAttestatio
     ...options.additionalPayload,
   } satisfies ClientAttestationJwtPayload)
 
-  const { jwt } = await options.callbacks.signJwt(options.signer, {
-    header,
-    payload,
-  })
+  const { jwt } = await signJwt({ header, payload, signer: options.signer, signJwsCallback: options.callbacks.signJws })
 
   return jwt
 }
@@ -226,7 +228,7 @@ export interface VerifyClientAttestationOptions {
   authorizationServer: string
   clientAttestationJwt: string
   clientAttestationPopJwt: string
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>
 
   /**
    * The expected client id (the `sub` of the client attestation), for example the `client_id` of the request, or
@@ -246,10 +248,10 @@ export interface VerifyClientAttestationOptions {
   now?: Date
 
   /**
-   * Allowed skew time in seconds for validity of token. Used for `exp` and `nbf`
+   * Allowed skew time in seconds for validity of token. Used for `exp`, `nbf` and `iat`
    * verification.
    *
-   * @default 0
+   * @default 30
    */
   allowedSkewInSeconds?: number
 }
@@ -288,7 +290,8 @@ export async function verifyClientAttestation({
       clientAttestationPop,
     }
   } catch (error) {
-    if (error instanceof Oauth2Error || error instanceof ValidationError) {
+    // Covers Oauth2Error, the jose errors and a ValidationError for a malformed client attestation
+    if (error instanceof IdentityError) {
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidClient,

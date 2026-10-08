@@ -1,19 +1,10 @@
-import {
-  type CallbackContext,
-  decodeJwt,
-  type Jwk,
-  type JwtSigner,
-  jwtSignerFromJwt,
-  Oauth2Error,
-  verifyJwt,
-  zJwk,
-  zJwtHeader,
-} from '@openid4vc/oauth2'
+import { type CallbackContext, Oauth2Error } from '@openid4vc/oauth2'
+import { decodeJwt, type Jwk, type JwsSigner, verifyJwt, zJwk, zJwtHeader } from '@owf/jose'
 import z from 'zod'
 
 export interface VerifyAttestationOptions {
   attestedJwt: string
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'verifyJws'>
   expectedAttestationJwk: Jwk
 }
 
@@ -22,50 +13,47 @@ export async function verifyAttestation(options: VerifyAttestationOptions) {
   if (!expectedAttestationJwk.alg) {
     throw new Oauth2Error('Invalid verifier attestation missing required alg property')
   }
-  const jwtSigner: JwtSigner = {
+  const jwtSigner: JwsSigner = {
     method: 'jwk',
     alg: expectedAttestationJwk.alg,
     publicJwk: expectedAttestationJwk,
   }
 
-  const { header, payload } = decodeJwt({ jwt: attestedJwt })
-  const verificationResult = await callbacks.verifyJwt(jwtSigner, {
-    header,
-    payload,
-    compact: attestedJwt,
+  // The claims of the attested jwt are verified by the caller, so only the signature is checked here
+  const { signer } = await verifyJwt({
+    jwt: attestedJwt,
+    signer: jwtSigner,
+    verifyJwsCallback: callbacks.verifyJws,
+    errorMessage: 'Invalid verifier attestation jwt. Signature verification failed.',
+    checkExpirationTime: false,
+    checkNotBefore: false,
+    checkIssuedAt: false,
   })
 
-  if (!verificationResult.verified) {
-    throw new Oauth2Error('Invalid verifier attestation jwt. Signature verification failed.')
-  }
-
-  return verificationResult
+  return { verified: true as const, signerJwk: signer.publicJwk }
 }
 
 export interface VerifyAttestationJwtOptions {
   attestationJwt: string
   clientId: string
   allowedSkewInSeconds?: number
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'verifyJws'>
 }
 export async function verifyAttestationJwt(options: VerifyAttestationJwtOptions) {
   const errors = []
 
-  const { header, payload } = decodeJwt({
+  const decodedJwt = decodeJwt({
     jwt: options.attestationJwt,
     headerSchema: z.object({ ...zJwtHeader.shape, typ: z.literal('verifier-attestation+jwt') }),
   })
+  const { payload } = decodedJwt
 
-  const jwtSigner = jwtSignerFromJwt({ header, payload })
   const { signer } = await verifyJwt({
-    header,
-    payload,
-    compact: options.attestationJwt,
-    signer: jwtSigner,
-    verifyJwtCallback: options.callbacks.verifyJwt,
+    jwt: decodedJwt,
+    verifyJwsCallback: options.callbacks.verifyJws,
     now: new Date(),
     expectedSubject: options.clientId,
-    allowedSkewInSeconds: options.allowedSkewInSeconds,
+    skewSeconds: options.allowedSkewInSeconds,
     requiredClaims: ['iss', 'sub', 'exp', 'cnf'],
   })
 

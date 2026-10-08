@@ -1,6 +1,6 @@
 import { zHttpsUrl } from '@openid4vc/utils'
+import { zJwsAlg } from '@owf/jose'
 import z from 'zod'
-import { zAlgValueNotNone } from '../../common/z-common'
 
 const zKnownClientAuthenticationMethod = z.enum([
   'client_secret_basic',
@@ -35,7 +35,7 @@ export const zAuthorizationServerMetadata = z
     introspection_endpoint_auth_methods_supported: z.optional(
       z.array(z.union([zKnownClientAuthenticationMethod, z.string()]))
     ),
-    introspection_endpoint_auth_signing_alg_values_supported: z.optional(z.array(zAlgValueNotNone)),
+    introspection_endpoint_auth_signing_alg_values_supported: z.optional(z.array(zJwsAlg)),
 
     // FiPA (no RFC yet)
     authorization_challenge_endpoint: z.optional(zHttpsUrl),
@@ -48,8 +48,8 @@ export const zAuthorizationServerMetadata = z
     'pre-authorized_grant_anonymous_access_supported': z.optional(z.boolean()),
 
     // OAuth 2.0 Attestation-Based Client Authentication (draft 09)
-    client_attestation_signing_alg_values_supported: z.optional(z.array(zAlgValueNotNone)),
-    client_attestation_pop_signing_alg_values_supported: z.optional(z.array(zAlgValueNotNone)),
+    client_attestation_signing_alg_values_supported: z.optional(z.array(zJwsAlg)),
+    client_attestation_pop_signing_alg_values_supported: z.optional(z.array(zJwsAlg)),
     // Endpoint from which the client can obtain a fresh challenge for the Client Attestation PoP JWT.
     challenge_endpoint: z.optional(zHttpsUrl),
 

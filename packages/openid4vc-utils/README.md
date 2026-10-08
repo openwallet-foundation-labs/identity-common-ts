@@ -24,9 +24,9 @@ yarn add @openid4vc/utils
 
 ## Dependencies
 
+- [@owf/identity-common](https://www.npmjs.com/package/@owf/identity-common)
 - [buffer](https://www.npmjs.com/package/buffer)
 - [zod](https://www.npmjs.com/package/zod)
-- [zod-validation-error](https://www.npmjs.com/package/zod-validation-error)
 
 ## Platform Support
 

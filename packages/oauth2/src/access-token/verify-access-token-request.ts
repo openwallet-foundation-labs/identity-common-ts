@@ -1,4 +1,5 @@
-import { ValidationError } from '@openid4vc/utils'
+import { IdentityError } from '@owf/identity-common'
+import type { Jwk } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import {
   type VerifiedClientAttestationJwt,
@@ -11,7 +12,6 @@ import {
   oauthClientAttestationPopHeader,
 } from '../client-attestation/z-client-attestation'
 import { SupportedClientAuthenticationMethod } from '../client-authentication'
-import type { Jwk } from '../common/jwk/z-jwk'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { type DpopVerificationOptions, verifyDpopJwt } from '../dpop/dpop'
@@ -87,9 +87,9 @@ export interface VerifyAccessTokenRequestClientAttestation {
 
   /**
    * Allowed skew time in seconds for validity of the client attestation and client attestation pop
-   * jwts. Used for `exp` and `nbf` verification.
+   * jwts. Used for `exp`, `nbf` and `iat` verification.
    *
-   * @default 0
+   * @default 30
    */
   allowedSkewInSeconds?: number
 }
@@ -139,7 +139,7 @@ export interface VerifyPreAuthorizedCodeAccessTokenRequestOptions {
   preAuthorizedCodeExpiresAt?: Date
   now?: Date
 
-  callbacks: Pick<CallbackContext, 'hash' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'hash' | 'verifyJws'>
 }
 
 export async function verifyPreAuthorizedCodeAccessTokenRequest(
@@ -229,7 +229,7 @@ export interface VerifyAuthorizationCodeAccessTokenRequestOptions {
   codeExpiresAt?: Date
   now?: Date
 
-  callbacks: Pick<CallbackContext, 'hash' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'hash' | 'verifyJws'>
 }
 
 export async function verifyAuthorizationCodeAccessTokenRequest(
@@ -293,7 +293,7 @@ export interface VerifyRefreshTokenAccessTokenRequestOptions {
   refreshTokenExpiresAt?: Date
   now?: Date
 
-  callbacks: Pick<CallbackContext, 'hash' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'hash' | 'verifyJws'>
 }
 
 export async function verifyRefreshTokenAccessTokenRequest(
@@ -344,7 +344,7 @@ export async function verifyRefreshTokenAccessTokenRequest(
 async function verifyAccessTokenRequestClientAttestation(
   options: VerifyAccessTokenRequestClientAttestation,
   authorizationServerMetadata: AuthorizationServerMetadata,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   dpopJwkThumbprint?: string,
   now?: Date
 ) {
@@ -395,7 +395,7 @@ async function verifyAccessTokenRequestClientAttestation(
 async function verifyAccessTokenRequestClientAttestationDpop(
   options: VerifyAccessTokenRequestClientAttestation & { clientAttestationJwt: string },
   authorizationServerMetadata: AuthorizationServerMetadata,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   dpopJwkThumbprint?: string,
   now?: Date
 ) {
@@ -428,7 +428,8 @@ async function verifyAccessTokenRequestClientAttestationDpop(
       allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
   } catch (error) {
-    if (error instanceof Oauth2Error || error instanceof ValidationError) {
+    // Covers Oauth2Error, the jose errors and a ValidationError for a malformed client attestation
+    if (error instanceof IdentityError) {
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidClient,
@@ -465,7 +466,7 @@ function assertConfirmationKeyMatchesDpopKey(confirmationJwkThumbprint: string, 
 async function verifyAccessTokenRequestDpop(
   options: VerifyAccessTokenRequestDpop,
   request: RequestLike,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   now?: Date
 ) {
   if (options.required && !options.jwt) {

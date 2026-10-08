@@ -1,11 +1,11 @@
-import { zNumericDate, zTyp } from '@openid4vc/utils'
+import { zNumericDate } from '@owf/identity-common'
+import { zJoseType, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
-import { zJwtHeader, zJwtPayload } from '../common/jwt/z-jwt'
 
 export const zAccessTokenProfileJwtHeader = z
   .object({
     ...zJwtHeader.shape,
-    typ: zTyp('at+jwt'),
+    typ: zJoseType('at+jwt'),
   })
   .loose()
 export type AccessTokenProfileJwtHeader = z.infer<typeof zAccessTokenProfileJwtHeader>

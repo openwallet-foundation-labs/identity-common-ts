@@ -2,7 +2,7 @@ import { encodeToBase64Url } from '@openid4vc/utils'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
+import { getSignJwsCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
 import { parseOpenid4vpAuthorizationResponsePayload } from '../authorization-response/parse-authorization-response-payload.js'
 import {
   createOpenid4vpAuthorizationResponse,
@@ -20,7 +20,7 @@ const callbacks = {
   ...partialCallbacks,
   // msw replaces the global fetch when the server starts listening
   fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
-  signJwt: getSignJwtCallback([]),
+  signJws: getSignJwsCallback([]),
   encryptJwe: () => {
     throw new Error('Not implemented')
   },
@@ -133,14 +133,14 @@ describe('resolveOpenid4vpAuthorizationRequest errors', () => {
 
   test('throws an Openid4vpAuthorizationRequestError with the unverified request when the request object signature is invalid', async () => {
     const encode = (value: object) => encodeToBase64Url(JSON.stringify(value))
-    const requestObject = `${encode({ alg: 'ES256', typ: 'oauth-authz-req+jwt', x5c: ['MIIB'] })}.${encode({
+    const requestObject = `${encode({ alg: 'ES256', typ: 'oauth-authz-req+jwt', x5c: ['MAA='] })}.${encode({
       ...authenticatedRequest,
       client_id: 'x509_san_dns:example.com',
     })}.c2lnbmF0dXJl`
 
     const error = await resolveOpenid4vpAuthorizationRequest({
       authorizationRequestPayload: { client_id: 'x509_san_dns:example.com', request: requestObject },
-      callbacks: { ...callbacks, verifyJwt: () => ({ verified: false }) },
+      callbacks: { ...callbacks, verifyJws: () => ({ verified: false }) },
       responseMode: { type: 'direct_post' },
     }).catch((error) => error)
 

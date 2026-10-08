@@ -1,10 +1,5 @@
-import {
-  type CallbackContext,
-  type JweEncryptor,
-  type JwtSigner,
-  jwtHeaderFromJwtSigner,
-  Oauth2Error,
-} from '@openid4vc/oauth2'
+import { type CallbackContext, Oauth2Error } from '@openid4vc/oauth2'
+import { type JweEncryptor, type JwsSigner, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import type {
   JarmAuthorizationResponse,
   JarmAuthorizationResponseEncryptedOnly,
@@ -12,9 +7,9 @@ import type {
 
 export interface CreateJarmAuthorizationResponseOptions {
   jarmAuthorizationResponse: JarmAuthorizationResponse | JarmAuthorizationResponseEncryptedOnly
-  jwtSigner?: JwtSigner
+  jwtSigner?: JwsSigner
   jweEncryptor?: JweEncryptor
-  callbacks: Pick<CallbackContext, 'signJwt' | 'encryptJwe'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'encryptJwe'>
 }
 
 export async function createJarmAuthorizationResponse(options: CreateJarmAuthorizationResponseOptions) {
@@ -25,9 +20,11 @@ export async function createJarmAuthorizationResponse(options: CreateJarmAuthori
   }
 
   if (jwtSigner && !jweEncryptor) {
-    const signed = await callbacks.signJwt(jwtSigner, {
-      header: jwtHeaderFromJwtSigner(jwtSigner),
+    const signed = await signJwt({
+      header: jwsHeaderFromSigner(jwtSigner),
       payload: jarmAuthorizationResponse,
+      signer: jwtSigner,
+      signJwsCallback: callbacks.signJws,
     })
     return { jarmAuthorizationResponseJwt: signed.jwt }
   }
@@ -35,9 +32,11 @@ export async function createJarmAuthorizationResponse(options: CreateJarmAuthori
   if (!jwtSigner || !jweEncryptor) {
     throw new Oauth2Error('JWT signer and/or encryptor are required to create a JARM auth response.')
   }
-  const signed = await callbacks.signJwt(jwtSigner, {
-    header: jwtHeaderFromJwtSigner(jwtSigner),
+  const signed = await signJwt({
+    header: jwsHeaderFromSigner(jwtSigner),
     payload: jarmAuthorizationResponse,
+    signer: jwtSigner,
+    signJwsCallback: callbacks.signJws,
   })
 
   const encrypted = await callbacks.encryptJwe(jweEncryptor, signed.jwt)

@@ -6,6 +6,20 @@ export {
   type Oid4vcTsConfig,
   setGlobalConfig,
 } from '@openid4vc/utils'
+// The jwt parsing and verification errors are raised by `@owf/jose`, so they are exported here as well.
+export {
+  JoseAlgorithmNotAllowedError,
+  JoseClaimVerificationError,
+  type JoseClaimVerificationReason,
+  JoseCriticalHeaderError,
+  JoseError,
+  JoseNotSupportedError,
+  JoseParseError,
+  JoseSignatureVerificationError,
+  JoseSignerError,
+  JoseValidationError,
+  JoseVerificationError,
+} from '@owf/jose'
 export type {
   RetrieveAccessTokenReturn,
   RetrieveAuthorizationCodeAccessTokenOptions,
@@ -74,9 +88,9 @@ export type {
   GetAuthorizationServerMetadataCallback,
   GetJwksCallback,
   HashCallback,
-  SignJwtCallback,
+  SignJwsCallback,
   VerifyDataIntegrityProofCallback,
-  VerifyJwtCallback,
+  VerifyJwsCallback,
 } from './callbacks'
 export { HashAlgorithm } from './callbacks'
 export {
@@ -121,39 +135,9 @@ export {
   clientAuthenticationNone,
   SupportedClientAuthenticationMethod,
 } from './client-authentication'
-export {
-  fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray,
-  fullySpecifiedCoseAlgorithmToJwaSignatureAlgorithm,
-  jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray,
-  jwaSignatureAlgorithmToFullySpecifiedCoseAlgorithm,
-} from './common/algorithm'
-export { type CalculateJwkThumbprintOptions, calculateJwkThumbprint } from './common/jwk/jwk-thumbprint'
 // TODO: should we move this to oauth2-utils?
 export { isJwkInSet } from './common/jwk/jwks'
-export { type Jwk, type JwkSet, zJwk, zJwkSet } from './common/jwk/z-jwk'
-export {
-  type DecodeJwtOptions,
-  type DecodeJwtResult,
-  decodeJwt,
-  jwtHeaderFromJwtSigner,
-  jwtSignerFromJwt,
-} from './common/jwt/decode-jwt'
-export { type DecodeJwtHeaderResult, decodeJwtHeader } from './common/jwt/decode-jwt-header'
-export { verifyJwt } from './common/jwt/verify-jwt'
-export { zCompactJwe } from './common/jwt/z-jwe'
-export type { JweEncryptor, JwtHeader, JwtPayload } from './common/jwt/z-jwt'
-export {
-  type JwtSigner,
-  type JwtSignerCustom,
-  type JwtSignerDid,
-  type JwtSignerJwk,
-  type JwtSignerWithJwk,
-  type JwtSignerX5c,
-  zCompactJwt,
-  zJwtHeader,
-  zJwtPayload,
-} from './common/jwt/z-jwt'
-export { type RequestLike, zAlgValueNotNone } from './common/z-common'
+export type { RequestLike } from './common/z-common'
 export {
   Oauth2ErrorCodes,
   type Oauth2ErrorResponse,
@@ -165,8 +149,6 @@ export { authorizationServerRequestWithDpopRetry } from './dpop/dpop-retry'
 export { Oauth2ClientAuthorizationChallengeError } from './error/Oauth2ClientAuthorizationChallengeError'
 export { Oauth2ClientErrorResponseError } from './error/Oauth2ClientErrorResponseError'
 export { Oauth2Error, type Oauth2ErrorOptions } from './error/Oauth2Error'
-export { Oauth2JwtParseError } from './error/Oauth2JwtParseError'
-export { Oauth2JwtVerificationError } from './error/Oauth2JwtVerificationError'
 export {
   Oauth2ResourceUnauthorizedError,
   type WwwAuthenticateHeaderChallenge,

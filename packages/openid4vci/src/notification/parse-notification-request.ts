@@ -1,5 +1,6 @@
 import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { parseWithErrorHandling, ValidationError } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
 import { type NotificationRequest, zNotificationRequest } from './z-notification'
 
 export interface ParseNotificationRequestOptions {

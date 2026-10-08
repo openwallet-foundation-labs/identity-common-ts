@@ -1,8 +1,10 @@
-import { dateToSeconds, ValidationError } from '@openid4vc/utils'
+import { dateToSeconds } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
+import { JoseValidationError, signJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
+import { getSignJwsCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
 import { type CredentialIssuerMetadata, type IssuerInfo, Openid4vciClient, Openid4vciIssuer } from '../index.js'
 
 const privateJwk = {
@@ -17,7 +19,7 @@ const signer = { method: 'jwk', alg: 'ES256', publicJwk } as const
 const callbacks = {
   ...partialCallbacks,
   fetch,
-  signJwt: getSignJwtCallback([privateJwk]),
+  signJws: getSignJwsCallback([privateJwk]),
 }
 const issuer = new Openid4vciIssuer({ callbacks })
 const client = new Openid4vciClient({ callbacks })
@@ -80,7 +82,9 @@ describe('Issuer info metadata', () => {
   })
 
   test('rejects malformed issuer info in signed metadata', async () => {
-    const { jwt } = await callbacks.signJwt(signer, {
+    const { jwt } = await signJwt({
+      signer,
+      signJwsCallback: callbacks.signJws,
       header: { alg: 'ES256', typ: 'openidvci-issuer-metadata+jwt', jwk: publicJwk },
       payload: {
         ...credentialIssuerMetadata,
@@ -92,7 +96,7 @@ describe('Issuer info metadata', () => {
     server.use(http.get(metadataUrl, () => HttpResponse.text(jwt, { headers: { 'Content-Type': 'application/jwt' } })))
 
     await expect(client.resolveIssuerMetadata(credentialIssuerMetadata.credential_issuer)).rejects.toThrow(
-      ValidationError
+      JoseValidationError
     )
   })
 })

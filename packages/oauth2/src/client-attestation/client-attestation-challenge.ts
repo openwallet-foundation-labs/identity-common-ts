@@ -1,10 +1,5 @@
-import {
-  ContentType,
-  createZodFetcher,
-  type FetchHeaders,
-  InvalidFetchResponseError,
-  ValidationError,
-} from '@openid4vc/utils'
+import { ContentType, createZodFetcher, type FetchHeaders, InvalidFetchResponseError } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import { Oauth2ErrorCodes, type Oauth2ErrorResponse } from '../common/z-oauth2-error'
 import { Oauth2ClientErrorResponseError } from '../error/Oauth2ClientErrorResponseError'

@@ -1,11 +1,12 @@
 import crypto from 'node:crypto'
-import type { CallbackContext, Jwk } from '@openid4vc/oauth2'
+import type { CallbackContext } from '@openid4vc/oauth2'
 import { ContentType } from '@openid4vc/utils'
+import type { Jwk } from '@owf/jose'
 import * as jose from 'jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
-import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
+import { getSignJwsCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
 import {
   type CredentialConfigurationSupportedWithFormats,
   type CredentialRequestEncryption,
@@ -63,7 +64,7 @@ const decryptJwe: CallbackContext['decryptJwe'] = async (jwe) => {
 const callbacks = {
   ...partialCallbacks,
   fetch,
-  signJwt: getSignJwtCallback([credentialRequestProofJwk]),
+  signJws: getSignJwsCallback([credentialRequestProofJwk]),
   encryptJwe,
   decryptJwe,
 }

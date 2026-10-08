@@ -1,5 +1,6 @@
-import { type CallbackContext, type JwtSigner, jwtHeaderFromJwtSigner } from '@openid4vc/oauth2'
+import type { CallbackContext } from '@openid4vc/oauth2'
 import { dateToSeconds, parseWithErrorHandling } from '@openid4vc/utils'
+import { type JwsSigner, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import type { CredentialIssuerMetadata } from './z-credential-issuer-metadata'
 import {
   type SignedCredentialIssuerMetadataHeader,
@@ -27,7 +28,7 @@ export interface CreateSignedCredentialIssuerMetadataJwtOptions {
   /**
    * Signer of the credential issuer metadata jwt
    */
-  signer: JwtSigner
+  signer: JwsSigner
 
   /**
    * The issuer of the issuer metadata jwt. This field is optional
@@ -37,7 +38,7 @@ export interface CreateSignedCredentialIssuerMetadataJwtOptions {
   /**
    * Callbacks used for creating the credential issuer metadata jwt
    */
-  callbacks: Pick<CallbackContext, 'signJwt'>
+  callbacks: Pick<CallbackContext, 'signJws'>
 
   /**
    * Additional payload to include in the credential issuer metadata jwt payload. Will be applied after
@@ -50,7 +51,7 @@ export async function createSignedCredentialIssuerMetadataJwt(
   options: CreateSignedCredentialIssuerMetadataJwtOptions
 ): Promise<string> {
   const header = parseWithErrorHandling(zSignedCredentialIssuerMetadataHeader, {
-    ...jwtHeaderFromJwtSigner(options.signer),
+    ...jwsHeaderFromSigner(options.signer),
     typ: 'openidvci-issuer-metadata+jwt',
   } satisfies SignedCredentialIssuerMetadataHeader)
 
@@ -63,6 +64,6 @@ export async function createSignedCredentialIssuerMetadataJwt(
     ...options.additionalPayload,
   } satisfies SignedCredentialIssuerMetadataPayload)
 
-  const { jwt } = await options.callbacks.signJwt(options.signer, { header, payload })
+  const { jwt } = await signJwt({ header, payload, signer: options.signer, signJwsCallback: options.callbacks.signJws })
   return jwt
 }

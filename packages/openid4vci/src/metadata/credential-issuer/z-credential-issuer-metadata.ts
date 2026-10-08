@@ -1,10 +1,10 @@
-import {
-  fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray,
-  jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray,
-  zAlgValueNotNone,
-  zJwk,
-} from '@openid4vc/oauth2'
 import { type InferOutputUnion, type Simplify, zDataUrl, zHttpsUrl } from '@openid4vc/utils'
+import {
+  coseAlgorithmsToJwaSignatureAlgorithms,
+  jwaSignatureAlgorithmsToCoseAlgorithms,
+  zJwk,
+  zJwsAlg,
+} from '@owf/jose'
 import z from 'zod'
 import {
   type CredentialFormatIdentifier,
@@ -142,7 +142,7 @@ export type CredentialIssuerMetadataDisplayEntry = z.infer<typeof zCredentialIss
 
 export const zCredentialRequestEncryptionJwk = zJwk.extend({
   kid: z.string().min(1),
-  alg: zAlgValueNotNone.min(1),
+  alg: zJwsAlg,
 })
 export type CredentialRequestEncryptionJwk = z.infer<typeof zCredentialRequestEncryptionJwk>
 
@@ -246,7 +246,7 @@ export const zCredentialConfigurationSupportedDraft11ToV1 = z
           credential_signing_alg_values_supported:
             // For mso_mdoc, transform JWA signature algorithm strings to fully-specified COSE algorithm numbers
             format === zMsoMdocFormatIdentifier.value
-              ? jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray(cryptographic_suites_supported)
+              ? jwaSignatureAlgorithmsToCoseAlgorithms(cryptographic_suites_supported)
               : cryptographic_suites_supported,
         }
       : {}),
@@ -359,9 +359,7 @@ const zCredentialConfigurationSupportedV1ToDraft11 = zCredentialConfigurationSup
               // For mso_mdoc, transform fully-specified COSE algorithm numbers to JWA signature algorithm strings
               format === zMsoMdocFormatIdentifier.value &&
               typeof credential_signing_alg_values_supported[0] === 'number'
-                ? fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray(
-                    credential_signing_alg_values_supported as number[]
-                  )
+                ? coseAlgorithmsToJwaSignatureAlgorithms(credential_signing_alg_values_supported as number[])
                 : credential_signing_alg_values_supported,
           }
         : {}),

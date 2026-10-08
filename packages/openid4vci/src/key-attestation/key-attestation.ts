@@ -1,13 +1,6 @@
-import {
-  type CallbackContext,
-  decodeJwt,
-  type Jwk,
-  type JwtSigner,
-  jwtHeaderFromJwtSigner,
-  jwtSignerFromJwt,
-  verifyJwt,
-} from '@openid4vc/oauth2'
+import type { CallbackContext } from '@openid4vc/oauth2'
 import { dateToSeconds, parseWithErrorHandling, type StringWithAutoCompletion } from '@openid4vc/utils'
+import { decodeJwt, type Jwk, type JwsSigner, jwsHeaderFromSigner, signJwt, verifyJwt } from '@owf/jose'
 import { Openid4vciError } from '../error/Openid4vciError'
 import {
   type Iso18045,
@@ -71,12 +64,12 @@ export interface CreateKeyAttestationJwtOptions {
   /**
    * Signer of the key attestation jwt
    */
-  signer: JwtSigner
+  signer: JwsSigner
 
   /**
    * Callbacks used for creating the key attestation jwt
    */
-  callbacks: Pick<CallbackContext, 'signJwt'>
+  callbacks: Pick<CallbackContext, 'signJws'>
 
   /**
    * Additional payload to include in the key attestation jwt payload. Will be applied after
@@ -87,7 +80,7 @@ export interface CreateKeyAttestationJwtOptions {
 
 export async function createKeyAttestationJwt(options: CreateKeyAttestationJwtOptions): Promise<string> {
   const header = parseWithErrorHandling(zKeyAttestationJwtHeader, {
-    ...jwtHeaderFromJwtSigner(options.signer),
+    ...jwsHeaderFromSigner(options.signer),
     typ: 'key-attestation+jwt',
   } satisfies KeyAttestationJwtHeader)
 
@@ -102,7 +95,7 @@ export async function createKeyAttestationJwt(options: CreateKeyAttestationJwtOp
     ...options.additionalPayload,
   } satisfies KeyAttestationJwtPayload)
 
-  const { jwt } = await options.callbacks.signJwt(options.signer, { header, payload })
+  const { jwt } = await signJwt({ header, payload, signer: options.signer, signJwsCallback: options.callbacks.signJws })
   return jwt
 }
 
@@ -169,12 +162,13 @@ export interface VerifyKeyAttestationJwtOptions {
   /**
    * Callbacks required for the key attestation jwt verification
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'verifyJws'>
 }
 
 export type VerifyKeyAttestationJwtReturn = Awaited<ReturnType<typeof verifyKeyAttestationJwt>>
 export async function verifyKeyAttestationJwt(options: VerifyKeyAttestationJwtOptions) {
-  const { header, payload } = parseKeyAttestationJwt({ keyAttestationJwt: options.keyAttestationJwt, use: options.use })
+  const decodedJwt = parseKeyAttestationJwt({ keyAttestationJwt: options.keyAttestationJwt, use: options.use })
+  const { header, payload } = decodedJwt
 
   // TODO: if you use stateless nonce, it doesn't make sense to verify the nonce here
   // We should just return the nonce after verification so it can be checked (or actually, it should be checked upfront)
@@ -184,11 +178,8 @@ export async function verifyKeyAttestationJwt(options: VerifyKeyAttestationJwtOp
   }
 
   const { signer } = await verifyJwt({
-    compact: options.keyAttestationJwt,
-    header,
-    payload,
-    signer: jwtSignerFromJwt({ header, payload }),
-    verifyJwtCallback: options.callbacks.verifyJwt,
+    jwt: decodedJwt,
+    verifyJwsCallback: options.callbacks.verifyJws,
     errorMessage: 'Error verifying key attestation jwt',
     expectedNonce: options.expectedNonce,
     now: options.now,

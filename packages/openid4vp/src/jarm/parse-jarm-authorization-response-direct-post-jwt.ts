@@ -1,5 +1,6 @@
-import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError, zCompactJwe, zCompactJwt } from '@openid4vc/oauth2'
+import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { ContentType, URLSearchParams } from '@openid4vc/utils'
+import { zCompactJwe, zCompactJwt } from '@owf/jose'
 import z from 'zod'
 
 export async function parseJarmAuthorizationResponseDirectPostJwt(request: Request) {

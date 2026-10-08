@@ -38,7 +38,7 @@ export interface ResolveOpenid4vpAuthorizationRequestOptions {
    */
   responseMode: ExpectedResponseMode
 
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'decryptJwe' | 'getX509CertificateMetadata' | 'fetch' | 'hash'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'decryptJwe' | 'getX509CertificateMetadata' | 'fetch' | 'hash'>
 }
 
 export type ResolvedOpenid4vpAuthorizationRequest = {

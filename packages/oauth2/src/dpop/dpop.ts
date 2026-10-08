@@ -7,11 +7,17 @@ import {
   parseWithErrorHandling,
   URL,
 } from '@openid4vc/utils'
+import { IdentityError } from '@owf/identity-common'
+import {
+  calculateJwkThumbprint,
+  type DecodeJwtResult,
+  decodeJwt,
+  type JwsSignerJwk,
+  signJwt,
+  verifyJwt,
+  zCompactJwt,
+} from '@owf/jose'
 import { type CallbackContext, HashAlgorithm } from '../callbacks'
-import { calculateJwkThumbprint } from '../common/jwk/jwk-thumbprint'
-import { type DecodeJwtResult, decodeJwt } from '../common/jwt/decode-jwt'
-import { verifyJwt } from '../common/jwt/verify-jwt'
-import { type JwtSignerJwk, zCompactJwt } from '../common/jwt/z-jwt'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { Oauth2Error } from '../error/Oauth2Error'
@@ -27,7 +33,7 @@ export interface RequestDpopOptions {
   /**
    * The signer of the dpop jwt
    */
-  signer: JwtSignerJwk
+  signer: JwsSignerJwk
 }
 
 export async function createDpopHeadersForRequest(options: CreateDpopJwtOptions) {
@@ -68,12 +74,12 @@ export interface CreateDpopJwtOptions {
   /**
    * Callback used for dpop
    */
-  callbacks: Pick<CallbackContext, 'generateRandom' | 'hash' | 'signJwt'>
+  callbacks: Pick<CallbackContext, 'generateRandom' | 'hash' | 'signJws'>
 
   /**
    * The signer of the dpop jwt. Only jwk signer allowed.
    */
-  signer: JwtSignerJwk
+  signer: JwsSignerJwk
 }
 
 export async function createDpopJwt(options: CreateDpopJwtOptions) {
@@ -99,10 +105,7 @@ export async function createDpopJwt(options: CreateDpopJwtOptions) {
     ...options.additionalPayload,
   } satisfies DpopJwtPayload)
 
-  const { jwt } = await options.callbacks.signJwt(options.signer, {
-    header,
-    payload,
-  })
+  const { jwt } = await signJwt({ header, payload, signer: options.signer, signJwsCallback: options.callbacks.signJws })
 
   return jwt
 }
@@ -110,7 +113,7 @@ export async function createDpopJwt(options: CreateDpopJwtOptions) {
 export interface DpopVerificationOptions {
   /**
    * Allowed dpop signing alg values. If not provided
-   * any alg values are allowed and it's up to the `verifyJwtCallback`
+   * any alg values are allowed and it's up to the `verifyJwsCallback`
    * to handle the alg.
    */
   allowedSigningAlgs?: string[]
@@ -124,6 +127,9 @@ export interface DpopVerificationOptions {
 
   /**
    * Allowed clock skew in seconds used when validating freshness based on `iat`.
+   *
+   * When provided, it is also the skew applied to the `iat`, `nbf` and `exp` checks of the
+   * proof, which otherwise use the default of `@owf/jose` (30 seconds).
    *
    * @default 0
    */
@@ -170,7 +176,7 @@ export interface VerifyDpopJwtOptions extends DpopVerificationOptions {
   /**
    * Callbacks used for verifying dpop jwt
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>
 
   now?: Date
 }
@@ -293,11 +299,11 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
         publicJwk: header.jwk,
       },
       now: options.now,
-      header,
-      payload,
-      compact: options.dpopJwt,
-      verifyJwtCallback: options.callbacks.verifyJwt,
+      jwt: decodedDpopJwt,
+      verifyJwsCallback: options.callbacks.verifyJws,
       errorMessage: 'dpop jwt verification failed',
+      // The `iat` (and `nbf`, `exp`) of the proof is verified here too, so a configured skew applies to it
+      skewSeconds: options.allowedSkewInSeconds,
     })
 
     return {
@@ -306,7 +312,7 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
       jwkThumbprint,
     }
   } catch (error) {
-    if (error instanceof Oauth2Error) {
+    if (error instanceof IdentityError) {
       throw new Oauth2ServerErrorResponseError({
         error: Oauth2ErrorCodes.InvalidDpopProof,
         error_description: error.message,

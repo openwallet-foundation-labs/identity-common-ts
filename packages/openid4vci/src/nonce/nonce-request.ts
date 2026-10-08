@@ -1,5 +1,6 @@
 import { InvalidFetchResponseError } from '@openid4vc/oauth2'
-import { ContentType, createZodFetcher, type Fetch, parseWithErrorHandling, ValidationError } from '@openid4vc/utils'
+import { ContentType, createZodFetcher, type Fetch, parseWithErrorHandling } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
 import { Openid4vciError } from '../error/Openid4vciError'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { type NonceResponse, zNonceResponse } from './z-nonce'

@@ -1,7 +1,7 @@
-import { zHttpMethod, zHttpsUrl, zNumericDate } from '@openid4vc/utils'
+import { zHttpMethod, zHttpsUrl } from '@openid4vc/utils'
+import { zNumericDate } from '@owf/identity-common'
+import { zJwk, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
-import { zJwk } from '../common/jwk/z-jwk'
-import { zJwtHeader, zJwtPayload } from '../common/jwt/z-jwt'
 
 export const zDpopJwtPayload = z
   .object({

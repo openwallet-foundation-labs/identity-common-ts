@@ -1,6 +1,5 @@
 import {
   type CallbackContext,
-  decodeJwt,
   hasRequestUri,
   isJarAuthorizationRequest,
   Oauth2ErrorCodes,
@@ -11,7 +10,9 @@ import {
   type RequestLike,
   zJarAuthorizationRequest,
 } from '@openid4vc/oauth2'
-import { formatZodError, parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@openid4vc/utils'
+import { formatZodError } from '@owf/identity-common'
+import { decodeJwt } from '@owf/jose'
 import z from 'zod'
 import type {
   InteractiveAuthorizationFollowUpRequest,

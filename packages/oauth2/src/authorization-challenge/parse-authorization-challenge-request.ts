@@ -1,4 +1,4 @@
-import { formatZodError } from '@openid4vc/utils'
+import { formatZodError } from '@owf/identity-common'
 import {
   type ParseAuthorizationRequestResult,
   parseAuthorizationRequest,

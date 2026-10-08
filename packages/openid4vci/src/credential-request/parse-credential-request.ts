@@ -1,6 +1,6 @@
 import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { ContentType, ValidationError } from '@openid4vc/utils'
-import { isMediaType } from '@owf/identity-common'
+import { ContentType } from '@openid4vc/utils'
+import { isMediaType, ValidationError } from '@owf/identity-common'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../version'
 import { type CredentialRequestBodyOptions, decryptCredentialRequest } from './decrypt-credential-request'

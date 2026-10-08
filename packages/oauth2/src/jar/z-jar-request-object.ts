@@ -1,5 +1,5 @@
+import { zJwtPayload } from '@owf/jose'
 import { z } from 'zod'
-import { zJwtPayload } from '../common/jwt/z-jwt'
 
 export const zJarRequestObjectPayload = z
   .object({

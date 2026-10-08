@@ -1,11 +1,5 @@
-import {
-  type BaseSchema,
-  ContentType,
-  createZodFetcher,
-  type Fetch,
-  InvalidFetchResponseError,
-  ValidationError,
-} from '@openid4vc/utils'
+import { type BaseSchema, ContentType, createZodFetcher, type Fetch, InvalidFetchResponseError } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
 import type z from 'zod'
 
 export interface FetchWellKnownMetadataOptions {

@@ -1,9 +1,10 @@
-import { Oauth2Error, zAlgValueNotNone } from '@openid4vc/oauth2'
+import { Oauth2Error } from '@openid4vc/oauth2'
 import { parseWithErrorHandling } from '@openid4vc/utils'
+import { zJwsAlg } from '@owf/jose'
 import { z } from 'zod'
 
 export const zJarmSignOnlyClientMetadata = z.object({
-  authorization_signed_response_alg: zAlgValueNotNone,
+  authorization_signed_response_alg: zJwsAlg,
 
   authorization_encrypted_response_alg: z.optional(z.never()),
   authorization_encrypted_response_enc: z.optional(z.never()),

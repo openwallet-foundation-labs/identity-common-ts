@@ -1,12 +1,6 @@
-import {
-  type CallbackContext,
-  decodeJwtHeader,
-  Oauth2ErrorCodes,
-  Oauth2ServerErrorResponseError,
-  zCompactJwe,
-  zCompactJwt,
-} from '@openid4vc/oauth2'
+import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { parseWithErrorHandling } from '@openid4vc/utils'
+import { decodeJwtHeader, zCompactJwe, zCompactJwt } from '@owf/jose'
 import z from 'zod'
 import type { Openid4vpAuthorizationRequest } from '../authorization-request/z-authorization-request'
 import type { Openid4vpAuthorizationRequestDcApi } from '../authorization-request/z-authorization-request-dc-api'
@@ -20,7 +14,7 @@ import { validateOpenid4vpAuthorizationResponsePayload } from './validate-author
 export interface ParseJarmAuthorizationResponseOptions {
   jarmResponseJwt: string
   authorizationRequestPayload: Openid4vpAuthorizationRequest | Openid4vpAuthorizationRequestDcApi
-  callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJws'>
 
   expectedClientId: string
 }

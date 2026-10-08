@@ -1,4 +1,5 @@
-import { formatZodError, URL } from '@openid4vc/utils'
+import { URL } from '@openid4vc/utils'
+import { formatZodError } from '@owf/identity-common'
 import z from 'zod'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { Oauth2ServerErrorResponseError } from '../error/Oauth2ServerErrorResponseError'

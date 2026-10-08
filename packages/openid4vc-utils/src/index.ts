@@ -12,7 +12,6 @@ export {
 export { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
 export { JsonParseError } from './error/JsonParseError'
 export { Openid4vcBaseError } from './error/Openid4vcBaseError'
-export { ValidationError } from './error/ValidationError'
 export { createFetcher, createZodFetcher, type ZodFetcher } from './fetcher'
 export {
   type Fetch,
@@ -42,7 +41,6 @@ export {
   zHttpsUrl,
   zInteger,
   zIs,
-  zNumericDate,
   zStringToJson,
   zTyp,
 } from './validation'
@@ -51,4 +49,3 @@ export {
   parseWwwAuthenticateHeader,
   type WwwAuthenticateHeaderChallenge,
 } from './www-authenticate'
-export { formatZodError } from './zod-error'

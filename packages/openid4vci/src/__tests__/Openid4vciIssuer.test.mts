@@ -1,7 +1,8 @@
 import { preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
 import { addSecondsToDate, ContentType } from '@openid4vc/utils'
+import { type JwsSigner, signJwt } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
-import { callbacks, getSignJwtCallback } from '../../../oauth2/src/__tests__/util.mjs'
+import { callbacks, getSignJwsCallback } from '../../../oauth2/src/__tests__/util.mjs'
 import { parseCredentialRequestPayload } from '../credential-request/parse-credential-request-payload.js'
 import { createCredentialRequestJwtProof } from '../formats/proof-type/jwt/jwt-proof-type.js'
 import { createKeyAttestationJwt } from '../key-attestation/key-attestation.js'
@@ -30,7 +31,7 @@ const { d: _, ...keyAttestationJwkPublic } = keyAttestationJwk
 const issuer = new Openid4vciIssuer({
   callbacks: {
     ...callbacks,
-    signJwt: getSignJwtCallback([]),
+    signJws: getSignJwsCallback([]),
   },
 })
 
@@ -182,7 +183,7 @@ describe('Openid4vciIssuer', () => {
     const keyAttestationJwt = await createKeyAttestationJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([keyAttestationJwk]),
+        signJws: getSignJwsCallback([keyAttestationJwk]),
       },
       attestedKeys: [credentialRequestProofJwkPublic],
       expiresAt: addSecondsToDate(new Date(), 500),
@@ -200,7 +201,7 @@ describe('Openid4vciIssuer', () => {
     const credentialRequestJwt = await createCredentialRequestJwtProof({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([credentialRequestProofJwk]),
+        signJws: getSignJwsCallback([credentialRequestProofJwk]),
       },
       keyAttestationJwt,
       credentialIssuer: credentialIssuerMetadata.credential_issuer,
@@ -321,7 +322,7 @@ describe('Openid4vciIssuer', () => {
     const credentialRequestJwtWithoutKeyAttestation = await createCredentialRequestJwtProof({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([credentialRequestProofJwk]),
+        signJws: getSignJwsCallback([credentialRequestProofJwk]),
       },
       credentialIssuer: credentialIssuerMetadata.credential_issuer,
       signer: {
@@ -350,7 +351,7 @@ describe('Openid4vciIssuer', () => {
     const attestationProof = await createKeyAttestationJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([keyAttestationJwk]),
+        signJws: getSignJwsCallback([keyAttestationJwk]),
       },
       attestedKeys: [credentialRequestProofJwkPublic],
       use: 'proof_type.attestation',
@@ -391,6 +392,82 @@ describe('Openid4vciIssuer', () => {
       c_nonce_expires_in: 500,
       credential: 'the-credential',
       format: 'vc+sd-jwt',
+    })
+  })
+
+  describe('verifyCredentialRequestJwtProof typ', () => {
+    const jwkSigner = { method: 'jwk', alg: 'ES256', publicJwk: credentialRequestProofJwkPublic } as const
+
+    // A jwt proof as `createCredentialRequestJwtProof` creates it, but with the given header
+    const signJwtProof = async ({
+      header,
+      signer = jwkSigner,
+      clientId,
+    }: {
+      header: Record<string, unknown>
+      signer?: JwsSigner
+      clientId?: string
+    }) => {
+      const { jwt } = await signJwt({
+        header,
+        payload: {
+          aud: credentialIssuerMetadata.credential_issuer,
+          iat: Math.floor(Date.now() / 1000),
+          nonce: 'some-nonce',
+          iss: clientId,
+        },
+        signer,
+        signJwsCallback: getSignJwsCallback([credentialRequestProofJwk]),
+      })
+
+      return jwt
+    }
+
+    test.each(['application/openid4vci-proof+jwt', 'OpenID4VCI-Proof+JWT'])(
+      'verifies a jwt proof whose typ is %s',
+      async (typ) => {
+        const { header } = await issuer.verifyCredentialRequestJwtProof({
+          expectedNonce: 'some-nonce',
+          issuerMetadata,
+          jwt: await signJwtProof({ header: { typ, jwk: credentialRequestProofJwkPublic } }),
+        })
+
+        expect(header.typ).toEqual(typ)
+      }
+    )
+
+    test.each(['openid4vci-proof+jwt', 'application/openid4vci-proof+jwt', 'OpenID4VCI-Proof+JWT'])(
+      'verifies a jwt proof whose typ is %s with a did in kid that is not the iss, as the iss is the client id',
+      async (typ) => {
+        const encodedJwk = Buffer.from(JSON.stringify(credentialRequestProofJwkPublic)).toString('base64url')
+        const didUrl = `did:jwk:${encodedJwk}#0`
+
+        const { signer } = await issuer.verifyCredentialRequestJwtProof({
+          expectedNonce: 'some-nonce',
+          issuerMetadata,
+          clientId: 'some_client_id',
+          jwt: await signJwtProof({
+            header: { typ, kid: didUrl },
+            signer: { method: 'did', alg: 'ES256', didUrl },
+            clientId: 'some_client_id',
+          }),
+        })
+
+        expect(signer).toEqual({ method: 'did', alg: 'ES256', didUrl, publicJwk: credentialRequestProofJwkPublic })
+      }
+    )
+
+    test('rejects a jwt whose typ is not openid4vci-proof+jwt as invalid_proof, caused by the typ', async () => {
+      const error = await issuer
+        .verifyCredentialRequestJwtProof({
+          expectedNonce: 'some-nonce',
+          issuerMetadata,
+          jwt: await signJwtProof({ header: { typ: 'key-attestation+jwt', jwk: credentialRequestProofJwkPublic } }),
+        })
+        .catch((e) => e)
+
+      expect(error.errorResponse).toEqual({ error: 'invalid_proof', error_description: 'Invalid proof' })
+      expect(error.cause.message).toContain(`Expected the media type to be 'openid4vci-proof+jwt' at "typ"`)
     })
   })
 })

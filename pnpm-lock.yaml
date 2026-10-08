@@ -322,6 +322,12 @@ importers:
       '@openid4vc/utils':
         specifier: workspace:^
         version: link:../openid4vc-utils
+      '@owf/identity-common':
+        specifier: workspace:^
+        version: link:../identity-common
+      '@owf/jose':
+        specifier: workspace:^
+        version: link:../jose
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -346,9 +352,6 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.7
-      zod-validation-error:
-        specifier: ^5.0.0
-        version: 5.0.0(zod@4.6.7)
 
   packages/openid4vci:
     dependencies:
@@ -361,6 +364,9 @@ importers:
       '@owf/identity-common':
         specifier: workspace:^
         version: link:../identity-common
+      '@owf/jose':
+        specifier: workspace:^
+        version: link:../jose
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -373,6 +379,9 @@ importers:
       '@openid4vc/utils':
         specifier: workspace:^
         version: link:../openid4vc-utils
+      '@owf/jose':
+        specifier: workspace:^
+        version: link:../jose
       zod:
         specifier: 'catalog:'
         version: 4.6.7

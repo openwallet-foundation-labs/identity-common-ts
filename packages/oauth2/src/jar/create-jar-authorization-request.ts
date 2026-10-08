@@ -1,18 +1,16 @@
 import { addSecondsToDate, dateToSeconds } from '@openid4vc/utils'
+import { type JweEncryptor, type Jwk, type JwsSigner, type JwtPayload, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
-import type { Jwk } from '../common/jwk/z-jwk'
-import { jwtHeaderFromJwtSigner } from '../common/jwt/decode-jwt'
-import type { JweEncryptor, JwtPayload, JwtSigner } from '../common/jwt/z-jwt'
 import type { JarAuthorizationRequest } from './z-jar-authorization-request'
 
 export interface CreateJarAuthorizationRequestOptions {
   authorizationRequestPayload: JwtPayload & { client_id?: string }
   requestUri?: string
 
-  jwtSigner: JwtSigner
+  jwtSigner: JwsSigner
   jweEncryptor?: JweEncryptor
 
-  callbacks: Pick<CallbackContext, 'signJwt' | 'encryptJwe'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'encryptJwe'>
 
   /**
    * Number of seconds after which the signed authorization request will expire
@@ -46,14 +44,16 @@ export async function createJarAuthorizationRequest(options: CreateJarAuthorizat
 
   const now = options.now ?? new Date()
 
-  const { jwt, signerJwk } = await callbacks.signJwt(jwtSigner, {
-    header: { ...jwtHeaderFromJwtSigner(jwtSigner), typ: 'oauth-authz-req+jwt' },
+  const { jwt, signerJwk } = await signJwt({
+    header: { ...jwsHeaderFromSigner(jwtSigner), typ: 'oauth-authz-req+jwt' },
     payload: {
       iat: dateToSeconds(now),
       exp: dateToSeconds(addSecondsToDate(now, options.expiresInSeconds)),
       ...options.additionalJwtPayload,
       ...authorizationRequestPayload,
     },
+    signer: jwtSigner,
+    signJwsCallback: callbacks.signJws,
   })
   authorizationRequestJwt = jwt
 

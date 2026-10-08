@@ -1,8 +1,7 @@
+import { calculateJwkThumbprint, type Jwk } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
-import { callbacks, getSignJwtCallback } from '../../__tests__/util.mjs'
+import { callbacks, getSignJwsCallback } from '../../__tests__/util.mjs'
 import { HashAlgorithm } from '../../callbacks'
-import { calculateJwkThumbprint } from '../../common/jwk/jwk-thumbprint'
-import type { Jwk } from '../../common/jwk/z-jwk'
 import { createDpopJwt, verifyDpopJwt } from '../dpop'
 
 const request = {
@@ -35,7 +34,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -66,7 +65,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -96,7 +95,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -122,7 +121,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -154,7 +153,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -172,7 +171,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -192,7 +191,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -214,11 +213,41 @@ describe('verifyDpopJwt', () => {
     ).rejects.toThrow('Dpop jwt is too old')
   })
 
+  test('applies allowedSkewInSeconds to a proof issued in the future', async () => {
+    const dpopJwt = await createDpopJwt({
+      callbacks: {
+        ...callbacks,
+        signJws: getSignJwsCallback([dpopSignerJwk]),
+      },
+      request,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: dpopSignerPublicJwk,
+      },
+      issuedAt: new Date('2024-01-01T00:00:45.000Z'),
+    })
+
+    const verify = (allowedSkewInSeconds: number) =>
+      verifyDpopJwt({
+        callbacks,
+        dpopJwt,
+        request,
+        now: new Date('2024-01-01T00:00:00.000Z'),
+        maxProofAgeSeconds: 30,
+        allowedSkewInSeconds,
+      })
+
+    // A skew larger than the 30 seconds `verifyJwt` allows by default is honoured for `iat` as well
+    await expect(verify(60)).resolves.toBeDefined()
+    await expect(verify(30)).rejects.toThrow('in the future')
+  })
+
   test('rejects replayed jti values when uniqueness callback indicates replay', async () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -269,7 +298,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -293,7 +322,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -318,7 +347,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {

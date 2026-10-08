@@ -1,5 +1,5 @@
-import { zJwk, zJwtHeader, zJwtPayload } from '@openid4vc/oauth2'
-import { zNumericDate, zTyp } from '@openid4vc/utils'
+import { zNumericDate } from '@owf/identity-common'
+import { zJoseType, zJwk, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
 
 export type KeyAttestationJwtUse = 'proof_type.jwt' | 'proof_type.attestation'
@@ -7,13 +7,12 @@ export type KeyAttestationJwtUse = 'proof_type.jwt' | 'proof_type.attestation'
 export const zKeyAttestationJwtHeader = z
   .object({
     ...zJwtHeader.shape,
-    typ: zTyp(
+    typ: zJoseType([
       // OpenID4VCI 1.0/1.1 final
-      'key-attestation+jwt'
-    ).or(
+      'key-attestation+jwt',
       // Legacy (<= draft 15) typ, accepted on verification for backwards compatibility
-      zTyp('keyattestation+jwt')
-    ),
+      'keyattestation+jwt',
+    ]),
   })
   .loose()
   .refine(({ kid, jwk }) => jwk === undefined || kid === undefined, {

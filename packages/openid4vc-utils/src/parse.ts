@@ -1,6 +1,6 @@
+import { parseWithErrorHandling as parseWithZodErrorHandling } from '@owf/identity-common'
 import type z from 'zod'
 import { JsonParseError } from './error/JsonParseError'
-import { ValidationError } from './error/ValidationError'
 
 export type BaseSchema = z.ZodTypeAny
 // biome-ignore lint/suspicious/noExplicitAny: no explanation
@@ -34,14 +34,7 @@ export function parseWithErrorHandling<Schema extends BaseSchema>(
   data: unknown,
   customErrorMessage?: string
 ): z.infer<Schema> {
-  const parseResult = schema.safeParse(data)
-
-  if (!parseResult.success) {
-    throw new ValidationError(
-      customErrorMessage ?? `Error validating schema with data ${JSON.stringify(data)}`,
-      parseResult.error
-    )
-  }
-
-  return parseResult.data
+  // NOTE: the data used to be included in the fallback message. It is not any more: these
+  // structures regularly carry values that should not end up in a log.
+  return parseWithZodErrorHandling(schema, data, customErrorMessage ?? 'Error validating schema')
 }

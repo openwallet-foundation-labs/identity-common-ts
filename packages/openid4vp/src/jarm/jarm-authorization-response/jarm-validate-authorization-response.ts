@@ -1,5 +1,5 @@
 import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { dateToSeconds } from '@openid4vc/utils'
+import { JoseClaimVerificationError, verifyJwtClaims } from '@owf/jose'
 import {
   type JarmAuthorizationResponse,
   type JarmAuthorizationResponseEncryptedOnly,
@@ -36,11 +36,24 @@ export const jarmAuthorizationResponseValidate = (options: {
   }
 
   // 4. The client checks the JWT's exp element to determine if the JWT is still valid. If the check fails, the client MUST abort processing and refuse the response.
-  // 120 seconds clock skew
-  if (authorizationResponse.exp !== undefined && authorizationResponse.exp < dateToSeconds()) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: 'The JARM authorization response is expired.',
-    })
+  // The time claims are verified the way they are for every other JWT: `exp`, `nbf` and `iat`, with
+  // the default clock skew of 30 seconds.
+  try {
+    verifyJwtClaims(authorizationResponse)
+  } catch (error) {
+    if (!(error instanceof JoseClaimVerificationError)) throw error
+
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description:
+          error.reason === 'expired'
+            ? 'The JARM authorization response is expired.'
+            : error.reason === 'not-yet-valid'
+              ? 'The JARM authorization response is not yet valid.'
+              : `Invalid '${error.claim}' claim in the JARM authorization response.`,
+      },
+      { cause: error }
+    )
   }
 }

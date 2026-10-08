@@ -24,7 +24,7 @@ export interface ResourceRequestOptions {
   /**
    * Callbacks
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'signJwt' | 'hash'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'signJws' | 'hash'>
 
   /**
    * Access token

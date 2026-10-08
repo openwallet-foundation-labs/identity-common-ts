@@ -1,15 +1,7 @@
-import {
-  type CallbackContext,
-  type DecodeJwtResult,
-  decodeJwt,
-  fetchWellKnownMetadata,
-  type JwtSignerWithJwk,
-  jwtSignerFromJwt,
-  Oauth2Error,
-  verifyJwt,
-  zCompactJwt,
-} from '@openid4vc/oauth2'
-import { ContentType, joinUriParts, Openid4vcBaseError, parseWithErrorHandling, URL } from '@openid4vc/utils'
+import { type CallbackContext, fetchWellKnownMetadata, Oauth2Error } from '@openid4vc/oauth2'
+import { ContentType, joinUriParts, parseWithErrorHandling, URL } from '@openid4vc/utils'
+import { IdentityError } from '@owf/identity-common'
+import { type DecodeJwtResult, decodeJwt, type JwsSignerWithJwk, verifyJwt, zCompactJwt } from '@owf/jose'
 import type { CredentialFormatIdentifier } from '../../formats/credential'
 import type { Openid4vciVersion } from '../../version'
 import type { IssuerMetadataResult } from '../fetch-issuer-metadata'
@@ -31,10 +23,10 @@ const wellKnownCredentialIssuerSuffix = '.well-known/openid-credential-issuer'
 
 export interface FetchCredentialIssuerMetadataOptions {
   /**
-   * Callbacks for fetching the credential issuer metadata. The `verifyJwt`
+   * Callbacks for fetching the credential issuer metadata. The `verifyJws`
    * callback is required unless `signedMetadata` is `disallowed`.
    */
-  callbacks?: Partial<Pick<CallbackContext, 'fetch' | 'verifyJwt'>>
+  callbacks?: Partial<Pick<CallbackContext, 'fetch' | 'verifyJws'>>
 
   /**
    * Whether the credential issuer metadata must be signed. This is sent as the `Accept` header.
@@ -43,7 +35,7 @@ export interface FetchCredentialIssuerMetadataOptions {
    *   Signed metadata that fails verification results in an error, without falling back to unsigned metadata.
    * - `disallowed`: only accept unsigned metadata
    *
-   * @default 'preferred' if a `verifyJwt` callback is provided, otherwise 'disallowed'
+   * @default 'preferred' if a `verifyJws` callback is provided, otherwise 'disallowed'
    */
   signedMetadata?: 'required' | 'preferred' | 'disallowed'
 
@@ -56,7 +48,7 @@ export interface FetchCredentialIssuerMetadataOptions {
 
 export interface CredentialIssuerMetadataSigned {
   jwt: DecodeJwtResult<typeof zSignedCredentialIssuerMetadataHeader, typeof zSignedCredentialIssuerMetadataPayload>
-  signer: JwtSignerWithJwk
+  signer: JwsSignerWithJwk
 }
 
 export interface FetchCredentialIssuerMetadataReturn {
@@ -91,7 +83,7 @@ export async function fetchCredentialIssuerMetadata(
     parsedIssuerUrl.pathname,
   ])
 
-  const signedMetadata = options?.signedMetadata ?? (options?.callbacks?.verifyJwt ? 'preferred' : 'disallowed')
+  const signedMetadata = options?.signedMetadata ?? (options?.callbacks?.verifyJws ? 'preferred' : 'disallowed')
   const acceptedContentTypeBySignedMetadata = {
     required: [ContentType.Jwt],
     preferred: [ContentType.Jwt, ContentType.Json],
@@ -105,9 +97,9 @@ export async function fetchCredentialIssuerMetadata(
     )
   }
 
-  if (signedMetadata !== 'disallowed' && !options?.callbacks?.verifyJwt) {
+  if (signedMetadata !== 'disallowed' && !options?.callbacks?.verifyJws) {
     throw new Oauth2Error(
-      `Signed credential issuer metadata is ${signedMetadata}, but no 'verifyJwt' callback provided to fetch credential issuer metadata method.`
+      `Signed credential issuer metadata is ${signedMetadata}, but no 'verifyJws' callback provided to fetch credential issuer metadata method.`
     )
   }
 
@@ -125,7 +117,9 @@ export async function fetchCredentialIssuerMetadata(
       acceptedContentType,
     })
   } catch (error) {
-    if (error instanceof Openid4vcBaseError) throw error
+    // A library error, such as invalid metadata (a `ValidationError`) or an error response, is thrown.
+    // `ValidationError` is not an `Openid4vcBaseError`, so `IdentityError` is what covers both.
+    if (error instanceof IdentityError) throw error
 
     // An exception occurs if a CORS-policy blocks the request, i.e. because the URL is invalid due to the legacy path being used
     // The legacy path should still be tried therefore we store the first error to rethrow it later if needed
@@ -155,16 +149,17 @@ export async function fetchCredentialIssuerMetadata(
   if (typeof result === 'string') {
     // We won't reach this, as we already check this for the signed metadata option.
     // Mainly to make TS happy
-    if (!options?.callbacks?.verifyJwt) {
+    if (!options?.callbacks?.verifyJws) {
       throw new Oauth2Error(
-        `Unable to verify signed credential issuer metadata, no 'verifyJwt' callback provided to fetch credential issuer metadata method.`
+        `Unable to verify signed credential issuer metadata, no 'verifyJws' callback provided to fetch credential issuer metadata method.`
       )
     }
-    const { header, payload, signature } = decodeJwt({
+    const decodedJwt = decodeJwt({
       jwt: result,
       headerSchema: zSignedCredentialIssuerMetadataHeader,
       payloadSchema: zSignedCredentialIssuerMetadataPayload,
     })
+    const { payload } = decodedJwt
 
     if (payload.sub !== credentialIssuer) {
       throw new Oauth2Error(
@@ -172,16 +167,10 @@ export async function fetchCredentialIssuerMetadata(
       )
     }
 
-    // Extract signer of the JWT
-    const signer = jwtSignerFromJwt({ header, payload })
-
     const verifyResult = await verifyJwt({
-      compact: result,
-      header,
-      payload,
-      verifyJwtCallback: options.callbacks.verifyJwt,
+      jwt: decodedJwt,
+      verifyJwsCallback: options.callbacks.verifyJws,
       now: options.now,
-      signer,
       errorMessage: 'signed credential issuer metadata jwt verification failed',
     })
 
@@ -195,12 +184,7 @@ export async function fetchCredentialIssuerMetadata(
       ...issuerMetadata,
       signed: {
         signer: verifyResult.signer,
-        jwt: {
-          header,
-          payload,
-          signature,
-          compact: result,
-        },
+        jwt: decodedJwt,
       },
     }
   } else if (result) {

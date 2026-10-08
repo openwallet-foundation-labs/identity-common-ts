@@ -1,15 +1,15 @@
-import { ValidationError } from '@openid4vc/utils'
+import { Openid4vcBaseError } from '@openid4vc/utils'
+import { IdentityError, ValidationError } from '@owf/identity-common'
+import { JoseParseError, type Jwk } from '@owf/jose'
 import { introspectToken } from '../access-token/introspect-token'
 import { SupportedAuthenticationScheme, verifyJwtProfileAccessToken } from '../access-token/verify-access-token'
 import type { AccessTokenProfileJwtPayload } from '../access-token/z-access-token-jwt'
 import type { TokenIntrospectionResponse } from '../access-token/z-token-introspection'
 import type { CallbackContext } from '../callbacks'
-import type { Jwk } from '../common/jwk/z-jwk'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { type DpopVerificationOptions, extractDpopJwtFromHeaders, verifyDpopJwt } from '../dpop/dpop'
 import { Oauth2Error } from '../error/Oauth2Error'
-import { Oauth2JwtParseError } from '../error/Oauth2JwtParseError'
 import { Oauth2ResourceUnauthorizedError } from '../error/Oauth2ResourceUnauthorizedError'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
 
@@ -27,7 +27,7 @@ export interface VerifyResourceRequestOptions {
   /**
    * Callbacks for verification of the access token.
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash' | 'clientAuthentication' | 'fetch' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash' | 'clientAuthentication' | 'fetch' | 'getJwks'>
 
   /**
    * allowed auth schemes for the access token. If not provided
@@ -94,9 +94,12 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
     now: options.now,
   }).catch((error) => {
     // It's ok if we couldn't parse it as a JWT -- it means it's probably an opaque token
-    if (error instanceof Oauth2JwtParseError || error instanceof ValidationError) return null
+    if (error instanceof JoseParseError || error instanceof ValidationError) return null
 
-    const errorMessage = error instanceof Oauth2Error ? error.message : 'Invalid access token'
+    // The message of an error raised while fetching from the authorization server, such as its JWKS,
+    // holds what that server responded with, which is not for the client: it gets a generic description
+    const errorMessage =
+      error instanceof IdentityError && !(error instanceof Openid4vcBaseError) ? error.message : 'Invalid access token'
     throw new Oauth2ResourceUnauthorizedError(
       `Error occurred during verification of jwt profile access token: ${error.message}`,
       {
@@ -196,7 +199,7 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
       })
       dpopJwk = decodedDpopJwt.header.jwk
     } catch (error) {
-      const errorMessage = error instanceof Oauth2Error ? error.message : 'Error verifying DPoP jwt'
+      const errorMessage = error instanceof IdentityError ? error.message : 'Error verifying DPoP jwt'
       throw new Oauth2ResourceUnauthorizedError(
         `Error occurred during verification of jwt profile access token: ${error instanceof Error ? error.message : error}`,
         {

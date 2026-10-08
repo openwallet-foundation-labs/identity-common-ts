@@ -5,7 +5,7 @@ export interface Oauth2ResourceServerOptions {
   /**
    * Callbacks required for the oauth2 resource server
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash' | 'clientAuthentication' | 'fetch' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash' | 'clientAuthentication' | 'fetch' | 'getJwks'>
 }
 
 export class Oauth2ResourceServer {

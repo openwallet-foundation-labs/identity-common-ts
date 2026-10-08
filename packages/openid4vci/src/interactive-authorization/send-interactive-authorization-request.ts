@@ -15,8 +15,8 @@ import {
   InvalidFetchResponseError,
   objectToQueryParams,
   parseWithErrorHandling,
-  ValidationError,
 } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
 import { Openid4vciClientInteractiveAuthorizationError } from '../error/Openid4vciClientInteractiveAuthorizationError'
 import {
   type InteractiveAuthorizationFollowUpRequest,
@@ -30,7 +30,7 @@ export interface SendInteractiveAuthorizationRequestOptions {
   /**
    * Callback context
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'signJwt' | 'hash' | 'generateRandom'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'signJws' | 'hash' | 'generateRandom'>
 
   /**
    * Authorization server metadata containing the interactive_authorization_endpoint

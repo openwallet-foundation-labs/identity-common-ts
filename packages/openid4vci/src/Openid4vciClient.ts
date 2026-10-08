@@ -62,11 +62,11 @@ import { Openid4vciVersion } from './version'
 
 export interface Openid4vciClientOptions {
   /**
-   * Callbacks required for the openid4vc client. The `verifyJwt` callback is only
+   * Callbacks required for the openid4vc client. The `verifyJws` callback is only
    * needed for verifying signed credential issuer metadata.
    */
-  callbacks: Omit<CallbackContext, 'verifyJwt' | 'encryptJwe'> &
-    Partial<Pick<CallbackContext, 'verifyJwt' | 'encryptJwe'>>
+  callbacks: Omit<CallbackContext, 'verifyJws' | 'encryptJwe'> &
+    Partial<Pick<CallbackContext, 'verifyJws' | 'encryptJwe'>>
 }
 
 export class Openid4vciClient {

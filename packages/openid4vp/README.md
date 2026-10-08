@@ -38,6 +38,7 @@ import { Openid4vpClient, Openid4vpVerifier } from '@openid4vc/openid4vp'
 
 - [@openid4vc/oauth2](https://www.npmjs.com/package/@openid4vc/oauth2)
 - [@openid4vc/utils](https://www.npmjs.com/package/@openid4vc/utils)
+- [@owf/jose](https://www.npmjs.com/package/@owf/jose)
 - [zod](https://www.npmjs.com/package/zod)
 
 ## Platform Support

@@ -1,48 +1,41 @@
 import type { Fetch, OrPromise } from '@openid4vc/utils'
+import type {
+  DecryptJweCallback,
+  EncryptJweCallback,
+  HashCallback,
+  Jwk,
+  JwkSet,
+  SignJwsCallback,
+  VerifyJwsCallback,
+} from '@owf/jose'
 import type { ClientAuthenticationCallback } from './client-authentication'
-import type { Jwk, JwkSet } from './common/jwk/z-jwk'
-import type { JweEncryptor, JwtHeader, JwtPayload, JwtSigner } from './common/jwt/z-jwt'
 import type { AuthorizationServerMetadata } from './metadata/authorization-server/z-authorization-server-metadata'
 
-/**
- * Supported hashing algorithms
- *
- * Based on https://www.iana.org/assignments/named-information/named-information.xhtml
- */
-export enum HashAlgorithm {
-  Sha256 = 'sha-256',
-  Sha384 = 'sha-384',
-  Sha512 = 'sha-512',
-}
-
-/**
- * Callback used for operations that require hashing
- */
-export type HashCallback = (data: Uint8Array, alg: HashAlgorithm) => OrPromise<Uint8Array>
+export type {
+  DecryptJweCallback,
+  DecryptJweCallbackOptions,
+  EncryptJweCallback,
+  /** Callback used for operations that require hashing */
+  HashCallback,
+  JweEncryptor,
+  /**
+   * Signs the signing input of a jws: the caller resolves the key from the signer, signs the bytes,
+   * and returns the signature.
+   */
+  SignJwsCallback,
+  /** Verifies the signature over the signing input of a jws, and decides whether the key is trusted. */
+  VerifyJwsCallback,
+} from '@owf/jose'
+export {
+  /**
+   * Supported hashing algorithms
+   *
+   * Based on https://www.iana.org/assignments/named-information/named-information.xhtml
+   */
+  HashAlgorithm,
+} from '@owf/jose'
 
 export type GenerateRandomCallback = (byteLength: number) => OrPromise<Uint8Array>
-
-export type SignJwtCallback = (
-  jwtSigner: JwtSigner,
-  jwt: { header: JwtHeader; payload: JwtPayload }
-) => OrPromise<{
-  jwt: string
-  signerJwk: Jwk
-}>
-
-export type VerifyJwtCallback = (
-  jwtSigner: JwtSigner,
-  jwt: { header: JwtHeader; payload: JwtPayload; compact: string }
-) => OrPromise<
-  | {
-      verified: true
-      signerJwk: Jwk
-    }
-  | {
-      verified: false
-      signerJwk?: Jwk
-    }
->
 
 export type VerifyDataIntegrityProofCallback = (
   dataIntegrityProof: Record<string, unknown>,
@@ -55,32 +48,6 @@ export type VerifyDataIntegrityProofCallback = (
   | {
       verified: false
       signerJwk?: Jwk
-    }
->
-
-export interface DecryptJweCallbackOptions {
-  jwk?: Jwk
-}
-
-/**
- * Return `{ decrypted: false }` for expected decryption failures, including invalid
- * ciphertext, authentication tags, or key mismatches. Throw only for unexpected
- * internal failures, such as an unavailable key store.
- * On success, return the JWK of the key actually used to decrypt.
- */
-export type DecryptJweCallback = (
-  jwe: string,
-  options?: DecryptJweCallbackOptions
-) => OrPromise<
-  | {
-      decrypted: true
-      decryptionJwk: Jwk
-      payload: string
-    }
-  | {
-      decrypted: false
-      decryptionJwk?: Jwk
-      payload?: string
     }
 >
 
@@ -121,14 +88,6 @@ export type GetAuthorizationServerMetadataCallback = (
  */
 export type GetJwksCallback = (jwksUri: string) => OrPromise<JwkSet | undefined>
 
-export type EncryptJweCallback = (
-  jweEncryptor: JweEncryptor,
-  data: string
-) => OrPromise<{
-  encryptionJwk: Jwk
-  jwe: string
-}>
-
 /**
  * Callback context provides the callbacks that are required for the openid4vc library
  */
@@ -162,9 +121,12 @@ export interface CallbackContext {
   hash: HashCallback
 
   /**
-   * Sign jwt callback for signing of Json Web Tokens
+   * Sign jws callback, used for signing every Json Web Token this library produces.
+   *
+   * It signs the bytes this library computed rather than producing a token of its own, so that the
+   * serialization — which is what the signature is over — is in one place.
    */
-  signJwt: SignJwtCallback
+  signJws: SignJwsCallback
 
   /**
    * Decrypt jwe callback for decrypting of Json Web Encryptions
@@ -177,9 +139,10 @@ export interface CallbackContext {
   encryptJwe: EncryptJweCallback
 
   /**
-   * Verify jwt callback for verification of Json Web Tokens
+   * Verify jws callback, used for verifying every Json Web Token this library reads. Besides
+   * checking the signature, this is where the caller decides whether the key is one it trusts.
    */
-  verifyJwt: VerifyJwtCallback
+  verifyJws: VerifyJwsCallback
 
   /**
    * Verify a Data Integrity proof (e.g. the `proof` of a `di_vp` key proof's Verifiable

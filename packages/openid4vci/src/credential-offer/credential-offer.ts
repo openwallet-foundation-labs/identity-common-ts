@@ -18,8 +18,8 @@ import {
   parseWithErrorHandling,
   URL,
   URLSearchParams,
-  ValidationError,
 } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
 import type z from 'zod'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../version'

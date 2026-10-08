@@ -1,6 +1,6 @@
-import { zNumericDate } from '@openid4vc/utils'
+import { zNumericDate } from '@owf/identity-common'
+import { zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
-import { zJwtHeader, zJwtPayload } from '../common/jwt/z-jwt'
 
 export const zIdTokenJwtHeader = z
   .object({

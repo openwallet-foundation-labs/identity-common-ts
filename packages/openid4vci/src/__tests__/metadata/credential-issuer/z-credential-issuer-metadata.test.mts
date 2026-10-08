@@ -1,3 +1,4 @@
+import { zodErrorMap } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
 import type { $ZodIssueInvalidUnion } from 'zod/v4/core'
 import {
@@ -23,11 +24,14 @@ describe('Credential Issuer Metadata', () => {
       success: true,
     })
 
-    const parseResult = zCredentialConfigurationSupportedWithFormats.safeParse({
-      format: 'vc+sd-jwt',
-      // vct should be required if format is vc+sd-jwt
-      // vct: 'SD_JWT_VC_example_in_OpenID4VCI',
-    })
+    const parseResult = zCredentialConfigurationSupportedWithFormats.safeParse(
+      {
+        format: 'vc+sd-jwt',
+        // vct should be required if format is vc+sd-jwt
+        // vct: 'SD_JWT_VC_example_in_OpenID4VCI',
+      },
+      { error: zodErrorMap }
+    )
 
     // Incorrect: sd-jwt without vct
     expect(parseResult.success).toBe(false)
@@ -36,7 +40,7 @@ describe('Credential Issuer Metadata', () => {
       // FIXME(vc+sd-jwt): fix expected to be 'string' when dropping support for legacy vc+sd-jwt format.
       expected: 'object',
       path: ['credential_definition'],
-      message: 'expected object, received undefined',
+      message: 'Invalid input: expected object, received undefined',
     })
 
     // Correct: mso mdoc with doctype
@@ -52,11 +56,14 @@ describe('Credential Issuer Metadata', () => {
     })
 
     // Incorrect: mso mdoc without doctype
-    const parseResultMdoc = zCredentialConfigurationSupportedWithFormats.safeParse({
-      format: 'mso_mdoc',
-      // doctype should be required if format is mso_mdoc
-      // doctype: 'org.iso.18013.5.1.mDL',
-    })
+    const parseResultMdoc = zCredentialConfigurationSupportedWithFormats.safeParse(
+      {
+        format: 'mso_mdoc',
+        // doctype should be required if format is mso_mdoc
+        // doctype: 'org.iso.18013.5.1.mDL',
+      },
+      { error: zodErrorMap }
+    )
     expect(parseResultMdoc.success).toEqual(false)
     expect(parseResultMdoc.error?.issues[0]).toMatchObject({
       code: 'invalid_union',
@@ -69,7 +76,7 @@ describe('Credential Issuer Metadata', () => {
         code: 'invalid_type',
         expected: 'string',
         path: ['doctype'],
-        message: 'expected string, received undefined',
+        message: 'Invalid input: expected string, received undefined',
       },
     ])
   })
