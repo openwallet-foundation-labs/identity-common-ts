@@ -1,5 +1,5 @@
 {
-  "name": "@owf/eudi-wrprc",
+  "name": "@owf/eudi-registration-certificate",
   "version": "0.4.2",
   "description": "ETSI TS 119 475 Wallet-Relying Party Registration Certificate (WRPRC) implementation",
   "files": [
@@ -7,11 +7,11 @@
   ],
   "license": "Apache-2.0",
   "exports": "./src/index.ts",
-  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-wrprc",
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-registration-certificate",
   "repository": {
     "type": "git",
     "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
-    "directory": "packages/eudi-wrprc"
+    "directory": "packages/eudi-registration-certificate"
   },
   "keywords": [
     "eudi",

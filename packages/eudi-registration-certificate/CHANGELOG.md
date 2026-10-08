@@ -1,4 +1,4 @@
-# @owf/eudi-wrprc
+# @owf/eudi-registration-certificate
 
 ## 0.4.2
 
