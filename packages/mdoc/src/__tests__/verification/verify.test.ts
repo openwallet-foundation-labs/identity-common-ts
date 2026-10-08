@@ -23,6 +23,7 @@ import {
   SessionTranscript,
   SignatureAlgorithm,
   Status,
+  UnprotectedHeaders,
   //StatusListInfo,
   Verifier,
 } from '../..'
@@ -423,6 +424,7 @@ suite('Verification', () => {
     subject,
     issuedAt,
     expirationTime = new Date(Date.now() + 3_600_000),
+    unprotectedX5Chain = false,
   }: {
     uri: string
     idx: number
@@ -431,7 +433,11 @@ suite('Verification', () => {
     issuedAt?: Date
     /** `null` omits the claim; absent uses the conformant default. */
     expirationTime?: Date | null
+    /** Moves the x5chain to the unprotected header, bound by a protected x5t (RFC 9360). */
+    unprotectedX5Chain?: boolean
   }) => {
+    const certificate = new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)
+    const x5chainHeader: [number, unknown] = [RegisteredCwtHeaderClaimKey.X5Chain, [certificate]]
     const statusListCwt = new StatusListCwt({
       payload: {
         statusList: new StatusList(new Array(10).fill(StatusType.Invalid), 2),
@@ -441,9 +447,17 @@ suite('Verification', () => {
       },
       protectedHeaders: ProtectedHeaders.create({
         protectedHeaders: new Map<number, unknown>([
-          [RegisteredCwtHeaderClaimKey.X5Chain, [new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData)]],
+          unprotectedX5Chain
+            ? [
+                RegisteredCwtHeaderClaimKey.X5T,
+                [-16, await mdocContext.crypto.digest({ digestAlgorithm: 'SHA-256', bytes: certificate })],
+              ]
+            : x5chainHeader,
           [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
         ]),
+      }),
+      unprotectedHeaders: UnprotectedHeaders.create({
+        unprotectedHeaders: new Map<number, unknown>(unprotectedX5Chain ? [x5chainHeader] : []),
       }),
     })
     statusListCwt.updateStatusList(idx, status)
@@ -503,6 +517,18 @@ suite('Verification', () => {
     await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
     // ...but not once the caller narrows the tolerance.
     await expect(verifyIssuerSigned(credential, { skewSeconds: 1 })).rejects.toThrow('is in the past')
+  })
+
+  // NOT allowed by § 12.3.6.3, but RFC 9360 allows it with a protected x5t.
+  test('Verify mdoc with a status list whose x5chain is in the unprotected header', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/unprotected-x5chain', { idx, unprotectedX5Chain: true })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    const { statusList, trustedStatusListChain } = await verifyIssuerSigned(credential)
+    expect(statusList).toBeDefined()
+    expect(trustedStatusListChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
   })
 
   test('Verify mdoc with a revoked entry in a status list', async () => {

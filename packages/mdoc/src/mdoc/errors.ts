@@ -74,6 +74,12 @@ export class NoPublicKeySetOnStatusListError extends MdlError {}
 export class InvalidSignatureError extends MdlError {}
 
 /**
+ * RFC 9360: the end-entity certificate "MUST be integrity protected by COSE". An `x5chain` in the
+ * unprotected header is therefore only accepted when a protected `x5t` matches its leaf.
+ */
+export class UnprotectedX5ChainNotBoundError extends MdlError {}
+
+/**
  * ISO/IEC 18013-5 second edition § 12.3.6.3 requires the status list of an MSO to be a Status List
  * Token in CWT format, "since the IssuerAuth structure is a CWT". A list served as a JWT is a
  * deviation, and is rejected rather than verified.

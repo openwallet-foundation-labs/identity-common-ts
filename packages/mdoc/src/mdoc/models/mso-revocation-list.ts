@@ -4,6 +4,7 @@ import {
   RegisteredCwtHeaderClaimKey,
   type SignatureAlgorithm,
 } from '@owf/cose'
+import { compareBytes } from '@owf/identity-common'
 import { fetchStatusList, SLException, StatusListCwt, type StatusListInfo } from '@owf/token-status-list'
 import type { MdocContext } from '../../context'
 import {
@@ -16,6 +17,7 @@ import {
   TrustedRevocationCertificatesMustContainAtleastOneCertificateError,
   UnableToExtractX5ChainFromCwtError,
   UnableToExtractX5ChainFromIdentifierListError,
+  UnprotectedX5ChainNotBoundError,
 } from '../errors'
 import { IdentifierListCwt } from './identifier-list-cwt'
 import type { IdentifierListInfo } from './identifier-list-info'
@@ -64,7 +66,8 @@ function assertTrustedCertificates({
  *
  * § 12.3.6.3 requires the chain to travel in the protected header of the CWT: "The CWT shall
  * contain the x5chain in the protected header that contains the certificate or chain of
- * certificates used to verify the signature".
+ * certificates used to verify the signature". A status list may instead carry it in the
+ * unprotected header when a protected `x5t` binds its leaf, as RFC 9360 allows.
  */
 async function verifyRevocationListSigner(
   {
@@ -133,6 +136,9 @@ export type VerifyStatusListTokenResult = {
  *
  * § 12.3.6.3 requires the list to be a Status List Token "in CWT format, since the IssuerAuth
  * structure is a CWT", so a list served as a JWT is rejected rather than verified.
+ *
+ * The signer chain is read from the protected header, as § 12.3.6.3 requires, or else from the
+ * unprotected header when a protected `x5t` matches its leaf (RFC 9360).
  */
 export async function verifyStatusListToken(
   {
@@ -143,7 +149,7 @@ export async function verifyStatusListToken(
     skewSeconds,
     checkFreshness,
   }: VerifyStatusListTokenOptions,
-  ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose'>
+  ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'crypto'>
 ): Promise<VerifyStatusListTokenResult> {
   if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
 
@@ -160,7 +166,11 @@ export async function verifyStatusListToken(
 
   const statusListCwt = StatusListCwt.fromToken(token)
 
-  const x5chain = normalizeX5Chain(statusListCwt.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5Chain))
+  const x5chain =
+    normalizeX5Chain(statusListCwt.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5Chain)) ??
+    // NOTE: an unprotected x5chain is NOT allowed by § 12.3.6.3, but RFC 9360 allows it when a
+    // protected x5t binds the leaf. So it is accepted with that binding.
+    (await boundUnprotectedX5Chain(statusListCwt, ctx))
   if (!x5chain) {
     throw new UnableToExtractX5ChainFromCwtError()
   }
@@ -274,6 +284,45 @@ export async function verifyIdentifierListToken(
   )
 
   return { identifierListCwt, chain }
+}
+
+/** SHA-256 in a COSE_CertHash (RFC 9360), as registered in RFC 9054. */
+const COSE_SHA_256 = -16
+
+/**
+ * The `x5chain` of the unprotected header of a revocation list, provided a protected `x5t` matches
+ * its leaf. The unprotected header is not covered by the signature, so without that binding the
+ * certificate could be replaced by another one for the same key (RFC 9360).
+ */
+async function boundUnprotectedX5Chain(
+  cwt: StatusListCwt,
+  ctx: Pick<MdocContext, 'crypto'>
+): Promise<Array<Uint8Array> | undefined> {
+  const x5chain = normalizeX5Chain(cwt.unprotectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5Chain))
+  if (!x5chain) return undefined
+
+  const x5t = cwt.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5T)
+  if (!Array.isArray(x5t) || x5t.length !== 2 || !(x5t[1] instanceof Uint8Array)) {
+    throw new UnprotectedX5ChainNotBoundError(
+      'The x5chain is in the unprotected header, but the protected header has no x5t that binds it'
+    )
+  }
+
+  const [hashAlgorithm, expectedHash] = x5t as [unknown, Uint8Array]
+  if (hashAlgorithm !== COSE_SHA_256) {
+    throw new UnprotectedX5ChainNotBoundError(
+      `The x5t of the protected header uses hash algorithm '${String(hashAlgorithm)}', only SHA-256 (-16) is supported`
+    )
+  }
+
+  const leafHash = await ctx.crypto.digest({ digestAlgorithm: 'SHA-256', bytes: x5chain[0] })
+  if (!compareBytes(leafHash, expectedHash)) {
+    throw new UnprotectedX5ChainNotBoundError(
+      'The x5t of the protected header does not match the leaf of the x5chain in the unprotected header'
+    )
+  }
+
+  return x5chain
 }
 
 /** COSE_X509 carries either a single certificate or a chain of them (RFC 9360). */
