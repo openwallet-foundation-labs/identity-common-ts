@@ -1,11 +1,10 @@
-import { type CallbackContext, HashAlgorithm } from '../callbacks'
+import type { CallbackContext } from '../callbacks'
 import { type VerifiedClientAttestationJwt, verifyClientAttestation } from '../client-attestation/client-attestation'
 import type { VerifiedClientAttestationPopJwt } from '../client-attestation/client-attestation-pop'
 import {
   oauthClientAttestationHeader,
   oauthClientAttestationPopHeader,
 } from '../client-attestation/z-client-attestation'
-import { calculateJwkThumbprint } from '../common/jwk/jwk-thumbprint'
 import type { Jwk } from '../common/jwk/z-jwk'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
@@ -53,6 +52,12 @@ export interface VerifyAuthorizationRequestClientAttestation {
 
   clientAttestationJwt?: string
   clientAttestationPopJwt?: string
+
+  /**
+   * The expected JWK thumbprint of the client instance key (the `cnf` key of the client attestation), for example
+   * from an earlier request of the same authorization session. A client attestation is required when this is set.
+   */
+  expectedConfirmationJwkThumbprint?: string
 
   /**
    * Allowed skew time in seconds for validity of the client attestation and client attestation pop
@@ -146,7 +151,12 @@ async function verifyAuthorizationRequestClientAttestation(
   requestClientId?: string
 ) {
   if (!options.clientAttestationJwt || !options.clientAttestationPopJwt) {
-    if (!options.required && !options.clientAttestationJwt && !options.clientAttestationPopJwt) {
+    if (
+      !options.required &&
+      !options.expectedConfirmationJwkThumbprint &&
+      !options.clientAttestationJwt &&
+      !options.clientAttestationPopJwt
+    ) {
       return undefined
     }
 
@@ -161,31 +171,15 @@ async function verifyAuthorizationRequestClientAttestation(
     callbacks,
     clientAttestationJwt: options.clientAttestationJwt,
     clientAttestationPopJwt: options.clientAttestationPopJwt,
+    // Ensure the client id matches with the client id provided in the authorization request
+    expectedClientId: requestClientId,
+    expectedConfirmationJwkThumbprint: options.expectedConfirmationJwkThumbprint,
     now,
     allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
 
-  if (requestClientId && requestClientId !== verifiedClientAttestation.clientAttestation.payload.sub) {
-    // Ensure the client id matches with the client id provided in the authorization request
-    throw new Oauth2ServerErrorResponseError(
-      {
-        error: Oauth2ErrorCodes.InvalidClient,
-        error_description: `The client_id '${requestClientId}' in the request does not match the client id '${verifiedClientAttestation.clientAttestation.payload.sub}' in the client attestation`,
-      },
-      {
-        status: 401,
-      }
-    )
-  }
-
   if (options.ensureConfirmationKeyMatchesDpopKey && dpopJwkThumbprint) {
-    const clientAttestationJkt = await calculateJwkThumbprint({
-      hashAlgorithm: HashAlgorithm.Sha256,
-      hashCallback: callbacks.hash,
-      jwk: verifiedClientAttestation.clientAttestation.payload.cnf.jwk,
-    })
-
-    if (clientAttestationJkt !== dpopJwkThumbprint) {
+    if (verifiedClientAttestation.clientAttestation.confirmationJwkThumbprint !== dpopJwkThumbprint) {
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidRequest,

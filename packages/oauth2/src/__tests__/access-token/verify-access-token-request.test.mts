@@ -1,9 +1,16 @@
+import * as jose from 'jose'
 import { describe, expect, test } from 'vitest'
 import {
+  type VerifyAccessTokenRequestClientAttestation,
   verifyAuthorizationCodeAccessTokenRequest,
   verifyPreAuthorizedCodeAccessTokenRequest,
   verifyRefreshTokenAccessTokenRequest,
 } from '../../access-token/verify-access-token-request'
+import { HashAlgorithm } from '../../callbacks'
+import { createClientAttestationJwt } from '../../client-attestation/client-attestation'
+import { createClientAttestationPopJwt } from '../../client-attestation/client-attestation-pop'
+import { calculateJwkThumbprint } from '../../common/jwk/jwk-thumbprint'
+import type { Jwk } from '../../common/jwk/z-jwk'
 import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
 import { createDpopJwt } from '../../dpop/dpop'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
@@ -910,5 +917,93 @@ describe('Verify Refresh Token Access Token Request', () => {
     })
 
     expect(dpop).toEqual({ jwk: dpopPublicJwk, jwkThumbprint: 'VyMJnrA8aEQPnpDn0kCkNIkjfQgt94xDbK0N1O9Os_4' })
+  })
+})
+
+describe('Verify client instance key of Access Token Request', () => {
+  async function generateEs256Key() {
+    const { publicKey, privateKey } = await jose.generateKeyPair('ES256', { extractable: true })
+    return {
+      privateJwk: (await jose.exportJWK(privateKey)) as Jwk,
+      publicJwk: (await jose.exportJWK(publicKey)) as Jwk,
+    }
+  }
+
+  // A new client attestation (for example after the previous one expired) with a PoP signed by the instance key
+  async function createClientAttestation(
+    attester: Awaited<ReturnType<typeof generateEs256Key>>,
+    instance: Awaited<ReturnType<typeof generateEs256Key>>
+  ) {
+    const signJwt = getSignJwtCallback([attester.privateJwk, instance.privateJwk])
+    const clientAttestationJwt = await createClientAttestationJwt({
+      callbacks: { signJwt },
+      clientId: 'wallet',
+      confirmation: { jwk: instance.publicJwk },
+      expiresAt: new Date(Date.now() + 3600 * 1000),
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+    })
+    const clientAttestationPopJwt = await createClientAttestationPopJwt({
+      callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+      authorizationServer: authorizationServerMetadata.issuer,
+      clientAttestation: clientAttestationJwt,
+    })
+    return { clientAttestationJwt, clientAttestationPopJwt }
+  }
+
+  const refreshTokenRequest = (clientAttestation: VerifyAccessTokenRequestClientAttestation) =>
+    verifyRefreshTokenAccessTokenRequest({
+      authorizationServerMetadata,
+      accessTokenRequest: { grant_type: refreshTokenGrantIdentifier, refresh_token: 'hello' },
+      grant: { grantType: refreshTokenGrantIdentifier, refreshToken: 'hello' },
+      callbacks,
+      expectedRefreshToken: 'hello',
+      request,
+      clientAttestation,
+    })
+
+  test('returns the thumbprint of the client instance key, and accepts a new client attestation for it', async () => {
+    const attester = await generateEs256Key()
+    const instance = await generateEs256Key()
+
+    const first = await refreshTokenRequest(await createClientAttestation(attester, instance))
+    const confirmationJwkThumbprint = first.clientAttestation?.clientAttestation.confirmationJwkThumbprint
+    expect(confirmationJwkThumbprint).toEqual(
+      await calculateJwkThumbprint({
+        hashAlgorithm: HashAlgorithm.Sha256,
+        hashCallback: callbacks.hash,
+        jwk: instance.publicJwk,
+      })
+    )
+
+    const second = await refreshTokenRequest({
+      ...(await createClientAttestation(attester, instance)),
+      expectedConfirmationJwkThumbprint: confirmationJwkThumbprint,
+    })
+    expect(second.clientAttestation?.clientAttestation.confirmationJwkThumbprint).toEqual(confirmationJwkThumbprint)
+  })
+
+  test('rejects a client attestation for another client instance key', async () => {
+    const attester = await generateEs256Key()
+    const first = await refreshTokenRequest(await createClientAttestation(attester, await generateEs256Key()))
+
+    await expect(
+      refreshTokenRequest({
+        ...(await createClientAttestation(attester, await generateEs256Key())),
+        expectedConfirmationJwkThumbprint: first.clientAttestation?.clientAttestation.confirmationJwkThumbprint,
+      })
+    ).rejects.toMatchObject({
+      errorResponse: {
+        error: Oauth2ErrorCodes.InvalidClient,
+        error_description: expect.stringContaining(
+          'does not match the expected jwk thumbprint. Use the same client instance key for all requests.'
+        ),
+      },
+    })
+  })
+
+  test('requires a client attestation when a client instance key is expected', async () => {
+    await expect(refreshTokenRequest({ expectedConfirmationJwkThumbprint: 'thumbprint' })).rejects.toThrow(
+      'Missing required client attestation parameters in access token request.'
+    )
   })
 })

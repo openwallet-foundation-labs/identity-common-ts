@@ -1,6 +1,11 @@
 import * as jose from 'jose'
 import { beforeAll, describe, expect, test } from 'vitest'
-import { createClientAttestationJwt, verifyClientAttestation } from '../../client-attestation/client-attestation'
+import { HashAlgorithm } from '../../callbacks'
+import {
+  createClientAttestationJwt,
+  verifyClientAttestation,
+  verifyClientAttestationJwt,
+} from '../../client-attestation/client-attestation'
 import {
   createClientAttestationPopJwt,
   verifyClientAttestationPopJwt,
@@ -11,8 +16,10 @@ import {
   zClientAttestationPopJwtHeader,
   zClientAttestationPopJwtPayload,
 } from '../../client-attestation/z-client-attestation'
+import { calculateJwkThumbprint } from '../../common/jwk/jwk-thumbprint'
 import type { Jwk } from '../../common/jwk/z-jwk'
 import { decodeJwt } from '../../common/jwt/decode-jwt'
+import { Oauth2Error } from '../../error/Oauth2Error'
 import { callbacks, getSignJwtCallback } from '../util.mjs'
 
 const authorizationServer = 'https://oauth2-auth-server.com'
@@ -146,6 +153,60 @@ describe('Client (Wallet) Attestation', () => {
     ).rejects.toThrow("'iss'")
   })
 
+  describe('verifyClientAttestationJwt', () => {
+    test('returns the jwk thumbprint of the cnf key', async () => {
+      const { confirmationJwkThumbprint } = await verifyClientAttestationJwt({ callbacks, clientAttestationJwt })
+
+      expect(confirmationJwkThumbprint).toEqual(
+        await calculateJwkThumbprint({
+          hashAlgorithm: HashAlgorithm.Sha256,
+          hashCallback: callbacks.hash,
+          jwk: instance.publicJwk,
+        })
+      )
+    })
+
+    test('accepts the expected jwk thumbprint of the cnf key', async () => {
+      const { confirmationJwkThumbprint } = await verifyClientAttestationJwt({ callbacks, clientAttestationJwt })
+
+      await expect(
+        verifyClientAttestationJwt({
+          callbacks,
+          clientAttestationJwt,
+          expectedConfirmationJwkThumbprint: confirmationJwkThumbprint,
+        })
+      ).resolves.toMatchObject({ confirmationJwkThumbprint })
+    })
+
+    test('rejects another expected jwk thumbprint than of the cnf key, without exposing the expected value', async () => {
+      const { confirmationJwkThumbprint } = await verifyClientAttestationJwt({ callbacks, clientAttestationJwt })
+
+      await expect(
+        verifyClientAttestationJwt({
+          callbacks,
+          clientAttestationJwt,
+          expectedConfirmationJwkThumbprint: 'other-thumbprint',
+        })
+      ).rejects.toThrow(
+        new Oauth2Error(
+          `Client attestation 'cnf' jwk thumbprint '${confirmationJwkThumbprint}' does not match the expected jwk thumbprint. Use the same client instance key for all requests.`
+        )
+      )
+    })
+
+    test('rejects another expected client id than the sub, without exposing the expected value', async () => {
+      await expect(
+        verifyClientAttestationJwt({ callbacks, clientAttestationJwt, expectedClientId: 'wallet' })
+      ).resolves.toBeDefined()
+
+      await expect(
+        verifyClientAttestationJwt({ callbacks, clientAttestationJwt, expectedClientId: 'other-wallet' })
+      ).rejects.toThrow(
+        new Oauth2Error("Client attestation 'sub' (client_id) value 'wallet' does not match the expected client id.")
+      )
+    })
+  })
+
   describe('verifyClientAttestation', () => {
     const invalidClient = { status: 401, errorResponse: { error: 'invalid_client' } }
 
@@ -166,7 +227,7 @@ describe('Client (Wallet) Attestation', () => {
 
       await expect(
         verifyClientAttestation({
-          callbacks: { verifyJwt: callbacks.verifyJwt },
+          callbacks: { verifyJwt: callbacks.verifyJwt, hash: callbacks.hash },
           authorizationServer,
           clientAttestationJwt: clientAttestationWithoutSub,
           clientAttestationPopJwt,
@@ -185,7 +246,7 @@ describe('Client (Wallet) Attestation', () => {
 
       await expect(
         verifyClientAttestation({
-          callbacks: { verifyJwt: callbacks.verifyJwt },
+          callbacks: { verifyJwt: callbacks.verifyJwt, hash: callbacks.hash },
           authorizationServer,
           clientAttestationJwt,
           clientAttestationPopJwt: clientAttestationPopWithoutJti,

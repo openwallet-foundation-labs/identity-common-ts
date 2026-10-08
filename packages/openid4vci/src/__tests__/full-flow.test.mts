@@ -578,6 +578,8 @@ describe('Full E2E test', () => {
               method: 'jwk',
               publicJwk: walletProviderJwkPublic,
             },
+            // The client instance key is the dpop key in this flow
+            confirmationJwkThumbprint: verifiedParRequest.dpop?.jwkThumbprint,
           },
           clientAttestationPop: {
             header: {

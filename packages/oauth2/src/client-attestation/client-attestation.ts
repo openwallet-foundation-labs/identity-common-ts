@@ -1,5 +1,6 @@
 import { dateToSeconds, type FetchHeaders, parseWithErrorHandling, ValidationError } from '@openid4vc/utils'
-import type { CallbackContext } from '../callbacks'
+import { type CallbackContext, HashAlgorithm } from '../callbacks'
+import { calculateJwkThumbprint } from '../common/jwk/jwk-thumbprint'
 import { decodeJwt, jwtHeaderFromJwtSigner, jwtSignerFromJwt } from '../common/jwt/decode-jwt'
 import { verifyJwt } from '../common/jwt/verify-jwt'
 import { type JwtSigner, zCompactJwt } from '../common/jwt/z-jwt'
@@ -36,11 +37,23 @@ export interface VerifyClientAttestationJwtOptions {
   allowedSkewInSeconds?: number
 
   /**
-   * Callbacks used for verifying client attestation pop jwt.
+   * The expected client id (the `sub` of the client attestation), for example the `client_id` of the request, or
+   * the client id bound to an authorization session.
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
+  expectedClientId?: string
 
-  // TODO: expectedClientId? expectedIssuer?
+  /**
+   * The expected JWK thumbprint of the client instance key (the `cnf` key of the client attestation), for example
+   * the thumbprint bound to an authorization session or refresh token.
+   */
+  expectedConfirmationJwkThumbprint?: string
+
+  /**
+   * Callbacks used for verifying client attestation jwt, and calculating the thumbprint of the `cnf` key.
+   */
+  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>
+
+  // TODO: expectedIssuer?
 }
 
 export type VerifiedClientAttestationJwt = Awaited<ReturnType<typeof verifyClientAttestationJwt>>
@@ -62,10 +75,38 @@ export async function verifyClientAttestationJwt(options: VerifyClientAttestatio
     allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
 
+  if (options.expectedClientId && options.expectedClientId !== payload.sub) {
+    throw new Oauth2Error(
+      `Client attestation 'sub' (client_id) value '${payload.sub}' does not match the expected client id.`
+    )
+  }
+
+  const confirmationJwkThumbprint = await calculateJwkThumbprint({
+    hashAlgorithm: HashAlgorithm.Sha256,
+    hashCallback: options.callbacks.hash,
+    jwk: payload.cnf.jwk,
+  })
+
+  if (
+    options.expectedConfirmationJwkThumbprint &&
+    options.expectedConfirmationJwkThumbprint !== confirmationJwkThumbprint
+  ) {
+    throw new Oauth2Error(
+      `Client attestation 'cnf' jwk thumbprint '${confirmationJwkThumbprint}' does not match the expected jwk thumbprint. Use the same client instance key for all requests.`
+    )
+  }
+
   return {
     header,
     payload,
     signer,
+
+    /**
+     * base64url encoding of the JWK SHA-256 Thumbprint (according to [RFC7638]) of the client instance key (the
+     * `cnf` key of the client attestation). Bind authorization sessions and refresh tokens to it, and pass it as
+     * `expectedConfirmationJwkThumbprint` in later requests.
+     */
+    confirmationJwkThumbprint,
   }
 }
 
@@ -185,7 +226,19 @@ export interface VerifyClientAttestationOptions {
   authorizationServer: string
   clientAttestationJwt: string
   clientAttestationPopJwt: string
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>
+
+  /**
+   * The expected client id (the `sub` of the client attestation), for example the `client_id` of the request, or
+   * the client id bound to an authorization session.
+   */
+  expectedClientId?: string
+
+  /**
+   * The expected JWK thumbprint of the client instance key (the `cnf` key of the client attestation), for example
+   * the thumbprint bound to an authorization session or refresh token.
+   */
+  expectedConfirmationJwkThumbprint?: string
 
   /**
    * Date to use for expiration. If not provided current date will be used.
@@ -206,6 +259,8 @@ export async function verifyClientAttestation({
   clientAttestationJwt,
   clientAttestationPopJwt,
   callbacks,
+  expectedClientId,
+  expectedConfirmationJwkThumbprint,
   now,
   allowedSkewInSeconds,
 }: VerifyClientAttestationOptions) {
@@ -213,6 +268,8 @@ export async function verifyClientAttestation({
     const clientAttestation = await verifyClientAttestationJwt({
       callbacks,
       clientAttestationJwt,
+      expectedClientId,
+      expectedConfirmationJwkThumbprint,
       now,
       allowedSkewInSeconds,
     })
