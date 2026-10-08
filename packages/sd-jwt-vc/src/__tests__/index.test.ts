@@ -382,6 +382,35 @@ describe('Revocation', () => {
     expect(result).toBeDefined()
   })
 
+  test('Test with the verification options passed to the status verifier', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    // the key of the status list issuer is passed with the verification options
+    const sdjwtWithKeyFromOptions = new SDJwtVcInstance<{ statusListKey: Crypto.KeyObject }>({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      statusListFetcher: () => Promise.resolve(statusListJWT),
+      statusVerifier: async (data, sig, options) => {
+        if (!options) return false
+        return Crypto.verify(null, Buffer.from(data), options.statusListKey, Buffer.from(sig, 'base64url'))
+      },
+    })
+
+    const expectedPayload: SdJwtVcPayload = {
+      iat,
+      iss,
+      vct,
+      status: { status_list: { uri: 'https://example.com/status-list', idx: 0 } },
+    }
+    const encodedSdjwt = await sdjwtWithKeyFromOptions.issue(expectedPayload)
+    await expect(
+      sdjwtWithKeyFromOptions.verify(encodedSdjwt, { statusListKey: statusListPublicKey })
+    ).resolves.toBeDefined()
+  })
+
   test('test to fetch the statuslist', async () => {
     //TODO: not implemented yet since we need to either mock the fetcher or use a real fetcher
   })

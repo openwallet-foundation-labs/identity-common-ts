@@ -480,7 +480,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     return { payload: claims, header: verifiedPayloads.header }
   }
 
-  public config(newConfig: SDJWTConfig) {
+  public config(newConfig: SDJWTConfig<T>) {
     this.userConfig = { ...this.userConfig, ...newConfig }
   }
 

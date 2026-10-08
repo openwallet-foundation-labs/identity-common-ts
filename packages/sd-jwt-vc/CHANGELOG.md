@@ -1,5 +1,41 @@
 # @sd-jwt/sd-jwt-vc
 
+## 0.22.0
+
+### Minor Changes
+
+- 1dd14dc: Pass the verification options to the status list verifier again, e.g. to resolve the key of the status list issuer. Only the time options are applied to the claims of the Status List Token.
+  
+  `SDJwtVcInstance` and `SDJWTVCConfig` now take the custom verification options as type parameter, like `SDJwtInstance` does, so the options passed to the `verifier` and the `statusVerifier` are typed: `new SDJwtVcInstance<{ statusListKey: KeyObject }>({ statusVerifier: (data, sig, options) => ... })`.
+
+### Patch Changes
+
+- b020b40: `safeVerify` now takes the error code from the `code` set on `SDJWTException` where the error is thrown, instead of matching substrings of the error message. Errors without a code (such as errors thrown by a custom verifier callback) are reported as `UNKNOWN_ERROR`.
+  
+  **Breaking:** the `SDJWTException` constructor takes an options object instead of positional arguments: `new SDJWTException(message, { details, code, cause })`. Replace `new SDJWTException(message, details)` with `new SDJWTException(message, { details })`. `JwtTimeClaimException` takes the same options, with `details` and `code` required.
+  
+  In `@sd-jwt/sd-jwt-vc`, `safeVerify` keeps the code of an `SDJWTException` thrown during the status and type metadata checks, for example `STATUS_INVALID` from a custom `statusValidator`, and only falls back to `STATUS_VERIFICATION_FAILED` or `VCT_VERIFICATION_FAILED` for errors without a code.
+- 1cd910e: Scope `expectedIssuer`, `expectedSubject`, `expectedVct`, and `maxAgeSeconds` to the issuer-signed SD-JWT payload rather than applying them to the Key Binding JWT or Status List Token. Credential `expectedAudience` and `allowedIssuerAlgorithms` no longer constrain the Key Binding JWT. Use `expectedKeyBindingAudience` to constrain the Key Binding JWT's audience. Issuer algorithm restrictions no longer constrain the Status List Token and its signature remains verified by the configured status verifier.
+- f599719: Verify the `typ` header of a Status List Token in JWT format. Token Status List requires the header to be `statuslist+jwt`, and requires a relying party to check it. `application/statuslist+jwt` is accepted too, as RFC 7515 section 4.1.9 requires of a recipient.
+  
+  - `@owf/token-status-list`: new `verifyStatusListJwtHeader`, which `verifyStatus` now calls before the claims.
+  - `@sd-jwt/sd-jwt-vc`: `verify` and `safeVerify` reject a status list token with a missing or wrong `typ` header, before its signature is verified.
+- 3b15c07: Expose the values behind failed time and status checks on the thrown exceptions, so callers can tell clock drift apart from an expired or stale token without parsing messages.
+  
+  - `@sd-jwt/core`: a failed `iat`, `nbf`, `exp` or maximum age check throws a `JwtTimeClaimException` (a subclass of `SDJWTException`). Its `details` (`JwtTimeClaimErrorDetails`) hold the claim, its value, the current time, the allowed clock skew and, for the maximum age check, the maximum age. `SDJWTException` has a new optional `code`, here `JWT_EXPIRED`, `JWT_NOT_YET_VALID` or `JWT_TOO_OLD`; `safeVerify` uses it before falling back to message matching.
+  - `@sd-jwt/core`: time check failures of the Key Binding JWT say `Key Binding JWT` instead of `JWT` and carry the new codes `KEY_BINDING_JWT_EXPIRED`, `KEY_BINDING_JWT_NOT_YET_VALID` and `KEY_BINDING_JWT_TOO_OLD`. `safeVerify` reports these codes instead of `KEY_BINDING_SIGNATURE_INVALID`.
+  - `@sd-jwt/sd-jwt-vc`: when the status list token fails verification, the `SLException` has the status list URI in `details` and the original exception as `cause`. A credential whose status is not valid fails with code `STATUS_INVALID` and `details` `{ uri, idx, status }`. A custom `statusValidator` receives the URI and index as a second argument.
+  - `@owf/mdoc`: the reason of the MSO validity check includes the MSO's validity period and the allowed clock skew.
+- Updated dependencies [1dd14dc]
+- Updated dependencies [b020b40]
+- Updated dependencies [1cd910e]
+- Updated dependencies [f599719]
+- Updated dependencies [f2aaf3e]
+- Updated dependencies [3b15c07]
+  - @sd-jwt/core@0.22.0
+  - @owf/token-status-list@0.4.2
+  - @owf/identity-common@0.4.2
+
 ## 0.21.1
 
 ### Patch Changes

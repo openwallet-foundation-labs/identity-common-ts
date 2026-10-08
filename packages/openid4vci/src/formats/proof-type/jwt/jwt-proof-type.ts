@@ -9,8 +9,16 @@ import {
 } from '@openid4vc/oauth2'
 import { dateToSeconds, parseWithErrorHandling } from '@openid4vc/utils'
 import { Openid4vciError } from '../../../error/Openid4vciError'
-import { type VerifyKeyAttestationJwtReturn, verifyKeyAttestationJwt } from '../../../key-attestation/key-attestation'
-import { zKeyAttestationJwtHeader, zKeyAttestationJwtPayload } from '../../../key-attestation/z-key-attestation'
+import {
+  type VerifyKeyAttestationJwtReturn,
+  verifyKeyAttestationJwt,
+  verifyKeyAttestationRequirements,
+} from '../../../key-attestation/key-attestation'
+import {
+  type KeyAttestationsRequired,
+  zKeyAttestationJwtHeader,
+  zKeyAttestationJwtPayload,
+} from '../../../key-attestation/z-key-attestation'
 import {
   type CredentialRequestJwtProofTypeHeader,
   type CredentialRequestJwtProofTypePayload,
@@ -124,6 +132,13 @@ export interface VerifyCredentialRequestJwtProofOptions {
   now?: Date
 
   /**
+   * The `key_attestations_required` value of the `jwt` proof type from the credential configuration in the
+   * credential issuer metadata. If provided, the proof MUST contain a `key_attestation` that meets these
+   * requirements.
+   */
+  keyAttestationsRequired?: KeyAttestationsRequired
+
+  /**
    * Callbacks required for the jwt verification.
    *
    * Will be used for the jwt proof, and optionally a `key_attestation` in the jwt proof header.
@@ -163,6 +178,7 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
       callbacks: options.callbacks,
       keyAttestationJwt: header.key_attestation,
       use: 'proof_type.jwt',
+      keyAttestationsRequired: options.keyAttestationsRequired,
     })
 
     const isSigedWithAttestedKey = await isJwkInSet({
@@ -176,6 +192,11 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
         `Credential request jwt proof is not signed with a key in the 'key_attestation' jwt payload 'attested_keys'`
       )
     }
+  }
+
+  // Throws if a key attestation is required but the proof does not contain one
+  if (!keyAttestationResult) {
+    verifyKeyAttestationRequirements({ keyAttestationsRequired: options.keyAttestationsRequired })
   }
 
   return {

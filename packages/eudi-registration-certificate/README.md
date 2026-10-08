@@ -1,6 +1,6 @@
-# @owf/eudi-wrprc
+# @owf/eudi-registration-certificate
 
-[![npm version](https://img.shields.io/npm/v/@owf/eudi-wrprc)](https://npmjs.com/package/@owf/eudi-wrprc)
+[![npm version](https://img.shields.io/npm/v/@owf/eudi-registration-certificate)](https://npmjs.com/package/@owf/eudi-registration-certificate)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/openwallet-foundation-labs/identity-common-ts/blob/main/LICENSE)
 
 Implementation of **ETSI TS 119 475 v1.2.1** - Wallet-Relying Party Registration Certificates (WRPRC) for [Identity Common TypeScript](https://github.com/openwallet-foundation-labs/identity-common-ts).
@@ -28,7 +28,7 @@ Parsing is deliberately more liberal than writing for the two field renames. `cl
 Writing stays on the published edition unless you ask for otherwise:
 
 ```typescript
-import { signWRPRC, WRPRC_DIALECTS } from '@owf/eudi-wrprc'
+import { signWRPRC, WRPRC_DIALECTS } from '@owf/eudi-registration-certificate'
 
 const signed = await signWRPRC({
   payload,
@@ -60,13 +60,13 @@ This package provides:
 
 ```bash
 # Using npm
-npm install @owf/eudi-wrprc
+npm install @owf/eudi-registration-certificate
 
 # Using pnpm
-pnpm add @owf/eudi-wrprc
+pnpm add @owf/eudi-registration-certificate
 
 # Using yarn
-yarn add @owf/eudi-wrprc
+yarn add @owf/eudi-registration-certificate
 ```
 
 ## Usage
@@ -74,7 +74,7 @@ yarn add @owf/eudi-wrprc
 ### Creating a WRPRC with the Fluent Builder
 
 ```typescript
-import { wrprc, WRP_ENTITLEMENTS } from '@owf/eudi-wrprc'
+import { wrprc, WRP_ENTITLEMENTS } from '@owf/eudi-registration-certificate'
 
 const payload = wrprc()
   .name('Example Service')
@@ -91,7 +91,7 @@ const payload = wrprc()
 ### Creating a WRPRC for a Natural Person
 
 ```typescript
-import { wrprc, WRP_ENTITLEMENTS } from '@owf/eudi-wrprc'
+import { wrprc, WRP_ENTITLEMENTS } from '@owf/eudi-registration-certificate'
 
 const payload = wrprc()
   .name('Self-Employed Consultant')
@@ -107,7 +107,7 @@ const payload = wrprc()
 ### Using Factory Functions
 
 ```typescript
-import { createLegalPersonWRPRC, WRP_ENTITLEMENTS } from '@owf/eudi-wrprc'
+import { createLegalPersonWRPRC, WRP_ENTITLEMENTS } from '@owf/eudi-registration-certificate'
 
 const payload = createLegalPersonWRPRC({
   name: 'Example Service',
@@ -122,7 +122,7 @@ const payload = createLegalPersonWRPRC({
 ### Specifying Credentials to Request
 
 ```typescript
-import { wrprc, credential, WRP_ENTITLEMENTS } from '@owf/eudi-wrprc'
+import { wrprc, credential, WRP_ENTITLEMENTS } from '@owf/eudi-registration-certificate'
 
 const payload = wrprc()
   .name('Verification Service')
@@ -147,7 +147,7 @@ const payload = wrprc()
 Attestation providers declare what they issue with `provides_attestations` (GEN-5.2.4-05). ETSI TS 119 475 v1.2.1 defines this as `Credential` objects containing `format` and `meta` only:
 
 ```typescript
-import { wrprc, credential, WRP_ENTITLEMENTS } from '@owf/eudi-wrprc'
+import { wrprc, credential, WRP_ENTITLEMENTS } from '@owf/eudi-registration-certificate'
 
 const payload = wrprc()
   .name('Attestation Provider')
@@ -169,7 +169,7 @@ Scheme URLs are not accepted for `provides_attestations`: wallets should be able
 GEN-5.2.1-04 requires the JWT to carry a JAdES signature with the B-B profile of ETSI TS 119 182-1. `signWRPRC` builds one through [`@owf/eudi-jades`](../eudi-jades), so the protected header holds `typ`, `alg`, the `x5c` certificate chain and the `iat` claimed signing time. `decodeWRPRC` rejects tokens that do not meet the B-B profile.
 
 ```typescript
-import { signWRPRC, wrprc, WRP_ENTITLEMENTS } from '@owf/eudi-wrprc'
+import { signWRPRC, wrprc, WRP_ENTITLEMENTS } from '@owf/eudi-registration-certificate'
 import { ES256 } from '@owf/crypto'
 
 const payload = wrprc()
@@ -205,7 +205,7 @@ Pass `signingTime` to pin the claimed signing time; it defaults to now.
 ### Decoding a WRPRC
 
 ```typescript
-import { decodeWRPRC } from '@owf/eudi-wrprc'
+import { decodeWRPRC } from '@owf/eudi-registration-certificate'
 
 const jwsString = 'eyJ0eXAiOiJyYy13cnArand0Ii...'
 const decoded = decodeWRPRC(jwsString, accessCertificateSub)
@@ -217,7 +217,7 @@ console.log(decoded.payload) // { name: '...', sub: '...', ... }
 ### Validating a WRPRC
 
 ```typescript
-import { validateWRPRCPayload } from '@owf/eudi-wrprc'
+import { validateWRPRCPayload } from '@owf/eudi-registration-certificate'
 
 const result = validateWRPRCPayload(payload, accessCertificateSub)
 
@@ -240,7 +240,7 @@ if (result.warnings.length > 0) {
 The package exports all entitlement URIs from ETSI TS 119 475 Annex A:
 
 ```typescript
-import { WRP_ENTITLEMENTS, PSP_SUB_ENTITLEMENTS } from '@owf/eudi-wrprc'
+import { WRP_ENTITLEMENTS, PSP_SUB_ENTITLEMENTS } from '@owf/eudi-registration-certificate'
 
 // Main entitlements
 WRP_ENTITLEMENTS.SERVICE_PROVIDER           // Basic service provider

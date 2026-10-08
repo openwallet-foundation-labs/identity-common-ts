@@ -46,6 +46,8 @@ To avoid reinventing the wheel, many identity projects share common needs for da
 
 The project is organized into six main categories:
 
+> **Note**: All packages within a category are versioned and published together, so they always share the same version. Each category is versioned independently of the other categories.
+
 #### Core Identity Utilities
 
 Generic, reusable utilities that can be used across any identity solution:
@@ -57,7 +59,7 @@ Generic, reusable utilities that can be used across any identity solution:
 | [`@owf/token-status-list`](./packages/token-status-list) | Status list bitstring handling, JWT and CWT/CBOR transport | ✅ Available |
 | `@owf/jose` | JOSE/JWT implementation with common validation methods | 📋 Planned |
 | `@owf/cose` | COSE/CWT implementation with common validation methods | 📋 Planned |
-| `@owf/x509` | X.509 certificate parsing, creation, and verification | 📋 Planned |
+| [`@owf/x509`](./packages/x509) | X.509 certificate and CRL parsing, creation, verification and revocation checking | ✅ Available |
 
 #### EUDI-Specific Tools
 
@@ -67,9 +69,9 @@ Tools specific to the [European Digital Identity (EUDI) Wallet](https://ec.europ
 |---------|-------------|--------|
 | [`@owf/eudi-lote`](./packages/eudi-lote) | ETSI TS 119 602 Lists of Trusted Entities (LoTE) | ✅ Available |
 | [`@owf/eudi-tl`](./packages/eudi-tl) | ETSI TS 119 612 XML Trusted Lists parsing and verification | ✅ Available |
-| [`@owf/eudi-wrprc`](./packages/eudi-wrprc) | ETSI TS 119 475 Wallet-Relying Party Registration Certificates | ✅ Available |
+| [`@owf/eudi-registration-certificate`](./packages/eudi-registration-certificate) | ETSI TS 119 475 Wallet-Relying Party Registration Certificates | ✅ Available |
 | [`@owf/eudi-attestation-schema`](./packages/eudi-attestation-schema) | TS11 Catalogue of Attestations SchemaMeta | ✅ Available |
-| `@owf/eudi-certificates` | Registration and access certificate verification | 📋 Planned |
+| [`@owf/eudi-access-certificate`](./packages/eudi-access-certificate) | ETSI TS 119 411-8 wallet-relying party access certificates | ✅ Available |
 | `@owf/eudi-sca` | TS12 Strong Customer Authentication Payments according to the latest to-be-added ARF |  In Progess |
 
 #### SD-JWT
@@ -150,6 +152,18 @@ npm install @owf/token-status-list
 
 📖 [View package documentation](./packages/token-status-list/README.md)
 
+### @owf/x509
+
+[![@owf/x509 version](https://img.shields.io/npm/v/@owf/x509)](https://npmjs.com/package/@owf/x509)
+
+Environment agnostic X.509 certificates and CRLs (RFC 5280): parsing, creation, signature verification and revocation checking. Signing and verification are callbacks, so private keys never enter the library.
+
+```bash
+npm install @owf/x509
+```
+
+📖 [View package documentation](./packages/x509/README.md)
+
 ### @owf/eudi-lote
 
 [![@owf/eudi-lote version](https://img.shields.io/npm/v/@owf/eudi-lote)](https://npmjs.com/package/@owf/eudi-lote)
@@ -174,17 +188,29 @@ npm install @owf/eudi-tl
 
 📖 [View package documentation](./packages/eudi-tl/README.md)
 
-### @owf/eudi-wrprc
+### @owf/eudi-registration-certificate
 
-[![@owf/eudi-wrprc version](https://img.shields.io/npm/v/@owf/eudi-wrprc)](https://npmjs.com/package/@owf/eudi-wrprc)
+[![@owf/eudi-registration-certificate version](https://img.shields.io/npm/v/@owf/eudi-registration-certificate)](https://npmjs.com/package/@owf/eudi-registration-certificate)
 
 SDK for creating, signing, and validating Wallet-Relying Party Registration Certificates (WRPRC) per ETSI TS 119 475 v1.2.1.
 
 ```bash
-npm install @owf/eudi-wrprc
+npm install @owf/eudi-registration-certificate
 ```
 
-📖 [View package documentation](./packages/eudi-wrprc/README.md)
+📖 [View package documentation](./packages/eudi-registration-certificate/README.md)
+
+### @owf/eudi-access-certificate
+
+[![@owf/eudi-access-certificate version](https://img.shields.io/npm/v/@owf/eudi-access-certificate)](https://npmjs.com/package/@owf/eudi-access-certificate)
+
+The ETSI TS 119 411-8 profile for wallet-relying party access certificates on top of `@owf/x509`: parsing, profile validation and creation. Runs on servers, in browsers and in React Native.
+
+```bash
+npm install @owf/eudi-access-certificate
+```
+
+📖 [View package documentation](./packages/eudi-access-certificate/README.md)
 
 ### @owf/eudi-attestation-schema
 

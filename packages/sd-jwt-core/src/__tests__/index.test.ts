@@ -1243,5 +1243,30 @@ describe('index', () => {
         })
       ).resolves.toHaveProperty('kb')
     })
+
+    test('applies allowedKeyBindingAlgorithms to the key binding JWT', async () => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation({ keyBindingAlgorithm: 'ES256' })
+      await expect(
+        sdjwt.verify(presentation, {
+          ...options,
+          allowedIssuerAlgorithms: ['EdDSA'],
+          allowedKeyBindingAlgorithms: ['ES256'],
+        })
+      ).resolves.toHaveProperty('kb')
+      await expect(
+        sdjwt.verify(presentation, {
+          ...options,
+          allowedIssuerAlgorithms: ['EdDSA'],
+          allowedKeyBindingAlgorithms: ['EdDSA'],
+        })
+      ).rejects.toThrow('Verify Error: Disallowed Key Binding alg ES256')
+    })
+
+    test('does not apply allowedKeyBindingAlgorithms to the issuer-signed JWT', async () => {
+      const { sdjwt, presentation, options } = await createKeyBoundPresentation({ keyBindingAlgorithm: 'ES256' })
+      await expect(
+        sdjwt.verify(presentation, { ...options, allowedKeyBindingAlgorithms: ['ES256'] })
+      ).resolves.toHaveProperty('kb')
+    })
   })
 })

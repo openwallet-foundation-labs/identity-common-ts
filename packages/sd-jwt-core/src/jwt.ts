@@ -60,8 +60,14 @@ export type VerifierOptions = {
 
   /**
    * Allowed JOSE algorithms for issuer-signed JWTs. `none` is always rejected.
+   * It does not apply to the Key Binding JWT, use `allowedKeyBindingAlgorithms` for that.
    */
   allowedIssuerAlgorithms?: string[]
+
+  /**
+   * Allowed JOSE algorithms for the Key Binding JWT. `none` is always rejected.
+   */
+  allowedKeyBindingAlgorithms?: string[]
 
   /**
    * nonce used to verify the key binding jwt to prevent replay attacks.

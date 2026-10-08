@@ -1,28 +1,18 @@
 {
-  "name": "@owf/eudi-wrprc",
-  "version": "0.4.1",
-  "description": "ETSI TS 119 475 Wallet-Relying Party Registration Certificate (WRPRC) implementation",
+  "name": "@owf/eudi-access-certificate",
+  "version": "0.0.0",
+  "description": "Parse, validate and create EUDI Wallet-Relying Party access certificates per ETSI TS 119 411-8",
   "files": [
     "dist"
   ],
   "license": "Apache-2.0",
   "exports": "./src/index.ts",
-  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-wrprc",
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-access-certificate",
   "repository": {
     "type": "git",
     "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
-    "directory": "packages/eudi-wrprc"
+    "directory": "packages/eudi-access-certificate"
   },
-  "keywords": [
-    "eudi",
-    "wallet",
-    "wrprc",
-    "registration-certificate",
-    "etsi",
-    "ts-119-475",
-    "relying-party",
-    "identity"
-  ],
   "publishConfig": {
     "access": "public",
     "main": "./dist/index.cjs",
@@ -42,9 +32,17 @@
     "build": "tsdown src/index.ts --format esm,cjs --dts --sourcemap"
   },
   "dependencies": {
-    "@owf/crypto": "workspace:*",
-    "@owf/eudi-jades": "workspace:*",
     "@owf/identity-common": "workspace:*",
-    "zod": "catalog:"
-  }
+    "@owf/x509": "workspace:*"
+  },
+  "keywords": [
+    "eudi",
+    "wallet",
+    "access-certificate",
+    "relying-party",
+    "etsi",
+    "ts-119-411-8",
+    "x509",
+    "eidas"
+  ]
 }
