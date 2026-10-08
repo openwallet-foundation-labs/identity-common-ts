@@ -1,4 +1,5 @@
-const unquote = (value: string) => value.substring(1, value.length - 1).replace(/\\"/g, '"')
+// A backslash escapes the character after it in a quoted string (RFC 9110 §5.6.4), not only a quote
+const unquote = (value: string) => value.substring(1, value.length - 1).replace(/\\(.)/g, '$1')
 // Fixup quoted strings and tokens with spaces around them
 const sanitize = (value: string) => (value.charAt(0) === '"' ? unquote(value) : value.trim())
 
@@ -74,6 +75,29 @@ export function parseWwwAuthenticateHeader(str: string): WwwAuthenticateHeaderCh
   return challenges
 }
 
+/**
+ * Replaces every run of characters outside visible ASCII and space with a single space.
+ *
+ * A value is often an error message, which can hold line breaks and input from whoever sent the
+ * request. A CR or LF would end the header there, and `Headers.set` rejects it as well as any
+ * character above U+00FF. RFC 6750 §3 limits `error_description` to a subset of the characters
+ * that are kept in any case.
+ */
+const toHeaderText = (value: string) => value.replace(/[^\x20-\x7E]+/g, ' ')
+
+/**
+ * `error_description` is meant for a developer reading it, and is mostly filled from an error
+ * message, so it is cut off rather than letting the message decide how large the header gets.
+ */
+const MAX_ERROR_DESCRIPTION_LENGTH = 500
+
+/**
+ * Encodes challenges as the value of a `WWW-Authenticate` header.
+ *
+ * The result is always a value a header can carry, whatever the challenges hold: every run of
+ * characters outside visible ASCII and space is replaced with a single space, and an
+ * `error_description` longer than 500 characters is cut off.
+ */
 export function encodeWwwAuthenticateHeader(challenges: WwwAuthenticateHeaderChallenge[]) {
   const entries: string[] = []
 
@@ -82,16 +106,26 @@ export function encodeWwwAuthenticateHeader(challenges: WwwAuthenticateHeaderCha
     const encodedParams = Object.entries(challenge.payload).flatMap(([key, value]) => {
       if (value === undefined) return []
 
-      const encode = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-      // Convert value to string and escape special characters
-      if (Array.isArray(value)) {
-        return value.map((v) => `${key}="${encode(v)}"`)
+      const name = toHeaderText(key)
+      const encode = (s: string) => {
+        let text = toHeaderText(s)
+        if (key === 'error_description' && text.length > MAX_ERROR_DESCRIPTION_LENGTH) {
+          text = `${text.slice(0, MAX_ERROR_DESCRIPTION_LENGTH - 3)}...`
+        }
+
+        // Escaped last, so that cutting off cannot split an escape
+        return text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
       }
 
-      return value ? `${key}="${encode(value)}"` : key
+      if (Array.isArray(value)) {
+        return value.map((v) => `${name}="${encode(v)}"`)
+      }
+
+      return value ? `${name}="${encode(value)}"` : name
     })
 
-    entries.push(encodedParams.length === 0 ? challenge.scheme : `${challenge.scheme} ${encodedParams.join(', ')}`)
+    const scheme = toHeaderText(challenge.scheme)
+    entries.push(encodedParams.length === 0 ? scheme : `${scheme} ${encodedParams.join(', ')}`)
   }
 
   return entries.join(', ')
