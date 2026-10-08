@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@owf/jose)](https://npmjs.com/package/@owf/jose)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/openwallet-foundation-labs/identity-common-ts/blob/main/LICENSE)
 
-JOSE (JWK, JWA and JWS) for [Identity Common TypeScript](https://github.com/openwallet-foundation-labs/identity-common-ts). Tokens are parsed and verified strictly, against zod schemas.
+JOSE (JWK, JWA, JWS, JWT and JWE) for [Identity Common TypeScript](https://github.com/openwallet-foundation-labs/identity-common-ts). Tokens are parsed and verified strictly, against zod schemas.
 
 ## Installation
 
@@ -22,37 +22,43 @@ yarn add @owf/jose
 
 Every base64url, UTF-8 and JSON decode goes through `@owf/identity-common`. It accepts only the base64url alphabet without padding, decodes UTF-8 with `fatal: true`, and throws the same opaque error for every failure. A header encoded with the standard base64 alphabet, or a payload with invalid UTF-8, is rejected.
 
-A token type is described by a schema. Compose the exported schemas into the protected header a token must have, and `parseJws` checks everything that follows from the token alone:
+A token type is described by a schema. Compose the exported schemas into the header and claims a token must have, and `decodeJwt` checks everything that follows from the token alone:
 
 ```typescript
 import { zTyp } from '@owf/identity-common'
-import { parseJws, zJwsProtectedHeader } from '@owf/jose'
+import { decodeJwt, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
 
-const zExampleHeader = z.object({ ...zJwsProtectedHeader.shape, typ: zTyp('example+jws') }).loose()
+const zKbJwtHeader = z.object({ ...zJwtHeader.shape, typ: zTyp('kb+jwt') }).loose()
+const zKbJwtPayload = z
+  .object({ ...zJwtPayload.shape, iat: z.number(), aud: z.string(), nonce: z.string(), sd_hash: z.string().min(1) })
+  .loose()
 
-// `protectedHeader` is typed from the schema
-const { protectedHeader, payload } = parseJws({ jws, protectedHeaderSchema: zExampleHeader })
+// `header` and `payload` are typed from the schemas
+const { header, payload } = decodeJwt({
+  jwt,
+  headerSchema: zKeyBindingJwtHeader,
+  payloadSchema: zKeyBindingJwtPayload,
+})
 ```
 
-`parseJws` also validates the protected header against `zJwsProtectedHeader` and returns the result as `registeredProtectedHeader`. The checks run on that result, so a profile schema cannot leave `alg` or `crit` unchecked.
+`decodeJwt` also validates the header against `zJwtHeader` and the payload against `zJwtPayload`. The checks run on those results, so a profile schema cannot leave `alg`, `crit` or `exp` unchecked.
 
-The algorithms a verifier accepts and the way the signer is identified are options of `verifyJwsSignature`, as a schema cannot express them.
+The current time, the audience of the verifier and the nonce it issued are options of `verifyJwt`, as a schema cannot express them.
 
 ## Signing and verifying
 
 The caller provides the cryptography. This package computes the bytes to sign, and the callback signs or verifies exactly those bytes.
 
 ```typescript
-import { base64url } from '@owf/identity-common'
+import { base64url, dateToSeconds } from '@owf/identity-common'
 import {
   type JwsSigner,
   jwsHeaderFromSigner,
-  parseJws,
   type SignJwsCallback,
-  signCompactJws,
+  signJwt,
   type VerifyJwsCallback,
-  verifyJwsSignature,
+  verifyJwt,
 } from '@owf/jose'
 
 // `kms`, `resolveKey` and `resolveTrustedKey` stand in for your own key management
@@ -78,25 +84,28 @@ const verifyJws: VerifyJwsCallback = async (signer, { signingInputBytes, signatu
 
 const signer: JwsSigner = { method: 'jwk', alg: 'ES256', publicJwk }
 
-const { compact } = await signCompactJws({
+const { jwt } = await signJwt({
   // The parameters that identify the key are only in the header when they are put there
-  protectedHeader: { typ: 'example+jws', ...jwsHeaderFromSigner(signer) },
-  payload: { hello: 'world' },
+  header: { typ: 'example+jwt', ...jwsHeaderFromSigner(signer) },
+  payload: { iss: 'https://issuer.example', aud: 'https://verifier.example', iat: dateToSeconds(new Date()) },
   signer,
   signJwsCallback: signJws,
 })
 
 // The signer is established from the header, here from its `jwk`
-const { signer: verifiedSigner } = await verifyJwsSignature({
-  jws: parseJws({ jws: compact }),
+const { payload, signer: verifiedSigner } = await verifyJwt({
+  jwt,
   verifyJwsCallback: verifyJws,
   allowedAlgorithms: ['ES256'],
+  expectedIssuer: 'https://issuer.example',
+  expectedAudience: 'https://verifier.example',
+  requiredClaims: ['iat'],
 })
 ```
 
 The verification callback decides whether the key is trusted, for example whether a certificate chain chains to a trusted root or whether a DID is acceptable. This package only establishes which key signed.
 
-`signCompactJws` validates the protected header before signing it. It does not add the header parameters that identify the key, because the token type decides which of them a token carries. Spread `jwsHeaderFromSigner(signer)` into the header to add them. It returns:
+`signJwt` validates the header and the claims set before signing them. It does not add the header parameters that identify the key, because the token type decides which of them a token carries. Spread `jwsHeaderFromSigner(signer)` into the header to add them. It returns:
 
 - for a `did` signer, its DID URL as `kid`
 - for a `federation` signer, `kid` and `trust_chain`. Without a trust chain it gives `kid` alone, and a verifier then establishes a `custom` signer
@@ -105,7 +114,7 @@ The verification callback decides whether the key is trusted, for example whethe
 
 ## Certificate chains
 
-`x5c`, in a JWS header and in a JWK, is validated when it is parsed, as RFC 7515 and RFC 7517 define it: a chain of at least one certificate, with the certificate that holds the key first. Each entry is the standard base64 (RFC 4648 section 4) of a DER encoded certificate. An entry is rejected when it has base64url characters, whitespace or line breaks, or missing or extra `=` padding. It is also rejected when it does not decode to exactly one DER SEQUENCE with a definite, minimally encoded length. The issue has the path of the entry and the code `invalid_format`, with `base64` or `der` as the format.
+`x5c`, in a JWS header, a JWE header and a JWK, is validated when it is parsed, as RFC 7515 and RFC 7517 define it: a chain of at least one certificate, with the certificate that holds the key first. Each entry is the standard base64 (RFC 4648 section 4) of a DER encoded certificate. An entry is rejected when it has base64url characters, whitespace or line breaks, or missing or extra `=` padding. It is also rejected when it does not decode to exactly one DER SEQUENCE with a definite, minimally encoded length. The issue has the path of the entry and the code `invalid_format`, with `base64` or `der` as the format.
 
 The certificates themselves are not parsed. The verification callback gets the `x5c` signer and decides whether the entries are valid X.509 certificates, whether the chain is in order and chains to a trusted root, and whether the first certificate holds the key that signed. A profile that validates a certificate chain in its own schema can use `zX5c` and `zX5cCertificate`.
 
@@ -122,8 +131,11 @@ Besides validating the structures, verification applies these rules:
 - A header that identifies the signer in more than one way is rejected. No precedence is applied.
 - `extractJwkFromJwkSet` selects a key from a JWK Set by its `kid` and `use`. The selection is rejected when no key in the set has the `kid`, or when several keys that differ have it. Without a `kid`, it is rejected when the set holds more than one key for the use. The same JWK listed twice counts as one key.
 - An unencoded payload (RFC 7797, `b64: false`) is opt-in: `parseJws` rejects a JWS with `b64` in `crit` unless `understoodCriticalParameters` includes `'b64'`. In a compact serialization, such a payload can only hold printable ASCII other than `.`, as RFC 7797 requires. Signing refuses anything else, and parsing rejects it. A detached payload, or one in a JSON serialization, is not limited this way.
+- The signature is verified before the claims, since the claims of a token mean nothing until its signer is established.
+- The claims are verified against `now` (the current time unless it is given), with a clock skew of 30 seconds for `exp`, `nbf` and `iat` unless `skewSeconds` says otherwise. Shifted by that skew, a token is rejected from its `exp` on, at `exp` itself too, and while its `nbf` or `iat` is in the future. An `expected*` option rejects a token that does not carry the claim at all.
+- The time claims are compared as numbers of seconds, so a NumericDate outside the range of a JavaScript `Date` is still ordered: an `exp` of `9999999999999` does not expire, and an `exp` of `-1e13` has expired. A time claim that is not a finite number gives an `invalid_type` issue.
 
-`signCompactJws` throws a `JoseInvalidArgumentError` for a signer whose `alg` is not the `alg` of the header, for an unencoded payload that a compact serialization cannot carry, and for a signing callback that does not return a non-empty base64url signature. `verifyJwsSignature` throws a `JoseAlgorithmNotAllowedError` when the `signer` it is given has another `alg` than the JWS.
+Options that a check cannot be made with are rejected rather than letting the check pass. A `now` that is not a valid date, or a `skewSeconds` or `maxAgeSeconds` that is not a finite number of at least 0, throws a `JoseInvalidArgumentError`: with a skew of `NaN`, every comparison against the current time would accept the token. `signCompactJws` and `signJwt` throw the same error for a signer whose `alg` is not the `alg` of the header, for an unencoded payload that a compact serialization cannot carry, and for a signing callback that does not return a non-empty base64url signature. `verifyJwsSignature` throws a `JoseAlgorithmNotAllowedError` when the `signer` it is given has another `alg` than the JWS.
 
 ## Errors
 
@@ -138,8 +150,10 @@ The errors of this package extend `IdentityError` from `@owf/identity-common`. T
 ## Not supported
 
 - An unsecured JWS (`alg: none`), and a JWS without a protected header.
-- Signing a JWS in a JSON serialization. `parseJws` and `verifyJwsSignature` read the flattened and general JSON serializations, but `signCompactJws` produces the compact serialization only.
-- An unencoded payload (`b64: false`) that is not valid UTF-8.
+- JWE encryption and decryption. The package provides the JWE structures (`zCompactJwe`, `zJweHeader`, and `decodeJwtHeader` to read the header of a compact JWE) and the callback types (`EncryptJweCallback`, `DecryptJweCallback`), and leaves the cryptography to the caller.
+- Nested JWTs. `decodeJwt` expects the claims set as the payload: decrypt an outer JWE, or read an outer JWS with `parseJws`, and decode the inner JWT from its payload.
+- Signing a JWS in a JSON serialization. `parseJws` and `verifyJwsSignature` read the flattened and general JSON serializations, but `signCompactJws` and `signJwt` produce the compact serialization only.
+- An unencoded payload (`b64: false`) in a JWT, and an unencoded payload that is not valid UTF-8.
 
 ## Platform support
 
