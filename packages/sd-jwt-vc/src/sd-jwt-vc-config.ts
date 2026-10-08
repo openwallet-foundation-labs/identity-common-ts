@@ -1,4 +1,4 @@
-import type { SDJWTConfig, Verifier } from '@sd-jwt/core'
+import type { SDJwtConfig, Verifier } from '@sd-jwt/core'
 import type { VCTFetcher } from './sd-jwt-vc-vct'
 
 export type StatusListFetcher = (uri: string) => Promise<string>
@@ -27,11 +27,11 @@ export type StatusListVerificationErrorDetails = {
 /**
  * Configuration for SD-JWT-VC
  */
-export type SDJWTVCConfig = SDJWTConfig & {
+export type SDJwtVcConfig = SDJwtConfig & {
   // A function that fetches the status list from the uri. If not provided, the library will assume that the response is a compact JWT.
   statusListFetcher?: StatusListFetcher
   // validte the status and decide if the status is valid or not. If not provided, the code will continue if it is 0, otherwise it will throw an error.
-  // To have safeVerify report an invalid status as STATUS_INVALID, throw an SDJWTException with the code 'STATUS_INVALID'.
+  // To have safeVerify report an invalid status as STATUS_INVALID, throw an SDJwtException with the code 'STATUS_INVALID'.
   statusValidator?: StatusValidator
   // a function that fetches the type metadata format from the uri. If not provided, the library will assume that the response is a TypeMetadataFormat. Caching has to be implemented in this function. If the integrity value is passed, it to be validated according to https://www.w3.org/TR/SRI/
   vctFetcher?: VCTFetcher

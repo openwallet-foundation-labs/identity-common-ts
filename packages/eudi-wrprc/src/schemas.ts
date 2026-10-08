@@ -221,7 +221,7 @@ export const WRPRC_JWS_ALGORITHMS = [
  * requires a JAdES B-B signature, whose protected header carries `iat` as the claimed
  * signing time (ETSI TS 119 182-1 clause 5.1.9). The informative Annex C header omits it.
  */
-export const WRPRCJWTHeaderSchema = z.object({
+export const WRPRCJwtHeaderSchema = z.object({
   /** Type of the Web Token - must be "rc-wrp+jwt" for JWT */
   typ: z.literal('rc-wrp+jwt'),
   /** Algorithm used to sign the JWT */
@@ -258,8 +258,8 @@ export const WRPRCCWTHeaderSchema = z.object({
 /**
  * Complete JWT WRPRC schema
  */
-export const WRPRCJWTSchema = z.object({
-  header: WRPRCJWTHeaderSchema,
+export const WRPRCJwtSchema = z.object({
+  header: WRPRCJwtHeaderSchema,
   payload: WRPRCPayloadSchema,
 })
 

@@ -103,7 +103,7 @@ decoded.getStatus(42) // 1
 ```typescript
 import { getStatusListFromJWT } from '@owf/token-status-list'
 
-const entry = getStatusListFromJWT(referencedTokenJWT)
+const entry = getStatusListFromJWT(referencedTokenJwt)
 // entry.idx  — index into the status list
 // entry.uri  — URI of the Status List Token
 ```
@@ -173,7 +173,7 @@ const decoded = decodeCWTStatusClaim(encoded)
 | `getListFromStatusListJWT` | Decode a `StatusList` from a JWT string |
 | `getStatusListFromJWT` | Extract `StatusListEntry` from a referenced token JWT |
 | `JWT_STATUS_LIST_TYPE` | `"statuslist+jwt"` |
-| `JWTClaimNames` | Claim name constants |
+| `JwtClaimNames` | Claim name constants |
 
 ### CWT Transport
 

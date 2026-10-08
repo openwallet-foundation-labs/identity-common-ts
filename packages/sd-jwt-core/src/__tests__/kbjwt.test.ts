@@ -3,7 +3,7 @@ import { exportJWK, importJWK, type JWK } from 'jose'
 import { describe, expect, test } from 'vitest'
 import { KBJwt } from '../kbjwt'
 import { type JwtPayload, KB_JWT_TYP, type KbVerifier, type kbPayload, type Signer } from '../types'
-import { JwtTimeClaimException, type SDJWTException } from '../utils'
+import { JwtTimeClaimException, type SDJwtException } from '../utils'
 
 describe('KB JWT', () => {
   test('create', async () => {
@@ -170,7 +170,7 @@ describe('KB JWT', () => {
         nonce: 'nonce',
       })
     } catch (e: unknown) {
-      const error = e as SDJWTException
+      const error = e as SDJwtException
       expect(error.message).toBe('Invalid Key Binding Jwt')
     }
   })
@@ -215,7 +215,7 @@ describe('KB JWT', () => {
         nonce: 'nonce',
       })
     } catch (e: unknown) {
-      const error = e as SDJWTException
+      const error = e as SDJwtException
       expect(error.message).toBe('Verify Error: Invalid JWT Signature')
     }
   })
@@ -261,7 +261,7 @@ describe('KB JWT', () => {
         nonce: 'nonce',
       })
     } catch (e: unknown) {
-      const error = e as SDJWTException
+      const error = e as SDJwtException
       expect(error.message).toBe('Verify Error: Invalid JWT')
     }
   })

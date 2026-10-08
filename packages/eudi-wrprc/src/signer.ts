@@ -12,7 +12,7 @@
 import { pemToDer } from '@owf/crypto'
 import { decode, JAdESProfile, Token, validateProfile } from '@owf/eudi-jades'
 import { toWRPRCDialect, WRPRC_DIALECTS } from './dialect'
-import type { SignedWRPRC, SignOptions, WRPRCJWTHeader, WRPRCPayload } from './types'
+import type { SignedWRPRC, SignOptions, WRPRCJwtHeader, WRPRCPayload } from './types'
 import { assertValidWRPRCPayload, parseWRPRCPayload } from './validator'
 import { WRPRCException } from './wrprc-exception'
 
@@ -63,7 +63,7 @@ export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
 
   return {
     jws: token.toString(),
-    header: token.getProtectedHeader() as WRPRCJWTHeader,
+    header: token.getProtectedHeader() as WRPRCJwtHeader,
     payload,
   }
 }
@@ -107,7 +107,7 @@ export function decodeWRPRC(jws: string, accessCertificateSub: string): SignedWR
 
   return {
     jws,
-    header: decoded.header as WRPRCJWTHeader,
+    header: decoded.header as WRPRCJwtHeader,
     payload,
   }
 }

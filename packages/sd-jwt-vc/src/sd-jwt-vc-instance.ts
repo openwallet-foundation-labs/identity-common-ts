@@ -3,8 +3,8 @@ import {
   getListFromStatusListJWT,
   MediaTypes,
   SLException,
-  type StatusListJWTHeaderParameters,
-  type StatusListJWTPayload,
+  type StatusListJwtHeaderParameters,
+  type StatusListJwtPayload,
   StatusType,
   verifyStatusListJwtClaims,
   verifyStatusListJwtHeader,
@@ -15,8 +15,8 @@ import {
   getJwtTimeValidationOptions,
   Jwt,
   type SafeVerifyResult,
-  SDJWTException,
   SDJwt,
+  SDJwtException,
   SDJwtInstance,
   type VerificationError,
   type VerificationErrorCode,
@@ -24,7 +24,7 @@ import {
 } from '@sd-jwt/core'
 import z from 'zod'
 import type {
-  SDJWTVCConfig,
+  SDJwtVcConfig,
   StatusInvalidErrorDetails,
   StatusListFetcher,
   StatusListVerificationErrorDetails,
@@ -47,9 +47,9 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
    */
   protected type = 'dc+sd-jwt'
 
-  protected userConfig: SDJWTVCConfig = {}
+  protected userConfig: SDJwtVcConfig = {}
 
-  constructor(userConfig?: SDJWTVCConfig) {
+  constructor(userConfig?: SDJwtVcConfig) {
     super(userConfig)
     if (userConfig) {
       this.userConfig = userConfig
@@ -65,7 +65,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
       const reservedNames = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'status']
       const reservedNamesInDisclosureFrame = disclosureFrame._sd.filter((key) => reservedNames.includes(String(key)))
       if (reservedNamesInDisclosureFrame.length > 0) {
-        throw new SDJWTException('Cannot disclose protected field')
+        throw new SDJwtException('Cannot disclose protected field')
       }
     }
   }
@@ -108,7 +108,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
   private async statusValidator(status: number, { uri, idx }: StatusValidatorContext): Promise<void> {
     if (status !== StatusType.Valid) {
       const details: StatusInvalidErrorDetails = { uri, idx, status }
-      throw new SDJWTException('Status is not valid', { details, code: 'STATUS_INVALID' })
+      throw new SDJwtException('Status is not valid', { details, code: 'STATUS_INVALID' })
     }
     return Promise.resolve()
   }
@@ -192,7 +192,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
         const error = ensureError(e)
         // A failure that carries a code (e.g. STATUS_INVALID from the status validator) keeps it;
         // problems with the status list itself are wrapped without one
-        if (error instanceof SDJWTException && error.code) {
+        if (error instanceof SDJwtException && error.code) {
           addError(error.code, error.message, error)
         } else {
           addError('STATUS_VERIFICATION_FAILED', `Status verification failed: ${error.message}`, error)
@@ -208,7 +208,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
           }
         } catch (e) {
           const error = ensureError(e)
-          if (error instanceof SDJWTException && error.code) {
+          if (error instanceof SDJwtException && error.code) {
             addError(error.code, error.message, error)
           } else {
             addError('VCT_VERIFICATION_FAILED', `VCT verification failed: ${error.message}`, error)
@@ -253,7 +253,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
     const { payload, header } = await SDJwt.extractJwt<Record<string, unknown>, SdJwtVcPayload>(encodedSDJwt)
 
     if (!payload) {
-      throw new SDJWTException('JWT payload is missing')
+      throw new SDJwtException('JWT payload is missing')
     }
 
     const result: VerificationResult = {
@@ -278,7 +278,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
     const alg = integrity.split('-')[0]
     //TODO: error handling when a hasher is passed that is not supporting the required algorithm according to the spec
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJwtException('Hasher not found')
     }
     const hashBuffer = await this.userConfig.hasher(arrayBuffer, alg)
     const integrityHash = integrity.split('-')[1]
@@ -356,7 +356,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
    * Validates that extending claim metadata respects the constraints from spec section 9.5.1.
    * @param baseClaim The base claim metadata
    * @param extendingClaim The extending claim metadata
-   * @throws SDJWTException if validation fails
+   * @throws SDJwtException if validation fails
    */
   private validateClaimExtension(baseClaim: Claim, extendingClaim: Claim): void {
     // Validate 'sd' property constraints (section 9.5.1)
@@ -364,7 +364,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
       // Cannot change from 'always' or 'never' to a different value
       if ((baseClaim.sd === 'always' || baseClaim.sd === 'never') && baseClaim.sd !== extendingClaim.sd) {
         const pathStr = JSON.stringify(extendingClaim.path)
-        throw new SDJWTException(
+        throw new SDJwtException(
           `Cannot change 'sd' property from '${baseClaim.sd}' to '${extendingClaim.sd}' for claim at path ${pathStr}`
         )
       }
@@ -467,18 +467,18 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
 
     // Check max depth (security consideration from spec section 10.3)
     if (maxDepth !== -1 && depth > maxDepth) {
-      throw new SDJWTException(`Maximum VCT extends depth of ${maxDepth} exceeded`)
+      throw new SDJwtException(`Maximum VCT extends depth of ${maxDepth} exceeded`)
     }
 
     if (!parentTypeMetadata.extends) {
-      throw new SDJWTException(
+      throw new SDJwtException(
         `Type metadata for vct '${parentTypeMetadata.vct}' has no 'extends' field. Unable to resolve extended type metadata document.`
       )
     }
 
     // Check for circular dependencies (security consideration from spec section 10.3)
     if (visitedVcts.has(parentTypeMetadata.extends)) {
-      throw new SDJWTException(`Circular dependency detected in VCT extends chain: ${parentTypeMetadata.extends}`)
+      throw new SDJwtException(`Circular dependency detected in VCT extends chain: ${parentTypeMetadata.extends}`)
     }
 
     // Mark this VCT as visited
@@ -493,7 +493,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
     // The extends value ALWAYS must resolve to a value. A custom user provided resolver
     // can return a minimal on-demand type metadata document if it wants to support this use case
     if (!extendedTypeMetadata) {
-      throw new SDJWTException(
+      throw new SDJwtException(
         `Resolving VCT extends value '${parentTypeMetadata.extends}' resulted in an undefined result.`
       )
     }
@@ -536,7 +536,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
 
     const validated = TypeMetadataFormatSchema.safeParse(data)
     if (!validated.success) {
-      throw new SDJWTException(`Invalid VCT type metadata for vct '${vct}':\n${z.prettifyError(validated.error)}`)
+      throw new SDJwtException(`Invalid VCT type metadata for vct '${vct}':\n${z.prettifyError(validated.error)}`)
     }
 
     return validated.data
@@ -559,15 +559,15 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
         // fetch the status list from the uri
         const fetcher: StatusListFetcher = this.userConfig.statusListFetcher ?? this.statusListFetcher.bind(this)
         // fetch the status list from the uri
-        const statusListJWT = await fetcher(uri)
+        const statusListJwt = await fetcher(uri)
 
-        const slJWT = Jwt.fromEncode<StatusListJWTHeaderParameters, StatusListJWTPayload>(statusListJWT)
+        const slJWT = Jwt.fromEncode<StatusListJwtHeaderParameters, StatusListJwtPayload>(statusListJwt)
         // check that the token is a Status List Token before its signature is verified
         verifyStatusListJwtHeader(slJWT.header ?? {})
         // check if the status list has a valid signature. Falls back to the verifier of the SD-JWT-VC.
         const statusListVerifier = this.userConfig.statusVerifier ?? this.userConfig.verifier
         if (!statusListVerifier) {
-          throw new SDJWTException('Verifier not found for status list JWT')
+          throw new SDJwtException('Verifier not found for status list JWT')
         }
         await slJWT.verify(statusListVerifier, getJwtTimeValidationOptions(options)).catch((err: unknown) => {
           const details: StatusListVerificationErrorDetails = { uri }
@@ -580,14 +580,14 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
         })
 
         // check the claims required for a Status List Token, e.g. that `sub` matches the referenced uri
-        verifyStatusListJwtClaims(slJWT.payload as StatusListJWTPayload, {
+        verifyStatusListJwtClaims(slJWT.payload as StatusListJwtPayload, {
           uri,
           now: options?.currentDate !== undefined ? secondsToDate(options.currentDate) : undefined,
           skewSeconds: options?.skewSeconds,
         })
 
         // get the status list from the status list JWT
-        const statusList = getListFromStatusListJWT(statusListJWT)
+        const statusList = getListFromStatusListJWT(statusListJwt)
         const status = statusList.getStatus(idx)
 
         // validate the status
@@ -597,7 +597,7 @@ export class SDJwtVcInstance extends SDJwtInstance<SdJwtVcPayload> {
     }
   }
 
-  public config(newConfig: SDJWTVCConfig) {
+  public config(newConfig: SDJwtVcConfig) {
     super.config(newConfig)
   }
 }

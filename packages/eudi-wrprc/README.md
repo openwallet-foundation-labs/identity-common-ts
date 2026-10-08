@@ -312,7 +312,7 @@ This library is **platform agnostic** and works in:
 ### Schemas
 
 - `WRPRCPayloadSchema` - Full WRPRC payload validation
-- `WRPRCJWTHeaderSchema` - JWT header validation
+- `WRPRCJwtHeaderSchema` - JWT header validation
 - `WRPRCCWTHeaderSchema` - CWT header validation
 - `CredentialSchema` - Credential specification validation
 - `ClaimSchema` - Claim specification validation
@@ -321,7 +321,7 @@ This library is **platform agnostic** and works in:
 ### Types
 
 - `WRPRCPayload` - WRPRC payload type
-- `WRPRCJWTHeader` - JWT header type
+- `WRPRCJwtHeader` - JWT header type
 - `SignedWRPRC` - Signed WRPRC with JWS string
 - `Credential` - Credential specification type
 - `ProvidedAttestation` - Provided attestation credential type with `format` and `meta` only
@@ -337,7 +337,7 @@ This library is **platform agnostic** and works in:
 ### Validators
 
 - `validateWRPRCPayload(payload, accessCertificateSub)` - Validate payload and access-certificate identity
-- `validateWRPRCJWTHeader(header)` - Validate JWT header
+- `validateWRPRCJwtHeader(header)` - Validate JWT header
 - `validateWRPRC(header, payload, accessCertificateSub)` - Validate complete WRPRC and access-certificate identity
 - `assertValidWRPRCPayload(payload, accessCertificateSub)` - Assert or throw
 - `parseWRPRCPayload(payload, accessCertificateSub)` - Validate and return the canonical payload

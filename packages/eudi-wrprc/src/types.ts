@@ -23,8 +23,8 @@ import type {
   SupervisoryAuthoritySchema,
   WRPRCCWTHeaderSchema,
   WRPRCCWTSchema,
-  WRPRCJWTHeaderSchema,
-  WRPRCJWTSchema,
+  WRPRCJwtHeaderSchema,
+  WRPRCJwtSchema,
   WRPRCPayloadSchema,
 } from './schemas'
 
@@ -78,7 +78,7 @@ export type NaturalPersonSubject = z.infer<typeof NaturalPersonSubjectSchema>
 // ============================================================================
 
 /** JWT Header for WRPRC */
-export type WRPRCJWTHeader = z.infer<typeof WRPRCJWTHeaderSchema>
+export type WRPRCJwtHeader = z.infer<typeof WRPRCJwtHeaderSchema>
 
 /** CWT Header for WRPRC */
 export type WRPRCCWTHeader = z.infer<typeof WRPRCCWTHeaderSchema>
@@ -88,7 +88,7 @@ export type WRPRCCWTHeader = z.infer<typeof WRPRCCWTHeaderSchema>
 // ============================================================================
 
 /** Complete JWT WRPRC document */
-export type WRPRCJWT = z.infer<typeof WRPRCJWTSchema>
+export type WRPRCJwt = z.infer<typeof WRPRCJwtSchema>
 
 /** Complete CWT WRPRC document */
 export type WRPRCCWT = z.infer<typeof WRPRCCWTSchema>
@@ -102,7 +102,7 @@ export interface SignedWRPRC {
   /** The compact JWS string */
   jws: string
   /** Decoded header */
-  header: WRPRCJWTHeader
+  header: WRPRCJwtHeader
   /** Decoded payload */
   payload: WRPRCPayload
 }
@@ -114,7 +114,7 @@ export interface SignOptions {
   /** Required subject of the access certificate the WRPRC is intended to authorize */
   accessCertificateSub: string
   /** Algorithm (default: ES256) */
-  algorithm?: WRPRCJWTHeader['alg']
+  algorithm?: WRPRCJwtHeader['alg']
   /** PEM-encoded certificates for x5c header (each element is a single PEM certificate) */
   certificates: string[]
   /** Key ID (optional) */

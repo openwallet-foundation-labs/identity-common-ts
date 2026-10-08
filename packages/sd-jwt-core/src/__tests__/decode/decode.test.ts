@@ -11,7 +11,7 @@ import {
   splitSdJwt,
   unpackObj,
 } from '../../decode'
-import { base64urlEncode, SDJWTException, uint8ArrayToBase64Url } from '../../utils'
+import { base64urlEncode, SDJwtException, uint8ArrayToBase64Url } from '../../utils'
 
 describe('decode tests', () => {
   test('decode jwt', () => {
@@ -32,14 +32,14 @@ describe('decode tests', () => {
     expect(() => decodeJwt(jwt)).toThrow('Invalid JWT as input')
   })
 
-  test('decode jwt rejects invalid UTF-8 and invalid JSON with an SDJWTException', () => {
+  test('decode jwt rejects invalid UTF-8 and invalid JSON with an SDJwtException', () => {
     const header = base64urlEncode(JSON.stringify({ alg: 'EdDSA' }))
     // `{"a":"` followed by an invalid UTF-8 sequence (0xc3 0x28) and `"}`
     const invalidUtf8 = uint8ArrayToBase64Url(
       new Uint8Array([0x7b, 0x22, 0x61, 0x22, 0x3a, 0x22, 0xc3, 0x28, 0x22, 0x7d])
     )
 
-    expect(() => decodeJwt(`${header}.${invalidUtf8}.sig`)).toThrow(SDJWTException)
+    expect(() => decodeJwt(`${header}.${invalidUtf8}.sig`)).toThrow(SDJwtException)
     expect(() => decodeJwt(`${header}.${invalidUtf8}.sig`)).toThrow('Invalid JWT as input')
     expect(() => decodeJwt(`${header}.${base64urlEncode('{not json')}.sig`)).toThrow('Invalid JWT as input')
   })

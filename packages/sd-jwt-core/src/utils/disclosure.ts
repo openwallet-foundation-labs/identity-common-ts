@@ -1,6 +1,6 @@
 import { type DisclosureData, type HasherAndAlg, type HasherAndAlgSync, SD_DIGEST, SD_LIST_KEY } from '../types'
 import { base64urlEncode, uint8ArrayToBase64Url } from './base64url'
-import { SDJWTException } from './error'
+import { SDJwtException } from './error'
 import { decodeBase64urlJsonStrict } from './strict-json'
 
 export class Disclosure<T = unknown> {
@@ -12,10 +12,10 @@ export class Disclosure<T = unknown> {
 
   public constructor(data: DisclosureData<T>, _meta?: { digest: string; encoded: string }) {
     if (!Array.isArray(data) || (data.length !== 2 && data.length !== 3)) {
-      throw new SDJWTException('Invalid disclosure data')
+      throw new SDJwtException('Invalid disclosure data')
     }
     if (typeof data[0] !== 'string') {
-      throw new SDJWTException('Invalid disclosure salt')
+      throw new SDJwtException('Invalid disclosure salt')
     }
 
     // If the meta is provided, then we assume that the data is already encoded and digested
@@ -29,10 +29,10 @@ export class Disclosure<T = unknown> {
     }
     if (data.length === 3) {
       if (typeof data[1] !== 'string') {
-        throw new SDJWTException('Invalid disclosure claim name')
+        throw new SDJwtException('Invalid disclosure claim name')
       }
       if (data[1] === SD_DIGEST || data[1] === SD_LIST_KEY) {
-        throw new SDJWTException(`Reserved disclosure claim name "${data[1]}" is not allowed`)
+        throw new SDJwtException(`Reserved disclosure claim name "${data[1]}" is not allowed`)
       }
       this.salt = data[0]
       this.key = data[1]

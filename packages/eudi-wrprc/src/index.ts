@@ -46,7 +46,7 @@ export {
   SupervisoryAuthoritySchema,
   WRPRC_JWS_ALGORITHMS,
   WRPRCCWTHeaderSchema,
-  WRPRCJWTHeaderSchema,
+  WRPRCJwtHeaderSchema,
   WRPRCPayloadSchema,
 } from './schemas'
 // Signer
@@ -67,7 +67,7 @@ export type {
   Status,
   SupervisoryAuthority,
   WRPRCCWTHeader,
-  WRPRCJWTHeader,
+  WRPRCJwtHeader,
   WRPRCPayload,
 } from './types'
 // Validators
@@ -81,7 +81,7 @@ export {
   validateLegalPersonWRPRC,
   validateNaturalPersonWRPRC,
   validateWRPRC,
-  validateWRPRCJWTHeader,
+  validateWRPRCJwtHeader,
   validateWRPRCPayload,
   WRPRC_VALIDATION_CODES,
 } from './validator'

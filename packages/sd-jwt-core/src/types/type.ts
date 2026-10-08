@@ -4,7 +4,7 @@ export const SD_DIGEST = '_sd'
 export const SD_DECOY = '_sd_decoy'
 export const KB_JWT_TYP = 'kb+jwt'
 
-export type SDJWTCompact = string
+export type SDJwtCompact = string
 export type Base64urlString = string
 
 export type DisclosureData<T> = [string, string, T] | [string, T]
@@ -50,7 +50,7 @@ export const DEFAULT_SECURE_HASH_ALGORITHMS = [
   'k12-512',
 ] as const satisfies ReadonlyArray<HashAlgorithm>
 
-export type SDJWTConfig<T = unknown> = {
+export type SDJwtConfig<T = unknown> = {
   omitTyp?: boolean
   hasher?: Hasher
   hashAlg?: HashAlgorithm

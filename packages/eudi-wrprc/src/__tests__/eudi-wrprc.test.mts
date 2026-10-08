@@ -13,7 +13,7 @@ import {
   validateLegalPersonWRPRC,
   validateNaturalPersonWRPRC,
   validateWRPRC,
-  validateWRPRCJWTHeader,
+  validateWRPRCJwtHeader,
   validateWRPRCPayload,
   WRP_ENTITLEMENTS,
   WRPRCException,
@@ -46,7 +46,7 @@ const validNaturalPersonPayload = {
   iat: Math.floor(Date.now() / 1000),
 }
 
-const validJWTHeader = {
+const validJwtHeader = {
   typ: 'rc-wrp+jwt' as const,
   alg: 'ES256' as const,
   x5c: ['MIIBkDCB...'],
@@ -215,21 +215,21 @@ describe('Validators', () => {
     })
   })
 
-  describe('validateWRPRCJWTHeader', () => {
+  describe('validateWRPRCJwtHeader', () => {
     it('should validate valid header', () => {
-      const result = validateWRPRCJWTHeader(validJWTHeader)
+      const result = validateWRPRCJwtHeader(validJwtHeader)
       expect(result.valid).toBe(true)
     })
 
     it('should reject invalid typ', () => {
-      const result = validateWRPRCJWTHeader({ ...validJWTHeader, typ: 'jwt' })
+      const result = validateWRPRCJwtHeader({ ...validJwtHeader, typ: 'jwt' })
       expect(result.valid).toBe(false)
     })
   })
 
   describe('validateWRPRC', () => {
     it('should validate complete WRPRC', () => {
-      const result = validateWRPRC(validJWTHeader, validLegalPersonPayload, validLegalPersonPayload.sub)
+      const result = validateWRPRC(validJwtHeader, validLegalPersonPayload, validLegalPersonPayload.sub)
       expect(result.valid).toBe(true)
     })
   })

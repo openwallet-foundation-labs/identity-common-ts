@@ -1,4 +1,4 @@
-export interface SDJWTVCStatusReference {
+export interface SDJwtVcStatusReference {
   // REQUIRED. implenentation according to https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html
   status_list: {
     // REQUIRED. index in the list of statuses

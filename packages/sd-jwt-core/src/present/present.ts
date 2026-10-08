@@ -11,7 +11,7 @@ import {
 } from '../decode'
 import type { Extensible, HasherSync } from '../types'
 import { encodePath, type Hasher, type PresentationFrame, SD_SEPARATOR } from '../types'
-import { Disclosure, SDJWTException } from '../utils'
+import { Disclosure, SDJwtException } from '../utils'
 
 // Presentable keys
 // The presentable keys are the path of JSON object that are presentable in the SD JWT
@@ -164,7 +164,7 @@ export const selectDisclosures = <T extends Record<string, unknown>>(
   const selectedDisclosures: SerializedDisclosure[] = presentedDisclosures.map((d) => {
     const { salt, key, value, _digest } = d
     if (!_digest) {
-      throw new SDJWTException('Implementation error: _digest is not defined')
+      throw new SDJwtException('Implementation error: _digest is not defined')
     }
     return {
       digest: _digest,

@@ -13,7 +13,7 @@ import {
   parseWRPRCPayload,
   signWRPRC,
   toWRPRCDialect,
-  validateWRPRCJWTHeader,
+  validateWRPRCJwtHeader,
   validateWRPRCPayload,
   WRP_ENTITLEMENTS,
   WRPRC_DIALECTS,
@@ -202,7 +202,7 @@ describe('GEN-5.2.1-04 JAdES B-B signature', () => {
     expect(signed.header.iat).toBeTypeOf('number')
     expect(signed.header.typ).toBe('rc-wrp+jwt')
     expect(signed.header.x5c).toHaveLength(1)
-    expect(validateWRPRCJWTHeader(signed.header).valid).toBe(true)
+    expect(validateWRPRCJwtHeader(signed.header).valid).toBe(true)
 
     expect(decodeWRPRC(signed.jws, 'LEINL-529900T8BM49AURSDO55').payload).toEqual(signed.payload)
   })

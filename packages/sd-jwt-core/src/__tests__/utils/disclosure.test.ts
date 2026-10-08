@@ -1,6 +1,6 @@
 import { generateSalt, hasher } from '@owf/crypto'
 import { describe, expect, test } from 'vitest'
-import { base64urlEncode, type SDJWTException } from '../../utils'
+import { base64urlEncode, type SDJwtException } from '../../utils'
 import { Disclosure } from '../../utils/disclosure'
 
 const hash = { alg: 'SHA256', hasher }
@@ -63,7 +63,7 @@ describe('Disclosure', () => {
     try {
       new Disclosure(data)
     } catch (e: unknown) {
-      const error = e as SDJWTException
+      const error = e as SDJwtException
       expect(typeof error.getFullMessage()).toBe('string')
     }
   })

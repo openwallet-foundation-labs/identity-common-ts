@@ -4,13 +4,13 @@ import {
   createHeaderAndPayload,
   SLException,
   StatusList,
-  type StatusListJWTHeaderParameters,
+  type StatusListJwtHeaderParameters,
 } from '@owf/token-status-list'
 import {
   type DisclosureFrame,
   type JwtPayload,
   JwtTimeClaimException,
-  SDJWTException,
+  SDJwtException,
   type Signer,
   type Verifier,
 } from '@sd-jwt/core'
@@ -48,7 +48,7 @@ const generateStatusList = async (): Promise<string> => {
     sub: 'https://example.com/status-list',
     iat: Math.floor(Date.now() / 1000),
   }
-  const header: StatusListJWTHeaderParameters = {
+  const header: StatusListJwtHeaderParameters = {
     alg: 'EdDSA',
     typ: 'statuslist+jwt',
   }
@@ -56,7 +56,7 @@ const generateStatusList = async (): Promise<string> => {
   return new SignJWT(values.payload).setProtectedHeader(values.header).sign(statusListPrivateKey)
 }
 
-const statusListJWT = await generateStatusList()
+const statusListJwt = await generateStatusList()
 
 describe('App', () => {
   test('Example', async () => {
@@ -94,7 +94,7 @@ describe('Revocation', () => {
     saltGenerator: generateSalt,
     statusListFetcher(_uri: string) {
       // we emulate fetching the status list from the uri. Validation of the JWT is not done here in the test but should be done in the implementation.
-      return Promise.resolve(statusListJWT)
+      return Promise.resolve(statusListJwt)
     },
     // statusValidator(status: number) {
     //   // we are only accepting status 0
@@ -183,7 +183,7 @@ describe('Revocation', () => {
       hasher: digest,
       hashAlg: 'sha-256',
       saltGenerator: generateSalt,
-      statusListFetcher: () => Promise.resolve(statusListJWT),
+      statusListFetcher: () => Promise.resolve(statusListJwt),
       statusVerifier: async (data: string, sig: string) =>
         Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
       statusValidator,
@@ -226,12 +226,12 @@ describe('Revocation', () => {
       hasher: digest,
       hashAlg: 'sha-256',
       saltGenerator: generateSalt,
-      statusListFetcher: () => Promise.resolve(statusListJWT),
+      statusListFetcher: () => Promise.resolve(statusListJwt),
       statusVerifier: async (data: string, sig: string) =>
         Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
       statusValidator: async (status: number) => {
         if (status !== 0)
-          throw new SDJWTException('Credential has been revoked', { details: { status }, code: 'STATUS_INVALID' })
+          throw new SDJwtException('Credential has been revoked', { details: { status }, code: 'STATUS_INVALID' })
       },
     })
     const claims = {
@@ -253,7 +253,7 @@ describe('Revocation', () => {
   })
 
   test.each([
-    [new SDJWTException('Type metadata does not match', { code: 'INVALID_VCT' }), 'INVALID_VCT'],
+    [new SDJwtException('Type metadata does not match', { code: 'INVALID_VCT' }), 'INVALID_VCT'],
     [new Error('Type metadata could not be fetched'), 'VCT_VERIFICATION_FAILED'],
   ])('safeVerify keeps the code of a failed type metadata check: %s', async (error, expectedCode) => {
     const { signer, verifier } = createSignerVerifier()
@@ -321,7 +321,7 @@ describe('Revocation', () => {
       { alg: 'EdDSA', typ: 'statuslist+jwt' }
     )
     // `createHeaderAndPayload` always sets the typ, so the wrong typ is set on the protected header instead
-    const wrongTypStatusListJWT = await new SignJWT(payload)
+    const wrongTypStatusListJwt = await new SignJWT(payload)
       .setProtectedHeader({ ...header, typ: 'JWT' })
       .sign(statusListPrivateKey)
 
@@ -333,7 +333,7 @@ describe('Revocation', () => {
       hasher: digest,
       hashAlg: 'sha-256',
       saltGenerator: generateSalt,
-      statusListFetcher: () => Promise.resolve(wrongTypStatusListJWT),
+      statusListFetcher: () => Promise.resolve(wrongTypStatusListJwt),
       statusVerifier: async (data: string, sig: string) =>
         Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
     })
@@ -358,7 +358,7 @@ describe('Revocation', () => {
       { iss: 'https://example.com', sub: 'https://example.com/status-list', iat },
       { alg: 'EdDSA', typ: 'statuslist+jwt' }
     )
-    const sameKeyStatusListJWT = await new SignJWT(payload).setProtectedHeader(header).sign(privateKey)
+    const sameKeyStatusListJwt = await new SignJWT(payload).setProtectedHeader(header).sign(privateKey)
 
     const { signer, verifier } = createSignerVerifier()
     const sdjwtWithoutStatusVerifier = new SDJwtVcInstance({
@@ -368,7 +368,7 @@ describe('Revocation', () => {
       hasher: digest,
       hashAlg: 'sha-256',
       saltGenerator: generateSalt,
-      statusListFetcher: () => Promise.resolve(sameKeyStatusListJWT),
+      statusListFetcher: () => Promise.resolve(sameKeyStatusListJwt),
     })
 
     const expectedPayload: SdJwtVcPayload = {
@@ -392,7 +392,7 @@ describe('Revocation', () => {
       { iss: 'https://example.com', sub: 'https://example.com/status-list', iat: 1000, exp: 2000 },
       { alg: 'EdDSA', typ: 'statuslist+jwt' }
     )
-    const expiredStatusListJWT = await new SignJWT(payload).setProtectedHeader(header).sign(statusListPrivateKey)
+    const expiredStatusListJwt = await new SignJWT(payload).setProtectedHeader(header).sign(statusListPrivateKey)
 
     const { signer, verifier } = createSignerVerifier()
     const sdjwtWithExpiredList = new SDJwtVcInstance({
@@ -402,7 +402,7 @@ describe('Revocation', () => {
       hasher: digest,
       hashAlg: 'sha-256',
       saltGenerator: generateSalt,
-      statusListFetcher: () => Promise.resolve(expiredStatusListJWT),
+      statusListFetcher: () => Promise.resolve(expiredStatusListJwt),
       statusVerifier: async (data: string, sig: string) =>
         Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
     })

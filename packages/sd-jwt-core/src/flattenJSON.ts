@@ -1,6 +1,6 @@
 import { splitSdJwt } from './decode'
 import { SD_SEPARATOR } from './types'
-import { SDJWTException } from './utils'
+import { SDJwtException } from './utils'
 
 export type FlattenJSONData = {
   jwtData: {
@@ -43,7 +43,7 @@ export class FlattenJSON {
 
     const { 0: protectedHeader, 1: payload, 2: signature } = jwt.split('.')
     if (!protectedHeader || !payload || !signature) {
-      throw new SDJWTException('Invalid JWT')
+      throw new SDJwtException('Invalid JWT')
     }
 
     return new FlattenJSON({

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { assertValidLoTE, validateLoTE } from '../index'
 import type { LoTEDocument } from '../types'
 import { LoTEProfile, validateLoTEProfile } from '../validator'
-import { EUPIDProvidersJWT, WalletProvidersJWT, WRPACProvidersJWT } from './fixtures.mjs'
+import { EUPIDProvidersJwt, WalletProvidersJwt, WRPACProvidersJwt } from './fixtures.mjs'
 
 describe('LoTE Validator', () => {
   const createMinimalValidLoTE = (): LoTEDocument => ({
@@ -449,28 +449,28 @@ describe('LoTE Validator', () => {
 
   describe('validateLoTEProfile', () => {
     it('should validate against EUPIDProvidersList profile', () => {
-      const { payload: lote } = decodeJwt(EUPIDProvidersJWT)
+      const { payload: lote } = decodeJwt(EUPIDProvidersJwt)
       const result = validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList)
 
       expect(result.valid).toBe(true)
     })
 
     it('should validate against EUWalletProvidersList profile', () => {
-      const { payload: lote } = decodeJwt(WalletProvidersJWT)
+      const { payload: lote } = decodeJwt(WalletProvidersJwt)
       const result = validateLoTEProfile(lote, LoTEProfile.EUWalletProvidersList)
 
       expect(result.valid).toBe(true)
     })
 
     it('should validate against EUWRPACProvidersList profile', () => {
-      const { payload: lote } = decodeJwt(WRPACProvidersJWT)
+      const { payload: lote } = decodeJwt(WRPACProvidersJwt)
       const result = validateLoTEProfile(lote, LoTEProfile.EUWRPACProvidersList)
 
       expect(result.valid).toBe(true)
     })
 
     it('short-circuit errors when validating against wrong profile', () => {
-      const { payload: lote } = decodeJwt(WRPACProvidersJWT)
+      const { payload: lote } = decodeJwt(WRPACProvidersJwt)
       const result = validateLoTEProfile(lote, [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUWalletProvidersList])
 
       expect(result.valid).toBe(false)
@@ -492,7 +492,7 @@ describe('LoTE Validator', () => {
     })
 
     it('only includes errors for matched LoTEProfile', () => {
-      const { payload: lote } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
+      const { payload: lote } = decodeJwt<any, LoTEDocument>(WRPACProvidersJwt)
 
       lote.LoTE.ListAndSchemeInformation.StatusDeterminationApproach = 'invalid'
 

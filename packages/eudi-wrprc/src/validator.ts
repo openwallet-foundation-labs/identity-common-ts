@@ -12,7 +12,7 @@ import { ALL_ENTITLEMENTS, ALL_PSP_SUB_ENTITLEMENTS, ATTESTATION_PROVIDER_ENTITL
 import {
   LegalPersonSubjectSchema,
   NaturalPersonSubjectSchema,
-  WRPRCJWTHeaderSchema,
+  WRPRCJwtHeaderSchema,
   WRPRCPayloadSchema,
 } from './schemas'
 import type { WRPRCPayload } from './types'
@@ -244,8 +244,8 @@ export function validateWRPRCPayload(payload: unknown, accessCertificateSub: str
 /**
  * Validate a JWT header for WRPRC
  */
-export function validateWRPRCJWTHeader(header: unknown): ValidationResult {
-  const result = WRPRCJWTHeaderSchema.safeParse(header)
+export function validateWRPRCJwtHeader(header: unknown): ValidationResult {
+  const result = WRPRCJwtHeaderSchema.safeParse(header)
   const errors: ValidationError[] = []
   const warnings: ValidationError[] = []
 
@@ -266,7 +266,7 @@ export function validateWRPRCJWTHeader(header: unknown): ValidationResult {
  * Validate a complete WRPRC (header + payload)
  */
 export function validateWRPRC(header: unknown, payload: unknown, accessCertificateSub: string): ValidationResult {
-  const headerResult = validateWRPRCJWTHeader(header)
+  const headerResult = validateWRPRCJwtHeader(header)
   const payloadResult = validateWRPRCPayload(payload, accessCertificateSub)
 
   const errors = [

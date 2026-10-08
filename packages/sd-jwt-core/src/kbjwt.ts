@@ -2,7 +2,7 @@ import { nowInSeconds } from '@owf/identity-common'
 import { getJwtTimeValidationOptions, Jwt, type VerifierOptions, validateJwtPayload } from './jwt'
 import { timeClaimException } from './time-claim-error'
 import { KB_JWT_TYP, type KbVerifier, type kbHeader, type kbPayload } from './types'
-import { SDJWTException } from './utils'
+import { SDJwtException } from './utils'
 
 export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload = kbPayload> extends Jwt<
   Header,
@@ -22,7 +22,7 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
     options?: VerifierOptions
   }) {
     if (!this.header || !this.payload || !this.signature) {
-      throw new SDJWTException('Verify Error: Invalid JWT')
+      throw new SDJwtException('Verify Error: Invalid JWT')
     }
 
     if (
@@ -36,11 +36,11 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
       typeof this.payload.sd_hash !== 'string' ||
       this.payload.sd_hash.length === 0
     ) {
-      throw new SDJWTException('Invalid Key Binding Jwt')
+      throw new SDJwtException('Invalid Key Binding Jwt')
     }
 
     if (this.payload.nonce !== values.nonce) {
-      throw new SDJWTException('Verify Error: Invalid Nonce')
+      throw new SDJwtException('Verify Error: Invalid Nonce')
     }
 
     if (values.options?.expectedKeyBindingAudience !== undefined) {
@@ -48,7 +48,7 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
         ? values.options.expectedKeyBindingAudience
         : [values.options.expectedKeyBindingAudience]
       if (!expectedAudiences.includes(this.payload.aud)) {
-        throw new SDJWTException('Verify Error: Invalid Key Binding audience')
+        throw new SDJwtException('Verify Error: Invalid Key Binding audience')
       }
     }
 
@@ -83,7 +83,7 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
   public static fromKBEncode<Header extends kbHeader = kbHeader, Payload extends kbPayload = kbPayload>(
     encodedJwt: string
   ): KBJwt<Header, Payload> {
-    const { header, payload, signature } = Jwt.decodeJWT<Header, Payload>(encodedJwt)
+    const { header, payload, signature } = Jwt.decodeJwt<Header, Payload>(encodedJwt)
 
     const jwt = new KBJwt<Header, Payload>({
       header,
