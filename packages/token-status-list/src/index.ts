@@ -1,3 +1,14 @@
+// Signing, parsing and verifying a Status List Token in JWT format raises `@owf/jose`'s errors,
+// re-exported here so they can be caught without depending on `@owf/jose` directly.
+export {
+  JoseClaimVerificationError,
+  JoseError,
+  JoseInvalidArgumentError,
+  JoseParseError,
+  JoseSignatureVerificationError,
+  JoseValidationError,
+  JoseVerificationError,
+} from '@owf/jose'
 export type { CreateStatusListCborOptions, StatusListCborWithStatusListOptions } from './cbor/status-list-cbor'
 export { StatusListCbor } from './cbor/status-list-cbor'
 export type { StatusListCwtOptions } from './cbor/status-list-cwt'
@@ -17,7 +28,14 @@ export { StatusListInfo } from './cbor/status-list-info'
 export { fetchStatusList } from './fetch-status-list'
 export type { EncryptBlock } from './ff1'
 export type { JwtWithStatusListPayload, StatusListJwtHeaderParameters, StatusListJwtPayload } from './jwt-types'
-export { JWT_STATUS_LIST_TYPE, JwtClaimNames } from './jwt-types'
+export {
+  JWT_STATUS_LIST_TYPE,
+  JwtClaimNames,
+  zJwtWithStatusListPayload,
+  zStatusListEntry,
+  zStatusListJwtHeader,
+  zStatusListJwtPayload,
+} from './jwt-types'
 export { StatusList } from './status-list'
 export { StatusListEntryNotValidError, StatusListError } from './status-list-error'
 export type {
@@ -32,14 +50,21 @@ export type {
   FeistelStatusListIndexAllocatorState,
 } from './status-list-index-feistel'
 export { createFeistelStatusListIndexAllocator, FeistelStatusListIndexAllocator } from './status-list-index-feistel'
-export type { VerifyStatusListJwtClaimsOptions } from './status-list-jwt'
+export type {
+  CreateStatusListJwtHeader,
+  CreateStatusListJwtPayload,
+  DecodeStatusListJwtResult,
+  SignStatusListJwtOptions,
+  VerifyStatusListJwtClaimsOptions,
+  VerifyStatusListJwtOptions,
+  VerifyStatusListJwtResult,
+} from './status-list-jwt'
 export {
   createHeaderAndPayload,
-  getListFromStatusListJwt,
-  getStatusListFromJwt,
-  verifyStatus,
+  decodeStatusListJwt,
+  signStatusListJwt,
+  verifyStatusListJwt,
   verifyStatusListJwtClaims,
-  verifyStatusListJwtHeader,
 } from './status-list-jwt'
 export type { BitsPerStatus, StatusListEntry } from './types'
 export { StatusListMediaTypes, StatusType } from './types'

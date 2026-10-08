@@ -1,20 +1,11 @@
-import { CoseInvalidSignatureError, CoseKey, RegisteredCwtClaimKey, SignatureAlgorithm } from '@owf/cose'
+import { CoseInvalidSignatureError, RegisteredCwtClaimKey, SignatureAlgorithm } from '@owf/cose'
 import { describe, expect, test } from 'vitest'
 import { StatusListCwt } from '../../cbor/status-list-cwt'
 import { type CreateStatusListCwtPayloadOptions, StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
 import { StatusListError } from '../../status-list-error'
 import { StatusType } from '../../types'
-import { sign1Context, signKey } from '../context'
-
-// A second key pair, to check that a token does not verify against a key that did not sign it.
-const otherSignKey = CoseKey.fromJwk({
-  kty: 'EC',
-  crv: 'P-256',
-  alg: 'ES256',
-  x: 'R7D-W2d9MEVRN_5P23yN9SodkjMEHI2Np_YHD02eTCQ',
-  y: 'c5Ynunf6XyarMKXt0hWEezNzsZv01uQpCnpT-qJoll8',
-})
+import { otherSignKey, sign1Context, signKey } from '../context'
 
 const uri = 'https://example.com/statuslists/1'
 const now = new Date('2026-01-01T12:00:00.000Z')

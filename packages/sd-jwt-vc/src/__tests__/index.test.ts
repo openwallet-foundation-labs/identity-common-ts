@@ -1,14 +1,15 @@
 import Crypto from 'node:crypto'
 import { hasher as digest, generateSalt } from '@owf/crypto'
 import {
+  type CreateStatusListJwtPayload,
   createHeaderAndPayload,
+  JoseValidationError,
   StatusList,
   StatusListError,
   type StatusListJwtHeaderParameters,
 } from '@owf/token-status-list'
 import {
   type DisclosureFrame,
-  type JwtPayload,
   JwtTimeClaimError,
   SdJwtError,
   SdJwtInstance,
@@ -44,7 +45,7 @@ const createSignerVerifier = () => {
 
 const generateStatusList = async (): Promise<string> => {
   const statusList = new StatusList([0, 1, 0, 0, 0, 0, 1, 1], 1)
-  const payload: JwtPayload = {
+  const payload: CreateStatusListJwtPayload = {
     iss: 'https://example.com',
     sub: 'https://example.com/status-list',
     iat: Math.floor(Date.now() / 1000),
@@ -484,7 +485,7 @@ describe('Revocation', () => {
     const encodedSdjwt = await sdjwt.issue(expectedPayload)
     const result = sdjwt.verify(encodedSdjwt)
     await expect(result).rejects.toThrowError(
-      "The subject claim 'https://example.com/status-list' must be equal to the uri 'https://example.com/other-status-list'"
+      "The 'sub' claim 'https://example.com/status-list' does not match the expected value 'https://example.com/other-status-list'"
     )
   })
 
@@ -519,9 +520,9 @@ describe('Revocation', () => {
       status: { status_list: { uri: 'https://example.com/status-list', idx: 0 } },
     }
     const encodedSdjwt = await sdjwtWithWrongTyp.issue(expectedPayload)
-    await expect(sdjwtWithWrongTyp.verify(encodedSdjwt)).rejects.toThrowError(
-      "The typ header 'JWT' must be equal to 'statuslist+jwt'"
-    )
+    const error = await sdjwtWithWrongTyp.verify(encodedSdjwt).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(JoseValidationError)
+    expect((error as Error).message).toContain('Expected the media type to be \'statuslist+jwt\' at "typ"')
   })
 
   test('Test with the verifier used for the status list when no status verifier is provided', async () => {
