@@ -57,7 +57,7 @@ identity-common-ts/
 ├── packages/                    # All publishable packages
 │   ├── identity-common/         # Core identity utilities (base package)
 │   ├── crypto/                  # Crypto implementation based on Web Crypto (@owf/crypto)
-│   ├── jose/                    # JOSE/JWT implementation (planned)
+│   ├── jose/                    # JOSE: JWK, JWA, JWS, JWT and JWE (@owf/jose)
 │   ├── cose/                    # COSE/CWT implementation (@owf/cose)
 │   ├── x509/                    # X.509 certificate utilities (@owf/x509)
 │   ├── token-status-list/       # JWT/CWT Token Status List (@owf/token-status-list)
