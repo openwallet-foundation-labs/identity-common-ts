@@ -1,5 +1,14 @@
 # @owf/mdoc
 
+## 0.8.3
+
+### Patch Changes
+
+- 93f6eff: Read a `status` of `null` in the MSO as absent. ISO/IEC 18013-5 does not allow `null` there, but Apple Wallet's developer mDLs send it, which failed with `Error decoding Status: Expected map, received null`.
+- @owf/cose@0.5.0
+  - @owf/identity-common@0.5.0
+  - @owf/token-status-list@0.5.0
+
 ## 0.8.2
 
 ### Patch Changes

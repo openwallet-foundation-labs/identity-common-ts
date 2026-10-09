@@ -1,5 +1,13 @@
 # @openid4vc/utils
 
+## 0.8.0
+
+### Patch Changes
+
+- 03a2040: Security fix: `encodeWwwAuthenticateHeader`, and so `Oauth2ResourceUnauthorizedError.toHeaderValue()`, always returns a valid header value. Control and non-ASCII characters are replaced with a space and an `error_description` longer than 500 characters is truncated, so a value taken from the request can no longer inject a header or make setting the header throw.
+  
+  `parseWwwAuthenticateHeader`, and so `Oauth2ResourceUnauthorizedError.fromHeaderValue()`, unescapes every escaped character in a quoted string (`\\` becomes `\`), not only an escaped quote.
+
 ## 0.7.0
 
 ### Patch Changes
