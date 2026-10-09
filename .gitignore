@@ -4,3 +4,8 @@ node_modules
 dist
 dist-fuzz
 *.tgz
+
+# Declaration files emitted next to sources (e.g. by tsc or the IDE); published types come from dist
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.mts
+packages/*/src/**/*.d.cts
