@@ -1,5 +1,14 @@
 # @owf/eudi-registration-certificate
 
+## 0.5.0
+
+### Patch Changes
+
+- 8969b41: Rename `@owf/eudi-wrprc` to `@owf/eudi-registration-certificate`. The API is unchanged; replace the package name in your dependencies and imports.
+- @owf/eudi-jades@0.5.0
+  - @owf/crypto@0.5.0
+  - @owf/identity-common@0.5.0
+
 ## 0.4.2
 
 ### Patch Changes

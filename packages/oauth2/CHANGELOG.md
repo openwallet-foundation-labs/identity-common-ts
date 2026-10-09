@@ -1,5 +1,21 @@
 # @openid4vc/oauth2
 
+## 0.8.0
+
+### Minor Changes
+
+- 2538f35: Bind authorization sessions and refresh tokens to the client instance key. `verifyClientAttestationJwt` now returns `confirmationJwkThumbprint`, the thumbprint of the `cnf` key of the client attestation, and accepts `expectedConfirmationJwkThumbprint` and `expectedClientId` to reject a client attestation for another key or client id. Authorization requests, token requests and `Oauth2AuthorizationServer.verifyClientAttestation` accept the same options. Pass `clientAttestation.clientAttestation.confirmationJwkThumbprint` from an earlier request as `clientAttestation.expectedConfirmationJwkThumbprint` in later requests, as required for refresh tokens by draft-ietf-oauth-attestation-based-client-auth section 10.3. A client attestation is required when it is set.
+  
+  `verifyClientAttestationJwt` now requires the `hash` callback.
+
+### Patch Changes
+
+- 03a2040: Security fix: `encodeWwwAuthenticateHeader`, and so `Oauth2ResourceUnauthorizedError.toHeaderValue()`, always returns a valid header value. Control and non-ASCII characters are replaced with a space and an `error_description` longer than 500 characters is truncated, so a value taken from the request can no longer inject a header or make setting the header throw.
+  
+  `parseWwwAuthenticateHeader`, and so `Oauth2ResourceUnauthorizedError.fromHeaderValue()`, unescapes every escaped character in a quoted string (`\\` becomes `\`), not only an escaped quote.
+- Updated dependencies [03a2040]
+  - @openid4vc/utils@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@owf/eudi-access-certificate",
-  "version": "0.0.0",
+  "version": "0.5.0",
   "description": "Parse, validate and create EUDI Wallet-Relying Party access certificates per ETSI TS 119 411-8",
   "files": [
     "dist"
