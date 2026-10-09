@@ -10,14 +10,17 @@ import {
   verifyStatusListJwtHeader,
 } from '@owf/token-status-list'
 import {
+  createHashMapping,
   type DisclosureFrame,
   ensureError,
   getJwtTimeValidationOptions,
+  getSDAlgAndPayload,
   Jwt,
   type SafeVerifyResult,
   SDJWTException,
   SDJwt,
   SDJwtInstance,
+  unpackObj,
   type VerificationError,
   type VerificationErrorCode,
   type VerifierOptions,
@@ -34,11 +37,15 @@ import type {
 import type { SdJwtVcPayload } from './sd-jwt-vc-payload'
 import {
   type Claim,
-  type ClaimPath,
   type ResolvedTypeMetadata,
   type TypeMetadataFormat,
   TypeMetadataFormatSchema,
 } from './sd-jwt-vc-type-metadata-format'
+import {
+  claimPathsEqual,
+  type TypeMetadataVerificationResult,
+  verifyClaimsAgainstTypeMetadata,
+} from './type-metadata-verification'
 import type { VerificationResult } from './verification-result'
 
 export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, T> {
@@ -131,6 +138,9 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
     if (this.userConfig.loadTypeMetadataFormat) {
       const resolvedTypeMetadata = await this.fetchVct(result)
       result.typeMetadata = resolvedTypeMetadata
+      if (resolvedTypeMetadata) {
+        result.typeMetadataVerification = await this.verifyTypeMetadata(encodedSDJwt, resolvedTypeMetadata)
+      }
     }
     return result
   }
@@ -205,6 +215,10 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
           const resolvedTypeMetadata = await this.fetchVct(result)
           if (result) {
             result.typeMetadata = resolvedTypeMetadata
+            // Skip the claim check when the SD-JWT itself is invalid, the error is already reported
+            if (resolvedTypeMetadata && baseResult.success) {
+              result.typeMetadataVerification = await this.verifyTypeMetadata(encodedSDJwt, resolvedTypeMetadata)
+            }
           }
         } catch (e) {
           const error = ensureError(e)
@@ -238,6 +252,56 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
       success: true,
       data: result,
     }
+  }
+
+  /**
+   * Verifies the presented claims of an SD-JWT VC against a Type Metadata format object.
+   * Checks for extra claims, missing mandatory claims, and selective disclosure constraints (`sd: "always"`, `sd: "never"`).
+   * If `typeMetadata` is omitted, attempts to fetch and resolve it automatically via `getVct`.
+   *
+   * @param encodedSDJwt The encoded SD-JWT VC string
+   * @param typeMetadata Optional type metadata object (ResolvedTypeMetadata or TypeMetadataFormat)
+   * @returns TypeMetadataVerificationResult
+   */
+  async verifyTypeMetadata(
+    encodedSDJwt: string,
+    typeMetadata?: ResolvedTypeMetadata | TypeMetadataFormat
+  ): Promise<TypeMetadataVerificationResult> {
+    if (!this.userConfig.hasher) {
+      throw new SDJWTException('Hasher not found')
+    }
+    const hasher = this.userConfig.hasher
+
+    const sdjwt = await SDJwt.fromEncode(encodedSDJwt, hasher)
+    if (!sdjwt.jwt?.payload) {
+      throw new SDJWTException('Invalid SD JWT: missing payload')
+    }
+
+    let resolvedMetadata = typeMetadata ?? (await this.getVct(encodedSDJwt))
+    if (!resolvedMetadata) {
+      throw new SDJWTException('Type metadata not found or could not be resolved')
+    }
+
+    const metadataVct =
+      'mergedTypeMetadata' in resolvedMetadata
+        ? (resolvedMetadata as ResolvedTypeMetadata).vctValues[0]
+        : resolvedMetadata.vct
+    if (sdjwt.jwt.payload.vct !== metadataVct) {
+      throw new SDJWTException(
+        `Type metadata vct '${metadataVct}' does not match the vct '${sdjwt.jwt.payload.vct}' of the SD-JWT VC`
+      )
+    }
+
+    if (!('mergedTypeMetadata' in resolvedMetadata) && resolvedMetadata.extends) {
+      resolvedMetadata = await this.resolveVctExtendsChain(resolvedMetadata)
+    }
+
+    const { _sd_alg, payload } = getSDAlgAndPayload(sdjwt.jwt.payload)
+    const disclosures = await createHashMapping(sdjwt.disclosures ?? [], { hasher, alg: _sd_alg })
+    // Validates the disclosures against the payload
+    unpackObj(payload, disclosures)
+
+    return verifyClaimsAgainstTypeMetadata(resolvedMetadata, payload, disclosures)
   }
 
   /**
@@ -342,17 +406,6 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
   }
 
   /**
-   * Checks if two claim paths are equal by comparing each element.
-   * @param path1 First claim path
-   * @param path2 Second claim path
-   * @returns True if paths are equal, false otherwise
-   */
-  private claimPathsEqual(path1: ClaimPath, path2: ClaimPath): boolean {
-    if (path1.length !== path2.length) return false
-    return path1.every((element, index) => element === path2[index])
-  }
-
-  /**
    * Validates that extending claim metadata respects the constraints from spec section 9.5.1.
    * @param baseClaim The base claim metadata
    * @param extendingClaim The extending claim metadata
@@ -402,9 +455,7 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
 
       // Validate extending claims that override base claims
       for (const extendingClaim of extendingClaims) {
-        const matchingBaseClaim = baseClaims.find((baseClaim) =>
-          this.claimPathsEqual(baseClaim.path, extendingClaim.path)
-        )
+        const matchingBaseClaim = baseClaims.find((baseClaim) => claimPathsEqual(baseClaim.path, extendingClaim.path))
 
         if (matchingBaseClaim) {
           this.validateClaimExtension(matchingBaseClaim, extendingClaim)
@@ -419,7 +470,7 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
       // Add base claims, replacing with extending version if path matches
       for (const baseClaim of baseClaims) {
         const extendingClaimIndex = extendedClaimsWithoutBase.findIndex((extendingClaim) =>
-          this.claimPathsEqual(baseClaim.path, extendingClaim.path)
+          claimPathsEqual(baseClaim.path, extendingClaim.path)
         )
         const extendingClaim = extendingClaimIndex !== -1 ? extendedClaimsWithoutBase[extendingClaimIndex] : undefined
 
