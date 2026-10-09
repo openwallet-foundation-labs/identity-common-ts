@@ -1,12 +1,12 @@
 // biome-ignore-all lint: @biomejs/biome seems to change the `new this(...)` calls into `new CborStructure(...)` which seems to cause a bug for this specific use case. We cannot alias to `thiz` or disable a specific rule
 
-import { Tag } from 'cbor-x'
 import { z } from 'zod'
 import {
   decodeStructureWithErrorHandling,
   encodeStructureWithErrorHandling,
   parseStructureWithErrorHandling,
 } from '../utils/zod'
+import { Tag } from './cbor-x'
 import { DataItem } from './data-item'
 import { cborDecode, cborEncode } from './parser'
 

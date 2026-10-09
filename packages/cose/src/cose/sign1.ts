@@ -1,4 +1,3 @@
-import { addExtension } from 'cbor-x'
 import z from 'zod'
 import {
   type AnyCborStructure,
@@ -8,6 +7,7 @@ import {
   cborEncode,
   type EncodedStructureType,
 } from '../cbor'
+import { addExtension } from '../cbor/cbor-x'
 import { zUint8Array } from '../utils/zod'
 import { CoseCertificateNotFoundError, CoseInvalidAlgorithmError, CosePayloadMustBeDefinedError } from './error'
 import {
