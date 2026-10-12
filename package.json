@@ -45,7 +45,7 @@
     "@peculiar/x509": "^2.1.0",
     "@sd-jwt/core": "workspace:*",
     "@sd-jwt/sd-jwt-vc": "workspace:*",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "dcql": "workspace:*",
     "fast-check": "^4.10.2",
     "hpke": "^1.1.7",

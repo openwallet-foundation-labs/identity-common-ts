@@ -48,7 +48,7 @@
     "@peculiar/asn1-x509": "catalog:",
     "@xmldom/xmldom": "^0.9.12",
     "xadesjs": "^2.6.8",
-    "xpath": "^0.0.34",
+    "xpath": "^0.0.35",
     "zod": "catalog:"
   }
 }
