@@ -33,7 +33,7 @@ export class Holder {
       trustedCertificates?: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       skewSeconds?: number
     },
-    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch'>
+    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch' | 'revocationListCache'>
   ): Promise<IssuerSignedVerificationResult> {
     const issuerSigned =
       typeof options.issuerSigned === 'string'

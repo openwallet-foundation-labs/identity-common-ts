@@ -18,6 +18,7 @@ import {
   Issuer,
   IssuerSigned,
   ItemsRequest,
+  type MdocContext,
   ProtectedHeaders,
   RegisteredCwtHeaderClaimKey,
   SessionTranscript,
@@ -1593,6 +1594,154 @@ suite('Verification', () => {
       await expect(
         Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates }, mdocContext)
       ).rejects.toThrow('No trusted certificate was found while validating the X.509 chain')
+    })
+  })
+
+  suite('Revocation list cache', () => {
+    // A context whose revocation list caches are backed by a Map, recording cache reads, cache
+    // writes and list requests in the order they happen. `fetch` is only ever used for a revocation
+    // list, so a `fetch` event is always a list request.
+    const cachingContext = () => {
+      const statusLists = new Map<string, StatusListCwt>()
+      const identifierLists = new Map<string, IdentifierListCwt>()
+      const events: Array<'get:miss' | 'get:hit' | 'set' | 'fetch'> = []
+      const requestedUris: string[] = []
+
+      const ctx = {
+        ...mdocContext,
+        fetch: (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+          events.push('fetch')
+          requestedUris.push(String(input))
+          return await fetch(input, init)
+        }) as typeof fetch,
+        revocationListCache: {
+          statusList: {
+            get: ({ uri }) => {
+              const statusListCwt = statusLists.get(uri)
+              events.push(statusListCwt ? 'get:hit' : 'get:miss')
+              return statusListCwt
+            },
+            set: ({ uri, statusListCwt }) => {
+              events.push('set')
+              statusLists.set(uri, statusListCwt)
+            },
+          },
+          identifierList: {
+            get: ({ uri }) => {
+              const identifierListCwt = identifierLists.get(uri)
+              events.push(identifierListCwt ? 'get:hit' : 'get:miss')
+              return identifierListCwt
+            },
+            set: ({ uri, identifierListCwt }) => {
+              events.push('set')
+              identifierLists.set(uri, identifierListCwt)
+            },
+          },
+        },
+      } satisfies MdocContext
+
+      return { ctx, events, requestedUris, statusLists, identifierLists }
+    }
+
+    const verifyWithCache = (credential: IssuerSigned, ctx: MdocContext) =>
+      Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates: validTrustedCertificates }, ctx)
+
+    test('reads the status list cache before fetching, and writes it after', async () => {
+      const idx = 3
+      const uri = await mockStatusList('/status-list/cache-hit', { idx })
+      const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+      const { ctx, events, requestedUris, statusLists } = cachingContext()
+
+      const first = await verifyWithCache(credential, ctx)
+      const second = await verifyWithCache(credential, ctx)
+
+      expect(events).toEqual(['get:miss', 'fetch', 'set', 'get:hit'])
+      expect(requestedUris).toEqual([uri])
+      // The second verification used the cached token itself, not an equal copy of it.
+      expect(second.statusList).toBe(statusLists.get(uri))
+      expect(second.statusList).toBe(first.statusList)
+    })
+
+    // `set` is reached only once the token has verified as a list published by the issuer, so the
+    // `ttl` and `exp` a cache bases its freshness policy on are never an unverified token's.
+    test('does not cache a status list that fails verification', async () => {
+      const idx = 3
+      const uri = await mockStatusList('/status-list/cache-unverified', {
+        idx,
+        subject: 'https://example.org/status-list/somewhere-else',
+      })
+      const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+      const { ctx, events, statusLists } = cachingContext()
+
+      await expect(verifyWithCache(credential, ctx)).rejects.toThrow('does not match the expected value')
+
+      expect(events).toEqual(['get:miss', 'fetch'])
+      expect(statusLists.size).toBe(0)
+    })
+
+    // Freshness is the cache's responsibility: an expired entry is not refetched, so verification
+    // fails closed rather than silently trusting it.
+    test('fails on a cached status list that has expired', async () => {
+      const idx = 3
+      const uri = await mockStatusList('/status-list/cache-stale', { idx })
+      const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+      const { ctx, events, statusLists } = cachingContext()
+
+      // Past the 30 second default skew, so the cached token is outside its validity window.
+      const expired = StatusListCwt.fromToken(
+        new Uint8Array(await signStatusListCwt({ uri, idx, expirationTime: new Date(Date.now() - 120_000) }))
+      )
+      statusLists.set(uri, expired)
+
+      await expect(verifyWithCache(credential, ctx)).rejects.toThrow('is in the past')
+
+      expect(events).toEqual(['get:hit'])
+      expect(statusLists.get(uri)).toBe(expired)
+    })
+
+    // The list verified as the issuer's; it is this credential that is revoked in it, not the list
+    // that is invalid, so the list is cached and serves the next verification.
+    test('caches a status list that revokes the credential', async () => {
+      const idx = 3
+      const uri = await mockStatusList('/status-list/cache-revoked', { idx, status: StatusType.Invalid })
+      const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+      const { ctx, events, statusLists } = cachingContext()
+
+      await expect(verifyWithCache(credential, ctx)).rejects.toThrow(`Status for id '${idx}' is not Valid`)
+      expect(events).toEqual(['get:miss', 'fetch', 'set'])
+      expect(statusLists.get(uri)).toBeDefined()
+
+      await expect(verifyWithCache(credential, ctx)).rejects.toThrow(`Status for id '${idx}' is not Valid`)
+      expect(events).toEqual(['get:miss', 'fetch', 'set', 'get:hit'])
+    })
+
+    test('reads the identifier list cache before fetching, and writes it after', async () => {
+      const id = new Uint8Array([0xab, 0xcd])
+      const uri = await mockIdentifierList('/identifier-list/cache-hit', { identifiers: [new Uint8Array([0x01])] })
+      const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+      const { ctx, events, requestedUris, identifierLists } = cachingContext()
+
+      const first = await verifyWithCache(credential, ctx)
+      const second = await verifyWithCache(credential, ctx)
+
+      expect(events).toEqual(['get:miss', 'fetch', 'set', 'get:hit'])
+      expect(requestedUris).toEqual([uri])
+      expect(second.identifierList).toBe(identifierLists.get(uri))
+      expect(second.identifierList).toBe(first.identifierList)
+    })
+
+    test('fetches on every verification without a cache', async () => {
+      const idx = 3
+      const uri = await mockStatusList('/status-list/no-cache', { idx })
+      const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+      const { ctx, events, requestedUris } = cachingContext()
+
+      const uncachedCtx = { ...ctx, revocationListCache: undefined }
+      await expect(verifyWithCache(credential, uncachedCtx)).resolves.toBeDefined()
+      await expect(verifyWithCache(credential, uncachedCtx)).resolves.toBeDefined()
+
+      expect(events).toEqual(['fetch', 'fetch'])
+      expect(requestedUris).toEqual([uri, uri])
     })
   })
 })

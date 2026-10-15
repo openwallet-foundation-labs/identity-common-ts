@@ -1,4 +1,6 @@
 import type { CoseKey, DigestAlgorithm, Mac0Context, MacAlgorithm, Sign1Context, SignatureAlgorithm } from '@owf/cose'
+import type { StatusListCwt } from '@owf/token-status-list'
+import type { IdentifierListCwt } from './mdoc/models/identifier-list-cwt'
 
 type MaybePromise<T> = Promise<T> | T
 
@@ -57,6 +59,35 @@ export interface HpkeContext {
   }) => MaybePromise<Uint8Array>
 }
 
+/**
+ * Storage for the status list tokens an MSO's `status_list` points at, keyed by the `uri` they are
+ * published at. A single list covers every credential that references it, so caching it saves a
+ * request per presentation.
+ *
+ * Freshness is the implementation's to decide: `get` returning a token means it is fresh enough to
+ * use. The token's own `ttl` and `exp` are available on `statusListCwt.payload` in `set`, which is
+ * called with a token whose signature and claims have verified.
+ */
+export interface StatusListCwtCache {
+  /**
+   * The cached token for `uri`, or undefined to fetch it. A returned token is verified against the
+   * current time and trust anchors before use, so a stale entry cannot make an invalid token pass —
+   * it fails the verification instead, as an expired token is not refetched. Entries have to be
+   * evicted before they expire.
+   */
+  get: (input: { uri: string }) => MaybePromise<StatusListCwt | undefined>
+  set: (input: { uri: string; statusListCwt: StatusListCwt }) => MaybePromise<void>
+}
+
+/**
+ * Storage for the identifier list tokens an MSO's `identifier_list` points at. The counterpart of
+ * {@link StatusListCwtCache}, with the same contract.
+ */
+export interface IdentifierListCwtCache {
+  get: (input: { uri: string }) => MaybePromise<IdentifierListCwt | undefined>
+  set: (input: { uri: string; identifierListCwt: IdentifierListCwt }) => MaybePromise<void>
+}
+
 export interface MdocContext {
   fetch: typeof fetch
   crypto: {
@@ -113,5 +144,14 @@ export interface MdocContext {
       notAfter: Date
       pem: string
     }>
+  }
+
+  /**
+   * Caches for the revocation lists an MSO references. A mechanism without a cache is fetched on
+   * every verification.
+   */
+  revocationListCache?: {
+    statusList?: StatusListCwtCache
+    identifierList?: IdentifierListCwtCache
   }
 }

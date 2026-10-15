@@ -210,7 +210,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       onCheck?: VerificationCallback
       skewSeconds?: number
     },
-    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch'>
+    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch' | 'revocationListCache'>
   ): Promise<DeviceResponseVerificationResult> {
     const onCheck = options.onCheck ?? defaultVerificationCallback
 

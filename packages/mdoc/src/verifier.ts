@@ -29,7 +29,7 @@ export class Verifier {
       onCheck?: VerificationCallback
       skewSeconds?: number
     },
-    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch'>
+    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch' | 'revocationListCache'>
   ): Promise<DeviceResponseVerificationResult> {
     const deviceResponse =
       options.deviceResponse instanceof DeviceResponse

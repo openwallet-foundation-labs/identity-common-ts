@@ -440,7 +440,7 @@ export class IsoMdocDcApi {
       now?: Date
       skewSeconds?: number
     },
-    ctx: Pick<MdocContext, 'crypto' | 'cose' | 'x509' | 'fetch'>
+    ctx: Pick<MdocContext, 'crypto' | 'cose' | 'x509' | 'fetch' | 'revocationListCache'>
   ): Promise<{
     deviceResponse: DeviceResponse
     verificationResult: DeviceResponseVerificationResult

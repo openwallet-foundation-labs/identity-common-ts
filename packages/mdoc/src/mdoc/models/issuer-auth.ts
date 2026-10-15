@@ -108,7 +108,7 @@ export class IssuerAuth extends Sign1 {
        */
       disableCertificateChainValidation?: boolean
     },
-    ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose'>
+    ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'revocationListCache'>
   ): Promise<{
     statusList?: StatusListCwt
     trustedStatusListChain?: Uint8Array[]
@@ -163,7 +163,7 @@ export class IssuerAuth extends Sign1 {
       disableStatusValidation?: boolean
       skewSeconds?: number
     },
-    ctx: Pick<MdocContext, 'x509' | 'cose' | 'fetch'>
+    ctx: Pick<MdocContext, 'x509' | 'cose' | 'fetch' | 'revocationListCache'>
   ): Promise<IssuerAuthVerificationResult> {
     const verificationCallback = options.verificationCallback ?? defaultVerificationCallback
     const now = options.now ?? new Date()

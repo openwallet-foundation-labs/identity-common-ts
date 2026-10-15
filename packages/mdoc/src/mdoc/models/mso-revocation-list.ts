@@ -122,32 +122,12 @@ export type VerifyStatusListTokenResult = {
 }
 
 /**
- * Fetch and verify the status list a `StatusListInfo` points at.
- *
- * `@owf/token-status-list` owns everything status-list-shaped — fetching and content-type
- * negotiation, the CWT structure, the claim checks and reading a status by index. What lives here
- * is only what that library cannot know about: the mdoc trust anchors and the `MdocContext` crypto
- * callbacks used to establish the signer, and the two rules ISO/IEC 18013-5 § 12.3.6 layers on top
- * of the Token Status List defaults — a mandatory `exp` (§ 12.3.6.3), and `Valid` as the only
- * acceptable status, since § 12.3.6.1 allows "no other status besides 'revoked'".
+ * Retrieves the status list token published at `uri`.
  *
  * § 12.3.6.3 requires the list to be a Status List Token "in CWT format, since the IssuerAuth
  * structure is a CWT", so a list served as a JWT is rejected rather than verified.
  */
-export async function verifyStatusListToken(
-  {
-    statusListInfo,
-    trustedCertificates,
-    disableCertificateChainValidation,
-    now = new Date(),
-    skewSeconds,
-    checkFreshness,
-  }: VerifyStatusListTokenOptions,
-  ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose'>
-): Promise<VerifyStatusListTokenResult> {
-  if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
-
-  const { uri, idx } = statusListInfo
+async function fetchStatusListCwt(uri: string, ctx: Pick<MdocContext, 'fetch'>): Promise<StatusListCwt> {
   const token = await fetchStatusList({ uri, customFetcher: ctx.fetch, acceptedFormats: ['cwt'] })
 
   // `fetchStatusList` decides on the response's Content-Type, not on `acceptedFormats`, so a JWT
@@ -158,7 +138,37 @@ export async function verifyStatusListToken(
     )
   }
 
-  const statusListCwt = StatusListCwt.fromToken(token)
+  return StatusListCwt.fromToken(token)
+}
+
+/**
+ * Fetch and verify the status list a `StatusListInfo` points at.
+ *
+ * `@owf/token-status-list` owns everything status-list-shaped — fetching and content-type
+ * negotiation, the CWT structure, the claim checks and reading a status by index. What lives here
+ * is only what that library cannot know about: the mdoc trust anchors and the `MdocContext` crypto
+ * callbacks used to establish the signer, and the two rules ISO/IEC 18013-5 § 12.3.6 layers on top
+ * of the Token Status List defaults — a mandatory `exp` (§ 12.3.6.3), and `Valid` as the only
+ * acceptable status, since § 12.3.6.1 allows "no other status besides 'revoked'".
+ */
+export async function verifyStatusListToken(
+  {
+    statusListInfo,
+    trustedCertificates,
+    disableCertificateChainValidation,
+    now = new Date(),
+    skewSeconds,
+    checkFreshness,
+  }: VerifyStatusListTokenOptions,
+  ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'revocationListCache'>
+): Promise<VerifyStatusListTokenResult> {
+  if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
+
+  const { uri, idx } = statusListInfo
+  const cache = ctx.revocationListCache?.statusList
+
+  const cached = await cache?.get({ uri })
+  const statusListCwt = cached ?? (await fetchStatusListCwt(uri, ctx))
 
   const x5chain = normalizeX5Chain(statusListCwt.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5Chain))
   if (!x5chain) {
@@ -176,15 +186,14 @@ export async function verifyStatusListToken(
     ctx
   )
 
-  // Signature, claims and the status at `idx`, in one call: the token is only the issuer's if it
-  // verifies, so there is nothing to read from it before that.
+  // Signature and claims, which establish the token as a list published by the issuer. There is
+  // nothing to read from it before that.
   await asMdlRevocationListError(
     () =>
       statusListCwt.verify(
         {
           key,
           uri,
-          idx,
           now,
           skewSeconds,
           checkIssuedAt: checkFreshness,
@@ -196,6 +205,13 @@ export async function verifyStatusListToken(
       ),
     InvalidSignatureError
   )
+
+  // Cached once verified, so a cache never bases its freshness policy on a `ttl` or an `exp` that
+  // is not the issuer's. The status at `idx` is read after, so that a list which revokes this
+  // credential is still kept as the valid list it is.
+  if (!cached) await cache?.set({ uri, statusListCwt })
+
+  await asMdlRevocationListError(() => statusListCwt.verifyStatus(idx), InvalidSignatureError)
 
   return { statusListCwt, chain }
 }
@@ -241,12 +257,15 @@ export async function verifyIdentifierListToken(
     skewSeconds,
     checkFreshness,
   }: VerifyIdentifierListTokenOptions,
-  ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose'>
+  ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'revocationListCache'>
 ): Promise<VerifyIdentifierListTokenResult> {
   if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
 
   const { uri, id } = identifierListInfo
-  const identifierListCwt = await IdentifierListCwt.fetch(uri, ctx)
+  const cache = ctx.revocationListCache?.identifierList
+
+  const cached = await cache?.get({ uri })
+  const identifierListCwt = cached ?? (await IdentifierListCwt.fetch(uri, ctx))
 
   const x5chain = identifierListCwt.x5chain
   if (!x5chain || x5chain.length === 0) {
@@ -267,11 +286,18 @@ export async function verifyIdentifierListToken(
   await asMdlRevocationListError(
     () =>
       identifierListCwt.verify(
-        { key, uri, id, now, skewSeconds, checkIssuedAt: checkFreshness },
+        { key, uri, now, skewSeconds, checkIssuedAt: checkFreshness },
         { sign1: ctx.cose.sign1 }
       ),
     InvalidIdentifierListSignatureError
   )
+
+  // Cached once verified, so a cache never bases its freshness policy on an `exp` that is not the
+  // issuer's. Whether `id` is on the list is read after, so that a list which revokes this
+  // credential is still kept as the valid list it is.
+  if (!cached) await cache?.set({ uri, identifierListCwt })
+
+  identifierListCwt.verifyStatus(id)
 
   return { identifierListCwt, chain }
 }

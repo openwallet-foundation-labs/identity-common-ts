@@ -92,7 +92,7 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
       disableStatusValidation?: boolean
       skewSeconds?: number
     },
-    ctx: Pick<MdocContext, 'x509' | 'crypto' | 'cose' | 'fetch'>
+    ctx: Pick<MdocContext, 'x509' | 'crypto' | 'cose' | 'fetch' | 'revocationListCache'>
   ): Promise<IssuerSignedVerificationResult> {
     const { valueDigests, digestAlgorithm } = this.issuerAuth.mobileSecurityObject
 
