@@ -461,6 +461,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       issuerSigned: options.issuerSigned,
       keyAuthorizations: options.keyAuthorizations,
       deviceNamespaces: options.deviceNamespaces,
+      alternatives: options.docRequest.itemsRequest.requestInfo?.alternativeDataElements,
     })
 
     if (options.elements) {
@@ -502,17 +503,21 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
         )
       }
 
-      if (!element.issuerSignedItem) {
-        const items = deviceNamespaces.get(element.namespace) ?? new Map()
-        items.set(element.elementIdentifier, element.elementValue)
-        deviceNamespaces.set(element.namespace, items)
-        continue
-      }
+      // An alternative set (ISO/IEC TS 23220-4 7.2.1.3.2) is disclosed whole, each element in its own
+      // namespace, which need not be the requested element's.
+      for (const disclosed of match.alternativeElements ?? [element]) {
+        if (!disclosed.issuerSignedItem) {
+          const items = deviceNamespaces.get(disclosed.namespace) ?? new Map()
+          items.set(disclosed.elementIdentifier, disclosed.elementValue)
+          deviceNamespaces.set(disclosed.namespace, items)
+          continue
+        }
 
-      const items = issuerNamespaces.get(claim.namespace) ?? []
-      // An age attestation can answer more than one `age_over_NN` request, but is disclosed once.
-      if (!items.includes(element.issuerSignedItem)) items.push(element.issuerSignedItem)
-      issuerNamespaces.set(claim.namespace, items)
+        const items = issuerNamespaces.get(disclosed.namespace) ?? []
+        // An age attestation can answer more than one `age_over_NN` request, but is disclosed once.
+        if (!items.includes(disclosed.issuerSignedItem)) items.push(disclosed.issuerSignedItem)
+        issuerNamespaces.set(disclosed.namespace, items)
+      }
     }
 
     // 18013-5 7.2.5: a reader must not request more than two age attestations, as together they
