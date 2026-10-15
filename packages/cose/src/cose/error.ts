@@ -26,6 +26,12 @@ export class CoseDNotDefinedError extends CoseError {}
 export class CoseKNotDefinedError extends CoseError {}
 export class CoseEphemeralMacKeyIsRequiredError extends CoseError {}
 export class CoseCertificateNotFoundError extends CoseError {}
+
+/**
+ * RFC 9360: the end-entity certificate "MUST be integrity protected by COSE". An `x5chain` in the
+ * unprotected header is therefore only accepted when a protected `x5t` matches its leaf.
+ */
+export class CoseX5ChainNotBoundError extends CoseError {}
 export class CoseKeyTypeNotSupportedForPrivateKeyExtractionError extends CoseError {}
 
 /** The CWT carries a detached payload (`null`), which cannot be decoded into a claims set. */

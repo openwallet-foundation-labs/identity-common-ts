@@ -27,7 +27,8 @@ const x5tOf = async (cert: Uint8Array) => [
 ]
 
 // ISO/IEC 18013-5 § 12.3.6.3 requires the x5chain in the protected header. RFC 9360 also allows
-// it in the unprotected header when a protected x5t binds the leaf.
+// it in the unprotected header when a protected x5t binds the leaf. The x5t check itself is
+// covered by the tests of `getIntegrityProtectedX5Chain` in @owf/cose.
 suite('verifyStatusListToken with an x5chain in the unprotected header', () => {
   const server = setupServer()
   beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -105,12 +106,6 @@ suite('verifyStatusListToken with an x5chain in the unprotected header', () => {
     await expect(verify(uri)).rejects.toThrow(UnprotectedX5ChainNotBoundError)
   })
 
-  test('Verify a status list with an unprotected x5chain and a malformed x5t', async () => {
-    const uri = await mockStatusList('/malformed-x5t', { x5t: [-16] })
-
-    await expect(verify(uri)).rejects.toThrow(UnprotectedX5ChainNotBoundError)
-  })
-
   test('Verify a status list with an x5chain in both headers', async () => {
     // The protected chain is used; the unbound unprotected one is ignored.
     const uri = await mockStatusList('/both', { protectedX5Chain: true, x5chain: otherCertificate })
@@ -122,14 +117,6 @@ suite('verifyStatusListToken with an x5chain in the unprotected header', () => {
 
   test('Verify a status list with an unprotected x5chain and the x5t of another certificate', async () => {
     const uri = await mockStatusList('/mismatch', { x5t: await x5tOf(otherCertificate) })
-
-    await expect(verify(uri)).rejects.toThrow(UnprotectedX5ChainNotBoundError)
-  })
-
-  test('Verify a status list with an unprotected x5chain and an x5t with an unsupported hash algorithm', async () => {
-    const [, hash] = await x5tOf(certificate)
-    // SHA-512 (-44), registered for COSE_CertHash but not supported here.
-    const uri = await mockStatusList('/unsupported-hash', { x5t: [-44, hash] })
 
     await expect(verify(uri)).rejects.toThrow(UnprotectedX5ChainNotBoundError)
   })

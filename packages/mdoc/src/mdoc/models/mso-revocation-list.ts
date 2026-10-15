@@ -1,10 +1,10 @@
 import {
   CoseInvalidSignatureError,
+  CoseX5ChainNotBoundError,
+  getIntegrityProtectedX5Chain,
   RegisteredCwtClaimKey,
-  RegisteredCwtHeaderClaimKey,
   type SignatureAlgorithm,
 } from '@owf/cose'
-import { compareBytes } from '@owf/identity-common'
 import { fetchStatusList, SLException, StatusListCwt, type StatusListInfo } from '@owf/token-status-list'
 import type { MdocContext } from '../../context'
 import {
@@ -27,15 +27,16 @@ import type { IdentifierListInfo } from './identifier-list-info'
  * errors they raise into the mdoc error hierarchy so that a caller of `IssuerAuth.verify` only ever
  * has to know `MdlError`.
  */
-async function asMdlRevocationListError(
-  verification: () => Promise<unknown> | unknown,
+async function asMdlRevocationListError<T>(
+  verification: () => Promise<T> | T,
   /** The error to report a failed signature as. */
   invalidSignatureError: new (message: string) => MdlError
-): Promise<void> {
+): Promise<T> {
   try {
-    await verification()
+    return await verification()
   } catch (error) {
     if (error instanceof CoseInvalidSignatureError) throw new invalidSignatureError(error.message)
+    if (error instanceof CoseX5ChainNotBoundError) throw new UnprotectedX5ChainNotBoundError(error.message)
     if (error instanceof SLException) throw new InvalidRevocationListError(error.message)
     throw error
   }
@@ -166,11 +167,12 @@ export async function verifyStatusListToken(
 
   const statusListCwt = StatusListCwt.fromToken(token)
 
-  const x5chain =
-    normalizeX5Chain(statusListCwt.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5Chain)) ??
-    // NOTE: an unprotected x5chain is NOT allowed by § 12.3.6.3, but RFC 9360 allows it when a
-    // protected x5t binds the leaf. So it is accepted with that binding.
-    (await boundUnprotectedX5Chain(statusListCwt, ctx))
+  // NOTE: an unprotected x5chain is NOT allowed by § 12.3.6.3, but RFC 9360 allows it when a
+  // protected x5t binds the leaf. So it is accepted with that binding.
+  const x5chain = await asMdlRevocationListError(
+    () => getIntegrityProtectedX5Chain(statusListCwt, ctx.crypto),
+    InvalidSignatureError
+  )
   if (!x5chain) {
     throw new UnableToExtractX5ChainFromCwtError()
   }
@@ -284,50 +286,4 @@ export async function verifyIdentifierListToken(
   )
 
   return { identifierListCwt, chain }
-}
-
-/** SHA-256 in a COSE_CertHash (RFC 9360), as registered in RFC 9054. */
-const COSE_SHA_256 = -16
-
-/**
- * The `x5chain` of the unprotected header of a revocation list, provided a protected `x5t` matches
- * its leaf. The unprotected header is not covered by the signature, so without that binding the
- * certificate could be replaced by another one for the same key (RFC 9360).
- */
-async function boundUnprotectedX5Chain(
-  cwt: StatusListCwt,
-  ctx: Pick<MdocContext, 'crypto'>
-): Promise<Array<Uint8Array> | undefined> {
-  const x5chain = normalizeX5Chain(cwt.unprotectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5Chain))
-  if (!x5chain) return undefined
-
-  const x5t = cwt.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5T)
-  if (!Array.isArray(x5t) || x5t.length !== 2 || !(x5t[1] instanceof Uint8Array)) {
-    throw new UnprotectedX5ChainNotBoundError(
-      'The x5chain is in the unprotected header, but the protected header has no x5t that binds it'
-    )
-  }
-
-  const [hashAlgorithm, expectedHash] = x5t as [unknown, Uint8Array]
-  if (hashAlgorithm !== COSE_SHA_256) {
-    throw new UnprotectedX5ChainNotBoundError(
-      `The x5t of the protected header uses hash algorithm '${String(hashAlgorithm)}', only SHA-256 (-16) is supported`
-    )
-  }
-
-  const leafHash = await ctx.crypto.digest({ digestAlgorithm: 'SHA-256', bytes: x5chain[0] })
-  if (!compareBytes(leafHash, expectedHash)) {
-    throw new UnprotectedX5ChainNotBoundError(
-      'The x5t of the protected header does not match the leaf of the x5chain in the unprotected header'
-    )
-  }
-
-  return x5chain
-}
-
-/** COSE_X509 carries either a single certificate or a chain of them (RFC 9360). */
-function normalizeX5Chain(x5chain: unknown): Array<Uint8Array> | undefined {
-  const chain = x5chain instanceof Uint8Array ? [x5chain] : x5chain
-  if (!Array.isArray(chain) || chain.length === 0 || !chain.every((c) => c instanceof Uint8Array)) return undefined
-  return chain
 }
