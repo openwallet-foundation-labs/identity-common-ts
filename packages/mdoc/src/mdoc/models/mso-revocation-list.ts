@@ -14,6 +14,7 @@ import {
   JwtNotSupportForStatusListError,
   type MdlError,
   NoPublicKeySetOnStatusListError,
+  StatusListEntryNotValidError,
   TrustedRevocationCertificatesMustContainAtleastOneCertificateError,
   UnableToExtractX5ChainFromCwtError,
   UnableToExtractX5ChainFromIdentifierListError,
@@ -188,15 +189,14 @@ export async function verifyStatusListToken(
     ctx
   )
 
-  // Signature, claims and the status at `idx`, in one call: the token is only the issuer's if it
-  // verifies, so there is nothing to read from it before that.
+  // Signature and claims first: the token is only the issuer's if it verifies, so there is nothing
+  // to read from it before that.
   await asMdlRevocationListError(
     () =>
       statusListCwt.verify(
         {
           key,
           uri,
-          idx,
           now,
           skewSeconds,
           checkIssuedAt: checkFreshness,
@@ -208,6 +208,21 @@ export async function verifyStatusListToken(
       ),
     InvalidSignatureError
   )
+
+  // The status at `idx` is checked only once the list verified, so that a list that does not verify
+  // is never reported as a status (Token Status List § 8.3).
+  try {
+    statusListCwt.verifyStatus(idx)
+  } catch (error) {
+    if (error instanceof SLException) {
+      throw new StatusListEntryNotValidError(error.message, {
+        uri,
+        idx,
+        status: statusListCwt.payload.statusList.getStatus(idx),
+      })
+    }
+    throw error
+  }
 
   return { statusListCwt, chain }
 }

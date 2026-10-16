@@ -975,7 +975,7 @@ describe('DeviceResponse.verify with a device request', () => {
     // The structured match survives the throw, so a caller that does not collect the checks itself
     // can still see which claim failed and why.
     expect(assessment.result?.type).toBe('deviceRequestMatch')
-    const match = assessment.result?.match
+    const match = assessment.result?.type === 'deviceRequestMatch' ? assessment.result.match : undefined
     expect(match?.success).toBe(false)
     expect(match?.docRequests[0].failedDocuments[0].claims.failedClaims).toEqual([
       expect.objectContaining({ elementIdentifier: 'birth_date', failure: 'notDisclosed' }),

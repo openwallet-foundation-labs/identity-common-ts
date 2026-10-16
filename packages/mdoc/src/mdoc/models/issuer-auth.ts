@@ -11,7 +11,13 @@ import { compareBytes } from '@owf/identity-common'
 import type { StatusListCwt } from '@owf/token-status-list'
 import z from 'zod'
 import type { MdocContext } from '../../context.js'
-import { defaultVerificationCallback, onCategoryCheck, type VerificationCallback } from '../check-callback.js'
+import {
+  defaultVerificationCallback,
+  onCategoryCheck,
+  type VerificationAssessmentResult,
+  type VerificationCallback,
+} from '../check-callback.js'
+import { IdentifierFoundInRevokedListError, StatusListEntryNotValidError } from '../errors.js'
 import type { IdentifierListCwt } from './identifier-list-cwt'
 import { MobileSecurityObject, type MobileSecurityObjectEncodedStructure } from './mobile-security-object.js'
 import { verifyIdentifierListToken, verifyStatusListToken } from './mso-revocation-list'
@@ -154,6 +160,24 @@ export class IssuerAuth extends Sign1 {
     }
   }
 
+  /**
+   * The revocation of the mdoc as data, when `error` reports one, so that a caller can tell it from
+   * a revocation list that could not be verified without parsing the message.
+   */
+  private revocationResult(error: unknown): VerificationAssessmentResult | undefined {
+    if (error instanceof StatusListEntryNotValidError) {
+      const { uri, idx, status } = error
+      return { type: 'statusNotValid', uri, idx, status }
+    }
+
+    const identifierList = this.mobileSecurityObject.status?.identifierList
+    if (error instanceof IdentifierFoundInRevokedListError && identifierList) {
+      return { type: 'identifierRevoked', uri: identifierList.uri, id: identifierList.id }
+    }
+
+    return undefined
+  }
+
   public async verify(
     options: {
       verificationCallback?: VerificationCallback
@@ -247,6 +271,7 @@ export class IssuerAuth extends Sign1 {
           status: 'FAILED',
           check: 'Status information must be valid',
           reason: err instanceof Error ? err.message : 'Unknown error',
+          result: this.revocationResult(err),
         })
       }
     }

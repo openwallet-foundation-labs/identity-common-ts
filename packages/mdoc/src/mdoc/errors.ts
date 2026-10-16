@@ -99,6 +99,27 @@ export class IdentifierFoundInRevokedListError extends MdlError {}
 export class InvalidRevocationListError extends MdlError {}
 
 /**
+ * The status list was verified, but the status of the MSO in it is not Valid, which ISO/IEC
+ * 18013-5 second edition 12.3.6.1 requires. Unlike a list that fails verification, this is a
+ * statement about the mdoc (Token Status List § 7 and § 8.3), so `uri`, `idx` and `status` are
+ * carried as data rather than only in the message. It extends `InvalidRevocationListError`,
+ * which a status that is not Valid was reported as before.
+ */
+export class StatusListEntryNotValidError extends InvalidRevocationListError {
+  public readonly uri: string
+  public readonly idx: number
+  /** The status at `idx`, e.g. `1` for Invalid (revoked) or `2` for Suspended. */
+  public readonly status: number
+
+  public constructor(message: string, { uri, idx, status }: { uri: string; idx: number; status: number }) {
+    super(message)
+    this.uri = uri
+    this.idx = idx
+    this.status = status
+  }
+}
+
+/**
  * ISO/IEC TS 18013-7:2025 C.5 requires the mdoc to abort when the DC API did not provide an origin,
  * as the session transcript — and thus the anti-relay binding — cannot be computed without it.
  */

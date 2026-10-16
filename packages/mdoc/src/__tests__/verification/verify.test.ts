@@ -25,6 +25,7 @@ import {
   Status,
   UnprotectedHeaders,
   //StatusListInfo,
+  VerificationError,
   Verifier,
 } from '../..'
 import { Handover } from '../../mdoc/models/handover'
@@ -537,9 +538,42 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    await expect(verifyIssuerSigned(credential)).rejects.toThrow(
-      `Status for id '${idx}' is not Valid (0), but is instead '1'`
-    )
+    const verification = verifyIssuerSigned(credential)
+    await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
+    await expect(verification).rejects.toMatchObject({
+      assessment: { result: { type: 'statusNotValid', uri, idx, status: StatusType.Invalid } },
+    })
+  })
+
+  test('Verify mdoc with a suspended entry in a status list', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/suspended', { idx, status: StatusType.Suspended })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    const verification = verifyIssuerSigned(credential)
+    await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '2'`)
+    await expect(verification).rejects.toMatchObject({
+      assessment: { result: { type: 'statusNotValid', uri, idx, status: StatusType.Suspended } },
+    })
+  })
+
+  // An expired list says nothing about the status it carries (Token Status List § 8.3), so the
+  // revoked entry on it is not reported.
+  test('Verify mdoc with a revoked entry in an expired status list', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/expired-revoked', {
+      idx,
+      status: StatusType.Invalid,
+      expirationTime: new Date(Date.now() - 3_600_000),
+    })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    const error = await verifyIssuerSigned(credential).catch((error) => error)
+    expect(error).toBeInstanceOf(VerificationError)
+    expect(error.message).toContain('is in the past')
+    expect(error.assessment.result).toBeUndefined()
   })
 
   const signIdentifierListCwt = async ({
@@ -673,9 +707,11 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    await expect(verifyWithoutChainValidation(credential)).rejects.toThrow(
-      `Status for id '${idx}' is not Valid (0), but is instead '1'`
-    )
+    const verification = verifyWithoutChainValidation(credential)
+    await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
+    await expect(verification).rejects.toMatchObject({
+      assessment: { result: { type: 'statusNotValid', uri, idx, status: StatusType.Invalid } },
+    })
   })
 
   test('Verify mdoc with an identifier list that carries its identifier without certificate chain validation', async () => {
@@ -695,9 +731,11 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
 
-    await expect(verifyIssuerSigned(credential)).rejects.toThrow(
-      `Identifier abcd found in the revoked identifier list at '${uri}'`
-    )
+    const verification = verifyIssuerSigned(credential)
+    await expect(verification).rejects.toThrow(`Identifier abcd found in the revoked identifier list at '${uri}'`)
+    await expect(verification).rejects.toMatchObject({
+      assessment: { result: { type: 'identifierRevoked', uri, id } },
+    })
   })
 
   // Token Status List, made binding on both mechanisms by § 12.3.6.1: `sub` shall equal the

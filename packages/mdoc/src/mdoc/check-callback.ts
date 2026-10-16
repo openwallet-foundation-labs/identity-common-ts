@@ -7,10 +7,25 @@ import { VerificationError } from './errors.js'
  * reaches both a callback that collects the checks and the {@link VerificationError} the default
  * callback throws.
  */
-export type VerificationAssessmentResult = {
-  type: 'deviceRequestMatch'
-  match: DeviceRequestMatchResult
-}
+export type VerificationAssessmentResult =
+  | {
+      type: 'deviceRequestMatch'
+      match: DeviceRequestMatchResult
+    }
+  | {
+      /** The status of the MSO in its status list is not Valid. */
+      type: 'statusNotValid'
+      uri: string
+      idx: number
+      /** The status at `idx`, e.g. `1` for Invalid (revoked) or `2` for Suspended. */
+      status: number
+    }
+  | {
+      /** The identifier of the MSO is in its identifier list. */
+      type: 'identifierRevoked'
+      uri: string
+      id: Uint8Array
+    }
 
 export interface VerificationAssessment {
   status: 'PASSED' | 'FAILED' | 'WARNING'
