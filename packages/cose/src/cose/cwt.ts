@@ -1,6 +1,6 @@
-import { Tag } from 'cbor-x'
 import type { AnyCborStructure, EncodedStructureType } from '../cbor'
 import { cborDecode, describeCborValue } from '../cbor'
+import { Tag } from '../cbor/cbor-x'
 import type { AnyCwtPayload, CwtPayload } from './claims/cwt-payload'
 import {
   CoseInvalidSignatureError,
