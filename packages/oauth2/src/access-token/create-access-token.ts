@@ -84,6 +84,16 @@ export async function createAccessTokenJwt(options: CreateAccessTokenOptions) {
 
   const now = options.now ?? new Date()
 
+  // Awaited outside the payload: older Hermes (React Native) compilers return the last property
+  // value instead of the object when an object literal in a ternary branch contains an `await`.
+  const dpopJkt = options.dpop
+    ? await calculateJwkThumbprint({
+        hashAlgorithm: HashAlgorithm.Sha256,
+        hashCallback: options.callbacks.hash,
+        jwk: options.dpop.jwk,
+      })
+    : undefined
+
   const payload = parseWithErrorHandling(zAccessTokenProfileJwtPayload, {
     iat: dateToSeconds(now),
     exp: dateToSeconds(addSecondsToDate(now, options.expiresInSeconds)),
@@ -93,15 +103,7 @@ export async function createAccessTokenJwt(options: CreateAccessTokenOptions) {
     client_id: options.clientId,
     sub: options.subject,
     scope: options.scope,
-    cnf: options.dpop
-      ? {
-          jkt: await calculateJwkThumbprint({
-            hashAlgorithm: HashAlgorithm.Sha256,
-            hashCallback: options.callbacks.hash,
-            jwk: options.dpop.jwk,
-          }),
-        }
-      : undefined,
+    cnf: dpopJkt ? { jkt: dpopJkt } : undefined,
     ...options.additionalPayload,
   } satisfies AccessTokenProfileJwtPayload)
 
