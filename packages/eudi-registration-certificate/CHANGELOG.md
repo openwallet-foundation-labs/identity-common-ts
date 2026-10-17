@@ -1,5 +1,19 @@
 # @owf/eudi-registration-certificate
 
+## 0.5.0
+
+### Minor Changes
+
+- b4105be: Drop the CommonJS build from all packages; only ESM is now published. All environments targeted by this library support ESM natively. This removes the dual-package hazard that caused `instanceof` checks to fail in Metro/Hermes and similar single-module-system runtimes.
+
+### Patch Changes
+
+- 8969b41: Rename `@owf/eudi-wrprc` to `@owf/eudi-registration-certificate`. The API is unchanged; replace the package name in your dependencies and imports.
+- Updated dependencies [b4105be]
+  - @owf/crypto@0.5.0
+  - @owf/eudi-jades@0.5.0
+  - @owf/identity-common@0.5.0
+
 ## 0.4.2
 
 ### Patch Changes

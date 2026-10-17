@@ -1,5 +1,19 @@
 # @owf/mdoc
 
+## 0.8.3
+
+### Patch Changes
+
+- 93f6eff: Read a `status` of `null` in the MSO as absent. ISO/IEC 18013-5 does not allow `null` there, but Apple Wallet's developer mDLs send it, which failed with `Error decoding Status: Expected map, received null`.
+- 6d8e998: Report a status list entry that is not Valid as `StatusListEntryNotValidError` with its `uri`, `idx` and `status`, so it can be told apart from a status list that fails verification. It extends `InvalidRevocationListError`. `IssuerAuth.verify` adds it, or a revoked identifier, to the failed check as a `VerificationAssessmentResult`.
+- b7002dd: Accept a status list whose `x5chain` is in the unprotected header when a protected `x5t` matches its leaf certificate. ISO/IEC 18013-5 § 12.3.6.3 requires the chain in the protected header, but RFC 9360 allows it with that binding. The context of `IssuerAuth.verify`, `IssuerAuth.verifyStatus` and `verifyStatusListToken` now requires `crypto` to check the `x5t`.
+- Updated dependencies [b7002dd]
+- Updated dependencies [b4105be]
+- Updated dependencies [dacb544]
+  - @owf/cose@0.5.0
+  - @owf/identity-common@0.5.0
+  - @owf/token-status-list@0.5.0
+
 ## 0.8.2
 
 ### Patch Changes

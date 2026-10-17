@@ -1,5 +1,16 @@
 # @openid4vc/openid4vci
 
+## 0.8.0
+
+### Patch Changes
+
+- 3f5adbd: Add optional `issuer_info` Credential Issuer Metadata support following ETSI TS 119 472-3, with independent `IssuerInfo`, `IssuerInfoEntry`, and `zIssuerInfo` exports.
+- Updated dependencies [2538f35]
+- Updated dependencies [3b10167]
+- Updated dependencies [03a2040]
+  - @openid4vc/oauth2@0.8.0
+  - @openid4vc/utils@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

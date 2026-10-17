@@ -1,5 +1,18 @@
 # @owf/cose
 
+## 0.5.0
+
+### Minor Changes
+
+- b4105be: Drop the CommonJS build from all packages; only ESM is now published. All environments targeted by this library support ESM natively. This removes the dual-package hazard that caused `instanceof` checks to fail in Metro/Hermes and similar single-module-system runtimes.
+
+### Patch Changes
+
+- b7002dd: Add `getIntegrityProtectedX5Chain`, which reads the `x5chain` of a COSE structure from the protected header, or else from the unprotected header when a protected `x5t` (SHA-256) matches its leaf, as RFC 9360 requires. An unbound unprotected `x5chain` throws `CoseX5ChainNotBoundError`.
+- dacb544: Reject a token at its `exp` instant. `verifyStatusListJwtClaims` (and so `verifyStatus`) and `CwtPayload.verifyClaims` (and so `Cwt.verify` and `StatusListCwtPayload.verifyClaims`) accepted a token when the current time was exactly `exp` plus the skew. RFC 7519 section 4.1.4 says a token MUST NOT be accepted on or after its `exp`, and RFC 8392 gives `exp` the same meaning in a CWT. This matches `@sd-jwt/core`.
+- Updated dependencies [b4105be]
+  - @owf/identity-common@0.5.0
+
 ## 0.4.2
 
 ### Patch Changes

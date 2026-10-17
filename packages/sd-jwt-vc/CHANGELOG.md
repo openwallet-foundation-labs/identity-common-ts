@@ -1,5 +1,20 @@
 # @sd-jwt/sd-jwt-vc
 
+## 0.23.0
+
+### Minor Changes
+
+- b4105be: Drop the CommonJS build from all packages; only ESM is now published. All environments targeted by this library support ESM natively. This removes the dual-package hazard that caused `instanceof` checks to fail in Metro/Hermes and similar single-module-system runtimes.
+
+### Patch Changes
+
+- 47e5ca8: Fix the `vct#integrity` and `extends#integrity` checks: the digest is now compared as base64, as defined by W3C Subresource Integrity, instead of hex. When the integrity metadata lists several hashes, only the strongest supported algorithm (`sha256`, `sha384`, `sha512`) is checked and any of its values may match. Integrity metadata without a supported algorithm is rejected.
+- Updated dependencies [b4105be]
+- Updated dependencies [dacb544]
+  - @owf/identity-common@0.5.0
+  - @sd-jwt/core@0.23.0
+  - @owf/token-status-list@0.5.0
+
 ## 0.22.0
 
 ### Minor Changes
