@@ -44,6 +44,7 @@ import {
   zCredentialConfigurationSupportedCommon,
   zCredentialConfigurationSupportedCommonDraft15,
 } from './z-credential-configuration-supported-common'
+import { zIssuerInfo } from './z-issuer-info'
 
 const allCredentialIssuerMetadataFormats = [
   zSdJwtDcCredentialIssuerMetadata,
@@ -164,6 +165,8 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
       .loose()
       .optional(),
     display: z.array(zCredentialIssuerMetadataDisplayEntry).optional(),
+    // ETSI TS 119 472-3 extension for issuer attestations
+    issuer_info: zIssuerInfo.optional(),
     credential_configurations_supported: z.record(z.string(), zCredentialConfigurationSupportedCommon),
   })
   .loose()

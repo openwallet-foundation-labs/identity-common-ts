@@ -114,6 +114,7 @@ export type {
   CredentialIssuerMetadataDisplayEntry,
 } from './metadata/credential-issuer/z-credential-issuer-metadata'
 export { zCredentialIssuerMetadataDraft14Draft15V1 as zCredentialIssuerMetadataSchema } from './metadata/credential-issuer/z-credential-issuer-metadata'
+export { type IssuerInfo, type IssuerInfoEntry, zIssuerInfo } from './metadata/credential-issuer/z-issuer-info'
 export type { IssuerMetadataResult } from './metadata/fetch-issuer-metadata'
 export type { NonceResponse } from './nonce/z-nonce'
 export type { SendNotificationResponseNotOk, SendNotificationResponseOk } from './notification/notification'
