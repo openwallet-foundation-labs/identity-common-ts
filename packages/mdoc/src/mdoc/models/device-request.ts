@@ -6,10 +6,24 @@ import { DocRequest, type DocRequestEncodedStructure } from './doc-request'
 const deviceRequestSchema = typedMap([
   ['version', z.string()],
   ['docRequests', z.array(z.instanceof(DocRequest))],
-  // A `DeviceRequestInfoBytes` that does not decode as ISO/IEC TS 23220-4 7.2.1.3.4 describes is
-  // kept as the data item received, rather than failing the request.
-  ['deviceRequestInfo', z.union([z.instanceof(DeviceRequestInfo), z.instanceof(DataItem)]).exactOptional()],
+  ['deviceRequestInfo', z.instanceof(DeviceRequestInfo).exactOptional()],
 ] as const)
+
+// Every document set of a use case points at doc requests of this device request.
+const deviceRequestOutputSchema = deviceRequestSchema.out.superRefine((map, ctx) => {
+  const docRequestCount = map.get('docRequests').length
+  map.get('deviceRequestInfo')?.useCases?.forEach((useCase, useCaseIndex) => {
+    for (const docRequestId of useCase.documentSets.flat()) {
+      if (docRequestId >= docRequestCount) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['deviceRequestInfo', 'useCases', useCaseIndex, 'documentSets'],
+          message: `Doc request ${docRequestId} does not exist, the device request has ${docRequestCount}`,
+        })
+      }
+    }
+  })
+})
 
 export type DeviceRequestDecodedStructure = z.output<typeof deviceRequestSchema>
 export type DeviceRequestEncodedStructure = z.input<typeof deviceRequestSchema>
@@ -22,7 +36,7 @@ export type DeviceRequestOptions = {
 
 export class DeviceRequest extends CborStructure<DeviceRequestEncodedStructure, DeviceRequestDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(deviceRequestSchema.in, deviceRequestSchema.out, {
+    return z.codec(deviceRequestSchema.in, deviceRequestOutputSchema, {
       decode: (input) => {
         const map: DeviceRequestDecodedStructure = TypedMap.fromMap(input)
         const docRequests = input.get('docRequests') as unknown[]
@@ -32,13 +46,10 @@ export class DeviceRequest extends CborStructure<DeviceRequestEncodedStructure, 
           docRequests.map((dr) => DocRequest.fromEncodedStructure(dr as DocRequestEncodedStructure))
         )
 
+        // Anything but a data item is left for the schema to reject.
         const deviceRequestInfo = input.get('deviceRequestInfo')
         if (deviceRequestInfo instanceof DataItem) {
-          try {
-            map.set('deviceRequestInfo', DeviceRequestInfo.fromDataItem(deviceRequestInfo))
-          } catch {
-            // Not a DeviceRequestInfo this version understands: left as is.
-          }
+          map.set('deviceRequestInfo', DeviceRequestInfo.fromDataItem(deviceRequestInfo))
         }
 
         return map
@@ -51,7 +62,7 @@ export class DeviceRequest extends CborStructure<DeviceRequestEncodedStructure, 
         )
 
         const deviceRequestInfo = output.get('deviceRequestInfo')
-        if (deviceRequestInfo instanceof DeviceRequestInfo) map.set('deviceRequestInfo', deviceRequestInfo.asDataItem)
+        if (deviceRequestInfo) map.set('deviceRequestInfo', deviceRequestInfo.asDataItem)
 
         return map
       },
@@ -67,12 +78,10 @@ export class DeviceRequest extends CborStructure<DeviceRequestEncodedStructure, 
   }
 
   /**
-   * The `deviceRequestInfo` of ISO/IEC TS 23220-4 7.2.1.3.4, when present and readable. One that
-   * does not decode is not returned, and stays in the encoded device request as received.
+   * The `deviceRequestInfo` of ISO/IEC TS 23220-4 7.2.1.3.4.
    */
-  public get deviceRequestInfo(): DeviceRequestInfo | undefined {
-    const deviceRequestInfo = this.structure.get('deviceRequestInfo')
-    return deviceRequestInfo instanceof DeviceRequestInfo ? deviceRequestInfo : undefined
+  public get deviceRequestInfo() {
+    return this.structure.get('deviceRequestInfo')
   }
 
   public static create(options: DeviceRequestOptions): DeviceRequest {

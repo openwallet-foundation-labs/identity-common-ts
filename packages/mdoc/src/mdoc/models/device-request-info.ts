@@ -1,50 +1,15 @@
 import { TypedMap, typedMap } from '@owf/cose'
 import { z } from 'zod'
 import { OriginalBytesCborStructure } from '../original-bytes-cbor-structure'
+import { UseCase, type UseCaseEncodedStructure, type UseCaseOptions } from './use-case'
 
-/**
- * A use case of a device request: the doc requests, by index into `docRequests`, that answer it.
- * Exactly one document set has to be returned for the use case to be satisfied, every doc request
- * of that set included.
- */
-export type UseCase = {
-  /**
-   * Whether the use case has to be satisfied for the device request to be.
-   */
-  mandatory: boolean
-  /**
-   * Why the reader asks, per purpose controller, as codes of a registry a profile defines.
-   */
-  purposeHints?: Map<string, number>
-  documentSets: Array<Array<number>>
-}
-
-// Validated as received and kept as a map, so that unknown keys survive a re-encoding.
-const useCaseSchema = z.map(z.unknown(), z.unknown()).superRefine((useCase, ctx) => {
-  if (typeof useCase.get('mandatory') !== 'boolean') {
-    ctx.addIssue({ code: 'custom', message: "Expected 'mandatory' to be a boolean" })
-  }
-  if (!z.array(z.array(z.number().int().nonnegative()).min(1)).min(1).safeParse(useCase.get('documentSets')).success) {
-    ctx.addIssue({
-      code: 'custom',
-      message: "Expected 'documentSets' to be a non-empty array of non-empty arrays of doc request indexes",
-    })
-  }
-  if (
-    useCase.has('purposeHints') &&
-    !z.map(z.string(), z.number().int()).safeParse(useCase.get('purposeHints')).success
-  ) {
-    ctx.addIssue({ code: 'custom', message: "Expected 'purposeHints' to map purpose controller ids to purpose codes" })
-  }
-})
-
-const deviceRequestInfoSchema = typedMap([['useCases', z.array(useCaseSchema).min(1).exactOptional()]] as const)
+const deviceRequestInfoSchema = typedMap([['useCases', z.array(z.instanceof(UseCase)).min(1).exactOptional()]] as const)
 
 export type DeviceRequestInfoEncodedStructure = z.input<typeof deviceRequestInfoSchema>
 export type DeviceRequestInfoDecodedStructure = z.output<typeof deviceRequestInfoSchema>
 
 export type DeviceRequestInfoOptions = {
-  useCases?: Array<UseCase>
+  useCases?: Array<UseCase | UseCaseOptions>
 }
 
 /**
@@ -59,18 +24,37 @@ export class DeviceRequestInfo extends OriginalBytesCborStructure<
   DeviceRequestInfoDecodedStructure
 > {
   public static override get encodingSchema() {
-    return deviceRequestInfoSchema
+    return z.codec(deviceRequestInfoSchema.in, deviceRequestInfoSchema.out, {
+      decode: (input) => {
+        const map: DeviceRequestInfoDecodedStructure = TypedMap.fromMap(input)
+
+        // Anything but an array is left for the schema to reject.
+        const useCases = input.get('useCases')
+        if (Array.isArray(useCases)) {
+          map.set(
+            'useCases',
+            useCases.map((useCase) => UseCase.fromEncodedStructure(useCase as UseCaseEncodedStructure))
+          )
+        }
+
+        return map
+      },
+      encode: (output) => {
+        const map = output.toMap() as Map<unknown, unknown>
+        const useCases = output.get('useCases')
+        if (useCases) {
+          map.set(
+            'useCases',
+            useCases.map((useCase) => useCase.encodedStructure)
+          )
+        }
+        return map
+      },
+    })
   }
 
-  public get useCases(): Array<UseCase> | undefined {
-    return this.structure.get('useCases')?.map((useCase) => {
-      const purposeHints = useCase.get('purposeHints') as Map<string, number> | undefined
-      return {
-        mandatory: useCase.get('mandatory') as boolean,
-        ...(purposeHints ? { purposeHints } : {}),
-        documentSets: useCase.get('documentSets') as Array<Array<number>>,
-      }
-    })
+  public get useCases() {
+    return this.structure.get('useCases')
   }
 
   public static create(options: DeviceRequestInfoOptions): DeviceRequestInfo {
@@ -79,12 +63,7 @@ export class DeviceRequestInfo extends OriginalBytesCborStructure<
     if (options.useCases !== undefined) {
       map.set(
         'useCases',
-        options.useCases.map((useCase) => {
-          const entries: Array<[unknown, unknown]> = [['mandatory', useCase.mandatory]]
-          if (useCase.purposeHints) entries.push(['purposeHints', useCase.purposeHints])
-          entries.push(['documentSets', useCase.documentSets])
-          return new Map(entries)
-        })
+        options.useCases.map((useCase) => (useCase instanceof UseCase ? useCase : UseCase.create(useCase)))
       )
     }
 
