@@ -1,9 +1,13 @@
 import { TypedMap, typedMap } from '@owf/cose'
 import { z } from 'zod'
+import { structureArrayHooks } from '../../utils/structureArray'
 import { OriginalBytesCborStructure } from '../original-bytes-cbor-structure'
 import { UseCase, type UseCaseEncodedStructure, type UseCaseOptions } from './use-case'
 
-const deviceRequestInfoSchema = typedMap([['useCases', z.array(z.instanceof(UseCase)).min(1).exactOptional()]] as const)
+const deviceRequestInfoSchema = typedMap(
+  [['useCases', z.array(z.instanceof(UseCase)).min(1).exactOptional()]] as const,
+  structureArrayHooks('useCases', (useCase) => UseCase.fromEncodedStructure(useCase as UseCaseEncodedStructure))
+)
 
 export type DeviceRequestInfoEncodedStructure = z.input<typeof deviceRequestInfoSchema>
 export type DeviceRequestInfoDecodedStructure = z.output<typeof deviceRequestInfoSchema>
@@ -24,33 +28,7 @@ export class DeviceRequestInfo extends OriginalBytesCborStructure<
   DeviceRequestInfoDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(deviceRequestInfoSchema.in, deviceRequestInfoSchema.out, {
-      decode: (input) => {
-        const map: DeviceRequestInfoDecodedStructure = TypedMap.fromMap(input)
-
-        // Anything but an array is left for the schema to reject.
-        const useCases = input.get('useCases')
-        if (Array.isArray(useCases)) {
-          map.set(
-            'useCases',
-            useCases.map((useCase) => UseCase.fromEncodedStructure(useCase as UseCaseEncodedStructure))
-          )
-        }
-
-        return map
-      },
-      encode: (output) => {
-        const map = output.toMap() as Map<unknown, unknown>
-        const useCases = output.get('useCases')
-        if (useCases) {
-          map.set(
-            'useCases',
-            useCases.map((useCase) => useCase.encodedStructure)
-          )
-        }
-        return map
-      },
-    })
+    return deviceRequestInfoSchema
   }
 
   public get useCases() {
