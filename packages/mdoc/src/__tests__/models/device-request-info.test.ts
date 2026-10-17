@@ -1,10 +1,9 @@
-import { cborEncode, DataItem } from '@owf/cose'
+import { cborDecode, cborEncode, DataItem } from '@owf/cose'
 import { hex } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
 import { DeviceRequest } from '../../mdoc/models/device-request'
 import { DeviceRequestInfo } from '../../mdoc/models/device-request-info'
 import { DocRequest } from '../../mdoc/models/doc-request'
-import { DocRequestInfo } from '../../mdoc/models/doc-request-info'
 import { ItemsRequest } from '../../mdoc/models/items-request'
 
 const MDL = 'org.iso.18013.5.1.mDL'
@@ -194,22 +193,24 @@ describe('ISO/IEC TS 23220-4 request information', () => {
           itemsRequest: ItemsRequest.create({
             docType: MDL,
             namespaces: { [MDL_NS]: { age_over_18: false } },
-            requestInfo: DocRequestInfo.create({
+            requestInfo: {
               alternativeDataElements: [
                 { requestedElement: [MDL_NS, 'age_over_18'], alternativeElementSets: [[[MDL_NS, 'birth_date']]] },
               ],
               issuerIdentifiers: [hex.decode('0a0b')],
-            }),
+            },
           }),
         }),
         DocRequest.create({
           itemsRequest: ItemsRequest.create({ docType: PID, namespaces: { [PID]: { family_name: false } } }),
         }),
       ],
-      deviceRequestInfo: DeviceRequestInfo.create({ useCases: [{ mandatory: true, documentSets: [[0], [1]] }] }),
+      deviceRequestInfo: { useCases: [{ mandatory: true, documentSets: [[0], [1]] }] },
     })
 
     const decoded = DeviceRequest.decode(deviceRequest.encode())
+
+    expect(decoded.version).toBe('1.1')
 
     const alternatives = decoded.docRequests[0].itemsRequest.requestInfo?.alternativeDataElements
     expect(alternatives?.[0].requestedElement).toStrictEqual([MDL_NS, 'age_over_18'])
@@ -217,6 +218,79 @@ describe('ISO/IEC TS 23220-4 request information', () => {
     expect(decoded.docRequests[0].itemsRequest.requestInfo?.issuerIdentifiers).toStrictEqual([hex.decode('0a0b')])
     expect(decoded.deviceRequestInfo?.useCases?.[0].mandatory).toBe(true)
     expect(decoded.deviceRequestInfo?.useCases?.[0].documentSets).toStrictEqual([[0], [1]])
+  })
+
+  test('reports each missing doc request of a use case once', () => {
+    const outOfRange = new DataItem({
+      buffer: cborEncode(
+        new Map([
+          [
+            'useCases',
+            [
+              new Map<string, unknown>([
+                ['mandatory', true],
+                ['documentSets', [[5], [5, 6], [5]]],
+              ]),
+            ],
+          ],
+        ])
+      ),
+    })
+
+    expect(() => DeviceRequest.decode(encodedDeviceRequest({ deviceRequestInfo: outOfRange }))).toThrow(
+      /^[^✖]*✖ Doc request 5, 6 do not exist, the device request has 2[^✖]*$/
+    )
+  })
+
+  test('reads integers an encoder wrote in more bytes than they need', () => {
+    const wide = new Map<string, unknown>([['maximumResponseSize', BigInt(65536)]])
+    const wideUseCases = new DataItem({
+      buffer: cborEncode(
+        new Map([
+          [
+            'useCases',
+            [
+              new Map<string, unknown>([
+                ['mandatory', true],
+                ['purposeHints', new Map([['org.iso.jtc1.sc17', BigInt(3)]])],
+                ['documentSets', [[BigInt(0)], [BigInt(1)]]],
+              ]),
+            ],
+          ],
+        ])
+      ),
+    })
+    const bytes = encodedDeviceRequest({ requestInfo: wide, deviceRequestInfo: wideUseCases })
+    // cbor-x decodes an integer written in 8 bytes as a bigint, whatever its value.
+    expect(typeof (cborDecode(cborEncode(wide)) as Map<string, unknown>).get('maximumResponseSize')).toBe('bigint')
+
+    const deviceRequest = DeviceRequest.decode(bytes)
+
+    expect(deviceRequest.docRequests[0].itemsRequest.requestInfo?.maximumResponseSize).toBe(65536)
+    expect(deviceRequest.deviceRequestInfo?.useCases?.[0].purposeHints).toStrictEqual(
+      new Map([['org.iso.jtc1.sc17', 3]])
+    )
+    expect(deviceRequest.deviceRequestInfo?.useCases?.[0].documentSets).toStrictEqual([[0], [1]])
+    expect(hex.encode(deviceRequest.encode())).toBe(hex.encode(bytes))
+  })
+
+  test('fails to decode a device request without doc requests', () => {
+    const bytes = cborEncode(new Map([['version', '1.0']]))
+
+    expect(() => DeviceRequest.decode(bytes)).toThrow(/Expected key 'docRequests' to be defined/)
+  })
+
+  test('creates version 1.1 with deviceRequestInfo, as 18013-5 asks, and 1.0 without', () => {
+    const docRequests = [
+      DocRequest.create({
+        itemsRequest: ItemsRequest.create({ docType: PID, namespaces: { [PID]: { family_name: false } } }),
+      }),
+    ]
+    const useCases = { useCases: [{ mandatory: true, documentSets: [[0]] }] }
+
+    expect(DeviceRequest.create({ docRequests }).version).toBe('1.0')
+    expect(DeviceRequest.create({ docRequests, deviceRequestInfo: useCases }).version).toBe('1.1')
+    expect(DeviceRequest.create({ docRequests, deviceRequestInfo: useCases, version: '1.0' }).version).toBe('1.0')
   })
 
   test('refuses to create a document set that points past the doc requests', () => {

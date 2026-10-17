@@ -1,10 +1,10 @@
-import { typedMap } from '@owf/cose'
+import { TypedMap, typedMap } from '@owf/cose'
 import { z } from 'zod'
 import { describeAgeOverLimitViolations, findAgeOverRequestLimitViolations } from '../../utils/ageOver'
 import { AgeOverLimitExceededError } from '../errors'
 import { OriginalBytesCborStructure } from '../original-bytes-cbor-structure'
 import type { DataElementIdentifier } from './data-element-identifier'
-import { DocRequestInfo } from './doc-request-info'
+import { DocRequestInfo, type DocRequestInfoOptions } from './doc-request-info'
 import type { DocType } from './doctype'
 import type { IntentToRetain } from './intent-to-retain'
 import type { Namespace } from './namespace'
@@ -46,7 +46,7 @@ export type ItemsRequestOptions = {
     | NamespacesStructure
     // We allow record when creating for easier usage
     | Record<Namespace, Record<DataElementIdentifier, IntentToRetain>>
-  requestInfo?: DocRequestInfo
+  requestInfo?: DocRequestInfo | DocRequestInfoOptions
 }
 
 export class ItemsRequest extends OriginalBytesCborStructure<
@@ -90,13 +90,18 @@ export class ItemsRequest extends OriginalBytesCborStructure<
       )
     }
 
-    const structure = new Map<unknown, unknown>([
+    const structure: ItemsRequestDecodedStructure = new TypedMap([
       ['docType', options.docType],
       ['nameSpaces', namespaces],
     ])
-    if (options.requestInfo) structure.set('requestInfo', options.requestInfo.encodedStructure)
+    if (options.requestInfo) {
+      structure.set(
+        'requestInfo',
+        options.requestInfo instanceof DocRequestInfo ? options.requestInfo : DocRequestInfo.create(options.requestInfo)
+      )
+    }
 
-    // biome-ignore lint/complexity/noThisInStatic: this.fromEncodedStructure is intentional for subclass support
-    return this.fromEncodedStructure(structure)
+    // biome-ignore lint/complexity/noThisInStatic: this.fromDecodedStructure is intentional for subclass support
+    return this.fromDecodedStructure(structure)
   }
 }

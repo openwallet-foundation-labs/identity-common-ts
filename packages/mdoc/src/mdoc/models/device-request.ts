@@ -1,6 +1,6 @@
 import { CborStructure, DataItem, TypedMap, typedMap } from '@owf/cose'
 import { z } from 'zod'
-import { DeviceRequestInfo } from './device-request-info'
+import { DeviceRequestInfo, type DeviceRequestInfoOptions } from './device-request-info'
 import { DocRequest, type DocRequestEncodedStructure } from './doc-request'
 
 const deviceRequestSchema = typedMap([
@@ -11,17 +11,18 @@ const deviceRequestSchema = typedMap([
 
 // Every document set of a use case points at doc requests of this device request.
 const deviceRequestOutputSchema = deviceRequestSchema.out.superRefine((map, ctx) => {
-  const docRequestCount = map.get('docRequests').length
+  // A missing or invalid docRequests is reported by the schema itself.
+  const docRequests: unknown = map.get('docRequests')
+  if (!Array.isArray(docRequests)) return
+  const docRequestCount = docRequests.length
   map.get('deviceRequestInfo')?.useCases?.forEach((useCase, useCaseIndex) => {
-    for (const docRequestId of useCase.documentSets.flat()) {
-      if (docRequestId >= docRequestCount) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['deviceRequestInfo', 'useCases', useCaseIndex, 'documentSets'],
-          message: `Doc request ${docRequestId} does not exist, the device request has ${docRequestCount}`,
-        })
-      }
-    }
+    const missing = Array.from(new Set(useCase.documentSets.flat())).filter((id) => id >= docRequestCount)
+    if (missing.length === 0) return
+    ctx.addIssue({
+      code: 'custom',
+      path: ['deviceRequestInfo', 'useCases', useCaseIndex, 'documentSets'],
+      message: `Doc request ${missing.join(', ')} ${missing.length === 1 ? 'does' : 'do'} not exist, the device request has ${docRequestCount}`,
+    })
   })
 })
 
@@ -29,9 +30,13 @@ export type DeviceRequestDecodedStructure = z.output<typeof deviceRequestSchema>
 export type DeviceRequestEncodedStructure = z.input<typeof deviceRequestSchema>
 
 export type DeviceRequestOptions = {
+  /**
+   * Defaults to `'1.1'` when `deviceRequestInfo` is given and to `'1.0'` otherwise, as the second
+   * edition of ISO/IEC 18013-5 asks (10.2.2).
+   */
   version?: string
   docRequests: Array<DocRequest>
-  deviceRequestInfo?: DeviceRequestInfo
+  deviceRequestInfo?: DeviceRequestInfo | DeviceRequestInfoOptions
 }
 
 export class DeviceRequest extends CborStructure<DeviceRequestEncodedStructure, DeviceRequestDecodedStructure> {
@@ -39,12 +44,14 @@ export class DeviceRequest extends CborStructure<DeviceRequestEncodedStructure, 
     return z.codec(deviceRequestSchema.in, deviceRequestOutputSchema, {
       decode: (input) => {
         const map: DeviceRequestDecodedStructure = TypedMap.fromMap(input)
-        const docRequests = input.get('docRequests') as unknown[]
-
-        map.set(
-          'docRequests',
-          docRequests.map((dr) => DocRequest.fromEncodedStructure(dr as DocRequestEncodedStructure))
-        )
+        // Anything but an array is left for the schema to reject.
+        const docRequests = input.get('docRequests')
+        if (Array.isArray(docRequests)) {
+          map.set(
+            'docRequests',
+            docRequests.map((dr) => DocRequest.fromEncodedStructure(dr as DocRequestEncodedStructure))
+          )
+        }
 
         // Anything but a data item is left for the schema to reject.
         const deviceRequestInfo = input.get('deviceRequestInfo')
@@ -85,11 +92,16 @@ export class DeviceRequest extends CborStructure<DeviceRequestEncodedStructure, 
   }
 
   public static create(options: DeviceRequestOptions): DeviceRequest {
+    const deviceRequestInfo =
+      options.deviceRequestInfo instanceof DeviceRequestInfo || options.deviceRequestInfo === undefined
+        ? options.deviceRequestInfo
+        : DeviceRequestInfo.create(options.deviceRequestInfo)
+
     const map: DeviceRequestDecodedStructure = new TypedMap([
-      ['version', options.version ?? '1.0'],
+      ['version', options.version ?? (deviceRequestInfo ? '1.1' : '1.0')],
       ['docRequests', options.docRequests],
     ])
-    if (options.deviceRequestInfo) map.set('deviceRequestInfo', options.deviceRequestInfo)
+    if (deviceRequestInfo) map.set('deviceRequestInfo', deviceRequestInfo)
     // biome-ignore lint/complexity/noThisInStatic: this.fromDecodedStructure is intentional for subclass support
     return this.fromDecodedStructure(map)
   }

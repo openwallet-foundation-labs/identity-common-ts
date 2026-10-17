@@ -1,10 +1,11 @@
 import { CborStructure, TypedMap, typedMap } from '@owf/cose'
 import { z } from 'zod'
+import { zInteger, zUnsignedInteger } from '../../utils/zodInteger'
 
 const useCaseSchema = typedMap([
   ['mandatory', z.boolean()],
-  ['purposeHints', z.map(z.string(), z.number().int()).exactOptional()],
-  ['documentSets', z.array(z.array(z.number().int().nonnegative()).min(1)).min(1)],
+  ['purposeHints', z.map(z.string(), zInteger).exactOptional()],
+  ['documentSets', z.array(z.array(zUnsignedInteger).min(1)).min(1)],
 ] as const)
 
 export type UseCaseEncodedStructure = z.input<typeof useCaseSchema>
@@ -39,12 +40,13 @@ export class UseCase extends CborStructure<UseCaseEncodedStructure, UseCaseDecod
     return this.structure.get('mandatory')
   }
 
-  public get purposeHints() {
-    return this.structure.get('purposeHints')
+  public get purposeHints(): Map<string, number> | undefined {
+    const purposeHints = this.structure.get('purposeHints')
+    return purposeHints && new Map(Array.from(purposeHints, ([controller, code]) => [controller, Number(code)]))
   }
 
-  public get documentSets() {
-    return this.structure.get('documentSets')
+  public get documentSets(): Array<Array<number>> {
+    return this.structure.get('documentSets').map((set) => set.map(Number))
   }
 
   public static create(options: UseCaseOptions): UseCase {
