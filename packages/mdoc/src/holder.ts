@@ -127,6 +127,16 @@ export class Holder {
     })
   }
 
+  /**
+   * Create a device response for a device request, with one document per entry of `documents`.
+   *
+   * Throws an `UnsatisfiedDeviceRequestError` when the documents do not answer the device request
+   * the way its request information asks (ISO/IEC TS 23220-4 7.2.1.3): a document of an issuer its
+   * doc request does not name, more than one document for a doc request with `uniqueDocSetRequired`,
+   * or, when the device request carries use cases, a mandatory use case left without a document for
+   * each doc request of one of its document sets. Elements can still be left out, and an empty
+   * `documents` declines the request.
+   */
   public static async createDeviceResponseForDeviceRequest(
     options: {
       deviceRequest: DeviceRequest
