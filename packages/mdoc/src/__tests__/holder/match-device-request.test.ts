@@ -305,7 +305,8 @@ describe('Holder.matchDeviceRequest', () => {
 
     expect(match).toStrictEqual({
       success: false,
-      docRequestsAsAlternatives: false,
+      useCasesSource: 'allDocRequests',
+      useCases: [{ useCaseIndex: 0, mandatory: true, success: false, documentSets: [] }],
       docRequests: [
         {
           docRequestIndex: 0,
@@ -330,14 +331,14 @@ describe('Holder.matchDeviceRequest', () => {
     const credentials = [await createIssuerSigned()]
 
     const allMatch = Holder.matchDeviceRequest({ deviceRequest, credentials })
-    expect(allMatch).toMatchObject({ success: false, docRequestsAsAlternatives: false })
+    expect(allMatch).toMatchObject({ success: false, useCasesSource: 'allDocRequests' })
 
     const alternativesMatch = Holder.matchDeviceRequest({
       deviceRequest,
       credentials,
       treatAmbiguousMultipleDocRequestsAsAlternatives: true,
     })
-    expect(alternativesMatch).toMatchObject({ success: true, docRequestsAsAlternatives: true })
+    expect(alternativesMatch).toMatchObject({ success: true, useCasesSource: 'eachDocRequest' })
     expect(alternativesMatch.docRequests.map((docRequest) => docRequest.success)).toEqual([true, false])
 
     const noneMatch = Holder.matchDeviceRequest({
@@ -345,7 +346,7 @@ describe('Holder.matchDeviceRequest', () => {
       credentials: [await createIssuerSigned({ docType: 'org.example.other' })],
       treatAmbiguousMultipleDocRequestsAsAlternatives: true,
     })
-    expect(noneMatch).toMatchObject({ success: false, docRequestsAsAlternatives: true })
+    expect(noneMatch).toMatchObject({ success: false, useCasesSource: 'eachDocRequest' })
   })
 
   test('ItemsRequest.create refuses more than two age_over_NN elements in a namespace', () => {

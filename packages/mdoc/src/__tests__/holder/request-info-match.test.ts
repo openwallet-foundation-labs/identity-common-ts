@@ -10,8 +10,11 @@ import {
   DocRequest,
   DocRequestInfo,
   Holder,
+  InvalidElementSelectionError,
   ItemsRequest,
+  MissingRequestedElementError,
   SessionTranscript,
+  UnsatisfiedDeviceRequestError,
   type VerificationAssessment,
   Verifier,
 } from '../..'
@@ -106,6 +109,14 @@ describe('alternative data elements', () => {
       alternativeElements: [
         { namespace: mdlNamespace, elementIdentifier: 'age_over_18', elementValue: true, source: 'issuerSigned' },
       ],
+      options: [
+        {
+          alternativeElementSetIndex: 1,
+          elements: [
+            { namespace: mdlNamespace, elementIdentifier: 'age_over_18', elementValue: true, source: 'issuerSigned' },
+          ],
+        },
+      ],
     })
   })
 
@@ -123,6 +134,90 @@ describe('alternative data elements', () => {
     const [claim] = match.docRequests[0].validCredentials[0]?.claims.validClaims ?? []
     expect(claim).toMatchObject({ disclosedElementIdentifier: 'age_in_years', elementValue: 36 })
     expect(claim).not.toHaveProperty('alternativeElements')
+  })
+
+  test("a holder is offered every option, the requested element first, then the alternative sets in the reader's order", async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [{ namespaces: { [mdlNamespace]: { age_in_years: false } }, requestInfo: ageInYearsOrAgeOver18 }],
+    })
+
+    const match = Holder.matchDeviceRequest({
+      deviceRequest,
+      credentials: [
+        await createIssuerSigned({ claims: { age_in_years: 36, age_birth_year: 1990, age_over_18: true } }),
+      ],
+    })
+
+    assert(match.success)
+    const [claim] = match.docRequests[0].validCredentials[0]?.claims.validClaims ?? []
+    expect(
+      claim?.options?.map((option) => [
+        option.alternativeElementSetIndex,
+        option.elements.map((element) => element.elementIdentifier),
+      ])
+    ).toStrictEqual([
+      [undefined, ['age_in_years']],
+      [0, ['age_birth_year']],
+      [1, ['age_over_18']],
+    ])
+  })
+
+  test('a claim without alternatives in the request lists no options', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [{ namespaces: { [mdlNamespace]: { family_name: false } }, requestInfo: ageInYearsOrAgeOver18 }],
+    })
+
+    const match = Holder.matchDeviceRequest({ deviceRequest, credentials: [await createIssuerSigned()] })
+
+    assert(match.success)
+    expect(match.docRequests[0].validCredentials[0]?.claims.validClaims[0]).not.toHaveProperty('options')
+  })
+
+  test('a holder can disclose an alternative set in place of the requested element it has', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [{ namespaces: { [mdlNamespace]: { age_in_years: false } }, requestInfo: ageInYearsOrAgeOver18 }],
+    })
+    const issuerSigned = await createIssuerSigned({ claims: { age_in_years: 36, age_over_18: true } })
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [
+          {
+            issuerSigned,
+            docRequestIndex: 0,
+            alternatives: { [mdlNamespace]: { age_in_years: 1 } },
+            signature: { signingKey: deviceKey },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    const disclosed = deviceResponse.documents?.[0].issuerSigned.getIssuerNamespace(mdlNamespace)
+    expect(disclosed?.map((item) => item.elementIdentifier)).toStrictEqual(['age_over_18'])
+    expect(Verifier.matchDeviceRequest({ deviceRequest, deviceResponse }).success).toBe(true)
+  })
+
+  test('a holder cannot pick an alternative set the request does not have, or the credential cannot disclose', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [{ namespaces: { [mdlNamespace]: { age_in_years: false } }, requestInfo: ageInYearsOrAgeOver18 }],
+    })
+    const issuerSigned = await createIssuerSigned({ claims: { age_in_years: 36 } })
+    const create = (alternatives: Record<string, Record<string, number>>) =>
+      Holder.createDeviceResponseForDeviceRequest(
+        {
+          deviceRequest,
+          sessionTranscript,
+          documents: [{ issuerSigned, docRequestIndex: 0, alternatives, signature: { signingKey: deviceKey } }],
+        },
+        mdocContext
+      )
+
+    await expect(create({ [mdlNamespace]: { age_in_years: 2 } })).rejects.toThrow(InvalidElementSelectionError)
+    await expect(create({ [mdlNamespace]: { family_name: 0 } })).rejects.toThrow(InvalidElementSelectionError)
+    await expect(create({ [mdlNamespace]: { age_in_years: 1 } })).rejects.toThrow(MissingRequestedElementError)
   })
 
   test('a holder with neither the element nor an alternative fails on the element', async () => {
@@ -205,8 +300,8 @@ describe('issuer identifiers', () => {
     expect(refused.docRequests[0].failedCredentials[0].issuer).toMatchObject({ success: false })
   })
 
-  test('a verifier refuses a document from an issuer the doc request does not name', async () => {
-    const deviceRequest = createDeviceRequest({
+  const namingAnotherIssuer = () =>
+    createDeviceRequest({
       docRequests: [
         {
           namespaces: { [mdlNamespace]: { family_name: false } },
@@ -214,9 +309,30 @@ describe('issuer identifiers', () => {
         },
       ],
     })
+
+  test('a holder refuses to answer with an mdoc of an issuer the doc request does not name', async () => {
+    await expect(
+      Holder.createDeviceResponseForDeviceRequest(
+        {
+          deviceRequest: namingAnotherIssuer(),
+          sessionTranscript,
+          documents: [
+            { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          ],
+        },
+        mdocContext
+      )
+    ).rejects.toThrow(UnsatisfiedDeviceRequestError)
+  })
+
+  test('a verifier refuses a document from an issuer the doc request does not name', async () => {
+    const deviceRequest = namingAnotherIssuer()
+    // A holder that does not check the request information.
     const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
       {
-        deviceRequest,
+        deviceRequest: createDeviceRequest({
+          docRequests: [{ namespaces: { [mdlNamespace]: { family_name: false } } }],
+        }),
         sessionTranscript,
         documents: [
           { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
@@ -244,6 +360,47 @@ describe('issuer identifiers', () => {
   })
 })
 
+describe('unique document set', () => {
+  const docRequest = { namespaces: { [mdlNamespace]: { family_name: false } } }
+  const unique = () =>
+    createDeviceRequest({
+      docRequests: [{ ...docRequest, requestInfo: DocRequestInfo.create({ uniqueDocSetRequired: true }) }],
+    })
+  const twoDocuments = async () => [
+    { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+    { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+  ]
+
+  test('a holder refuses to answer a doc request that requires a unique document set with two documents', async () => {
+    await expect(
+      Holder.createDeviceResponseForDeviceRequest(
+        { deviceRequest: unique(), sessionTranscript, documents: await twoDocuments() },
+        mdocContext
+      )
+    ).rejects.toThrow(UnsatisfiedDeviceRequestError)
+  })
+
+  test('a verifier fails a doc request that requires a unique document set when two documents satisfy it', async () => {
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest: createDeviceRequest({ docRequests: [docRequest] }),
+        sessionTranscript,
+        documents: await twoDocuments(),
+      },
+      mdocContext
+    )
+
+    const match = Verifier.matchDeviceRequest({ deviceRequest: unique(), deviceResponse })
+
+    expect(match.success).toBe(false)
+    expect(match.docRequests[0]).toMatchObject({
+      success: false,
+      validDocuments: [{ documentIndex: 0 }, { documentIndex: 1 }],
+      reason: 'Documents 0, 1 all satisfy doc request 0, but it requires a unique document set',
+    })
+  })
+})
+
 describe('use cases', () => {
   const mdlOrPhotoId = (mandatory = true) =>
     createDeviceRequest({
@@ -262,18 +419,18 @@ describe('use cases', () => {
 
     expect(match).toMatchObject({
       success: true,
-      docRequestsAsAlternatives: true,
-      useCases: [{ useCaseIndex: 0, mandatory: true, success: true, documentSet: [1] }],
+      useCasesSource: 'deviceRequestInfo',
+      useCases: [{ useCaseIndex: 0, mandatory: true, success: true, documentSets: [[1]] }],
     })
   })
 
-  test('the first document set that is satisfied is the one to answer', async () => {
+  test('every document set the holder can answer is listed, for the holder to pick one', async () => {
     const match = Holder.matchDeviceRequest({
       deviceRequest: mdlOrPhotoId(),
       credentials: [await createIssuerSigned({ docType: photoIdDocType }), await createIssuerSigned()],
     })
 
-    expect(match.useCases?.[0].documentSet).toStrictEqual([0])
+    expect(match.useCases[0].documentSets).toStrictEqual([[0], [1]])
   })
 
   test('a mandatory use case nothing satisfies fails the match, whatever treatAmbiguousMultipleDocRequestsAsAlternatives says', async () => {
@@ -297,8 +454,8 @@ describe('use cases', () => {
     expect(match).toMatchObject({
       success: false,
       useCases: [
-        { useCaseIndex: 0, mandatory: true, success: false },
-        { useCaseIndex: 1, mandatory: false, success: true, documentSet: [0] },
+        { useCaseIndex: 0, mandatory: true, success: false, documentSets: [] },
+        { useCaseIndex: 1, mandatory: false, success: true, documentSets: [[0]] },
       ],
     })
   })
@@ -329,8 +486,123 @@ describe('use cases', () => {
       mdocContext
     )
 
-    expect(result.deviceRequestMatch).toMatchObject({ success: true, useCases: [{ success: true, documentSet: [0] }] })
+    expect(result.deviceRequestMatch).toMatchObject({
+      success: true,
+      useCases: [{ success: true, documentSets: [[0]] }],
+    })
     expect(checks.filter((check) => check.status !== 'PASSED')).toStrictEqual([])
     expect(checks.map((check) => check.check)).toContain('Device response must satisfy mandatory use case 0')
+  })
+
+  const mandatoryPhotoIdOptionalMdl = () =>
+    createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } } },
+        { docType: photoIdDocType, namespaces: { [mdlNamespace]: { family_name: false } } },
+      ],
+      useCases: [
+        { mandatory: true, documentSets: [[1]] },
+        { mandatory: false, documentSets: [[0]] },
+      ],
+    })
+
+  test('a holder refuses a response that leaves a mandatory use case unsatisfied, but may send nothing', async () => {
+    const deviceRequest = mandatoryPhotoIdOptionalMdl()
+
+    await expect(
+      Holder.createDeviceResponseForDeviceRequest(
+        {
+          deviceRequest,
+          sessionTranscript,
+          documents: [
+            { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          ],
+        },
+        mdocContext
+      )
+    ).rejects.toThrow(UnsatisfiedDeviceRequestError)
+
+    const declined = await Holder.createDeviceResponseForDeviceRequest(
+      { deviceRequest, sessionTranscript, documents: [] },
+      mdocContext
+    )
+    expect(declined.documents ?? []).toHaveLength(0)
+  })
+
+  test('a holder may leave out elements of a mandatory use case, only the documents are checked', async () => {
+    const deviceRequest = mandatoryPhotoIdOptionalMdl()
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [
+          {
+            issuerSigned: await createIssuerSigned({ docType: photoIdDocType }),
+            docRequestIndex: 1,
+            elements: {},
+            signature: { signingKey: deviceKey },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    expect(deviceResponse.documents).toHaveLength(1)
+  })
+
+  test('without use cases, the doc requests are one mandatory use case, or optional ones as alternatives', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } } },
+        { docType: photoIdDocType, namespaces: { [mdlNamespace]: { family_name: false } } },
+      ],
+    })
+    const credentials = [await createIssuerSigned()]
+
+    expect(Holder.matchDeviceRequest({ deviceRequest, credentials })).toMatchObject({
+      success: false,
+      useCasesSource: 'allDocRequests',
+      useCases: [{ mandatory: true, success: false, documentSets: [] }],
+    })
+    expect(
+      Holder.matchDeviceRequest({ deviceRequest, credentials, treatAmbiguousMultipleDocRequestsAsAlternatives: true })
+    ).toMatchObject({
+      success: true,
+      useCasesSource: 'eachDocRequest',
+      useCases: [
+        { mandatory: false, success: true, documentSets: [[0]] },
+        { mandatory: false, success: false, documentSets: [] },
+      ],
+    })
+    expect(
+      Holder.matchDeviceRequest({
+        deviceRequest,
+        credentials: [],
+        treatAmbiguousMultipleDocRequestsAsAlternatives: true,
+      }).success
+    ).toBe(false)
+  })
+
+  test('without use cases, a holder is not held to any doc request', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } } },
+        { docType: photoIdDocType, namespaces: { [mdlNamespace]: { family_name: false } } },
+      ],
+    })
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+        ],
+      },
+      mdocContext
+    )
+
+    expect(deviceResponse.documents).toHaveLength(1)
   })
 })

@@ -32,6 +32,14 @@ export class MissingRequestedElementError extends MdlError {}
 export class InvalidElementSelectionError extends MdlError {}
 
 /**
+ * The documents of a device response do not answer the device request the way its request
+ * information asks (ISO/IEC TS 23220-4 7.2.1.3): a document comes from an issuer the doc request
+ * does not accept, more than one document answers a doc request that requires a unique document
+ * set, or the documents leave a use case of the device request unsatisfied that has to be.
+ */
+export class UnsatisfiedDeviceRequestError extends MdlError {}
+
+/**
  * A credential is used to answer a doc request for another docType: the docType of its mobile
  * security object is not the docType the doc request asks for.
  */
