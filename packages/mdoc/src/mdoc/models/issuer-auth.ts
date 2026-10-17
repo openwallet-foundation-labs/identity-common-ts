@@ -167,12 +167,12 @@ export class IssuerAuth extends Sign1 {
   private revocationResult(error: unknown): VerificationAssessmentResult | undefined {
     if (error instanceof StatusListEntryNotValidError) {
       const { uri, idx, status } = error
-      return { type: 'statusNotValid', uri, idx, status }
+      return { type: 'statusListEntryNotValid', uri, idx, status }
     }
 
     const identifierList = this.mobileSecurityObject.status?.identifierList
     if (error instanceof IdentifierFoundInRevokedListError && identifierList) {
-      return { type: 'identifierRevoked', uri: identifierList.uri, id: identifierList.id }
+      return { type: 'identifierListEntryRevoked', uri: identifierList.uri, id: identifierList.id }
     }
 
     return undefined

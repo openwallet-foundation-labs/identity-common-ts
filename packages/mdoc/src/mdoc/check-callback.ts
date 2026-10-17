@@ -14,7 +14,7 @@ export type VerificationAssessmentResult =
     }
   | {
       /** The status of the MSO in its status list is not Valid. */
-      type: 'statusNotValid'
+      type: 'statusListEntryNotValid'
       uri: string
       idx: number
       /** The status at `idx`, e.g. `1` for Invalid (revoked) or `2` for Suspended. */
@@ -22,7 +22,7 @@ export type VerificationAssessmentResult =
     }
   | {
       /** The identifier of the MSO is in its identifier list. */
-      type: 'identifierRevoked'
+      type: 'identifierListEntryRevoked'
       uri: string
       id: Uint8Array
     }

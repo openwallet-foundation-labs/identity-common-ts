@@ -541,7 +541,7 @@ suite('Verification', () => {
     const verification = verifyIssuerSigned(credential)
     await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
     await expect(verification).rejects.toMatchObject({
-      assessment: { result: { type: 'statusNotValid', uri, idx, status: StatusType.Invalid } },
+      assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Invalid } },
     })
   })
 
@@ -554,7 +554,7 @@ suite('Verification', () => {
     const verification = verifyIssuerSigned(credential)
     await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '2'`)
     await expect(verification).rejects.toMatchObject({
-      assessment: { result: { type: 'statusNotValid', uri, idx, status: StatusType.Suspended } },
+      assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Suspended } },
     })
   })
 
@@ -710,7 +710,7 @@ suite('Verification', () => {
     const verification = verifyWithoutChainValidation(credential)
     await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
     await expect(verification).rejects.toMatchObject({
-      assessment: { result: { type: 'statusNotValid', uri, idx, status: StatusType.Invalid } },
+      assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Invalid } },
     })
   })
 
@@ -734,7 +734,7 @@ suite('Verification', () => {
     const verification = verifyIssuerSigned(credential)
     await expect(verification).rejects.toThrow(`Identifier abcd found in the revoked identifier list at '${uri}'`)
     await expect(verification).rejects.toMatchObject({
-      assessment: { result: { type: 'identifierRevoked', uri, id } },
+      assessment: { result: { type: 'identifierListEntryRevoked', uri, id } },
     })
   })
 
