@@ -11,32 +11,25 @@ import type { Namespace } from './namespace'
 
 const namespacesSchema = z.map(z.string(), z.map(z.string(), z.boolean()))
 
-// Zod schema for ItemsRequest. A `requestInfo` that does not match the CDDL of ISO/IEC TS 23220-4
-// is kept as received rather than failing the request: the mdoc app ignores what it cannot
-// interpret (7.2.1.3.2), and the items request is signed as received.
+// Zod schema for ItemsRequest
 const itemsRequestSchema = typedMap(
   [
     ['docType', z.string()],
     ['nameSpaces', namespacesSchema],
-    ['requestInfo', z.union([z.instanceof(DocRequestInfo), z.map(z.unknown(), z.unknown())]).exactOptional()],
+    ['requestInfo', z.instanceof(DocRequestInfo).exactOptional()],
   ] as const,
   {
     decode: (input, originalDecode) => {
       const map = originalDecode(input)
+      // Anything but a map is left for the schema to reject.
       const requestInfo = input.get('requestInfo')
-      if (requestInfo instanceof Map) {
-        try {
-          map.set('requestInfo', DocRequestInfo.fromEncodedStructure(requestInfo))
-        } catch {
-          // Not a DocRequestInfo this version understands: left as is.
-        }
-      }
+      if (requestInfo instanceof Map) map.set('requestInfo', DocRequestInfo.fromEncodedStructure(requestInfo))
       return map
     },
     encode: (output, originalEncode) => {
       const map = originalEncode(output)
       const requestInfo = output.get('requestInfo')
-      if (requestInfo instanceof DocRequestInfo) map.set('requestInfo', requestInfo.encodedStructure)
+      if (requestInfo) map.set('requestInfo', requestInfo.encodedStructure)
       return map
     },
   }
@@ -73,12 +66,10 @@ export class ItemsRequest extends OriginalBytesCborStructure<
   }
 
   /**
-   * The `requestInfo` of ISO/IEC TS 23220-4 7.2.1.3.2, when present and readable. One that does
-   * not match its CDDL is not returned, and stays in the encoded items request as received.
+   * The `requestInfo` of ISO/IEC TS 23220-4 7.2.1.3.2.
    */
-  public get requestInfo(): DocRequestInfo | undefined {
-    const requestInfo = this.structure.get('requestInfo')
-    return requestInfo instanceof DocRequestInfo ? requestInfo : undefined
+  public get requestInfo() {
+    return this.structure.get('requestInfo')
   }
 
   /**
