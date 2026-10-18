@@ -21,6 +21,7 @@ import {
   type ClaimMatch,
   type DeviceRequestMatchOptions,
   type DeviceRequestMatchResult,
+  type ElementMatch,
   matchDeviceRequest,
   matchElements,
   matchIssuer,
@@ -58,6 +59,12 @@ import type { IssuerSignedItem } from './issuer-signed-item'
 import type { KeyAuthorizations } from './key-authorizations'
 import type { Namespace } from './namespace'
 import type { SessionTranscript } from './session-transcript'
+
+/**
+ * Whether a requested element is answered by one of its alternative sets, which a holder only
+ * discloses when it chooses one: the credential does not have the element itself.
+ */
+const isAnsweredByAlternative = (match: ElementMatch) => match.options?.[0].alternativeElementSetIndex !== undefined
 
 const deviceResponseEncodedSchema = typedMap([
   ['version', z.string()],
@@ -534,8 +541,10 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     // The element of each requested element left out of the selection, with that claim. One that the
     // credential does not have, and that an alternative set answers, has none to leave out.
     const declinedElements = new Map(
-      claims.flatMap(({ claim, element, alternativeElements }) =>
-        element && !alternativeElements && !isSelected(claim) ? [[element, claim] as const] : []
+      claims.flatMap((match) =>
+        match.element && !isAnsweredByAlternative(match) && !isSelected(match.claim)
+          ? [[match.element, match.claim] as const]
+          : []
       )
     )
 
@@ -565,7 +574,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       // An alternative set is only disclosed when the holder chooses it, so that nothing is disclosed
       // that the holder was not shown: the requested element may be answered by elements in other
       // namespaces, which the claim does not describe.
-      if (match.alternativeElements && !chosen) {
+      if (isAnsweredByAlternative(match) && !chosen) {
         throw new MissingRequestedElementError(
           `Element '${claim.elementIdentifier}' in namespace '${claim.namespace}' is not in the credential. Choose one of its alternative sets ${match.options?.map((option) => option.alternativeElementSetIndex).join(', ')} with \`alternatives\` to disclose in its place`
         )

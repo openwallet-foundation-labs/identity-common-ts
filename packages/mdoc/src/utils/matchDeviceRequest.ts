@@ -124,20 +124,15 @@ export type ClaimMatchSuccess = ClaimMatchBase & {
   elementValue: DataElementValue
   source: DisclosedElementSource
   /**
-   * Set when the requested element is answered by an alternative set of the `requestInfo` of the
-   * doc request (ISO/IEC TS 23220-4 7.2.1.3.2) rather than by itself: every element of that set,
-   * possibly in other namespaces (18013-5 second edition 10.2.4). `disclosedElementIdentifier`,
-   * `elementValue` and `source` are then those of its first element. For a holder, this means the
-   * credential does not have the element: a response only discloses an alternative set when the
-   * holder chooses it with the `alternatives` of the document it creates.
-   */
-  alternativeElements?: NonEmptyArray<DisclosedElement>
-  /**
-   * Set when the doc request has alternatives for the element: every way it can be answered, in
-   * order of preference. The element itself comes first when it is there, then each alternative set
-   * whose elements all are, in the reader's order. The fields above describe the first option. A
-   * holder discloses an alternative set by choosing it with the `alternatives` of the document it
-   * creates, and otherwise the element itself.
+   * Set when the doc request has alternatives for the element (ISO/IEC TS 23220-4 7.2.1.3.2): every
+   * way it can be answered, in order of preference. The element itself comes first when it is
+   * there, then each alternative set whose elements all are, in the reader's order, possibly in other
+   * namespaces (18013-5 second edition 10.2.4).
+   *
+   * `disclosedElementIdentifier`, `elementValue` and `source` describe the first element of the first
+   * option. That option is an alternative set (it has an `alternativeElementSetIndex`) only when the
+   * element itself is not there. A holder discloses an alternative set by choosing it with the
+   * `alternatives` of the document it creates, and otherwise the element itself.
    */
   options?: NonEmptyArray<ClaimMatchOption>
 }
@@ -341,14 +336,15 @@ export type UseCaseMatch = {
   purposeHints?: Map<string, number>
   success: boolean
   /**
-   * Every doc request that a document set of the use case holds, in ascending order.
-   */
-  docRequestIndexes: Array<number>
-  /**
-   * Every document set of the use case, in request order, whose doc requests are all satisfied.
-   * Empty when none is. A holder answers exactly one of them (ISO/IEC TS 23220-4 7.2.1.4).
+   * Every document set of the use case, in request order: the doc requests, by index, that answer
+   * it together.
    */
   documentSets: Array<Array<number>>
+  /**
+   * The document sets of `documentSets` whose doc requests are all satisfied, in request order.
+   * Empty when none is. A holder answers exactly one of them (ISO/IEC TS 23220-4 7.2.1.4).
+   */
+  matchingDocumentSets: Array<Array<number>>
 }
 
 /**
@@ -893,8 +889,8 @@ const matchUseCases = ({ useCasesSource, useCases }: ResolvedUseCases, docReques
       mandatory,
       ...(purposeHints ? { purposeHints } : {}),
       success: satisfied.length > 0,
-      docRequestIndexes: Array.from(new Set(documentSets.flat())).sort((a, b) => a - b),
-      documentSets: satisfied,
+      documentSets,
+      matchingDocumentSets: satisfied,
     }
   })
 
@@ -953,18 +949,16 @@ type ElementCandidate = DisclosedElement & {
 export type ElementMatch =
   | {
       claim: ClaimMatchSuccess
-      element: ElementCandidate
       /**
-       * Every element of the alternative set that answers the claim, when one does; `element` is
-       * the first of them.
+       * The first element of the first option, see `claim.options`.
        */
-      alternativeElements?: NonEmptyArray<ElementCandidate>
+      element: ElementCandidate
       /**
        * Every option, as `claim.options` lists them, when the element has alternatives.
        */
       options?: NonEmptyArray<ElementOption>
     }
-  | { claim: ClaimMatchFailure; element?: undefined; alternativeElements?: undefined; options?: undefined }
+  | { claim: ClaimMatchFailure; element?: undefined; options?: undefined }
 
 /**
  * @internal
@@ -1106,11 +1100,9 @@ export const matchElements = (options: {
     const [first] = elementOptions
     for (const element of first.elements) usedElements.add(element)
     const [element] = first.elements
-    const alternativeElements = first.alternativeElementSetIndex === undefined ? undefined : first.elements
 
     claims.push({
       element,
-      ...(alternativeElements ? { alternativeElements } : {}),
       ...(listOptions ? { options: elementOptions } : {}),
       claim: {
         ...claim,
@@ -1118,9 +1110,6 @@ export const matchElements = (options: {
         disclosedElementIdentifier: element.elementIdentifier,
         elementValue: element.elementValue,
         source: element.source,
-        ...(alternativeElements
-          ? { alternativeElements: alternativeElements.map(toDisclosedElement) as NonEmptyArray<DisclosedElement> }
-          : {}),
         ...(listOptions
           ? {
               options: elementOptions.map(({ alternativeElementSetIndex, elements }) => ({
@@ -1418,7 +1407,7 @@ export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, onChec
           status: 'FAILED',
           check,
           category: 'DOCUMENT_FORMAT',
-          reason: `None of the document sets of use case ${useCase.useCaseIndex} has all its doc requests satisfied. ${failureReasons(useCase.docRequestIndexes)}`,
+          reason: `None of the document sets of use case ${useCase.useCaseIndex} has all its doc requests satisfied. ${failureReasons(useCase.documentSets.flat())}`,
           result,
         })
       }
@@ -1432,7 +1421,7 @@ export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, onChec
         status: 'FAILED',
         check,
         category: 'DOCUMENT_FORMAT',
-        reason: `No use case is satisfied. ${failureReasons(match.useCases.flatMap((useCase) => useCase.docRequestIndexes))}`,
+        reason: `No use case is satisfied. ${failureReasons(match.useCases.flatMap((useCase) => useCase.documentSets.flat()))}`,
         result,
       })
     }

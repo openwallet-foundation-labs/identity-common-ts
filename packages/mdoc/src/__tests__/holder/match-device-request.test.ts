@@ -306,7 +306,7 @@ describe('Holder.matchDeviceRequest', () => {
     expect(match).toStrictEqual({
       success: false,
       useCasesSource: 'allDocRequests',
-      useCases: [{ useCaseIndex: 0, mandatory: true, success: false, docRequestIndexes: [0], documentSets: [] }],
+      useCases: [{ useCaseIndex: 0, mandatory: true, success: false, documentSets: [[0]], matchingDocumentSets: [] }],
       docRequests: [
         {
           docRequestIndex: 0,

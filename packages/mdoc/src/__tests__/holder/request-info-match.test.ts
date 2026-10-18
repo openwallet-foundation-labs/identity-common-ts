@@ -115,9 +115,6 @@ describe('alternative data elements', () => {
       disclosedElementIdentifier: 'age_over_18',
       elementValue: true,
       source: 'issuerSigned',
-      alternativeElements: [
-        { namespace: mdlNamespace, elementIdentifier: 'age_over_18', elementValue: true, source: 'issuerSigned' },
-      ],
       options: [
         {
           alternativeElementSetIndex: 1,
@@ -142,7 +139,12 @@ describe('alternative data elements', () => {
     assert(match.success)
     const [claim] = match.docRequests[0].validCredentials[0]?.claims.validClaims ?? []
     expect(claim).toMatchObject({ disclosedElementIdentifier: 'age_in_years', elementValue: 36 })
-    expect(claim).not.toHaveProperty('alternativeElements')
+    // The first option is the element itself, so it has no alternativeElementSetIndex.
+    expect(claim?.options?.[0]).toStrictEqual({
+      elements: [
+        { namespace: mdlNamespace, elementIdentifier: 'age_in_years', elementValue: 36, source: 'issuerSigned' },
+      ],
+    })
   })
 
   test("a holder is offered every option, the requested element first, then the alternative sets in the reader's order", async () => {
@@ -716,7 +718,9 @@ describe('use cases', () => {
     expect(match).toMatchObject({
       success: true,
       useCasesSource: 'deviceRequestInfo',
-      useCases: [{ useCaseIndex: 0, mandatory: true, success: true, documentSets: [[1]] }],
+      useCases: [
+        { useCaseIndex: 0, mandatory: true, success: true, documentSets: [[0], [1]], matchingDocumentSets: [[1]] },
+      ],
     })
   })
 
@@ -726,7 +730,7 @@ describe('use cases', () => {
       credentials: [await createIssuerSigned({ docType: photoIdDocType }), await createIssuerSigned()],
     })
 
-    expect(match.useCases[0].documentSets).toStrictEqual([[0], [1]])
+    expect(match.useCases[0].matchingDocumentSets).toStrictEqual([[0], [1]])
   })
 
   test('a mandatory use case nothing satisfies fails the match, whatever treatAmbiguousMultipleDocRequestsAsAlternatives says', async () => {
@@ -750,8 +754,8 @@ describe('use cases', () => {
     expect(match).toMatchObject({
       success: false,
       useCases: [
-        { useCaseIndex: 0, mandatory: true, success: false, documentSets: [] },
-        { useCaseIndex: 1, mandatory: false, success: true, documentSets: [[0]] },
+        { useCaseIndex: 0, mandatory: true, success: false, documentSets: [[1]], matchingDocumentSets: [] },
+        { useCaseIndex: 1, mandatory: false, success: true, documentSets: [[0]], matchingDocumentSets: [[0]] },
       ],
     })
   })
@@ -784,7 +788,7 @@ describe('use cases', () => {
 
     expect(result.deviceRequestMatch).toMatchObject({
       success: true,
-      useCases: [{ success: true, documentSets: [[0]] }],
+      useCases: [{ success: true, documentSets: [[0], [1]], matchingDocumentSets: [[0]] }],
     })
     expect(checks.filter((check) => check.status !== 'PASSED')).toStrictEqual([])
     expect(checks.map((check) => check.check)).toContain('Device response must satisfy mandatory use case 0')
@@ -859,7 +863,7 @@ describe('use cases', () => {
     expect(Holder.matchDeviceRequest({ deviceRequest, credentials })).toMatchObject({
       success: false,
       useCasesSource: 'allDocRequests',
-      useCases: [{ mandatory: true, success: false, documentSets: [] }],
+      useCases: [{ mandatory: true, success: false, documentSets: [[0, 1]], matchingDocumentSets: [] }],
     })
     expect(
       Holder.matchDeviceRequest({ deviceRequest, credentials, treatAmbiguousMultipleDocRequestsAsAlternatives: true })
@@ -867,8 +871,8 @@ describe('use cases', () => {
       success: true,
       useCasesSource: 'eachDocRequest',
       useCases: [
-        { mandatory: false, success: true, documentSets: [[0]] },
-        { mandatory: false, success: false, documentSets: [] },
+        { mandatory: false, success: true, documentSets: [[0]], matchingDocumentSets: [[0]] },
+        { mandatory: false, success: false, documentSets: [[1]], matchingDocumentSets: [] },
       ],
     })
     expect(
@@ -1117,8 +1121,8 @@ describe('response checks', () => {
       mandatory: true,
       purposeHints,
       success: true,
-      docRequestIndexes: [0],
       documentSets: [[0]],
+      matchingDocumentSets: [[0]],
     })
   })
 

@@ -388,7 +388,7 @@ describe('IsoMdocDcApi round trip', () => {
     expect(match).toMatchObject({
       success: true,
       useCasesSource: 'deviceRequestInfo',
-      useCases: [{ success: true, documentSets: [[0]] }],
+      useCases: [{ success: true, documentSets: [[0], [1]], matchingDocumentSets: [[0]] }],
     })
 
     const createResponse = (alternatives?: Record<string, Record<string, number>>) =>
@@ -418,7 +418,7 @@ describe('IsoMdocDcApi round trip', () => {
     expect(checks.filter((check) => check.status !== 'PASSED')).toStrictEqual([])
     expect(verificationResult.deviceRequestMatch).toMatchObject({
       success: true,
-      useCases: [{ success: true, documentSets: [[0]] }],
+      useCases: [{ success: true, documentSets: [[0], [1]], matchingDocumentSets: [[0]] }],
     })
     expect(deviceResponse.documents?.[0].issuerSigned.getPrettyClaims(mdlNamespace)).toStrictEqual({
       family_name: 'Doe',
