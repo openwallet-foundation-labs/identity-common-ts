@@ -1,52 +1,41 @@
 import { hex } from '@owf/identity-common'
 
 /**
- * The key identifiers of a certificate: the `keyIdentifier` of its authority key identifier and its
- * subject key identifier (RFC 5280 4.2.1.1 and 4.2.1.2).
+ * The `keyIdentifier` of the authority key identifier of a certificate (RFC 5280 4.2.1.1), which
+ * ISO/IEC TS 23220-4 7.2.1.3.2 and 18013-5 second edition 10.2.4 match `issuerIdentifiers` against.
+ * It is the subject key identifier of the certificate that issued it, so a reader names an issuer
+ * by the subject key identifier of its IACA or issuing CA.
  *
- * ISO/IEC TS 23220-4 7.2.1.3.2 matches `issuerIdentifiers` against the authority key identifier of a
- * certificate in the x5chain of the IssuerAuth, and notes that a reader passing the subject key
- * identifier of the certificate it verifies an issuer with matches one too, so both are returned.
- *
- * Matching runs without the `x509` context, so this reads the two extensions straight from the DER.
- * A certificate that does not parse yields no identifier rather than an error.
+ * Matching runs without the `x509` context, so this reads the extension straight from the DER. A
+ * certificate that does not parse, or has no such extension, yields undefined rather than an error.
  */
-export const certificateKeyIdentifiers = (certificate: Uint8Array): Array<Uint8Array> => {
+export const certificateAuthorityKeyIdentifier = (certificate: Uint8Array): Uint8Array | undefined => {
   try {
     const [certificateSequence] = readTlvs(certificate)
     const [tbsCertificate] = readTlvs(certificateSequence.value)
     // [3] EXPLICIT Extensions, after the optional issuer and subject unique identifiers.
     const extensionsField = readTlvs(tbsCertificate.value).find((tlv) => tlv.tag === 0xa3)
-    if (!extensionsField) return []
+    if (!extensionsField) return undefined
 
     const [extensions] = readTlvs(extensionsField.value)
-    const identifiers: Array<Uint8Array> = []
     for (const extension of readTlvs(extensions.value)) {
       const [extensionId, ...rest] = readTlvs(extension.value)
       // extnValue is the last element; `critical` may come before it.
       const extensionValue = rest[rest.length - 1]
       if (extensionId?.tag !== 0x06 || extensionValue?.tag !== 0x04) continue
+      if (hex.encode(extensionId.value) !== AUTHORITY_KEY_IDENTIFIER) continue
 
-      const oid = hex.encode(extensionId.value)
-      if (oid === SUBJECT_KEY_IDENTIFIER) {
-        const [keyIdentifier] = readTlvs(extensionValue.value)
-        if (keyIdentifier?.tag === 0x04) identifiers.push(keyIdentifier.value)
-      } else if (oid === AUTHORITY_KEY_IDENTIFIER) {
-        const [authorityKeyIdentifier] = readTlvs(extensionValue.value)
-        // keyIdentifier is [0] IMPLICIT, the primitive context-specific tag 0x80.
-        const keyIdentifier =
-          authorityKeyIdentifier && readTlvs(authorityKeyIdentifier.value).find((t) => t.tag === 0x80)
-        if (keyIdentifier) identifiers.push(keyIdentifier.value)
-      }
+      const [authorityKeyIdentifier] = readTlvs(extensionValue.value)
+      // keyIdentifier is [0] IMPLICIT, the primitive context-specific tag 0x80.
+      return authorityKeyIdentifier && readTlvs(authorityKeyIdentifier.value).find((t) => t.tag === 0x80)?.value
     }
-    return identifiers
+    return undefined
   } catch {
-    return []
+    return undefined
   }
 }
 
-/** 2.5.29.14 and 2.5.29.35, as DER object identifier contents. */
-const SUBJECT_KEY_IDENTIFIER = '551d0e'
+/** 2.5.29.35, as DER object identifier contents. */
 const AUTHORITY_KEY_IDENTIFIER = '551d23'
 
 type Tlv = { tag: number; value: Uint8Array }

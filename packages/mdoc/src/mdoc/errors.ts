@@ -35,7 +35,8 @@ export class InvalidElementSelectionError extends MdlError {}
  * The documents of a device response do not answer the device request the way its request
  * information asks (ISO/IEC TS 23220-4 7.2.1.3): a document comes from an issuer the doc request
  * does not accept, more than one document answers a doc request that requires a unique document
- * set, or the documents leave a use case of the device request unsatisfied that has to be.
+ * set, the documents leave a mandatory use case of the device request unsatisfied, or every use
+ * case, or the response is larger than the reader accepts.
  */
 export class UnsatisfiedDeviceRequestError extends MdlError {}
 
