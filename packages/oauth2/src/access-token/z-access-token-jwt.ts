@@ -1,11 +1,11 @@
-import { zNumericDate } from '@openid4vc/utils'
+import { zNumericDate, zTyp } from '@openid4vc/utils'
 import z from 'zod'
 import { zJwtHeader, zJwtPayload } from '../common/jwt/z-jwt'
 
 export const zAccessTokenProfileJwtHeader = z
   .object({
     ...zJwtHeader.shape,
-    typ: z.enum(['application/at+jwt', 'at+jwt']),
+    typ: zTyp('at+jwt'),
   })
   .loose()
 export type AccessTokenProfileJwtHeader = z.infer<typeof zAccessTokenProfileJwtHeader>

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { zDataUrl } from '../validation.js'
+import { isJwtTyp, zDataUrl, zTyp } from '../validation.js'
 
 describe('zDataUrl', () => {
   test.each([
@@ -18,5 +18,49 @@ describe('zDataUrl', () => {
   ])('rejects %s', (_description, url) => {
     const result = zDataUrl.safeParse(url)
     expect(result.success).toBe(false)
+  })
+})
+
+describe('zTyp', () => {
+  const zProofTyp = zTyp('openid4vci-proof+jwt')
+
+  test.each([
+    ['the short form', 'openid4vci-proof+jwt'],
+    ['the full media type', 'application/openid4vci-proof+jwt'],
+    ['the short form in different casing', 'OpenID4VCI-Proof+JWT'],
+    ['the full media type in different casing', 'Application/OpenID4VCI-Proof+JWT'],
+  ])('accepts %s and keeps the value as sent', (_description, typ) => {
+    expect(zProofTyp.parse(typ)).toEqual(typ)
+  })
+
+  test.each([
+    ['a different typ', 'jwt'],
+    ['a different media type prefix', 'text/openid4vci-proof+jwt'],
+    ['an empty string', ''],
+    ['a non-string value', 1],
+    ['undefined', undefined],
+  ])('rejects %s', (_description, typ) => {
+    expect(zProofTyp.safeParse(typ).success).toBe(false)
+  })
+})
+
+describe('isJwtTyp', () => {
+  test.each([
+    ['the short form', 'openid4vci-proof+jwt'],
+    ['the full media type', 'application/openid4vci-proof+jwt'],
+    ['the short form in different casing', 'OpenID4VCI-Proof+JWT'],
+    ['the full media type in different casing', 'Application/OpenID4VCI-Proof+JWT'],
+  ])('matches %s', (_description, value) => {
+    expect(isJwtTyp(value, 'openid4vci-proof+jwt')).toBe(true)
+  })
+
+  test.each([
+    ['a different typ', 'jwt'],
+    ['a different media type prefix', 'text/openid4vci-proof+jwt'],
+    ['an empty string', ''],
+    ['a non-string value', 1],
+    ['undefined', undefined],
+  ])('does not match %s', (_description, value) => {
+    expect(isJwtTyp(value, 'openid4vci-proof+jwt')).toBe(false)
   })
 })

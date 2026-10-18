@@ -2,6 +2,7 @@ import {
   type BaseSchema,
   decodeBase64,
   encodeToUtf8String,
+  isJwtTyp,
   parseWithErrorHandling,
   stringToJsonWithErrorHandling,
 } from '@openid4vc/utils'
@@ -158,7 +159,7 @@ export function jwtSignerFromJwt({
       payload.iss &&
       header.kid?.startsWith('did:') &&
       !header.kid.startsWith(payload.iss) &&
-      header.typ !== 'openid4vci-proof+jwt'
+      !isJwtTyp(header.typ, 'openid4vci-proof+jwt')
     ) {
       found.push({
         method: 'did',

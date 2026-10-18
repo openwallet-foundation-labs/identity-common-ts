@@ -22,6 +22,32 @@ export const zInteger = z.number().int()
  */
 export const zNumericDate = z.number()
 
+/**
+ * Whether `value` is the JWT `typ` header value for the media type `application/<typ>`. Pass `typ` in its
+ * short lowercase form.
+ *
+ * Matches the short form and the full `application/` form in any casing, as recipients must
+ * treat a `typ` without a `/` as if `application/` were prepended, and media types are
+ * case-insensitive (RFC 7515 Section 4.1.9).
+ */
+export function isJwtTyp(value: unknown, typ: string): boolean {
+  if (typeof value !== 'string') return false
+
+  const lowerCaseValue = value.toLowerCase()
+  return lowerCaseValue === typ || lowerCaseValue === `application/${typ}`
+}
+
+/**
+ * Schema for the JWT `typ` header value for the media type `application/<typ>`, using {@link isJwtTyp}.
+ * The value is not changed, so the parsed header matches the signed one.
+ *
+ * The input type only allows the lowercase forms, so created JWTs use them. Prefer the short form.
+ */
+export const zTyp = <const Typ extends string>(typ: Typ) =>
+  z.string().refine((value) => isJwtTyp(value, typ), {
+    message: `Expected typ '${typ}' or 'application/${typ}' (case-insensitive)`,
+  }) as z.ZodType<string, Typ | `application/${Typ}`>
+
 export const zHttpMethod = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE', 'CONNECT', 'PATCH'])
 export type HttpMethod = z.infer<typeof zHttpMethod>
 

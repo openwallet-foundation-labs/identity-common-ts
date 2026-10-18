@@ -1,4 +1,4 @@
-import { ContentType, createFetcher, type Fetch, zHttpsUrl } from '@openid4vc/utils'
+import { ContentType, createFetcher, type Fetch, isJwtTyp, zHttpsUrl } from '@openid4vc/utils'
 import type { CallbackContext } from '../../callbacks'
 import { decodeJwt } from '../../common/jwt/decode-jwt'
 import { verifyJwt } from '../../common/jwt/verify-jwt'
@@ -183,8 +183,8 @@ async function verifyJarRequestObject(options: {
 
   // Some existing deployments may alternatively be using both type
   if (
-    jwt.header.typ !== signedAuthorizationRequestJwtHeaderTyp &&
-    jwt.header.typ !== jwtAuthorizationRequestJwtHeaderTyp
+    !isJwtTyp(jwt.header.typ, signedAuthorizationRequestJwtHeaderTyp) &&
+    !isJwtTyp(jwt.header.typ, jwtAuthorizationRequestJwtHeaderTyp)
   ) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequestObject,
