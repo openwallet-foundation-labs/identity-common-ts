@@ -10,6 +10,7 @@ import {
   EncryptedResponseData,
   EncryptionInfo,
   EncryptionParameters,
+  Holder,
   InvalidDcApiRequestError,
   InvalidDcApiResponseError,
   InvalidEncryptionInfoError,
@@ -17,6 +18,7 @@ import {
   IsoMdocDcApi,
   ItemsRequest,
   MissingOriginError,
+  MissingRequestedElementError,
   RegisteredCwtHeaderClaimKey,
   type VerificationAssessment,
 } from '../..'
@@ -337,6 +339,91 @@ describe('IsoMdocDcApi round trip', () => {
     )
 
     expect(deviceResponse.documents).toHaveLength(1)
+  })
+
+  test('request information goes from a signed request to a verified response', async () => {
+    const mdl = await createIssuerSigned()
+    const photoIdDocType = 'org.iso.23220.photoid.1'
+    const { readerKey, readerCertificate } = await createReaderCertificate()
+
+    // The mdl has no age_in_years, so it can only answer with the alternative birth_date.
+    const { request } = await IsoMdocDcApi.createRequest(
+      {
+        docRequests: [
+          {
+            docType: mdlDocType,
+            namespaces: { [mdlNamespace]: { family_name: false, age_in_years: false } },
+            requestInfo: {
+              alternativeDataElements: [
+                {
+                  requestedElement: [mdlNamespace, 'age_in_years'],
+                  alternativeElementSets: [[[mdlNamespace, 'birth_date']]],
+                },
+              ],
+            },
+          },
+          { docType: photoIdDocType, namespaces: requestedNamespaces },
+        ],
+        deviceRequestInfo: { useCases: [{ mandatory: true, documentSets: [[0], [1]] }] },
+        recipientPublicKey,
+        readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin },
+      },
+      mdocContext
+    )
+
+    const requestChecks: Array<VerificationAssessment> = []
+    const parsedRequest = await IsoMdocDcApi.parseRequest(
+      {
+        request,
+        origin,
+        trustedReaderCertificates: [readerCertificate],
+        verificationCallback: (assessment) => requestChecks.push(assessment),
+      },
+      mdocContext
+    )
+    expect(requestChecks.filter((check) => check.status === 'FAILED')).toStrictEqual([])
+    expect(parsedRequest.deviceRequest.version).toBe('1.1')
+
+    const match = Holder.matchDeviceRequest({ deviceRequest: parsedRequest.deviceRequest, credentials: [mdl] })
+    expect(match).toMatchObject({
+      success: true,
+      useCasesSource: 'deviceRequestInfo',
+      useCases: [{ success: true, documentSets: [[0]] }],
+    })
+
+    const createResponse = (alternatives?: Record<string, Record<string, number>>) =>
+      IsoMdocDcApi.createResponse(
+        { parsedRequest, documents: [{ issuerSigned: mdl, deviceKey, docRequestIndex: 0, alternatives }] },
+        mdocContext
+      )
+
+    // An alternative set is only disclosed when the holder chooses it.
+    await expect(createResponse()).rejects.toThrow(MissingRequestedElementError)
+    const response = await createResponse({ [mdlNamespace]: { age_in_years: 0 } })
+
+    const checks: Array<VerificationAssessment> = []
+    const { deviceResponse, verificationResult } = await IsoMdocDcApi.verifyResponse(
+      {
+        response,
+        origin,
+        encryptionInfo: request.encryptionInfo,
+        recipientKey: recipientPrivateKey,
+        deviceRequest: parsedRequest.deviceRequest,
+        trustedCertificates,
+        onCheck: (check) => checks.push(check),
+      },
+      mdocContext
+    )
+
+    expect(checks.filter((check) => check.status !== 'PASSED')).toStrictEqual([])
+    expect(verificationResult.deviceRequestMatch).toMatchObject({
+      success: true,
+      useCases: [{ success: true, documentSets: [[0]] }],
+    })
+    expect(deviceResponse.documents?.[0].issuerSigned.getPrettyClaims(mdlNamespace)).toStrictEqual({
+      family_name: 'Doe',
+      birth_date: '1990-01-01',
+    })
   })
 
   test('createResponse throws when the context has no HPKE support', async () => {
