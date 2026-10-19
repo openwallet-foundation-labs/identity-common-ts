@@ -15,6 +15,7 @@ A clear and concise description of what the bug is.
 Which package(s) does this affect?
 
 - [ ] `@owf/identity-common`
+- [ ] `@owf/openid-federation`
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
 - [ ] `@owf/mdoc`
