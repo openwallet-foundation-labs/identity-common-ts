@@ -696,6 +696,7 @@ export const matchDeviceRequest = (options: {
       validDocuments: validDocuments.map((document) => document.documentIndex),
     }))
   )
+  const excessDocuments = new Set(attribution.excess.documentIndexes)
 
   const docRequests = matches.map(({ uniqueDocSetRequired, candidateDocuments, ...match }): DocRequestMatch => {
     const { docRequestIndex, docType, validDocuments, failedDocuments } = match
@@ -709,15 +710,18 @@ export const matchDeviceRequest = (options: {
     })
 
     // More documents than doc requests that take one document each can take, this one among them.
-    const excess = candidateDocuments
-      .map((document) => document.documentIndex)
-      .filter((documentIndex) => attribution.excess.documentIndexes.includes(documentIndex))
-    if (uniqueDocSetRequired && excess.length > 0) {
+    const excess = uniqueDocSetRequired
+      ? candidateDocuments
+          .map((document) => document.documentIndex)
+          .filter((documentIndex) => excessDocuments.has(documentIndex))
+      : []
+    if (excess.length > 0) {
+      const own = new Set(excess)
       const others = matches
-        .filter((other) => other.candidateDocuments.some((document) => excess.includes(document.documentIndex)))
+        .filter((other) => other.candidateDocuments.some((document) => own.has(document.documentIndex)))
         .map((other) => other.docRequestIndex)
       return failure(
-        `Doc request ${docRequestIndex} requires a unique document set, but documents ${excess.join(', ')} may only answer ${others.length === 1 ? `doc request ${docRequestIndex}` : `doc requests ${others.join(', ')}, which all do`}`
+        `Doc request ${docRequestIndex} requires a unique document set, but the response has more documents than such doc requests can take: documents ${excess.join(', ')} may only answer ${others.length === 1 ? `doc request ${docRequestIndex}` : `doc requests ${others.join(', ')}, which all do`}`
       )
     }
     if (uniqueDocSetRequired && isNonEmptyArray(validDocuments) && !attribution.canAnswer([docRequestIndex])) {

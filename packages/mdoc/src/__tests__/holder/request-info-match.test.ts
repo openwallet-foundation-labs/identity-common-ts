@@ -622,7 +622,8 @@ describe('unique document set', () => {
     expect(match.docRequests[0]).toMatchObject({
       success: false,
       validDocuments: [{ documentIndex: 0 }, { documentIndex: 1 }],
-      reason: 'Doc request 0 requires a unique document set, but documents 0, 1 may only answer doc request 0',
+      reason:
+        'Doc request 0 requires a unique document set, but the response has more documents than such doc requests can take: documents 0, 1 may only answer doc request 0',
     })
   })
 
@@ -1475,7 +1476,7 @@ describe('attribution', () => {
     expect(failed.match?.docRequests.map((docRequest) => docRequest.success)).toStrictEqual([false, false])
     expect(failed.match?.docRequests[0]).toMatchObject({
       reason:
-        'Doc request 0 requires a unique document set, but documents 0, 1, 2 may only answer doc requests 0, 1, which all do',
+        'Doc request 0 requires a unique document set, but the response has more documents than such doc requests can take: documents 0, 1, 2 may only answer doc requests 0, 1, which all do',
     })
   })
 
