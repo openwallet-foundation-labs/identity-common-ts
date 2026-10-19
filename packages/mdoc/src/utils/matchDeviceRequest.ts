@@ -20,6 +20,7 @@ import {
   findAgeOverLimitViolations,
   findAgeOverRequestLimitViolations,
 } from './ageOver'
+import { createAttribution } from './attribution'
 import { getOwnProperty } from './getOwnProperty'
 import { isDeviceSignedElementAuthorized } from './keyAuthorizations'
 
@@ -311,9 +312,10 @@ export type DocRequestMatchFailure = DocRequestMatchBase & {
   validDocuments: Array<DocumentMatchSuccess>
   /**
    * Set when the `requestInfo` of the doc request sets `uniqueDocSetRequired` (ISO/IEC TS 23220-4
-   * 7.2.1.3.2), and more documents satisfy it than one, plus one for each other doc request of its
-   * docType. A response does not say which document answers which doc request, and a document that
-   * satisfies this one may answer another of the same docType with elements left out.
+   * 7.2.1.3.2), and the response has more documents for it than one: documents of its docType and
+   * of an issuer it accepts, satisfying it or not, that may only answer doc requests that take one
+   * document each, this one among them, and outnumber them; or when such documents leave it none
+   * that satisfies it. See {@link DeviceRequestAttribution}.
    */
   reason?: string
 }
@@ -335,6 +337,10 @@ export type UseCaseMatch = {
    * edition 10.2.5). Only use cases of the `deviceRequestInfo` have them.
    */
   purposeHints?: Map<string, number>
+  /**
+   * Whether the use case can be answered on its own. Whether it can be answered together with the
+   * others is in `attribution` of the match.
+   */
   success: boolean
   /**
    * Every document set of the use case, in request order: the doc requests, by index, that answer
@@ -372,20 +378,30 @@ export type UseCasesMatch = {
 }
 
 /**
- * How a response answers the request, as it does not say which document answers which doc request.
- * A document may answer every doc request of its docType and of an issuer it accepts, also with
- * elements left out, as a holder can decline them, and one document can answer several doc
- * requests.
+ * Which document answers which doc request, and with which document set each use case is answered.
+ * A response does not say, so the match works it out. A document may answer every doc request of
+ * its docType and of an issuer it accepts, also with elements left out, as a holder can decline
+ * them, and one document can answer several doc requests. A doc request with `uniqueDocSetRequired`
+ * takes one document only, so a document that only such doc requests may answer needs one of them
+ * to itself, and they are only satisfied together when that leaves each of them a document that
+ * satisfies it. Whether they are does not depend on the order of the documents; which document a
+ * doc request takes, when several would do, may.
+ *
+ * A holder answers each use case with exactly one document set (ISO/IEC TS 23220-4 7.2.1.4), so a
+ * document that answers no doc request of the sets in `useCases`, nor of a use case that is not
+ * satisfied, should not have been sent, which `reportDeviceRequestMatch` warns about.
  */
 export type DeviceRequestAttribution = {
   /**
-   * The use cases the response answers, in order, each with the first of its `matchingDocumentSets`.
-   * Empty when the match fails.
+   * The use cases the response is taken to answer, in order, each with its document set: every
+   * mandatory use case, and the others that can be answered together with them, tried in order. Of
+   * the `matchingDocumentSets` of a use case, the set the most documents may answer is tried first,
+   * then request order.
    */
   useCases: Array<{ useCaseIndex: number; documentSet: Array<number> }>
   /**
-   * Per document, in response order, the doc requests of those document sets it may answer, in
-   * order. Empty for a document that answers none.
+   * Per document, in response order, the doc requests it answers, in order. Empty for a document
+   * that answers none.
    */
   documents: Array<{ documentIndex: number; docRequestIndexes: Array<number> }>
 }
@@ -423,6 +439,11 @@ export type DeviceRequestMatchSuccess = DeviceRequestMatchBase &
 
 export type DeviceRequestMatchFailure = DeviceRequestMatchBase & {
   success: false
+  /**
+   * Set when every use case the response has to satisfy can be satisfied on its own, but not
+   * together, see {@link DeviceRequestAttribution}.
+   */
+  reason?: string
   /**
    * One entry per doc request, in request order.
    */
@@ -569,8 +590,8 @@ export type HolderCredential = {
  * The `requestInfo` of a doc request is applied too: a document of an issuer it does not name
  * fails, an alternative set it allows answers a requested element, and its elements count as
  * requested rather than over-disclosed, and with
- * `uniqueDocSetRequired` the doc request fails when more documents satisfy it than one, plus one for
- * each other doc request of its docType, which they may answer instead.
+ * `uniqueDocSetRequired` the doc request fails when the response has more documents for it than
+ * one, see {@link DeviceRequestAttribution} for which document answers which doc request.
  *
  * Shares its matching with {@link matchCredentialsToDeviceRequest}, which matches like a verifier
  * that accepts every element from `'any'` source.
@@ -659,36 +680,49 @@ export const matchDeviceRequest = (options: {
       docType,
       uniqueDocSetRequired: requestInfo?.uniqueDocSetRequired ?? false,
       // A document of its docType and of an issuer it accepts may answer it with elements left out.
-      candidateDocuments: documentMatches
-        .filter((documentMatch) => documentMatch.docType.success && documentMatch.issuer?.success !== false)
-        .map((documentMatch) => documentMatch.documentIndex),
+      candidateDocuments: documentMatches.filter(
+        (documentMatch) => documentMatch.docType.success && documentMatch.issuer?.success !== false
+      ),
       validDocuments: documentMatches.filter((documentMatch) => documentMatch.success),
       failedDocuments: documentMatches.filter((documentMatch) => !documentMatch.success),
     }
   })
 
+  const attribution = createAttribution(
+    matches.map(({ docRequestIndex, uniqueDocSetRequired, candidateDocuments, validDocuments }) => ({
+      docRequestIndex,
+      uniqueDocSetRequired,
+      candidateDocuments: candidateDocuments.map((document) => document.documentIndex),
+      validDocuments: validDocuments.map((document) => document.documentIndex),
+    }))
+  )
+
   const docRequests = matches.map(({ uniqueDocSetRequired, candidateDocuments, ...match }): DocRequestMatch => {
     const { docRequestIndex, docType, validDocuments, failedDocuments } = match
+    const failure = (reason: string): DocRequestMatchFailure => ({
+      docRequestIndex,
+      docType,
+      success: false,
+      validDocuments,
+      failedDocuments,
+      reason,
+    })
 
-    // A response does not say which document answers which doc request. A document that satisfies
-    // this doc request may answer another one of the same docType, possibly with elements left out,
-    // so only the documents that the other doc requests of its docType cannot account for count.
-    const otherDocRequests = matches.filter(
-      (other) => other.docRequestIndex !== docRequestIndex && other.docType === docType
-    ).length
-    if (uniqueDocSetRequired && validDocuments.length - otherDocRequests > 1) {
-      const documentIndexes = validDocuments.map((document) => document.documentIndex).join(', ')
-      return {
-        docRequestIndex,
-        docType,
-        success: false,
-        validDocuments,
-        failedDocuments,
-        reason:
-          otherDocRequests === 0
-            ? `Documents ${documentIndexes} satisfy doc request ${docRequestIndex}, but it requires a unique document set`
-            : `Documents ${documentIndexes} satisfy doc request ${docRequestIndex}, but it requires a unique document set, and the ${otherDocRequests} other doc request(s) of docType '${docType}' can take at most ${otherDocRequests} of them`,
-      }
+    // More documents than doc requests that take one document each can take, this one among them.
+    const excess = attribution.excess.find((group) => group.docRequestIndexes.includes(docRequestIndex))
+    if (uniqueDocSetRequired && excess) {
+      const others =
+        excess.docRequestIndexes.length === 1
+          ? `doc request ${docRequestIndex}`
+          : `doc requests ${excess.docRequestIndexes.join(', ')}, which all do`
+      return failure(
+        `Doc request ${docRequestIndex} requires a unique document set, but documents ${excess.documentIndexes.join(', ')} may only answer ${others}`
+      )
+    }
+    if (uniqueDocSetRequired && isNonEmptyArray(validDocuments) && !attribution.canAnswer([docRequestIndex])) {
+      return failure(
+        `Doc request ${docRequestIndex} requires a unique document set, and the documents that only doc requests like it may answer leave it none of documents ${validDocuments.map((document) => document.documentIndex).join(', ')}, which satisfy it`
+      )
     }
 
     return isNonEmptyArray(validDocuments)
@@ -703,29 +737,44 @@ export const matchDeviceRequest = (options: {
 
   const useCases = matchUseCases(
     resolveUseCases(deviceRequest, matchOptions?.treatAmbiguousMultipleDocRequestsAsAlternatives),
-    docRequests
+    docRequests,
+    attribution.canAnswer
   )
 
-  const answered = useCases.success
-    ? useCases.match.useCases.flatMap(({ useCaseIndex, matchingDocumentSets: [documentSet] }) =>
-        documentSet ? [{ useCaseIndex, documentSet }] : []
-      )
-    : []
+  // Which document set each use case is answered with: of a use case, the set the most documents
+  // may answer is tried first.
+  const documentsOf = (documentSet: Array<number>) =>
+    new Set(
+      documentSet.flatMap((index) => matches[index]?.candidateDocuments.map((document) => document.documentIndex) ?? [])
+    ).size
+  const chosen = useCases.success
+    ? chooseDocumentSets(useCases.match.useCases, attribution.canAnswer, documentsOf)
+    : undefined
+  const byDocRequest = attribution.answer((chosen ?? []).flatMap(({ documentSet }) => documentSet))
   const docRequestsOf = documents.map((): Array<number> => [])
-  for (const docRequestIndex of new Set(answered.flatMap(({ documentSet }) => documentSet))) {
-    for (const documentIndex of matches[docRequestIndex]?.candidateDocuments ?? []) {
-      docRequestsOf[documentIndex]?.push(docRequestIndex)
-    }
+  for (const [docRequestIndex, documentIndexes] of Array.from(byDocRequest).sort(([a], [b]) => a - b)) {
+    for (const documentIndex of documentIndexes) docRequestsOf[documentIndex]?.push(docRequestIndex)
   }
-  const attribution = {
-    useCases: answered,
-    documents: docRequestsOf.map((docRequestIndexes, documentIndex) => ({
-      documentIndex,
-      docRequestIndexes: docRequestIndexes.sort((a, b) => a - b),
-    })),
+  const answered = {
+    useCases: chosen ?? [],
+    documents: docRequestsOf.map((docRequestIndexes, documentIndex) => ({ documentIndex, docRequestIndexes })),
   }
 
-  if (!useCases.success) return { success: false, ...useCases.match, docRequests, unrequestedDocuments, attribution }
+  if (!useCases.success || !chosen) {
+    return {
+      success: false,
+      ...useCases.match,
+      docRequests,
+      unrequestedDocuments,
+      attribution: answered,
+      ...(useCases.success
+        ? {
+            reason:
+              'Every use case it requires can be answered, but not together: the doc requests with uniqueDocSetRequired among them cannot each have a document that satisfies them',
+          }
+        : {}),
+    }
+  }
   if (useCases.match.useCasesSource !== 'allDocRequests') {
     return {
       success: true,
@@ -733,7 +782,7 @@ export const matchDeviceRequest = (options: {
       useCases: useCases.match.useCases,
       docRequests,
       unrequestedDocuments,
-      attribution,
+      attribution: answered,
     }
   }
   // A single use case holding every doc request is only satisfied when all of them are.
@@ -743,7 +792,7 @@ export const matchDeviceRequest = (options: {
     useCases: useCases.match.useCases,
     docRequests: docRequests.filter(isSuccess),
     unrequestedDocuments,
-    attribution,
+    attribution: answered,
   }
 }
 
@@ -932,9 +981,16 @@ const resolveUseCases = (
  * request is: every mandatory use case and at least one use case has to be (18013-5 second edition
  * 10.2.5).
  */
-const matchUseCases = ({ useCasesSource, useCases }: ResolvedUseCases, docRequests: Array<{ success: boolean }>) => {
+const matchUseCases = (
+  { useCasesSource, useCases }: ResolvedUseCases,
+  docRequests: Array<{ success: boolean }>,
+  // Whether the doc requests of a set can be answered together, see `createAttribution`.
+  canAnswer: (docRequestIndexes: Array<number>) => boolean = () => true
+) => {
   const matches = useCases.map(({ mandatory, purposeHints, documentSets }, useCaseIndex): UseCaseMatch => {
-    const satisfied = documentSets.filter((set) => set.every((index) => docRequests[index]?.success === true))
+    const satisfied = documentSets.filter(
+      (set) => set.every((index) => docRequests[index]?.success === true) && canAnswer(set)
+    )
     return {
       useCaseIndex,
       mandatory,
@@ -950,6 +1006,58 @@ const matchUseCases = ({ useCasesSource, useCases }: ResolvedUseCases, docReques
     success:
       matches.every((useCase) => !useCase.mandatory || useCase.success) && matches.some((useCase) => useCase.success),
   }
+}
+
+/**
+ * One document set per use case, answered together: every mandatory use case, and as many others as
+ * can be added in order. The sets of a use case are tried the one `documentsOf` gives most first,
+ * then in request order. Undefined when the mandatory use cases cannot be answered together, or
+ * without one, when none can be answered. Tries every combination of the sets of the mandatory use
+ * cases, which the request sets.
+ */
+const chooseDocumentSets = (
+  useCases: Array<UseCaseMatch>,
+  canAnswer: (docRequestIndexes: Array<number>) => boolean,
+  documentsOf: (documentSet: Array<number>) => number
+): Array<{ useCaseIndex: number; documentSet: Array<number> }> | undefined => {
+  const preferences = new Map(
+    useCases.map((useCase) => [
+      useCase.useCaseIndex,
+      useCase.matchingDocumentSets
+        .map((documentSet, order) => ({ documentSet, order, documents: documentsOf(documentSet) }))
+        .sort((a, b) => b.documents - a.documents || a.order - b.order)
+        .map(({ documentSet }) => ({ useCaseIndex: useCase.useCaseIndex, documentSet })),
+    ])
+  )
+  const preferred = (useCase: UseCaseMatch) => preferences.get(useCase.useCaseIndex) ?? []
+
+  const mandatory = useCases.filter((useCase) => useCase.mandatory)
+  const search = (
+    index: number,
+    chosen: Array<{ useCaseIndex: number; documentSet: Array<number> }>
+  ): typeof chosen | undefined => {
+    const useCase = mandatory[index]
+    if (!useCase) return chosen
+    for (const option of preferred(useCase)) {
+      const next = [...chosen, option]
+      if (!canAnswer(next.flatMap(({ documentSet }) => documentSet))) continue
+      const found = search(index + 1, next)
+      if (found) return found
+    }
+    return undefined
+  }
+
+  const chosen = search(0, [])
+  if (!chosen) return undefined
+  for (const useCase of useCases) {
+    if (useCase.mandatory) continue
+    const option = preferred(useCase).find(({ documentSet }) =>
+      canAnswer([...chosen.flatMap((answered) => answered.documentSet), ...documentSet])
+    )
+    if (option) chosen.push(option)
+  }
+  chosen.sort((a, b) => a.useCaseIndex - b.useCaseIndex)
+  return chosen.length > 0 ? chosen : undefined
 }
 
 /**
@@ -1454,13 +1562,30 @@ const collectElements = (issuerSigned: IssuerSigned, deviceNamespaces?: DeviceNa
  * The match is attached to the doc request checks as their structured `result`, so that it survives
  * a callback that throws on a `FAILED` check instead of collecting them.
  */
-export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, onCheck: VerificationCallback) => {
+export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, reportCheck: VerificationCallback) => {
   const result = { type: 'deviceRequestMatch', match } as const
-  const failureReasons = (docRequestIndexes: Array<number>) =>
-    match.docRequests
+  let failed = false
+  const onCheck: VerificationCallback = (check) => {
+    if (check.status === 'FAILED') failed = true
+    reportCheck(check)
+  }
+  // Doc requests that are each satisfied may still not be answered together, see `createAttribution`.
+  const together =
+    'Its doc requests are each satisfied, but not together: those with uniqueDocSetRequired cannot each have a document that satisfies them'
+  const failureReasons = (documentSets: Array<Array<number>>) => {
+    const docRequestIndexes = documentSets.flat()
+    const reasons = match.docRequests
       .filter((docRequest) => !docRequest.success && docRequestIndexes.includes(docRequest.docRequestIndex))
       .map((docRequest) => `Doc request ${docRequest.docRequestIndex}: ${docRequestFailureReason(docRequest)}`)
-      .join('. ')
+    const satisfied = new Set(match.docRequests.filter(isSuccess).map((docRequest) => docRequest.docRequestIndex))
+    const notTogether = documentSets.filter((set) => set.every((index) => satisfied.has(index)))
+    if (notTogether.length > 0) {
+      reasons.push(
+        `Doc requests ${notTogether.map((set) => set.join(', ')).join('; ')} are each satisfied, but not together: those with uniqueDocSetRequired cannot each have a document that satisfies them`
+      )
+    }
+    return reasons.join('. ')
+  }
 
   if (match.useCasesSource === 'deviceRequestInfo') {
     // A mandatory use case is a check of its own; an optional one only counts towards "at least one".
@@ -1474,7 +1599,7 @@ export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, onChec
           status: 'FAILED',
           check,
           category: 'DOCUMENT_FORMAT',
-          reason: `None of the document sets of use case ${useCase.useCaseIndex} has all its doc requests satisfied. ${failureReasons(useCase.documentSets.flat())}`,
+          reason: `None of the document sets of use case ${useCase.useCaseIndex} is satisfied. ${failureReasons(useCase.documentSets)}`,
           result,
         })
       }
@@ -1488,7 +1613,7 @@ export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, onChec
         status: 'FAILED',
         check,
         category: 'DOCUMENT_FORMAT',
-        reason: `No use case is satisfied. ${failureReasons(match.useCases.flatMap((useCase) => useCase.documentSets.flat()))}`,
+        reason: `No use case is satisfied. ${failureReasons(match.useCases.flatMap((useCase) => useCase.documentSets))}`,
         result,
       })
     }
@@ -1528,6 +1653,16 @@ export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, onChec
     }
   }
 
+  if (!match.success && !failed) {
+    onCheck({
+      status: 'FAILED',
+      check: 'Device response must answer the doc requests it satisfies together',
+      category: 'DOCUMENT_FORMAT',
+      reason: match.reason ?? together,
+      result,
+    })
+  }
+
   for (const { documentIndex, docRequestIndexes, unrequestedClaims } of findOverDisclosure(match)) {
     const docRequests =
       docRequestIndexes.length === 1
@@ -1541,6 +1676,44 @@ export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, onChec
       reason: `Document ${documentIndex} disclosed ${unrequestedClaims
         .map((claim) => `'${claim.elementIdentifier}' in namespace '${claim.namespace}'`)
         .join(', ')}, which ${docRequests} did not ask for`,
+    })
+  }
+
+  // A holder answers each use case with exactly one document set (ISO/IEC TS 23220-4 7.2.1.4). A
+  // document that may answer a doc request of a use case the response is not taken to answer may be
+  // an answer to it with elements left out, and documents of a docType no doc request asks for are
+  // reported below.
+  const unrequested = new Set(match.unrequestedDocuments.map((document) => document.documentIndex))
+  const answeredUseCases = new Set(match.attribution.useCases.map((useCase) => useCase.useCaseIndex))
+  const answeredDocRequests = new Set(match.attribution.useCases.flatMap(({ documentSet }) => documentSet))
+  const unanswered = new Set(
+    match.useCases
+      .filter((useCase) => !answeredUseCases.has(useCase.useCaseIndex))
+      .flatMap((useCase) => useCase.documentSets.flat())
+  )
+  // The documents of the docType of a doc request of those use cases, and of an issuer it accepts.
+  const mayAnswerUnanswered = new Set(
+    match.docRequests
+      .filter((docRequest) => unanswered.has(docRequest.docRequestIndex))
+      .flatMap((docRequest) => [...docRequest.validDocuments, ...docRequest.failedDocuments])
+      .filter((document) => document.docType.success && document.issuer?.success !== false)
+      .map((document) => document.documentIndex)
+  )
+  const unattributed = match.attribution.documents.filter(
+    (document) =>
+      !unrequested.has(document.documentIndex) &&
+      !mayAnswerUnanswered.has(document.documentIndex) &&
+      !document.docRequestIndexes.some((docRequestIndex) => answeredDocRequests.has(docRequestIndex))
+  )
+  if (match.success && unattributed.length > 0) {
+    const sets = match.attribution.useCases
+      .map(({ useCaseIndex, documentSet }) => `use case ${useCaseIndex} with doc requests ${documentSet.join(', ')}`)
+      .join('; ')
+    onCheck({
+      status: 'WARNING',
+      check: 'Device response must only contain documents of one document set per use case',
+      category: 'DOCUMENT_FORMAT',
+      reason: `${unattributed.length === 1 ? 'Document' : 'Documents'} ${unattributed.map((document) => document.documentIndex).join(', ')} ${unattributed.length === 1 ? 'answers' : 'answer'} no doc request of the document sets the use cases are answered with (${sets})`,
     })
   }
 

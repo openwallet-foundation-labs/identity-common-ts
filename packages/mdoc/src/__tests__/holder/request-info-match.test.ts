@@ -9,6 +9,7 @@ import {
   DeviceKey,
   DeviceRequest,
   DeviceRequestInfo,
+  type DeviceRequestMatchResult,
   DeviceResponse,
   type DeviceResponseDocumentOptions,
   DocRequest,
@@ -621,7 +622,7 @@ describe('unique document set', () => {
     expect(match.docRequests[0]).toMatchObject({
       success: false,
       validDocuments: [{ documentIndex: 0 }, { documentIndex: 1 }],
-      reason: 'Documents 0, 1 satisfy doc request 0, but it requires a unique document set',
+      reason: 'Doc request 0 requires a unique document set, but documents 0, 1 may only answer doc request 0',
     })
   })
 
@@ -653,7 +654,12 @@ describe('unique document set', () => {
       mdocContext
     )
 
-    expect(Verifier.matchDeviceRequest({ deviceRequest, deviceResponse }).success).toBe(true)
+    const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse })
+    expect(match.success).toBe(true)
+    // Document 1 answers the optional use case with given_name left out, which is no reason to warn.
+    const checks: Array<VerificationAssessment> = []
+    reportDeviceRequestMatch(match, (check) => checks.push(check))
+    expect(checks.filter((check) => check.status !== 'PASSED')).toStrictEqual([])
   })
 
   test('a verifier counts a document that also satisfies another doc request for that one', async () => {
@@ -1115,6 +1121,188 @@ describe('issuer identifiers against a certificate chain', () => {
       issuer: { success: false, reason: expect.stringContaining('has no validated certificate chain') },
     })
   })
+  test('a verifier gives each document its own doc request when two require a unique document set', async () => {
+    const fr = await createIssuer('FR')
+    const de = await createIssuer('DE')
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        {
+          namespaces: { [mdlNamespace]: { family_name: false } },
+          requestInfo: DocRequestInfo.create({ uniqueDocSetRequired: true }),
+        },
+        {
+          namespaces: { [mdlNamespace]: { family_name: false } },
+          requestInfo: DocRequestInfo.create({ uniqueDocSetRequired: true, issuerIdentifiers: [fr.iacaKeyIdentifier] }),
+        },
+      ],
+    })
+    // The French mDL satisfies both doc requests and comes first, the German one only the first.
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest: createDeviceRequest({
+          docRequests: [{ namespaces: { [mdlNamespace]: { family_name: false } } }],
+        }),
+        sessionTranscript,
+        documents: [
+          { issuerSigned: await sign(fr), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          { issuerSigned: await sign(de), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+        ],
+      },
+      mdocContext
+    )
+
+    const match = Verifier.matchDeviceRequest({
+      deviceRequest,
+      deviceResponse,
+      issuerCertificateChains: [
+        [fr.documentSigner, fr.iaca],
+        [de.documentSigner, de.iaca],
+      ],
+    })
+
+    expect(match.success).toBe(true)
+    expect(match.attribution.documents).toStrictEqual([
+      { documentIndex: 0, docRequestIndexes: [1] },
+      { documentIndex: 1, docRequestIndexes: [0] },
+    ])
+  })
+
+  test('which doc requests fail for one document too many does not depend on the order of the documents', async () => {
+    const fr = await createIssuer('FR')
+    const de = await createIssuer('DE')
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        {
+          namespaces: { [mdlNamespace]: { family_name: false } },
+          requestInfo: DocRequestInfo.create({ uniqueDocSetRequired: true, issuerIdentifiers: [fr.iacaKeyIdentifier] }),
+        },
+        {
+          namespaces: { [mdlNamespace]: { family_name: false } },
+          requestInfo: DocRequestInfo.create({ uniqueDocSetRequired: true }),
+        },
+      ],
+      useCases: [
+        { mandatory: true, documentSets: [[0]] },
+        { mandatory: false, documentSets: [[1]] },
+      ],
+    })
+    const french = [await sign(fr), await sign(fr)]
+    const german = await sign(de)
+    const chains = new Map([
+      [fr, [fr.documentSigner, fr.iaca]],
+      [de, [de.documentSigner, de.iaca]],
+    ])
+
+    const verify = async (documents: Array<[IssuerSigned, Awaited<ReturnType<typeof createIssuer>>]>) => {
+      const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+        {
+          deviceRequest: createDeviceRequest({
+            docRequests: [{ namespaces: { [mdlNamespace]: { family_name: false } } }],
+          }),
+          sessionTranscript,
+          documents: documents.map(([issuerSigned]) => ({
+            issuerSigned,
+            docRequestIndex: 0,
+            signature: { signingKey: deviceKey },
+          })),
+        },
+        mdocContext
+      )
+      const match = Verifier.matchDeviceRequest({
+        deviceRequest,
+        deviceResponse,
+        issuerCertificateChains: documents.map(([, issuer]) => chains.get(issuer)),
+      })
+      return { success: match.success, docRequests: match.docRequests.map((docRequest) => docRequest.success) }
+    }
+
+    // Three documents for two doc requests that take one each, whichever comes first.
+    const expected = { success: false, docRequests: [false, false] }
+    expect(
+      await verify([
+        [french[0], fr],
+        [french[1], fr],
+        [german, de],
+      ])
+    ).toStrictEqual(expected)
+    expect(
+      await verify([
+        [german, de],
+        [french[0], fr],
+        [french[1], fr],
+      ])
+    ).toStrictEqual(expected)
+  })
+
+  test('a doc request that takes one document fails when the one it has to take does not satisfy it', async () => {
+    const fr = await createIssuer('FR')
+    const de = await createIssuer('DE')
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        {
+          namespaces: { [mdlNamespace]: { family_name: false, given_name: false } },
+          requestInfo: DocRequestInfo.create({ uniqueDocSetRequired: true }),
+        },
+        {
+          namespaces: { [mdlNamespace]: { family_name: false } },
+          requestInfo: DocRequestInfo.create({ issuerIdentifiers: [fr.iacaKeyIdentifier] }),
+        },
+      ],
+      useCases: [
+        { mandatory: false, documentSets: [[0]] },
+        { mandatory: false, documentSets: [[1]] },
+      ],
+    })
+    // Only the first doc request may take the German mDL, which lacks given_name, so it cannot take
+    // the French one that satisfies it.
+    const issuer = new Issuer(mdlDocType, mdocContext)
+    issuer.addIssuerNamespace(mdlNamespace, { family_name: 'Doe', given_name: 'John' })
+    const signed = new Date(Date.now() - 60_000)
+    const full = await issuer.sign({
+      signingKey: fr.signingKey,
+      certificates: [fr.documentSigner],
+      algorithm: SignatureAlgorithm.ES256,
+      digestAlgorithm: 'SHA-256',
+      deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+      validityInfo: { signed, validFrom: signed, validUntil: new Date(Date.now() + 60 * 60 * 1000) },
+    })
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest: createDeviceRequest({
+          docRequests: [{ namespaces: { [mdlNamespace]: { family_name: false, given_name: false } } }],
+        }),
+        sessionTranscript,
+        documents: [
+          {
+            issuerSigned: await sign(de),
+            docRequestIndex: 0,
+            elements: { [mdlNamespace]: ['family_name'] },
+            signature: { signingKey: deviceKey },
+          },
+          { issuerSigned: full, docRequestIndex: 0, signature: { signingKey: deviceKey } },
+        ],
+      },
+      mdocContext
+    )
+
+    const match = Verifier.matchDeviceRequest({
+      deviceRequest,
+      deviceResponse,
+      issuerCertificateChains: [
+        [de.documentSigner, de.iaca],
+        [fr.documentSigner, fr.iaca],
+      ],
+    })
+
+    expect(match.success).toBe(true)
+    expect(match.docRequests[0]).toMatchObject({
+      success: false,
+      validDocuments: [{ documentIndex: 1 }],
+      reason:
+        'Doc request 0 requires a unique document set, and the documents that only doc requests like it may answer leave it none of documents 1, which satisfy it',
+    })
+    expect(match.attribution.useCases).toStrictEqual([{ useCaseIndex: 1, documentSet: [1] }])
+  })
 })
 
 describe('response checks', () => {
@@ -1226,6 +1414,358 @@ describe('response checks', () => {
     expect(reason('Device response must satisfy at least one use case')).toMatch(
       /^No use case is satisfied\. Doc request 0: .*Doc request 1: /
     )
+  })
+})
+
+describe('attribution', () => {
+  const familyName = { namespaces: { [mdlNamespace]: { family_name: false } } }
+  const respond = async (
+    deviceRequest: DeviceRequest,
+    documents: Array<{ docRequestIndex: number | Array<number>; docType?: string }>
+  ) =>
+    Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: await Promise.all(
+          documents.map(async ({ docRequestIndex, docType }) => ({
+            issuerSigned: await createIssuerSigned({ docType }),
+            docRequestIndex,
+            signature: { signingKey: deviceKey },
+          }))
+        ),
+      },
+      mdocContext
+    )
+  const verify = async (deviceRequest: DeviceRequest, deviceResponse: DeviceResponse) => {
+    const checks: Array<VerificationAssessment> = []
+    const result = await Verifier.verifyDeviceResponse(
+      {
+        deviceRequest,
+        deviceResponse,
+        sessionTranscript,
+        trustedCertificates: [{ issuance: [issuerCertificate] }],
+        disableStatusValidation: true,
+        onCheck: (check) => checks.push(check),
+      },
+      mdocContext
+    )
+    return { match: result.deviceRequestMatch, checks: checks.filter((check) => check.status !== 'PASSED') }
+  }
+
+  test('two doc requests that require a unique document set take one document each', async () => {
+    const unique = { ...familyName, requestInfo: DocRequestInfo.create({ uniqueDocSetRequired: true }) }
+    const deviceRequest = createDeviceRequest({ docRequests: [unique, unique] })
+
+    const { match, checks } = await verify(
+      deviceRequest,
+      await respond(deviceRequest, [{ docRequestIndex: 0 }, { docRequestIndex: 1 }])
+    )
+    expect(checks).toStrictEqual([])
+    expect(match?.attribution.documents).toStrictEqual([
+      { documentIndex: 0, docRequestIndexes: [0] },
+      { documentIndex: 1, docRequestIndexes: [1] },
+    ])
+
+    // A third document is one too many for them.
+    const plain = createDeviceRequest({ docRequests: [familyName] })
+    const three = await respond(plain, [{ docRequestIndex: 0 }, { docRequestIndex: 0 }, { docRequestIndex: 0 }])
+    const failed = await verify(deviceRequest, three)
+    expect(failed.match?.success).toBe(false)
+    expect(failed.match?.docRequests.map((docRequest) => docRequest.success)).toStrictEqual([false, false])
+    expect(failed.match?.docRequests[0]).toMatchObject({
+      reason:
+        'Doc request 0 requires a unique document set, but documents 0, 1, 2 may only answer doc requests 0, 1, which all do',
+    })
+  })
+
+  test('a document of a document set the use case is not answered with is reported as a warning', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [familyName, { ...familyName, docType: photoIdDocType }],
+      useCases: [{ mandatory: true, documentSets: [[0], [1]] }],
+    })
+
+    const { match, checks } = await verify(
+      deviceRequest,
+      await respond(deviceRequest, [{ docRequestIndex: 0 }, { docRequestIndex: 1, docType: photoIdDocType }])
+    )
+
+    expect(match?.success).toBe(true)
+    expect(match?.attribution).toStrictEqual({
+      useCases: [{ useCaseIndex: 0, documentSet: [0] }],
+      documents: [
+        { documentIndex: 0, docRequestIndexes: [0] },
+        { documentIndex: 1, docRequestIndexes: [1] },
+      ],
+    })
+    expect(checks).toStrictEqual([
+      {
+        status: 'WARNING',
+        check: 'Device response must only contain documents of one document set per use case',
+        category: 'DOCUMENT_FORMAT',
+        reason:
+          'Document 1 answers no doc request of the document sets the use cases are answered with (use case 0 with doc requests 0)',
+      },
+    ])
+  })
+
+  test('a use case is taken to be answered with the satisfied document set the most documents answer', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [familyName, { ...familyName, docType: photoIdDocType }],
+      useCases: [{ mandatory: true, documentSets: [[0], [0, 1]] }],
+    })
+
+    const { match, checks } = await verify(
+      deviceRequest,
+      await respond(deviceRequest, [{ docRequestIndex: 0 }, { docRequestIndex: 1, docType: photoIdDocType }])
+    )
+
+    expect(checks).toStrictEqual([])
+    expect(match?.attribution.useCases).toStrictEqual([{ useCaseIndex: 0, documentSet: [0, 1] }])
+  })
+})
+
+describe('attribution, order and satisfaction', () => {
+  const unique = DocRequestInfo.create({ uniqueDocSetRequired: true })
+  const withClaims = async (claims: Array<string>, docRequestIndex: number) => ({
+    issuerSigned: await createIssuerSigned(),
+    docRequestIndex,
+    elements: { [mdlNamespace]: claims },
+    signature: { signingKey: deviceKey },
+  })
+
+  test('a doc request that takes one document takes one that satisfies it when there is one', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } }, requestInfo: unique },
+        { namespaces: { [mdlNamespace]: { family_name: false, given_name: false } }, requestInfo: unique },
+      ],
+    })
+    // The full document for the second doc request comes first.
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [await withClaims(['family_name', 'given_name'], 1), await withClaims(['family_name'], 0)],
+      },
+      mdocContext
+    )
+
+    const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse })
+
+    expect(match.success).toBe(true)
+    expect(match.attribution.documents).toStrictEqual([
+      { documentIndex: 0, docRequestIndexes: [1] },
+      { documentIndex: 1, docRequestIndexes: [0] },
+    ])
+  })
+
+  test('the document that satisfies a doc request is not reported as not answering it', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } }, requestInfo: unique },
+        { namespaces: { [mdlNamespace]: { given_name: false, birth_date: false } }, requestInfo: unique },
+      ],
+      useCases: [
+        { mandatory: true, documentSets: [[0]] },
+        { mandatory: false, documentSets: [[1]] },
+      ],
+    })
+    // Document 0 only has birth_date, which satisfies neither doc request; document 1 satisfies the first.
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [await withClaims(['birth_date'], 1), await withClaims(['family_name'], 0)],
+      },
+      mdocContext
+    )
+
+    const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse })
+    const checks: Array<VerificationAssessment> = []
+    reportDeviceRequestMatch(match, (check) => checks.push(check))
+
+    expect(match.success).toBe(true)
+    expect(match.attribution.documents).toStrictEqual([
+      { documentIndex: 0, docRequestIndexes: [1] },
+      { documentIndex: 1, docRequestIndexes: [0] },
+    ])
+    expect(checks.filter((check) => check.status !== 'PASSED')).toStrictEqual([])
+  })
+})
+
+describe('doc requests answered together', () => {
+  const unique = DocRequestInfo.create({ uniqueDocSetRequired: true })
+  const familyName = { namespaces: { [mdlNamespace]: { family_name: false } }, requestInfo: unique }
+  // One document with family_name for the first doc request, one with nothing for the second.
+  const respond = async (deviceRequest: DeviceRequest) =>
+    Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          {
+            issuerSigned: await createIssuerSigned(),
+            docRequestIndex: 1,
+            elements: {},
+            signature: { signingKey: deviceKey },
+          },
+        ],
+      },
+      mdocContext
+    )
+  const report = (match: DeviceRequestMatchResult) => {
+    const checks: Array<VerificationAssessment> = []
+    reportDeviceRequestMatch(match, (check) => checks.push(check))
+    return checks.filter((check) => check.status === 'FAILED').map(({ check, reason }) => ({ check, reason }))
+  }
+
+  test('two doc requests that take one document each are not both satisfied by the one document that satisfies them', async () => {
+    const deviceRequest = createDeviceRequest({ docRequests: [familyName, familyName] })
+
+    const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse: await respond(deviceRequest) })
+
+    expect(match.success).toBe(false)
+    expect(match.docRequests.map((docRequest) => docRequest.success)).toStrictEqual([true, true])
+    expect(report(match)).toStrictEqual([
+      {
+        check: 'Device response must answer the doc requests it satisfies together',
+        reason:
+          'Its doc requests are each satisfied, but not together: those with uniqueDocSetRequired cannot each have a document that satisfies them',
+      },
+    ])
+  })
+
+  test('two mandatory use cases that can each be answered, but not together, fail', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [familyName, familyName],
+      useCases: [
+        { mandatory: true, documentSets: [[0]] },
+        { mandatory: true, documentSets: [[1]] },
+      ],
+    })
+
+    const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse: await respond(deviceRequest) })
+
+    expect(match).toMatchObject({
+      success: false,
+      useCases: [{ success: true }, { success: true }],
+      reason:
+        'Every use case it requires can be answered, but not together: the doc requests with uniqueDocSetRequired among them cannot each have a document that satisfies them',
+    })
+    expect(report(match).map(({ check }) => check)).toStrictEqual([
+      'Device response must answer the doc requests it satisfies together',
+    ])
+
+    // One of them on its own is answered.
+    const optional = createDeviceRequest({
+      docRequests: [familyName, familyName],
+      useCases: [
+        { mandatory: true, documentSets: [[0]] },
+        { mandatory: false, documentSets: [[1]] },
+      ],
+    })
+    const answered = Verifier.matchDeviceRequest({ deviceRequest: optional, deviceResponse: await respond(optional) })
+    expect(answered.success).toBe(true)
+    expect(answered.attribution.useCases).toStrictEqual([{ useCaseIndex: 0, documentSet: [0] }])
+  })
+
+  test('a document that may be a partial answer to an unanswered use case is not warned about, whatever the order of the doc requests', async () => {
+    const familyName = { namespaces: { [mdlNamespace]: { family_name: false } } }
+    const givenName = { namespaces: { [mdlNamespace]: { given_name: false } }, requestInfo: unique }
+    for (const familyNameUnique of [true, false]) {
+      const alternative = familyNameUnique ? { ...familyName, requestInfo: unique } : familyName
+      // The doc request of the optional use case comes second or third.
+      for (const [docRequests, useCases] of [
+        [
+          [{ ...familyName, requestInfo: unique }, alternative, givenName],
+          [
+            { mandatory: true, documentSets: [[0], [1]] },
+            { mandatory: false, documentSets: [[2]] },
+          ],
+        ],
+        [
+          [{ ...familyName, requestInfo: unique }, givenName, alternative],
+          [
+            { mandatory: true, documentSets: [[0], [2]] },
+            { mandatory: false, documentSets: [[1]] },
+          ],
+        ],
+      ] as const) {
+        const deviceRequest = createDeviceRequest({
+          docRequests: [...docRequests],
+          useCases: useCases.map((useCase) => ({
+            ...useCase,
+            documentSets: useCase.documentSets.map((set) => [...set]),
+          })),
+        })
+        const optional = useCases[1].documentSets[0][0]
+        // The second document answers the optional use case with everything left out.
+        const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+          {
+            deviceRequest,
+            sessionTranscript,
+            documents: [
+              { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+              {
+                issuerSigned: await createIssuerSigned(),
+                docRequestIndex: optional,
+                elements: {},
+                signature: { signingKey: deviceKey },
+              },
+            ],
+          },
+          mdocContext
+        )
+
+        const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse })
+        const checks: Array<VerificationAssessment> = []
+        reportDeviceRequestMatch(match, (check) => checks.push(check))
+
+        expect(match.success).toBe(true)
+        expect(checks.filter((check) => check.status !== 'PASSED')).toStrictEqual([])
+      }
+    }
+  })
+
+  test('a partial answer to an optional use case that cannot be answered with the mandatory one is not warned about', async () => {
+    const both = {
+      namespaces: { [mdlNamespace]: { family_name: false, given_name: false } },
+      requestInfo: unique,
+    }
+    const deviceRequest = createDeviceRequest({
+      docRequests: [both, both],
+      useCases: [
+        { mandatory: true, documentSets: [[0]] },
+        { mandatory: false, documentSets: [[1]] },
+      ],
+    })
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          {
+            issuerSigned: await createIssuerSigned(),
+            docRequestIndex: 1,
+            elements: { [mdlNamespace]: ['given_name'] },
+            signature: { signingKey: deviceKey },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse })
+    const checks: Array<VerificationAssessment> = []
+    reportDeviceRequestMatch(match, (check) => checks.push(check))
+
+    // The optional use case can be answered on its own, but not with the mandatory one.
+    expect(match).toMatchObject({ success: true, useCases: [{ success: true }, { success: true }] })
+    expect(match.attribution.useCases).toStrictEqual([{ useCaseIndex: 0, documentSet: [0] }])
+    expect(checks.filter((check) => check.status !== 'PASSED')).toStrictEqual([])
   })
 })
 
