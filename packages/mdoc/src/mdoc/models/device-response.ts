@@ -849,17 +849,20 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
 
     const hasDocument = (docRequestIndex: number) => documentsPerDocRequest.has(docRequestIndex)
     const isSatisfied = (documentSets: Array<Array<number>>) => documentSets.some((set) => set.every(hasDocument))
+    const answered = `they answer doc requests ${Array.from(documentsPerDocRequest.keys())
+      .sort((a, b) => a - b)
+      .join(', ')}`
 
     for (const [useCaseIndex, useCase] of useCases.entries()) {
       if (useCase.mandatory && !isSatisfied(useCase.documentSets)) {
         throw new UnsatisfiedDeviceRequestError(
-          `Use case ${useCaseIndex} is mandatory, but none of its document sets has a document for each of its doc requests`
+          `Use case ${useCaseIndex} is mandatory, but the documents do not answer every doc request of any of its document sets (${answered})`
         )
       }
     }
     if (!useCases.some((useCase) => isSatisfied(useCase.documentSets))) {
       throw new UnsatisfiedDeviceRequestError(
-        'None of the use cases has a document set with a document for each of its doc requests'
+        `None of the use cases has a document set whose doc requests the documents all answer (${answered})`
       )
     }
   }

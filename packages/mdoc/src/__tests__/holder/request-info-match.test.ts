@@ -793,6 +793,33 @@ describe('use cases', () => {
       ],
     })
 
+  test('a holder refuses a response that answers none of the use cases, and says which doc requests it answers', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } } },
+        { docType: photoIdDocType, namespaces: { [mdlNamespace]: { family_name: false } } },
+      ],
+      useCases: [{ mandatory: false, documentSets: [[0, 1]] }],
+    })
+
+    await expect(
+      Holder.createDeviceResponseForDeviceRequest(
+        {
+          deviceRequest,
+          sessionTranscript,
+          documents: [
+            { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          ],
+        },
+        mdocContext
+      )
+    ).rejects.toThrow(
+      new UnsatisfiedDeviceRequestError(
+        'None of the use cases has a document set whose doc requests the documents all answer (they answer doc requests 0)'
+      )
+    )
+  })
+
   test('a holder refuses a response that leaves a mandatory use case unsatisfied, but may send nothing', async () => {
     const deviceRequest = mandatoryPhotoIdOptionalMdl()
 
@@ -1131,7 +1158,7 @@ describe('response checks', () => {
 
     await expect(respond(deviceRequest)).rejects.toThrow(
       new UnsatisfiedDeviceRequestError(
-        'Use case 0 is mandatory, but none of its document sets has a document for each of its doc requests'
+        'Use case 0 is mandatory, but the documents do not answer every doc request of any of its document sets (they answer doc requests 0)'
       )
     )
     const deviceResponse = await respond(deviceRequest, [0, 1])
