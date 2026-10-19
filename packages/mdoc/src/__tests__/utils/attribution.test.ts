@@ -18,7 +18,7 @@ describe('createAttribution', () => {
       docRequest(1, { unique: true, candidates: [0, 1, 2] }),
     ])
 
-    expect(attribution.excess).toStrictEqual([{ documentIndexes: [0, 1, 2], docRequestIndexes: [0, 1] }])
+    expect(attribution.excess).toStrictEqual({ documentIndexes: [0, 1, 2], docRequestIndexes: [0, 1] })
     expect(attribution.canAnswer([0])).toBe(false)
   })
 
@@ -29,7 +29,7 @@ describe('createAttribution', () => {
       docRequest(1, { unique: true, candidates: [1, 2] }),
     ])
 
-    expect(attribution.excess).toStrictEqual([{ documentIndexes: [0, 1, 2], docRequestIndexes: [0, 1] }])
+    expect(attribution.excess).toStrictEqual({ documentIndexes: [0, 1, 2], docRequestIndexes: [0, 1] })
   })
 
   test('a doc request that already has documents too many does not take another', () => {
@@ -41,7 +41,7 @@ describe('createAttribution', () => {
       docRequest(2, { candidates: [3] }),
     ])
 
-    expect(attribution.excess).toStrictEqual([{ documentIndexes: [0, 1], docRequestIndexes: [0] }])
+    expect(attribution.excess).toStrictEqual({ documentIndexes: [0, 1], docRequestIndexes: [0] })
     expect(attribution.canAnswer([1])).toBe(false)
     expect(attribution.canAnswer([2])).toBe(true)
   })
@@ -52,7 +52,7 @@ describe('createAttribution', () => {
       docRequest(1, { candidates: [0, 1, 2] }),
     ])
 
-    expect(attribution.excess).toStrictEqual([])
+    expect(attribution.excess).toStrictEqual({ documentIndexes: [], docRequestIndexes: [] })
     expect(attribution.canAnswer([0, 1])).toBe(true)
   })
 
@@ -63,7 +63,7 @@ describe('createAttribution', () => {
       docRequest(1, { unique: true, candidates: [0, 1], valid: [0] }),
     ])
 
-    expect(attribution.excess).toStrictEqual([])
+    expect(attribution.excess).toStrictEqual({ documentIndexes: [], docRequestIndexes: [] })
     expect(attribution.canAnswer([0])).toBe(true)
     expect(attribution.canAnswer([1])).toBe(true)
     expect(attribution.canAnswer([0, 1])).toBe(false)
@@ -157,8 +157,8 @@ describe('createAttribution', () => {
           )
           .map(({ docRequestIndex }) => docRequestIndex)
       )
-      expect(new Set(attribution.excess.flatMap((group) => group.documentIndexes))).toStrictEqual(excessDocuments)
-      expect(new Set(attribution.excess.flatMap((group) => group.docRequestIndexes))).toStrictEqual(excessDocRequests)
+      expect(new Set(attribution.excess.documentIndexes)).toStrictEqual(excessDocuments)
+      expect(new Set(attribution.excess.docRequestIndexes)).toStrictEqual(excessDocRequests)
       if (excessDocuments.size > 0) covered.excess++
 
       const rest = onlyUnique.filter((documentIndex) => !excessDocuments.has(documentIndex))
@@ -194,12 +194,10 @@ describe('createAttribution', () => {
           validDocuments: d.validDocuments.map((index) => last - index).sort((a, b) => a - b),
         }))
       )
-      expect(
-        reversed.excess.map((group) => ({
-          documentIndexes: group.documentIndexes.map((index) => last - index).sort((a, b) => a - b),
-          docRequestIndexes: group.docRequestIndexes,
-        }))
-      ).toStrictEqual(attribution.excess)
+      expect({
+        documentIndexes: reversed.excess.documentIndexes.map((index) => last - index).sort((a, b) => a - b),
+        docRequestIndexes: reversed.excess.docRequestIndexes,
+      }).toStrictEqual(attribution.excess)
       for (let mask = 0; mask < 1 << docRequests.length; mask++) {
         const required = docRequests.filter((_, index) => mask & (1 << index)).map((d) => d.docRequestIndex)
         expect(reversed.canAnswer(required)).toBe(attribution.canAnswer(required))

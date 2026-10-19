@@ -440,8 +440,8 @@ export type DeviceRequestMatchSuccess = DeviceRequestMatchBase &
 export type DeviceRequestMatchFailure = DeviceRequestMatchBase & {
   success: false
   /**
-   * Set when every use case the response has to satisfy can be satisfied on its own, but not
-   * together, see {@link DeviceRequestAttribution}.
+   * Set when every use case the response has to satisfy can be satisfied on its own, or every doc
+   * request when they are all requested, but not together, see {@link DeviceRequestAttribution}.
    */
   reason?: string
   /**
@@ -709,14 +709,15 @@ export const matchDeviceRequest = (options: {
     })
 
     // More documents than doc requests that take one document each can take, this one among them.
-    const excess = attribution.excess.find((group) => group.docRequestIndexes.includes(docRequestIndex))
-    if (uniqueDocSetRequired && excess) {
-      const others =
-        excess.docRequestIndexes.length === 1
-          ? `doc request ${docRequestIndex}`
-          : `doc requests ${excess.docRequestIndexes.join(', ')}, which all do`
+    const excess = candidateDocuments
+      .map((document) => document.documentIndex)
+      .filter((documentIndex) => attribution.excess.documentIndexes.includes(documentIndex))
+    if (uniqueDocSetRequired && excess.length > 0) {
+      const others = matches
+        .filter((other) => other.candidateDocuments.some((document) => excess.includes(document.documentIndex)))
+        .map((other) => other.docRequestIndex)
       return failure(
-        `Doc request ${docRequestIndex} requires a unique document set, but documents ${excess.documentIndexes.join(', ')} may only answer ${others}`
+        `Doc request ${docRequestIndex} requires a unique document set, but documents ${excess.join(', ')} may only answer ${others.length === 1 ? `doc request ${docRequestIndex}` : `doc requests ${others.join(', ')}, which all do`}`
       )
     }
     if (uniqueDocSetRequired && isNonEmptyArray(validDocuments) && !attribution.canAnswer([docRequestIndex])) {
@@ -761,18 +762,19 @@ export const matchDeviceRequest = (options: {
   }
 
   if (!useCases.success || !chosen) {
+    // Use cases or doc requests that can each be answered, but not together, fail no check of their own.
+    const reason = useCases.success
+      ? 'Every use case it requires can be answered, but not together: the doc requests with uniqueDocSetRequired among them cannot each have a document that satisfies them'
+      : useCases.match.useCasesSource === 'allDocRequests' && docRequests.every(isSuccess)
+        ? 'Its doc requests are each satisfied, but not together: those with uniqueDocSetRequired cannot each have a document that satisfies them'
+        : undefined
     return {
       success: false,
       ...useCases.match,
       docRequests,
       unrequestedDocuments,
       attribution: answered,
-      ...(useCases.success
-        ? {
-            reason:
-              'Every use case it requires can be answered, but not together: the doc requests with uniqueDocSetRequired among them cannot each have a document that satisfies them',
-          }
-        : {}),
+      ...(reason ? { reason } : {}),
     }
   }
   if (useCases.match.useCasesSource !== 'allDocRequests') {
@@ -1562,16 +1564,9 @@ const collectElements = (issuerSigned: IssuerSigned, deviceNamespaces?: DeviceNa
  * The match is attached to the doc request checks as their structured `result`, so that it survives
  * a callback that throws on a `FAILED` check instead of collecting them.
  */
-export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, reportCheck: VerificationCallback) => {
+export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, onCheck: VerificationCallback) => {
   const result = { type: 'deviceRequestMatch', match } as const
-  let failed = false
-  const onCheck: VerificationCallback = (check) => {
-    if (check.status === 'FAILED') failed = true
-    reportCheck(check)
-  }
   // Doc requests that are each satisfied may still not be answered together, see `createAttribution`.
-  const together =
-    'Its doc requests are each satisfied, but not together: those with uniqueDocSetRequired cannot each have a document that satisfies them'
   const failureReasons = (documentSets: Array<Array<number>>) => {
     const docRequestIndexes = documentSets.flat()
     const reasons = match.docRequests
@@ -1653,12 +1648,12 @@ export const reportDeviceRequestMatch = (match: DeviceRequestMatchResult, report
     }
   }
 
-  if (!match.success && !failed) {
+  if (!match.success && match.reason) {
     onCheck({
       status: 'FAILED',
       check: 'Device response must answer the doc requests it satisfies together',
       category: 'DOCUMENT_FORMAT',
-      reason: match.reason ?? together,
+      reason: match.reason,
       result,
     })
   }

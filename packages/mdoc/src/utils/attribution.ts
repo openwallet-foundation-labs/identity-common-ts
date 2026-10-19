@@ -51,8 +51,8 @@ export const createAttribution = (docRequests: Array<DocRequestCandidates>) => {
     candidatesOf,
     maximumMatching(onlyUnique, (documentIndex) => candidatesOf.get(documentIndex) ?? [])
   )
-  const excessDocRequests = new Set(excess.flatMap((group) => group.docRequestIndexes))
-  const excessDocuments = new Set(excess.flatMap((group) => group.documentIndexes))
+  const excessDocRequests = new Set(excess.docRequestIndexes)
+  const excessDocuments = new Set(excess.documentIndexes)
   const remaining = onlyUnique.filter((documentIndex) => !excessDocuments.has(documentIndex))
 
   /**
@@ -154,60 +154,31 @@ const maximumMatching = (documents: Array<number>, neighbours: (documentIndex: n
 }
 
 /**
- * The groups of documents left without a doc request in a maximum matching, with every document and
- * doc request an alternating path reaches from them: along a candidate of a document, and back along
- * the document that doc request takes. Groups that share a doc request are one.
+ * The documents left without a doc request in a maximum matching, with every document an alternating
+ * path reaches from them: along a candidate of a document, and back along the document that doc
+ * request takes. These are the documents some maximum matching leaves without a doc request, and
+ * their candidates are the doc requests with documents too many.
  */
 const findExcess = (
   documents: Array<number>,
   candidatesOf: Map<number, Array<number>>,
   matching: Map<number, number>
-): Array<{ documentIndexes: Array<number>; docRequestIndexes: Array<number> }> => {
+) => {
   const takes = new Map(Array.from(matching, ([documentIndex, docRequestIndex]) => [docRequestIndex, documentIndex]))
 
-  // Union-find over doc requests, so that merging groups stays linear.
-  const parent = new Map<number, number>()
-  const find = (docRequestIndex: number): number => {
-    const next = parent.get(docRequestIndex) ?? docRequestIndex
-    if (next === docRequestIndex) return docRequestIndex
-    const root = find(next)
-    parent.set(docRequestIndex, root)
-    return root
-  }
-
-  const reachedDocuments = new Set<number>()
-  for (const start of documents) {
-    if (matching.has(start) || reachedDocuments.has(start)) continue
-    const queue = [start]
-    reachedDocuments.add(start)
-    for (let position = 0; position < queue.length; position++) {
-      const documentIndex = queue[position] as number
-      const docRequestIndexes = candidatesOf.get(documentIndex) ?? []
-      const [first] = docRequestIndexes
-      for (const docRequestIndex of docRequestIndexes) {
-        if (first !== undefined) parent.set(find(docRequestIndex), find(first))
-        const next = takes.get(docRequestIndex)
-        if (next !== undefined && !reachedDocuments.has(next)) {
-          reachedDocuments.add(next)
-          queue.push(next)
-        }
+  const queue = documents.filter((documentIndex) => !matching.has(documentIndex))
+  const reached = new Set(queue)
+  for (let position = 0; position < queue.length; position++) {
+    for (const docRequestIndex of candidatesOf.get(queue[position] as number) ?? []) {
+      const next = takes.get(docRequestIndex)
+      if (next !== undefined && !reached.has(next)) {
+        reached.add(next)
+        queue.push(next)
       }
     }
   }
 
-  const groups = new Map<number, { documentIndexes: Array<number>; docRequestIndexes: Set<number> }>()
-  for (const documentIndex of Array.from(reachedDocuments).sort((a, b) => a - b)) {
-    const docRequestIndexes = candidatesOf.get(documentIndex) ?? []
-    const [first] = docRequestIndexes
-    if (first === undefined) continue
-    const group = groups.get(find(first)) ?? { documentIndexes: [], docRequestIndexes: new Set<number>() }
-    group.documentIndexes.push(documentIndex)
-    for (const docRequestIndex of docRequestIndexes) group.docRequestIndexes.add(docRequestIndex)
-    groups.set(find(first), group)
-  }
-
-  return Array.from(groups.values(), ({ documentIndexes, docRequestIndexes }) => ({
-    documentIndexes,
-    docRequestIndexes: Array.from(docRequestIndexes).sort((a, b) => a - b),
-  })).sort((a, b) => (a.docRequestIndexes[0] ?? 0) - (b.docRequestIndexes[0] ?? 0))
+  const documentIndexes = Array.from(reached).sort((a, b) => a - b)
+  const docRequestIndexes = new Set(documentIndexes.flatMap((documentIndex) => candidatesOf.get(documentIndex) ?? []))
+  return { documentIndexes, docRequestIndexes: Array.from(docRequestIndexes).sort((a, b) => a - b) }
 }
