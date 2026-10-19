@@ -42,7 +42,7 @@
     "@owf/identity-common": "workspace:*",
     "@owf/token-status-list": "workspace:*",
     "@panva/hkdf": "^1.2.1",
-    "@peculiar/x509": "^2.1.0",
+    "@peculiar/x509": "^2.2.0",
     "@sd-jwt/core": "workspace:*",
     "@sd-jwt/sd-jwt-vc": "workspace:*",
     "@types/node": "^26.6.5",
