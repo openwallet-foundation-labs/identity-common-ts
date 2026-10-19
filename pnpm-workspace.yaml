@@ -11,7 +11,7 @@ catalog:
   cbor-x: ^1.6.6
   typescript: ~7.0.2
   vitest: ^5.0.5
-  zod: ^4.6.5
+  zod: ^4.6.7
 
 onlyBuiltDependencies:
   - msw
