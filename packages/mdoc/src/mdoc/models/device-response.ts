@@ -40,6 +40,7 @@ import {
   MissingRequestedElementError,
   UnsatisfiedDeviceRequestError,
 } from '../errors'
+import type { AlternativeDataElementsSet } from './alternative-data-elements-set'
 import type { DataElementIdentifier } from './data-element-identifier'
 import type { DataElementValue } from './data-element-value'
 import { DeviceAuth, type DeviceAuthOptions } from './device-auth'
@@ -53,6 +54,7 @@ import { DeviceSignedItems } from './device-signed-items'
 import type { DocRequest } from './doc-request'
 import { Document, type DocumentEncodedStructure } from './document'
 import { DocumentError, type DocumentErrorStructure } from './document-error'
+import type { IntentToRetain } from './intent-to-retain'
 import type { IssuerAuthVerificationResult } from './issuer-auth'
 import { IssuerNamespaces } from './issuer-namespaces'
 import { IssuerSigned } from './issuer-signed'
@@ -112,9 +114,11 @@ export type DeviceResponseVerificationResult = {
 export type DeviceResponseDocumentOptions = {
   issuerSigned: IssuerSigned
   /**
-   * Index into `deviceRequest.docRequests` of the doc request this document answers.
+   * Index into `deviceRequest.docRequests` of the doc request this document answers, or of every
+   * doc request it answers, which then all have its docType. The document discloses the elements
+   * all of them request, and counts as their document for `uniqueDocSetRequired` and the use cases.
    */
-  docRequestIndex: number
+  docRequestIndex: number | Array<number>
   /**
    * The requested elements to disclose, per namespace. Defaults to every element the doc request
    * asks for. Pass a subset to leave out elements, for instance the ones the user declined to share.
@@ -128,7 +132,8 @@ export type DeviceResponseDocumentOptions = {
   /**
    * For a requested element that has alternatives in the `requestInfo` of the doc request (ISO/IEC
    * TS 23220-4 7.2.1.3.2, 18013-5 second edition 10.2.4), the index into its `alternativeElementSets`
-   * of the set to disclose in its place, per namespace and element. Every element of the set is
+   * of the set to disclose in its place, per namespace and element. For a document that answers
+   * several doc requests, the ones that request the element must have the same alternatives for it. Every element of the set is
    * disclosed, possibly in other namespaces. The `options` of the claims of `Holder.matchDeviceRequest`
    * list the sets the credential can disclose.
    *
@@ -138,9 +143,10 @@ export type DeviceResponseDocumentOptions = {
    * could answer it.
    *
    * Throws an `InvalidElementSelectionError` for an element the doc request does not request, a set
-   * it does not have, an element that `elements` leaves out, or a set that discloses an element that
-   * `elements` leaves out; and a `MissingRequestedElementError` for a set the credential does not
-   * have every element of.
+   * it does not have, an element that `elements` leaves out, a set that discloses an element that
+   * `elements` leaves out, or an element that the doc requests of the document have different
+   * alternatives for; and a `MissingRequestedElementError` for a set the credential does not have
+   * every element of.
    */
   alternatives?: Record<Namespace, Record<DataElementIdentifier, number>>
   /**
@@ -341,13 +347,12 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
   }
 
   /**
-   * Create a single disclosed `Document` for one `DocRequest`, authenticated with either a
+   * Create a single disclosed `Document` for the doc requests it answers, authenticated with either a
    * device signature or a device MAC.
    */
   private static async createDocument(
     options: {
-      docRequest: DocRequest
-      docRequestIndex: number
+      docRequests: Array<{ docRequestIndex: number; docRequest: DocRequest }>
       sessionTranscript: SessionTranscript | Uint8Array
       issuerSigned: IssuerSigned
       elements?: Record<Namespace, Array<DataElementIdentifier>>
@@ -370,25 +375,26 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     const signingKey = useSignature ? options.signature?.signingKey : options.mac?.signingKey
     if (!signingKey) throw new Error('Signing key is missing')
 
-    const { docRequest } = options
-    const docType = docRequest.itemsRequest.docType
-
     // Every access to the mobile security object decodes it, so decode it once.
     const mobileSecurityObject = options.issuerSigned.issuerAuth.mobileSecurityObject
     const { keyAuthorizations } = mobileSecurityObject.deviceKeyInfo
+    const docType = mobileSecurityObject.docType
 
     // The document is labeled with the requested docType, which is not signed, so a credential of
     // another docType would produce a document every reader has to reject.
-    if (mobileSecurityObject.docType !== docType) {
-      throw new DocTypeMismatchError(
-        `Credential has docType '${mobileSecurityObject.docType}', but doc request ${options.docRequestIndex} requests docType '${docType}'`
-      )
+    for (const { docRequestIndex, docRequest } of options.docRequests) {
+      if (docRequest.itemsRequest.docType !== docType) {
+        throw new DocTypeMismatchError(
+          `Credential has docType '${docType}', but doc request ${docRequestIndex} requests docType '${docRequest.itemsRequest.docType}'`
+        )
+      }
     }
 
     // Only the selected elements are disclosed, so values in `deviceNamespaces` that are not requested
     // do not need to be authorized, the same as `Holder.matchDeviceRequest` ignores them.
     const { issuerNamespaces: disclosedIssuerNamespaces, deviceNamespaces } = DeviceResponse.selectElements({
-      docRequest,
+      ...DeviceResponse.mergeDocRequests(options.docRequests),
+      docRequestIndexes: options.docRequests.map(({ docRequestIndex }) => docRequestIndex),
       issuerSigned: options.issuerSigned,
       keyAuthorizations,
       deviceNamespaces: options.deviceNamespaces,
@@ -483,7 +489,21 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
    * out, is not disclosed.
    */
   private static selectElements(options: {
-    docRequest: DocRequest
+    namespaces: Map<Namespace, Map<DataElementIdentifier, IntentToRetain>>
+    alternativeDataElements: Array<AlternativeDataElementsSet> | undefined
+    /**
+     * The requested elements that the doc requests have different alternatives for, which cannot be
+     * chosen, with the doc requests that request them.
+     */
+    conflictingAlternatives: Array<{
+      namespace: Namespace
+      elementIdentifier: DataElementIdentifier
+      docRequestIndexes: Array<number>
+    }>
+    /**
+     * The doc requests the document answers, for the error messages.
+     */
+    docRequestIndexes: Array<number>
     issuerSigned: IssuerSigned
     keyAuthorizations: KeyAuthorizations | undefined
     deviceNamespaces?: DeviceNamespaces
@@ -492,19 +512,23 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
   }) {
     const { claims } = matchElements({
       mode: 'holder',
-      namespaces: options.docRequest.itemsRequest.namespaces,
+      namespaces: options.namespaces,
       issuerSigned: options.issuerSigned,
       keyAuthorizations: options.keyAuthorizations,
       deviceNamespaces: options.deviceNamespaces,
-      alternatives: options.docRequest.itemsRequest.requestInfo?.alternativeDataElements,
+      alternatives: options.alternativeDataElements,
     })
+
+    const several = options.docRequestIndexes.length > 1
+    const docRequests = several ? `doc requests ${options.docRequestIndexes.join(', ')}` : 'the doc request'
+    const doNotRequest = `${docRequests} ${several ? 'do' : 'does'} not request`
 
     if (options.elements) {
       for (const [namespace, elementIdentifiers] of Object.entries(options.elements)) {
         for (const elementIdentifier of elementIdentifiers) {
-          if (!options.docRequest.itemsRequest.namespaces.get(namespace)?.has(elementIdentifier)) {
+          if (!options.namespaces.get(namespace)?.has(elementIdentifier)) {
             throw new InvalidElementSelectionError(
-              `Element '${elementIdentifier}' in namespace '${namespace}' is selected for disclosure, but the doc request does not request it`
+              `Element '${elementIdentifier}' in namespace '${namespace}' is selected for disclosure, but ${doNotRequest} it`
             )
           }
         }
@@ -514,21 +538,29 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     const isSelected = ({ namespace, elementIdentifier }: ClaimMatch) =>
       options.elements ? (getOwnProperty(options.elements, namespace)?.includes(elementIdentifier) ?? false) : true
 
-    const requestedAlternatives = options.docRequest.itemsRequest.requestInfo?.alternativeDataElements
+    const requestedAlternatives = options.alternativeDataElements
     for (const [namespace, chosen] of Object.entries(options.alternatives ?? {})) {
       for (const [elementIdentifier, alternativeElementSetIndex] of Object.entries(chosen)) {
-        if (!options.docRequest.itemsRequest.namespaces.get(namespace)?.has(elementIdentifier)) {
+        if (!options.namespaces.get(namespace)?.has(elementIdentifier)) {
           throw new InvalidElementSelectionError(
-            `Alternative set ${alternativeElementSetIndex} of element '${elementIdentifier}' in namespace '${namespace}' is selected for disclosure, but the doc request does not request the element`
+            `Alternative set ${alternativeElementSetIndex} of element '${elementIdentifier}' in namespace '${namespace}' is selected for disclosure, but ${doNotRequest} the element`
           )
         }
         const sets = requestedAlternatives?.find(
           ({ requestedElement: [requestedNamespace, requestedIdentifier] }) =>
             requestedNamespace === namespace && requestedIdentifier === elementIdentifier
         )?.alternativeElementSets
+        const conflict = options.conflictingAlternatives.find(
+          (element) => element.namespace === namespace && element.elementIdentifier === elementIdentifier
+        )
+        if (conflict) {
+          throw new InvalidElementSelectionError(
+            `Alternative set ${alternativeElementSetIndex} of element '${elementIdentifier}' in namespace '${namespace}' is selected for disclosure, but doc requests ${conflict.docRequestIndexes.join(', ')} have different alternatives for it. Answer them with separate documents`
+          )
+        }
         if (!sets?.[alternativeElementSetIndex]) {
           throw new InvalidElementSelectionError(
-            `Alternative set ${alternativeElementSetIndex} of element '${elementIdentifier}' in namespace '${namespace}' is selected for disclosure, but the doc request has no such alternative set`
+            `Alternative set ${alternativeElementSetIndex} of element '${elementIdentifier}' in namespace '${namespace}' is selected for disclosure, but ${docRequests} ${several ? 'have' : 'has'} no such alternative set`
           )
         }
         if (options.elements && !getOwnProperty(options.elements, namespace)?.includes(elementIdentifier)) {
@@ -555,7 +587,16 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       const { claim } = match
       if (!isSelected(claim)) continue
 
-      if (match.element === undefined) throw new MissingRequestedElementError(match.claim.reason)
+      if (match.element === undefined) {
+        const conflict = options.conflictingAlternatives.find(
+          (element) => element.namespace === claim.namespace && element.elementIdentifier === claim.elementIdentifier
+        )
+        throw new MissingRequestedElementError(
+          conflict
+            ? `Element '${claim.elementIdentifier}' in namespace '${claim.namespace}' is not in the credential, and doc requests ${conflict.docRequestIndexes.join(', ')} have different alternatives for it. Answer them with separate documents`
+            : match.claim.reason
+        )
+      }
       const { element } = match
 
       const alternativeElementSetIndex = getOwnProperty(
@@ -637,7 +678,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     const ageOverLimitViolations = findAgeOverLimitViolations(disclosedElementIdentifiers)
     if (ageOverLimitViolations.length > 0) {
       throw new AgeOverLimitExceededError(
-        `Doc request would be answered with ${describeAgeOverLimitViolations(ageOverLimitViolations)}, but at most two age_over_NN elements may be disclosed per namespace. Select at most two of them${options.alternatives && Object.keys(options.alternatives).length > 0 ? ', or choose other alternative sets' : ''}`
+        `${several ? `Doc requests ${options.docRequestIndexes.join(', ')}` : 'Doc request'} would be answered with ${describeAgeOverLimitViolations(ageOverLimitViolations)}, but at most two age_over_NN elements may be disclosed per namespace. Select at most two of them${options.alternatives && Object.keys(options.alternatives).length > 0 ? ', or choose other alternative sets' : ''}`
       )
     }
 
@@ -666,6 +707,91 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     return DeviceResponse.fromDecodedStructure(map)
   }
 
+  /**
+   * The doc requests a document answers, from its `docRequestIndex`.
+   */
+  private static findDocRequests(
+    deviceRequest: DeviceRequest,
+    document: Pick<DeviceResponseDocumentOptions, 'docRequestIndex'>
+  ) {
+    const docRequestIndexes = Array.from(
+      new Set(typeof document.docRequestIndex === 'number' ? [document.docRequestIndex] : document.docRequestIndex)
+    )
+    if (docRequestIndexes.length === 0) throw new Error('A document has to answer at least one doc request')
+
+    return docRequestIndexes.map((docRequestIndex) => ({
+      docRequestIndex,
+      docRequest: DeviceResponse.findDocRequest(deviceRequest, docRequestIndex),
+    }))
+  }
+
+  /**
+   * What the doc requests of a document request together: every element any of them requests, and
+   * its alternatives. An element that more than one of them requests with different alternatives,
+   * or without alternatives in one of them, is answered by itself only: an alternative set of one
+   * doc request would not answer the other.
+   */
+  private static mergeDocRequests(docRequests: Array<{ docRequestIndex: number; docRequest: DocRequest }>) {
+    const namespaces = new Map<Namespace, Map<DataElementIdentifier, IntentToRetain>>()
+    for (const { docRequest } of docRequests) {
+      for (const [namespace, elements] of docRequest.itemsRequest.namespaces) {
+        const merged = namespaces.get(namespace) ?? new Map<DataElementIdentifier, IntentToRetain>()
+        for (const [elementIdentifier, intentToRetain] of elements) {
+          merged.set(elementIdentifier, (merged.get(elementIdentifier) ?? false) || intentToRetain)
+        }
+        namespaces.set(namespace, merged)
+      }
+    }
+
+    const alternativeDataElements: Array<AlternativeDataElementsSet> = []
+    const conflictingAlternatives: Array<{
+      namespace: Namespace
+      elementIdentifier: DataElementIdentifier
+      docRequestIndexes: Array<number>
+    }> = []
+    for (const [namespace, elements] of namespaces) {
+      for (const elementIdentifier of elements.keys()) {
+        const requesting = docRequests.filter(({ docRequest }) =>
+          docRequest.itemsRequest.namespaces.get(namespace)?.has(elementIdentifier)
+        )
+        const alternatives = requesting.map(({ docRequest }) =>
+          docRequest.itemsRequest.requestInfo?.alternativeDataElements?.find(
+            ({ requestedElement: [requestedNamespace, requestedIdentifier] }) =>
+              requestedNamespace === namespace && requestedIdentifier === elementIdentifier
+          )
+        )
+        const [first] = alternatives
+        if (!first) {
+          if (alternatives.some((alternative) => alternative)) {
+            conflictingAlternatives.push({
+              namespace,
+              elementIdentifier,
+              docRequestIndexes: requesting.map(({ docRequestIndex }) => docRequestIndex),
+            })
+          }
+          continue
+        }
+        const sameSets = (alternative: AlternativeDataElementsSet | undefined) =>
+          JSON.stringify(alternative?.alternativeElementSets) === JSON.stringify(first.alternativeElementSets)
+        if (alternatives.every(sameSets)) {
+          alternativeDataElements.push(first)
+        } else {
+          conflictingAlternatives.push({
+            namespace,
+            elementIdentifier,
+            docRequestIndexes: requesting.map(({ docRequestIndex }) => docRequestIndex),
+          })
+        }
+      }
+    }
+
+    return {
+      namespaces,
+      alternativeDataElements: alternativeDataElements.length > 0 ? alternativeDataElements : undefined,
+      conflictingAlternatives,
+    }
+  }
+
   private static findDocRequest(deviceRequest: DeviceRequest, docRequestIndex: number): DocRequest {
     const docRequest = deviceRequest.docRequests[docRequestIndex]
     if (!docRequest) throw new Error(`No doc request found at index ${docRequestIndex}`)
@@ -681,9 +807,9 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
    * without a document set whose doc requests all have a document.
    *
    * Only which doc requests get a document is checked, not which elements are disclosed, so the
-   * holder can still leave elements out. A doc request counts as having a document when a document
-   * of its docType is sent, as one document can answer several doc requests of the same docType. A
-   * response without any document is not checked, as that is how a holder declines a request it
+   * holder can still leave elements out. A doc request has a document when a document names it in
+   * its `docRequestIndex`, as one document can answer several doc requests. A response without any
+   * document is not checked, as that is how a holder declines a request it
    * cannot or does not want to satisfy (18013-5 second edition 10.2.1).
    *
    * A device request without use cases does not say whether it asks for all its doc requests or for
@@ -693,38 +819,35 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
    */
   private static checkRequestInfo(deviceRequest: DeviceRequest, documents: Array<DeviceResponseDocumentOptions>) {
     const documentsPerDocRequest = new Map<number, number>()
-    const docTypes = new Set<string>()
 
     for (const [documentIndex, document] of documents.entries()) {
-      const { docRequestIndex } = document
-      const { requestInfo } = DeviceResponse.findDocRequest(deviceRequest, docRequestIndex).itemsRequest
-      documentsPerDocRequest.set(docRequestIndex, (documentsPerDocRequest.get(docRequestIndex) ?? 0) + 1)
-      docTypes.add(document.issuerSigned.issuerAuth.mobileSecurityObject.docType)
+      for (const { docRequestIndex, docRequest } of DeviceResponse.findDocRequests(deviceRequest, document)) {
+        const { requestInfo } = docRequest.itemsRequest
+        documentsPerDocRequest.set(docRequestIndex, (documentsPerDocRequest.get(docRequestIndex) ?? 0) + 1)
 
-      const issuer = matchIssuer(
-        requestInfo?.issuerIdentifiers,
-        issuerAuthCertificateChain(document.issuerSigned),
-        'x5chain of the IssuerAuth'
-      )
-      if (issuer && !issuer.success) {
-        throw new UnsatisfiedDeviceRequestError(
-          `Document ${documentIndex} answers doc request ${docRequestIndex}, but comes from an issuer it does not accept: ${issuer.reason}`
+        const issuer = matchIssuer(
+          requestInfo?.issuerIdentifiers,
+          issuerAuthCertificateChain(document.issuerSigned),
+          'x5chain of the IssuerAuth'
         )
-      }
+        if (issuer && !issuer.success) {
+          throw new UnsatisfiedDeviceRequestError(
+            `Document ${documentIndex} answers doc request ${docRequestIndex}, but comes from an issuer it does not accept: ${issuer.reason}`
+          )
+        }
 
-      if (requestInfo?.uniqueDocSetRequired && documentsPerDocRequest.get(docRequestIndex) === 2) {
-        throw new UnsatisfiedDeviceRequestError(
-          `More than one document answers doc request ${docRequestIndex}, but it requires a unique document set`
-        )
+        if (requestInfo?.uniqueDocSetRequired && documentsPerDocRequest.get(docRequestIndex) === 2) {
+          throw new UnsatisfiedDeviceRequestError(
+            `More than one document answers doc request ${docRequestIndex}, but it requires a unique document set`
+          )
+        }
       }
     }
 
     const useCases = deviceRequest.deviceRequestInfo?.useCases
     if (!useCases || documents.length === 0) return
 
-    const hasDocument = (docRequestIndex: number) =>
-      documentsPerDocRequest.has(docRequestIndex) ||
-      docTypes.has(DeviceResponse.findDocRequest(deviceRequest, docRequestIndex).itemsRequest.docType)
+    const hasDocument = (docRequestIndex: number) => documentsPerDocRequest.has(docRequestIndex)
     const isSatisfied = (documentSets: Array<Array<number>>) => documentSets.some((set) => set.every(hasDocument))
 
     for (const [useCaseIndex, useCase] of useCases.entries()) {
@@ -768,7 +891,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
    * Create a device response for a device request.
    *
    * Every document brings its own device key and, optionally, its own device namespaces, and names
-   * the doc request it answers through `docRequestIndex`. Elements and doc requests may be left out,
+   * the doc requests it answers through `docRequestIndex`. Elements and doc requests may be left out,
    * as long as the response still answers the request the way its request information asks: see
    * `Holder.createDeviceResponseForDeviceRequest` for what is refused.
    */
@@ -786,8 +909,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       options.documents.map((document) =>
         DeviceResponse.createDocument(
           {
-            docRequest: DeviceResponse.findDocRequest(options.deviceRequest, document.docRequestIndex),
-            docRequestIndex: document.docRequestIndex,
+            docRequests: DeviceResponse.findDocRequests(options.deviceRequest, document),
             sessionTranscript: options.sessionTranscript,
             issuerSigned: document.issuerSigned,
             elements: document.elements,

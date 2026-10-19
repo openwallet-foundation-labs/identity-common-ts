@@ -331,7 +331,7 @@ export class IsoMdocDcApi {
     options: {
       parsedRequest: IsoMdocDcApiParsedRequest
       /**
-       * The documents to disclose, each naming the doc request of `parsedRequest.docRequests` it
+       * The documents to disclose, each naming the doc requests of `parsedRequest.docRequests` it
        * answers through `docRequestIndex`. See `DeviceResponse.createWithDeviceRequest` for how the
        * elements to disclose are selected.
        */

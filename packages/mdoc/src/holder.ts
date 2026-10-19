@@ -139,8 +139,9 @@ export class Holder {
    * - more than one document for a doc request with `uniqueDocSetRequired`
    * - when the device request carries use cases, a mandatory use case, or every use case, left
    *   without a document for each doc request of one of its document sets. A document counts for
-   *   every doc request of its docType. Without use cases this is not checked, as the iOS DC API
-   *   presents several doc requests as alternatives, see `treatAmbiguousMultipleDocRequestsAsAlternatives`
+   *   the doc requests its `docRequestIndex` names, so one document can answer several doc
+   *   requests of its docType. Without use cases this is not checked, as the iOS DC API presents
+   *   several doc requests as alternatives, see `treatAmbiguousMultipleDocRequestsAsAlternatives`
    * - a response larger than the smallest `maximumResponseSize` of the doc requests
    *
    * Elements can still be left out, and an empty `documents` declines the request.

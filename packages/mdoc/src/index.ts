@@ -38,6 +38,7 @@ export {
   type CredentialMatch,
   type CredentialMatchFailure,
   type CredentialMatchSuccess,
+  type DeviceRequestAttribution,
   type DeviceRequestMatchFailure,
   type DeviceRequestMatchOptions,
   type DeviceRequestMatchResult,

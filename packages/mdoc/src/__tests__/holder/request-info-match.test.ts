@@ -10,8 +10,10 @@ import {
   DeviceRequest,
   DeviceRequestInfo,
   DeviceResponse,
+  type DeviceResponseDocumentOptions,
   DocRequest,
   DocRequestInfo,
+  DocTypeMismatchError,
   Holder,
   InvalidElementSelectionError,
   Issuer,
@@ -1090,7 +1092,11 @@ describe('issuer identifiers against a certificate chain', () => {
 
 describe('response checks', () => {
   const familyName = { namespaces: { [mdlNamespace]: { family_name: false } } }
-  const respond = async (deviceRequest: DeviceRequest, docRequestIndex = 0, docType = mdlDocType) =>
+  const respond = async (
+    deviceRequest: DeviceRequest,
+    docRequestIndex: number | Array<number> = 0,
+    docType = mdlDocType
+  ) =>
     Holder.createDeviceResponseForDeviceRequest(
       {
         deviceRequest,
@@ -1117,15 +1123,25 @@ describe('response checks', () => {
     await expect(respond(limited(100_000))).resolves.toBeDefined()
   })
 
-  test('a holder may answer two doc requests of a document set with one document of their docType', async () => {
+  test('a holder may answer two doc requests of a document set with one document that names both', async () => {
     const deviceRequest = createDeviceRequest({
       docRequests: [{ namespaces: { [mdlNamespace]: { family_name: false, given_name: false } } }, familyName],
       useCases: [{ mandatory: true, documentSets: [[0, 1]] }],
     })
 
-    const deviceResponse = await respond(deviceRequest)
+    await expect(respond(deviceRequest)).rejects.toThrow(
+      new UnsatisfiedDeviceRequestError(
+        'Use case 0 is mandatory, but none of its document sets has a document for each of its doc requests'
+      )
+    )
+    const deviceResponse = await respond(deviceRequest, [0, 1])
 
-    expect(Verifier.matchDeviceRequest({ deviceRequest, deviceResponse }).success).toBe(true)
+    const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse })
+    expect(match.success).toBe(true)
+    expect(match.attribution).toStrictEqual({
+      useCases: [{ useCaseIndex: 0, documentSet: [0, 1] }],
+      documents: [{ documentIndex: 0, docRequestIndexes: [0, 1] }],
+    })
   })
 
   test('a document for a doc request that does not exist is refused as such', async () => {
@@ -1182,6 +1198,160 @@ describe('response checks', () => {
     expect(reason('Device response must satisfy mandatory use case 0')).not.toMatch(/Doc request 0: /)
     expect(reason('Device response must satisfy at least one use case')).toMatch(
       /^No use case is satisfied\. Doc request 0: .*Doc request 1: /
+    )
+  })
+})
+
+describe('a document for several doc requests', () => {
+  const respond = async (
+    deviceRequest: DeviceRequest,
+    document: Partial<DeviceResponseDocumentOptions> & Pick<DeviceResponseDocumentOptions, 'docRequestIndex'>
+  ) =>
+    Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [{ issuerSigned: await createIssuerSigned(), signature: { signingKey: deviceKey }, ...document }],
+      },
+      mdocContext
+    )
+
+  test('discloses what every doc request it answers asks for', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } } },
+        { namespaces: { [mdlNamespace]: { given_name: false } } },
+      ],
+    })
+
+    const deviceResponse = await respond(deviceRequest, { docRequestIndex: [0, 1] })
+
+    expect(deviceResponse.documents?.[0].issuerSigned.getPrettyClaims(mdlNamespace)).toStrictEqual({
+      family_name: 'Doe',
+      given_name: 'John',
+    })
+  })
+
+  test('counts for each of them when one requires a unique document set', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } } },
+        {
+          namespaces: { [mdlNamespace]: { given_name: false } },
+          requestInfo: DocRequestInfo.create({ uniqueDocSetRequired: true }),
+        },
+      ],
+    })
+
+    await expect(
+      Holder.createDeviceResponseForDeviceRequest(
+        {
+          deviceRequest,
+          sessionTranscript,
+          documents: [
+            { issuerSigned: await createIssuerSigned(), docRequestIndex: [0, 1], signature: { signingKey: deviceKey } },
+            { issuerSigned: await createIssuerSigned(), docRequestIndex: 1, signature: { signingKey: deviceKey } },
+          ],
+        },
+        mdocContext
+      )
+    ).rejects.toThrow(
+      new UnsatisfiedDeviceRequestError(
+        'More than one document answers doc request 1, but it requires a unique document set'
+      )
+    )
+  })
+
+  test('cannot choose an alternative set for an element its doc requests have different alternatives for', async () => {
+    const alternatives = (set: Array<[string, string]>) =>
+      DocRequestInfo.create({
+        alternativeDataElements: [{ requestedElement: [mdlNamespace, 'age_in_years'], alternativeElementSets: [set] }],
+      })
+    const request = (second: DocRequestInfo | undefined) =>
+      createDeviceRequest({
+        docRequests: [
+          {
+            namespaces: { [mdlNamespace]: { age_in_years: false } },
+            requestInfo: alternatives([[mdlNamespace, 'birth_date']]),
+          },
+          { namespaces: { [mdlNamespace]: { age_in_years: false, family_name: false } }, requestInfo: second },
+        ],
+      })
+    const chooseBirthDate = { docRequestIndex: [0, 1], alternatives: { [mdlNamespace]: { age_in_years: 0 } } }
+
+    const same = await respond(request(alternatives([[mdlNamespace, 'birth_date']])), chooseBirthDate)
+    expect(same.documents?.[0].issuerSigned.getPrettyClaims(mdlNamespace)).toStrictEqual({
+      family_name: 'Doe',
+      birth_date: '1990-01-01',
+    })
+
+    for (const second of [undefined, alternatives([[mdlNamespace, 'given_name']])]) {
+      await expect(respond(request(second), chooseBirthDate)).rejects.toThrow(
+        new InvalidElementSelectionError(
+          `Alternative set 0 of element 'age_in_years' in namespace '${mdlNamespace}' is selected for disclosure, but doc requests 0, 1 have different alternatives for it. Answer them with separate documents`
+        )
+      )
+    }
+    // Without a choice, the credential does not have the element, and none of the sets answers both.
+    await expect(respond(request(undefined), { docRequestIndex: [0, 1] })).rejects.toThrow(
+      new MissingRequestedElementError(
+        `Element 'age_in_years' in namespace '${mdlNamespace}' is not in the credential, and doc requests 0, 1 have different alternatives for it. Answer them with separate documents`
+      )
+    )
+    // Also when the doc request without alternatives for it comes first.
+    await expect(respond(request(undefined), { ...chooseBirthDate, docRequestIndex: [1, 0] })).rejects.toThrow(
+      new InvalidElementSelectionError(
+        `Alternative set 0 of element 'age_in_years' in namespace '${mdlNamespace}' is selected for disclosure, but doc requests 1, 0 have different alternatives for it. Answer them with separate documents`
+      )
+    )
+  })
+
+  test('is attributed by the verifier to every doc request of the answered document sets it may answer', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } } },
+        { namespaces: { [mdlNamespace]: { given_name: false } } },
+        { docType: photoIdDocType, namespaces: { [mdlNamespace]: { family_name: false } } },
+      ],
+      useCases: [
+        { mandatory: true, documentSets: [[0, 1]] },
+        { mandatory: false, documentSets: [[2]] },
+      ],
+    })
+
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 1, signature: { signingKey: deviceKey } },
+        ],
+      },
+      mdocContext
+    )
+
+    // Either document may answer either doc request, with elements left out.
+    expect(Verifier.matchDeviceRequest({ deviceRequest, deviceResponse }).attribution).toStrictEqual({
+      useCases: [{ useCaseIndex: 0, documentSet: [0, 1] }],
+      documents: [
+        { documentIndex: 0, docRequestIndexes: [0, 1] },
+        { documentIndex: 1, docRequestIndexes: [0, 1] },
+      ],
+    })
+  })
+
+  test('is refused for doc requests of another docType, or none', async () => {
+    const deviceRequest = createDeviceRequest({
+      docRequests: [
+        { namespaces: { [mdlNamespace]: { family_name: false } } },
+        { docType: photoIdDocType, namespaces: { [mdlNamespace]: { family_name: false } } },
+      ],
+    })
+
+    await expect(respond(deviceRequest, { docRequestIndex: [0, 1] })).rejects.toThrow(DocTypeMismatchError)
+    await expect(respond(deviceRequest, { docRequestIndex: [] })).rejects.toThrow(
+      new Error('A document has to answer at least one doc request')
     )
   })
 })
