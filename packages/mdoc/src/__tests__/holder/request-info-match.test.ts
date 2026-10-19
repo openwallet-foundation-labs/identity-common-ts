@@ -9,6 +9,7 @@ import {
   DeviceKey,
   DeviceRequest,
   DeviceRequestInfo,
+  DeviceResponse,
   DocRequest,
   DocRequestInfo,
   Holder,
@@ -26,7 +27,6 @@ import {
   Verifier,
 } from '../..'
 import { Handover } from '../../mdoc/models/handover'
-import { certificateAuthorityKeyIdentifier } from '../../utils/keyIdentifiers'
 import { DEVICE_JWK_PRIVATE, DEVICE_JWK_PUBLIC, ISSUER_CERTIFICATE } from '../config'
 import { mdocContext } from '../context'
 import { createIssuerSigned, issuerCertificate, mdlDocType, mdlNamespace } from '../iso-mdoc-dc-api/fixtures'
@@ -76,21 +76,6 @@ const ageInYearsOrAgeOver18 = DocRequestInfo.create({
       alternativeElementSets: [[[mdlNamespace, 'age_birth_year']], [[mdlNamespace, 'age_over_18']]],
     },
   ],
-})
-
-describe('certificateAuthorityKeyIdentifier', () => {
-  test('reads the authority key identifier as @peculiar/x509 does', () => {
-    const certificate = new x509.X509Certificate(ISSUER_CERTIFICATE)
-    const keyIdentifier = certificateAuthorityKeyIdentifier(issuerCertificate)
-
-    expect(keyIdentifier && hex.encode(keyIdentifier)).toBe(
-      certificate.getExtension(x509.AuthorityKeyIdentifierExtension)?.keyId
-    )
-  })
-
-  test('yields nothing for bytes that are not a certificate', () => {
-    expect(certificateAuthorityKeyIdentifier(new Uint8Array([0x30, 0x82, 0xff]))).toBeUndefined()
-  })
 })
 
 describe('alternative data elements', () => {
@@ -1024,6 +1009,38 @@ describe('issuer identifiers against a certificate chain', () => {
     expect(failed).toStrictEqual([])
   })
 
+  test('a holder answers with an mdoc of the IACA the doc request names, matched against its x5chain', async () => {
+    const issuer = await createIssuer('FR')
+    const other = await createIssuer('DE')
+    const issuerSigned = await sign(issuer)
+    const respond = (deviceRequest: DeviceRequest) =>
+      Holder.createDeviceResponseForDeviceRequest(
+        {
+          deviceRequest,
+          sessionTranscript,
+          documents: [{ issuerSigned, docRequestIndex: 0, signature: { signingKey: deviceKey } }],
+        },
+        mdocContext
+      )
+
+    await expect(respond(naming(issuer.iacaKeyIdentifier))).resolves.toBeInstanceOf(DeviceResponse)
+    await expect(respond(naming(other.iacaKeyIdentifier))).rejects.toThrow(UnsatisfiedDeviceRequestError)
+  })
+
+  test('a credential without an x5chain does not match a doc request that names issuers', async () => {
+    const issuer = await createIssuer('FR')
+    const issuerSigned = await sign(issuer)
+    issuerSigned.issuerAuth.unprotectedHeaders.headers.delete(RegisteredCwtHeaderClaimKey.X5Chain)
+
+    const match = Holder.matchDeviceRequest({
+      deviceRequest: naming(issuer.iacaKeyIdentifier),
+      credentials: [issuerSigned],
+    })
+
+    expect(match.success).toBe(false)
+    expect(match.docRequests[0].failedCredentials[0].issuer).toMatchObject({ success: false })
+  })
+
   test('the subject key identifier of the document signer certificate does not name its issuer', async () => {
     const issuer = await createIssuer('FR')
 
@@ -1050,8 +1067,24 @@ describe('issuer identifiers against a certificate chain', () => {
 
     expect(match?.success).toBe(false)
     expect(failed.map((check) => check.reason).join(' ')).toContain('validated certificate chain')
-    // Matched on its own, against the x5chain, the document passes: hence `issuerCertificateChains`.
-    expect(Verifier.matchDeviceRequest({ deviceRequest, deviceResponse }).success).toBe(true)
+    // Without validated chains, the verifier does not fall back to the x5chain.
+    const unvalidated = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse })
+    expect(unvalidated.success).toBe(false)
+    expect(unvalidated.docRequests[0].failedDocuments[0]).toMatchObject({
+      issuer: { success: false, reason: expect.stringContaining('has no validated certificate chain') },
+    })
+  })
+
+  test('an mdoc whose chain does not validate does not match its issuer', async () => {
+    const issuer = await createIssuer('FR')
+    const other = await createIssuer('DE')
+
+    const { match } = await verify(naming(issuer.iacaKeyIdentifier), await sign(issuer), other.iaca)
+
+    expect(match?.success).toBe(false)
+    expect(match?.docRequests[0].failedDocuments[0]).toMatchObject({
+      issuer: { success: false, reason: expect.stringContaining('has no validated certificate chain') },
+    })
   })
 })
 

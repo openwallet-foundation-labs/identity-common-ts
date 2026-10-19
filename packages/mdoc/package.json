@@ -42,6 +42,7 @@
     "@owf/cose": "workspace:^",
     "@owf/identity-common": "workspace:^",
     "@owf/token-status-list": "workspace:^",
+    "@owf/x509": "workspace:^",
     "zod": "catalog:"
   }
 }

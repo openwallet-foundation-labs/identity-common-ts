@@ -27,8 +27,9 @@ export type DocRequestInfoOptions = {
   alternativeDataElements?: Array<AlternativeDataElementsSet | AlternativeDataElementsSetOptions>
   /**
    * Key identifiers of the authority key identifier of an acceptable issuer certificate. An mdoc
-   * only satisfies the doc request when one of them matches a certificate in the x5chain of its
-   * IssuerAuth.
+   * only satisfies the doc request when one of them is the authority key identifier of a certificate
+   * in its chain: for a verifier the chain it validated, as the x5chain is unprotected, and for a
+   * holder the x5chain of its IssuerAuth.
    */
   issuerIdentifiers?: Array<Uint8Array>
   uniqueDocSetRequired?: boolean

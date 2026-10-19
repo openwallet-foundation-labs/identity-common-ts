@@ -284,6 +284,9 @@ importers:
       '@owf/token-status-list':
         specifier: workspace:^
         version: link:../token-status-list
+      '@owf/x509':
+        specifier: workspace:^
+        version: link:../x509
       zod:
         specifier: 'catalog:'
         version: 4.6.5

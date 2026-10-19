@@ -52,8 +52,8 @@ export class Verifier {
     deviceResponse: Uint8Array | DeviceResponse
     matchOptions?: DeviceRequestMatchOptions
     /**
-     * See `issuerCertificateChains` of {@link matchDeviceRequest}: without them, `issuerIdentifiers`
-     * are matched against the x5chain, which the holder controls.
+     * See `issuerCertificateChains` of {@link matchDeviceRequest}: without them, no document
+     * satisfies a doc request that names issuers, as the x5chain is not trusted.
      */
     issuerCertificateChains?: Array<Array<Uint8Array> | undefined>
   }): DeviceRequestMatchResult {

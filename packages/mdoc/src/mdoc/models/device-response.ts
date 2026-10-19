@@ -22,6 +22,7 @@ import {
   type DeviceRequestMatchOptions,
   type DeviceRequestMatchResult,
   type ElementMatch,
+  issuerAuthCertificateChain,
   matchDeviceRequest,
   matchElements,
   matchIssuer,
@@ -700,7 +701,11 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       documentsPerDocRequest.set(docRequestIndex, (documentsPerDocRequest.get(docRequestIndex) ?? 0) + 1)
       docTypes.add(document.issuerSigned.issuerAuth.mobileSecurityObject.docType)
 
-      const issuer = matchIssuer(document.issuerSigned, requestInfo?.issuerIdentifiers)
+      const issuer = matchIssuer(
+        requestInfo?.issuerIdentifiers,
+        issuerAuthCertificateChain(document.issuerSigned),
+        'x5chain of the IssuerAuth'
+      )
       if (issuer && !issuer.success) {
         throw new UnsatisfiedDeviceRequestError(
           `Document ${documentIndex} answers doc request ${docRequestIndex}, but comes from an issuer it does not accept: ${issuer.reason}`

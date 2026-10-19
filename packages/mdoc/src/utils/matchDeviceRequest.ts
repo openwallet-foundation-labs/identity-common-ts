@@ -1,3 +1,5 @@
+import { hexEncode } from '@owf/identity-common'
+import { parseCertificate } from '@owf/x509'
 import type { VerificationCallback } from '../mdoc/check-callback'
 import { InvalidDeviceRequestMatchOptionsError } from '../mdoc/errors'
 import type { AlternativeDataElementsSet } from '../mdoc/models/alternative-data-elements-set'
@@ -20,7 +22,6 @@ import {
 } from './ageOver'
 import { getOwnProperty } from './getOwnProperty'
 import { isDeviceSignedElementAuthorized } from './keyAuthorizations'
-import { certificateAuthorityKeyIdentifier } from './keyIdentifiers'
 
 export type DisclosedElementSource = 'issuerSigned' | 'deviceSigned'
 
@@ -564,11 +565,10 @@ export const matchDeviceRequest = (options: {
   matchOptions?: DeviceRequestMatchOptions
   /**
    * Per document, in response order, its certificate chain as validated against the trusted
-   * certificates, leaf first. The `issuerIdentifiers` of a doc request are matched against it. The
-   * x5chain is in the unprotected header of the IssuerAuth, so a holder can add any certificate to
-   * it: without a validated chain, which is the default, a document passes `issuerIdentifiers` with
-   * the certificate of any issuer added to its x5chain. `Verifier.verifyDeviceResponse` passes the
-   * chains it validates.
+   * certificates, leaf first. The `issuerIdentifiers` of a doc request are matched against it, and
+   * a document without one does not satisfy a doc request that names issuers. The x5chain is not
+   * used: it is in the unprotected header of the IssuerAuth, so a holder can add the certificate of
+   * any issuer to it. `Verifier.verifyDeviceResponse` passes the chains it validates.
    */
   issuerCertificateChains?: Array<Array<Uint8Array> | undefined>
 }): DeviceRequestMatchResult => {
@@ -603,9 +603,9 @@ export const matchDeviceRequest = (options: {
             : { success: true, docType }
 
       const issuerResult = matchIssuer(
-        document.issuerSigned,
         requestInfo?.issuerIdentifiers,
-        options.issuerCertificateChains?.[documentIndex]
+        options.issuerCertificateChains?.[documentIndex],
+        'validated certificate chain'
       )
 
       const { claims, unusedElements } = matchElements({
@@ -723,7 +723,8 @@ export const matchDeviceRequest = (options: {
  * is not matched against any credential, and fails with `invalidDocRequest`.
  *
  * The doc requests are matched by use case, the same way as {@link matchDeviceRequest} does, and each
- * use case lists every document set the credentials can answer, of which the holder picks one.
+ * use case lists the document sets the credentials can answer (`matchingDocumentSets`), of which
+ * the holder picks one.
  *
  * The `requestInfo` of a doc request is applied too: a credential of an issuer it does not name
  * fails, and a requested element is answered by one of its alternative sets when the credential
@@ -782,7 +783,11 @@ export const matchCredentialsToDeviceRequest = (options: {
                 reason: `Credential has docType '${credentialDocType}', but docType '${docType}' was requested`,
               }
 
-        const issuerResult = matchIssuer(issuerSigned, requestInfo?.issuerIdentifiers)
+        const issuerResult = matchIssuer(
+          requestInfo?.issuerIdentifiers,
+          issuerAuthCertificateChain(issuerSigned),
+          'x5chain of the IssuerAuth'
+        )
 
         const claimsResult = toClaimsMatchResult(
           matchElements({
@@ -877,7 +882,7 @@ const resolveUseCases = (
 }
 
 /**
- * Per use case every document set whose doc requests are all satisfied, and whether the device
+ * Per use case the document sets whose doc requests are all satisfied, and whether the device
  * request is: every mandatory use case and at least one use case has to be (18013-5 second edition
  * 10.2.5).
  */
@@ -903,38 +908,54 @@ const matchUseCases = ({ useCasesSource, useCases }: ResolvedUseCases, docReques
 
 /**
  * Whether a document or credential comes from one of `issuerIdentifiers`; undefined when the doc
- * request names no issuer. Matched against the authority key identifiers of `certificateChain`,
- * which defaults to the x5chain of the IssuerAuth.
+ * request names no issuer. Matched against the authority key identifiers of `certificateChain`:
+ * for a verifier the chain it validated, as the x5chain is in the unprotected header of the
+ * IssuerAuth, and for a holder the x5chain of its own credential. Without a chain, it fails.
  *
  * @internal
  */
 export const matchIssuer = (
-  issuerSigned: IssuerSigned,
   issuerIdentifiers: Array<Uint8Array> | undefined,
-  certificateChain?: Array<Uint8Array>
+  certificateChain: Array<Uint8Array> | undefined,
+  chainName: 'validated certificate chain' | 'x5chain of the IssuerAuth'
 ): IssuerMatchResult | undefined => {
   if (!issuerIdentifiers) return undefined
 
-  let certificates: Array<Uint8Array> = []
-  try {
-    certificates = certificateChain ?? issuerSigned.issuerAuth.certificateChain
-  } catch {
-    // No x5chain: no key identifier to match.
+  const accepted = `the ${issuerIdentifiers.length} issuer identifier(s) the doc request accepts`
+  if (!certificateChain) {
+    return { success: false, reason: `The document has no ${chainName} to match ${accepted} against` }
   }
-  const keyIdentifiers = certificates.flatMap((certificate) => certificateAuthorityKeyIdentifier(certificate) ?? [])
 
-  return issuerIdentifiers.some((identifier) =>
-    keyIdentifiers.some((keyIdentifier) => equalBytes(identifier, keyIdentifier))
-  )
+  const keyIdentifiers = certificateChain.flatMap((certificate) => {
+    try {
+      return parseCertificate(certificate).authorityKeyIdentifier ?? []
+    } catch {
+      // A certificate that does not parse has no key identifier to match.
+      return []
+    }
+  })
+
+  return issuerIdentifiers.some((identifier) => keyIdentifiers.includes(hexEncode(identifier)))
     ? { success: true }
     : {
         success: false,
-        reason: `No certificate in the ${certificateChain ? 'validated certificate chain' : 'x5chain of the IssuerAuth'} has one of the ${issuerIdentifiers.length} issuer identifier(s) the doc request accepts as its authority key identifier`,
+        reason: `No certificate in the ${chainName} has one of ${accepted} as its authority key identifier`,
       }
 }
 
-const equalBytes = (a: Uint8Array, b: Uint8Array) =>
-  a.length === b.length && a.every((byte, index) => byte === b[index])
+/**
+ * The x5chain of the IssuerAuth of a credential, which a holder matches issuers against; undefined
+ * when it cannot be read.
+ *
+ * @internal
+ */
+export const issuerAuthCertificateChain = (issuerSigned: IssuerSigned) => {
+  try {
+    return issuerSigned.issuerAuth.certificateChain
+  } catch {
+    return undefined
+  }
+}
 
 type ElementCandidate = DisclosedElement & {
   /**
