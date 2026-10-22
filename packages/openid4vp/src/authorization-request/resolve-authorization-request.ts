@@ -15,6 +15,7 @@ import {
 import type { PexPresentationDefinition } from '../models/z-pex'
 import { type ParsedTransactionDataEntry, parseTransactionData } from '../transaction-data/parse-transaction-data'
 import { type Openid4vpVersionNumber, parseAuthorizationRequestVersion } from '../version'
+import { Openid4vpAuthorizationRequestError } from './Openid4vpAuthorizationRequestError'
 import {
   validateOpenid4vpAuthorizationRequestPayload,
   type WalletVerificationOptions,
@@ -76,12 +77,6 @@ export async function resolveOpenid4vpAuthorizationRequest(
 ): Promise<ResolvedOpenid4vpAuthorizationRequest> {
   const { wallet, callbacks } = options
 
-  let authorizationRequestPayload:
-    | Openid4vpAuthorizationRequest
-    | ((Openid4vpAuthorizationRequestDcApi | Openid4vpAuthorizationRequestIae) & {
-        presentation_definition_uri?: never
-      })
-
   const parsed = parseWithErrorHandling(
     z.union([
       zOpenid4vpAuthorizationRequestDcApi,
@@ -94,6 +89,10 @@ export async function resolveOpenid4vpAuthorizationRequest(
   )
 
   let jar: VerifiedJarRequest | undefined
+  let parsedAuthorizationRequestPayload:
+    | Openid4vpAuthorizationRequest
+    | Openid4vpAuthorizationRequestDcApi
+    | Openid4vpAuthorizationRequestIae
   if (isJarAuthorizationRequest(parsed)) {
     jar = await verifyJarRequest({
       jarRequestParams: parsed,
@@ -103,84 +102,131 @@ export async function resolveOpenid4vpAuthorizationRequest(
       allowRequestUri: options.responseMode.type === 'direct_post',
     })
 
-    const parsedJarAuthorizationRequestPayload = parseWithErrorHandling(
+    parsedAuthorizationRequestPayload = parseWithErrorHandling(
       z.union([zOpenid4vpAuthorizationRequestDcApi, zOpenid4vpAuthorizationRequestIae, zOpenid4vpAuthorizationRequest]),
       jar.authorizationRequestPayload,
       'Invalid authorization request. Could not parse jar request payload as openid4vp auth request.'
     )
-
-    authorizationRequestPayload = validateOpenId4vpAuthorizationRequestPayload({
-      authorizationRequestPayload: parsedJarAuthorizationRequestPayload,
-      wallet,
-      jar: true,
-      responseMode: options.responseMode,
-    })
   } else {
-    authorizationRequestPayload = validateOpenId4vpAuthorizationRequestPayload({
-      authorizationRequestPayload: parsed,
-      wallet,
-      jar: false,
+    parsedAuthorizationRequestPayload = parsed
+  }
 
+  const validateClient = async (
+    authorizationRequestPayload:
+      | Openid4vpAuthorizationRequest
+      | Openid4vpAuthorizationRequestDcApi
+      | Openid4vpAuthorizationRequestIae
+  ) => {
+    const version = parseAuthorizationRequestVersion(authorizationRequestPayload)
+    let clientMetadata = authorizationRequestPayload.client_metadata
+    if (
+      !isOpenid4vpAuthorizationRequestDcApi(authorizationRequestPayload) &&
+      !isOpenid4vpAuthorizationRequestIae(authorizationRequestPayload) &&
+      !clientMetadata &&
+      authorizationRequestPayload.client_metadata_uri
+    ) {
+      clientMetadata = await fetchClientMetadata({ clientMetadataUri: authorizationRequestPayload.client_metadata_uri })
+    }
+
+    const client = await validateOpenid4vpClientId({
+      authorizationRequestPayload: {
+        ...authorizationRequestPayload,
+        client_metadata: clientMetadata,
+      },
+      jar,
+
+      callbacks,
+      origin: options.responseMode.type === 'dc_api' ? options.responseMode.expectedOrigin : undefined,
+      version,
+    })
+
+    return { version, client }
+  }
+
+  let authorizationRequestPayload:
+    | Openid4vpAuthorizationRequest
+    | ((Openid4vpAuthorizationRequestDcApi | Openid4vpAuthorizationRequestIae) & {
+        presentation_definition_uri?: never
+      })
+    | undefined
+  let payloadValidationError: Oauth2ServerErrorResponseError | undefined
+  try {
+    authorizationRequestPayload = validateOpenId4vpAuthorizationRequestPayload({
+      authorizationRequestPayload: parsedAuthorizationRequestPayload,
+      wallet,
+      jar: jar !== undefined,
       responseMode: options.responseMode,
     })
+  } catch (error) {
+    if (!(error instanceof Oauth2ServerErrorResponseError)) throw error
+    payloadValidationError = error
   }
 
-  const version = parseAuthorizationRequestVersion(authorizationRequestPayload)
-  let clientMetadata = authorizationRequestPayload.client_metadata
-  if (
-    !isOpenid4vpAuthorizationRequestDcApi(authorizationRequestPayload) &&
-    !isOpenid4vpAuthorizationRequestIae(authorizationRequestPayload) &&
-    !clientMetadata &&
-    authorizationRequestPayload.client_metadata_uri
-  ) {
-    clientMetadata = await fetchClientMetadata({ clientMetadataUri: authorizationRequestPayload.client_metadata_uri })
-  }
+  const { version, client } = await validateClient(
+    authorizationRequestPayload ?? parsedAuthorizationRequestPayload
+  ).catch((error) => {
+    // The payload validation error takes precedence, as the payload is validated first
+    const requestError = payloadValidationError ?? error
+    if (!(requestError instanceof Oauth2ServerErrorResponseError)) throw requestError
 
-  const clientMeta = await validateOpenid4vpClientId({
-    authorizationRequestPayload: {
-      ...authorizationRequestPayload,
-      client_metadata: clientMetadata,
-    },
-    jar,
-
-    callbacks,
-    origin: options.responseMode.type === 'dc_api' ? options.responseMode.expectedOrigin : undefined,
-    version,
+    // Without `client`, as the client is not authenticated
+    throw new Openid4vpAuthorizationRequestError(requestError, {
+      authorizationRequestPayload: parsedAuthorizationRequestPayload,
+      jar,
+    })
   })
 
-  let pex: ResolvedOpenid4vpAuthorizationRequest['pex'] | undefined
-  let dcql: ResolvedOpenid4vpAuthorizationRequest['dcql'] | undefined
-
-  if (authorizationRequestPayload.presentation_definition || authorizationRequestPayload.presentation_definition_uri) {
-    if (authorizationRequestPayload.presentation_definition_uri) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: 'Cannot fetch presentation definition from URI. Not supported.',
-      })
-    }
-
-    pex = {
-      presentation_definition: authorizationRequestPayload.presentation_definition,
-      presentation_definition_uri: authorizationRequestPayload.presentation_definition_uri,
-    }
+  if (!authorizationRequestPayload) {
+    throw new Openid4vpAuthorizationRequestError(payloadValidationError as Oauth2ServerErrorResponseError, {
+      authorizationRequestPayload: parsedAuthorizationRequestPayload,
+      client,
+      jar,
+    })
   }
 
-  if (authorizationRequestPayload.dcql_query) {
-    dcql = { query: authorizationRequestPayload.dcql_query }
-  }
+  try {
+    let pex: ResolvedOpenid4vpAuthorizationRequest['pex'] | undefined
+    let dcql: ResolvedOpenid4vpAuthorizationRequest['dcql'] | undefined
 
-  const transactionData = authorizationRequestPayload.transaction_data
-    ? parseTransactionData({ transactionData: authorizationRequestPayload.transaction_data })
-    : undefined
+    if (
+      authorizationRequestPayload.presentation_definition ||
+      authorizationRequestPayload.presentation_definition_uri
+    ) {
+      if (authorizationRequestPayload.presentation_definition_uri) {
+        throw new Oauth2ServerErrorResponseError({
+          error: Oauth2ErrorCodes.InvalidRequest,
+          error_description: 'Cannot fetch presentation definition from URI. Not supported.',
+        })
+      }
 
-  return {
-    transactionData,
-    authorizationRequestPayload,
-    jar,
-    client: clientMeta,
-    pex,
-    dcql,
-    version,
+      pex = {
+        presentation_definition: authorizationRequestPayload.presentation_definition,
+        presentation_definition_uri: authorizationRequestPayload.presentation_definition_uri,
+      }
+    }
+
+    if (authorizationRequestPayload.dcql_query) {
+      dcql = { query: authorizationRequestPayload.dcql_query }
+    }
+
+    const transactionData = authorizationRequestPayload.transaction_data
+      ? parseTransactionData({ transactionData: authorizationRequestPayload.transaction_data })
+      : undefined
+
+    return {
+      transactionData,
+      authorizationRequestPayload,
+      jar,
+      client,
+      pex,
+      dcql,
+      version,
+    }
+  } catch (error) {
+    if (error instanceof Oauth2ServerErrorResponseError) {
+      throw new Openid4vpAuthorizationRequestError(error, { authorizationRequestPayload, client, jar })
+    }
+    throw error
   }
 }
 

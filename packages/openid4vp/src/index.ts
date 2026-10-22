@@ -2,6 +2,7 @@ export {
   type CreateOpenid4vpAuthorizationRequestOptions,
   createOpenid4vpAuthorizationRequest,
 } from './authorization-request/create-authorization-request'
+export { Openid4vpAuthorizationRequestError } from './authorization-request/Openid4vpAuthorizationRequestError'
 export {
   type ParseOpenid4vpAuthorizationRequestOptions,
   parseOpenid4vpAuthorizationRequest,

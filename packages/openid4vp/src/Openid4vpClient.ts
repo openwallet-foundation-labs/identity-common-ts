@@ -13,6 +13,10 @@ import {
   type SubmitOpenid4vpAuthorizationResponseOptions,
   submitOpenid4vpAuthorizationResponse,
 } from './authorization-response/submit-authorization-response'
+import type {
+  Openid4vpAuthorizationErrorResponse,
+  Openid4vpAuthorizationResponse,
+} from './authorization-response/z-authorization-response'
 
 export interface Openid4vpClientOptions {
   /**
@@ -34,10 +38,12 @@ export class Openid4vpClient {
     return resolveOpenid4vpAuthorizationRequest({ ...options, callbacks: this.options.callbacks })
   }
 
-  public async createOpenid4vpAuthorizationResponse(
-    options: Omit<CreateOpenid4vpAuthorizationResponseOptions, 'callbacks'>
-  ) {
-    return createOpenid4vpAuthorizationResponse({ ...options, callbacks: this.options.callbacks })
+  public async createOpenid4vpAuthorizationResponse<
+    ResponsePayload extends
+      | Openid4vpAuthorizationResponse
+      | Openid4vpAuthorizationErrorResponse = Openid4vpAuthorizationResponse,
+  >(options: Omit<CreateOpenid4vpAuthorizationResponseOptions<ResponsePayload>, 'callbacks'>) {
+    return createOpenid4vpAuthorizationResponse<ResponsePayload>({ ...options, callbacks: this.options.callbacks })
   }
 
   public async submitOpenid4vpAuthorizationResponse(
