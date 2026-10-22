@@ -18,6 +18,8 @@ import {
   Issuer,
   IssuerSigned,
   ItemsRequest,
+  type MdocContext,
+  type MdocFetchContext,
   ProtectedHeaders,
   RegisteredCwtHeaderClaimKey,
   SessionTranscript,
@@ -1657,6 +1659,79 @@ suite('Verification', () => {
       await expect(
         Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates }, mdocContext)
       ).rejects.toThrow('No trusted certificate was found while validating the X.509 chain')
+    })
+  })
+
+  suite('Fetch context', () => {
+    // A context that records what each fetch was asked to retrieve, alongside the URI.
+    const recordingContext = () => {
+      const requests: Array<{ uri: string; type: MdocFetchContext['type'] }> = []
+
+      const ctx = {
+        ...mdocContext,
+        fetch: (input, init, context) => {
+          requests.push({ uri: String(input), type: context.type })
+          return fetch(input, init)
+        },
+      } satisfies MdocContext
+
+      return { ctx, requests }
+    }
+
+    const verifyWith = (credential: IssuerSigned, ctx: MdocContext) =>
+      Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates: validTrustedCertificates }, ctx)
+
+    test('a status list is fetched as `statusList`', async () => {
+      const idx = 3
+      const uri = await mockStatusList('/status-list/fetch-context', { idx })
+      const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+      const { ctx, requests } = recordingContext()
+
+      await expect(verifyWith(credential, ctx)).resolves.toBeDefined()
+
+      expect(requests).toEqual([{ uri, type: 'statusList' }])
+    })
+
+    test('an identifier list is fetched as `identifierList`', async () => {
+      const id = new Uint8Array([0xab, 0xcd])
+      const uri = await mockIdentifierList('/identifier-list/fetch-context', { identifiers: [] })
+      const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+      const { ctx, requests } = recordingContext()
+
+      await expect(verifyWith(credential, ctx)).resolves.toBeDefined()
+
+      expect(requests).toEqual([{ uri, type: 'identifierList' }])
+    })
+
+    test('an MSO carrying both mechanisms distinguishes them', async () => {
+      const idx = 3
+      const id = new Uint8Array([0xab, 0xcd])
+      const statusListUri = await mockStatusList('/status-list/fetch-context-both', { idx })
+      const identifierListUri = await mockIdentifierList('/identifier-list/fetch-context-both', { identifiers: [] })
+      const credential = await issueMdocWithStatus({
+        statusList: { idx, uri: statusListUri },
+        identifierList: { id, uri: identifierListUri },
+      })
+      const { ctx, requests } = recordingContext()
+
+      await expect(verifyWith(credential, ctx)).resolves.toBeDefined()
+
+      expect(requests).toEqual([
+        { uri: statusListUri, type: 'statusList' },
+        { uri: identifierListUri, type: 'identifierList' },
+      ])
+    })
+
+    test('the platform fetch satisfies the context callback', async () => {
+      const idx = 3
+      const uri = await mockStatusList('/status-list/fetch-context-platform', { idx })
+      const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+      // Handing the library the platform implementation directly is the common case, and is what
+      // makes the resource context an additive argument.
+      const ctx = { ...mdocContext, fetch: globalThis.fetch } satisfies MdocContext
+
+      await expect(verifyWith(credential, ctx)).resolves.toBeDefined()
     })
   })
 })

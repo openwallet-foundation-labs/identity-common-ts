@@ -57,8 +57,27 @@ export interface HpkeContext {
   }) => MaybePromise<Uint8Array>
 }
 
+/**
+ * What a {@link MdocContext.fetch} call is retrieving. Lets an implementation apply policy —
+ * caching, timeouts, retries — per resource rather than to every request alike.
+ */
+export type MdocFetchContext = {
+  type: 'statusList' | 'identifierList'
+}
+
 export interface MdocContext {
-  fetch: typeof fetch
+  /**
+   * Retrieves a resource over HTTP. `context` names what is being retrieved; the revocation lists
+   * an MSO references are the only resources this library fetches.
+   *
+   * The global `fetch` satisfies this, as it ignores the third argument.
+   */
+  fetch: (
+    input: Parameters<typeof fetch>[0],
+    init: Parameters<typeof fetch>[1],
+    context: MdocFetchContext
+  ) => Promise<Response>
+
   crypto: {
     random: (length: number) => Uint8Array
     digest: (input: { digestAlgorithm: DigestAlgorithm; bytes: Uint8Array }) => MaybePromise<Uint8Array>

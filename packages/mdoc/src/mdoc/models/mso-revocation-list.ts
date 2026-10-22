@@ -156,7 +156,11 @@ export async function verifyStatusListToken(
   if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
 
   const { uri, idx } = statusListInfo
-  const token = await fetchStatusList({ uri, customFetcher: ctx.fetch, acceptedFormats: ['cwt'] })
+  const token = await fetchStatusList({
+    uri,
+    customFetcher: (input, init) => ctx.fetch(input, init, { type: 'statusList' }),
+    acceptedFormats: ['cwt'],
+  })
 
   // `fetchStatusList` decides on the response's Content-Type, not on `acceptedFormats`, so a JWT
   // still comes back as a string even though it was not asked for.
