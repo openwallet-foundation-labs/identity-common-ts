@@ -22,24 +22,15 @@ import {
 } from './validate-authorization-request'
 import { validateOpenid4vpAuthorizationRequestDcApiPayload } from './validate-authorization-request-dc-api'
 import { validateOpenid4vpAuthorizationRequestIaePayload } from './validate-authorization-request-iae'
-import { type Openid4vpAuthorizationRequest, zOpenid4vpAuthorizationRequest } from './z-authorization-request'
+import { isOpenid4vpAuthorizationRequestDcApi } from './z-authorization-request-dc-api'
+import { isOpenid4vpAuthorizationRequestIae } from './z-authorization-request-iae'
 import {
-  isOpenid4vpAuthorizationRequestDcApi,
-  type Openid4vpAuthorizationRequestDcApi,
-  zOpenid4vpAuthorizationRequestDcApi,
-} from './z-authorization-request-dc-api'
-import {
-  isOpenid4vpAuthorizationRequestIae,
-  type Openid4vpAuthorizationRequestIae,
-  zOpenid4vpAuthorizationRequestIae,
-} from './z-authorization-request-iae'
+  type Openid4vpAuthorizationRequestPayload,
+  zOpenid4vpAuthorizationRequestPayload,
+} from './z-authorization-request-payload'
 
 export interface ResolveOpenid4vpAuthorizationRequestOptions {
-  authorizationRequestPayload:
-    | Openid4vpAuthorizationRequest
-    | Openid4vpAuthorizationRequestDcApi
-    | Openid4vpAuthorizationRequestIae
-    | Openid4vpJarAuthorizationRequest
+  authorizationRequestPayload: Openid4vpAuthorizationRequestPayload | Openid4vpJarAuthorizationRequest
   wallet?: WalletVerificationOptions
 
   /**
@@ -52,10 +43,7 @@ export interface ResolveOpenid4vpAuthorizationRequestOptions {
 
 export type ResolvedOpenid4vpAuthorizationRequest = {
   transactionData?: ParsedTransactionDataEntry[]
-  authorizationRequestPayload:
-    | Openid4vpAuthorizationRequest
-    | Openid4vpAuthorizationRequestDcApi
-    | Openid4vpAuthorizationRequestIae
+  authorizationRequestPayload: Openid4vpAuthorizationRequestPayload
   jar: VerifiedJarRequest | undefined
   client: ParsedClientIdentifier
   pex?: {
@@ -78,21 +66,13 @@ export async function resolveOpenid4vpAuthorizationRequest(
   const { wallet, callbacks } = options
 
   const parsed = parseWithErrorHandling(
-    z.union([
-      zOpenid4vpAuthorizationRequestDcApi,
-      zOpenid4vpAuthorizationRequestIae,
-      zOpenid4vpAuthorizationRequest,
-      zOpenid4vpJarAuthorizationRequest,
-    ]),
+    z.union([zOpenid4vpAuthorizationRequestPayload, zOpenid4vpJarAuthorizationRequest]),
     options.authorizationRequestPayload,
     'Invalid authorization request. Could not parse openid4vp authorization request as openid4vp or jar auth request.'
   )
 
   let jar: VerifiedJarRequest | undefined
-  let parsedAuthorizationRequestPayload:
-    | Openid4vpAuthorizationRequest
-    | Openid4vpAuthorizationRequestDcApi
-    | Openid4vpAuthorizationRequestIae
+  let parsedAuthorizationRequestPayload: Openid4vpAuthorizationRequestPayload
   if (isJarAuthorizationRequest(parsed)) {
     jar = await verifyJarRequest({
       jarRequestParams: parsed,
@@ -103,7 +83,7 @@ export async function resolveOpenid4vpAuthorizationRequest(
     })
 
     parsedAuthorizationRequestPayload = parseWithErrorHandling(
-      z.union([zOpenid4vpAuthorizationRequestDcApi, zOpenid4vpAuthorizationRequestIae, zOpenid4vpAuthorizationRequest]),
+      zOpenid4vpAuthorizationRequestPayload,
       jar.authorizationRequestPayload,
       'Invalid authorization request. Could not parse jar request payload as openid4vp auth request.'
     )
@@ -111,12 +91,7 @@ export async function resolveOpenid4vpAuthorizationRequest(
     parsedAuthorizationRequestPayload = parsed
   }
 
-  const validateClient = async (
-    authorizationRequestPayload:
-      | Openid4vpAuthorizationRequest
-      | Openid4vpAuthorizationRequestDcApi
-      | Openid4vpAuthorizationRequestIae
-  ) => {
+  const validateClient = async (authorizationRequestPayload: Openid4vpAuthorizationRequestPayload) => {
     const version = parseAuthorizationRequestVersion(authorizationRequestPayload)
     let clientMetadata = authorizationRequestPayload.client_metadata
     if (
@@ -143,12 +118,7 @@ export async function resolveOpenid4vpAuthorizationRequest(
     return { version, client }
   }
 
-  let authorizationRequestPayload:
-    | Openid4vpAuthorizationRequest
-    | ((Openid4vpAuthorizationRequestDcApi | Openid4vpAuthorizationRequestIae) & {
-        presentation_definition_uri?: never
-      })
-    | undefined
+  let authorizationRequestPayload: Openid4vpAuthorizationRequestPayload | undefined
   let payloadValidationError: Oauth2ServerErrorResponseError | undefined
   try {
     authorizationRequestPayload = validateOpenId4vpAuthorizationRequestPayload({
@@ -189,20 +159,20 @@ export async function resolveOpenid4vpAuthorizationRequest(
     let dcql: ResolvedOpenid4vpAuthorizationRequest['dcql'] | undefined
 
     if (
-      authorizationRequestPayload.presentation_definition ||
+      'presentation_definition_uri' in authorizationRequestPayload &&
       authorizationRequestPayload.presentation_definition_uri
     ) {
-      if (authorizationRequestPayload.presentation_definition_uri) {
-        throw new Oauth2ServerErrorResponseError({
-          error: Oauth2ErrorCodes.InvalidRequest,
-          error_description: 'Cannot fetch presentation definition from URI. Not supported.',
-        })
-      }
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'Cannot fetch presentation definition from URI. Not supported.',
+      })
+    }
 
-      pex = {
-        presentation_definition: authorizationRequestPayload.presentation_definition,
-        presentation_definition_uri: authorizationRequestPayload.presentation_definition_uri,
-      }
+    if (
+      'presentation_definition' in authorizationRequestPayload &&
+      authorizationRequestPayload.presentation_definition
+    ) {
+      pex = { presentation_definition: authorizationRequestPayload.presentation_definition }
     }
 
     if (authorizationRequestPayload.dcql_query) {
@@ -265,10 +235,7 @@ type ExpectedResponseMode =
     }
 
 function validateOpenId4vpAuthorizationRequestPayload(options: {
-  authorizationRequestPayload:
-    | Openid4vpAuthorizationRequest
-    | Openid4vpAuthorizationRequestDcApi
-    | Openid4vpAuthorizationRequestIae
+  authorizationRequestPayload: Openid4vpAuthorizationRequestPayload
   wallet?: WalletVerificationOptions
   jar: boolean
 

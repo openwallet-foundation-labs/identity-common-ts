@@ -17,17 +17,10 @@ import {
   zCompactJwt,
   zJarRequestObjectPayload,
 } from '@openid4vc/oauth2'
-import { z } from 'zod'
 import { Openid4vpAuthorizationRequestError } from '../../authorization-request/Openid4vpAuthorizationRequestError'
-import { zOpenid4vpAuthorizationRequest } from '../../authorization-request/z-authorization-request'
-import {
-  isOpenid4vpResponseModeDcApi,
-  zOpenid4vpAuthorizationRequestDcApi,
-} from '../../authorization-request/z-authorization-request-dc-api'
-import {
-  isOpenid4vpResponseModeIae,
-  zOpenid4vpAuthorizationRequestIae,
-} from '../../authorization-request/z-authorization-request-iae'
+import { isOpenid4vpResponseModeDcApi } from '../../authorization-request/z-authorization-request-dc-api'
+import { isOpenid4vpResponseModeIae } from '../../authorization-request/z-authorization-request-iae'
+import { zOpenid4vpAuthorizationRequestPayload } from '../../authorization-request/z-authorization-request-payload'
 import { getOpenid4vpClientId } from '../../client-identifier-prefix/parse-client-identifier-prefix'
 import {
   type ClientIdPrefix,
@@ -193,9 +186,7 @@ function withUnverifiedAuthorizationRequest(error: unknown, requestObject: strin
     return error
   }
 
-  const parsed = z
-    .union([zOpenid4vpAuthorizationRequestDcApi, zOpenid4vpAuthorizationRequestIae, zOpenid4vpAuthorizationRequest])
-    .safeParse(payload)
+  const parsed = zOpenid4vpAuthorizationRequestPayload.safeParse(payload)
   if (!parsed.success) return error
 
   return new Openid4vpAuthorizationRequestError(serverError, { authorizationRequestPayload: parsed.data })

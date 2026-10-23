@@ -1,9 +1,7 @@
 import { Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import type { ParsedClientIdentifier } from '../client-identifier-prefix/parse-client-identifier-prefix'
 import type { VerifiedJarRequest } from '../jar/handle-jar-request/verify-jar-request'
-import type { Openid4vpAuthorizationRequest } from './z-authorization-request'
-import type { Openid4vpAuthorizationRequestDcApi } from './z-authorization-request-dc-api'
-import type { Openid4vpAuthorizationRequestIae } from './z-authorization-request-iae'
+import type { Openid4vpAuthorizationRequestPayload } from './z-authorization-request-payload'
 
 /**
  * Error thrown when resolving an authorization request fails once the authorization request payload is known.
@@ -22,10 +20,7 @@ import type { Openid4vpAuthorizationRequestIae } from './z-authorization-request
  * `Oauth2ServerErrorResponseError`, as there is nowhere to send the error to.
  */
 export class Openid4vpAuthorizationRequestError extends Oauth2ServerErrorResponseError {
-  public readonly authorizationRequestPayload:
-    | Openid4vpAuthorizationRequest
-    | Openid4vpAuthorizationRequestDcApi
-    | Openid4vpAuthorizationRequestIae
+  public readonly authorizationRequestPayload: Openid4vpAuthorizationRequestPayload
 
   /**
    * Whether the client was authenticated. Only then is `client` defined.
