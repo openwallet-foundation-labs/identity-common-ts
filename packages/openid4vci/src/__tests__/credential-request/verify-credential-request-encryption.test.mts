@@ -57,6 +57,7 @@ describe('verifyCredentialRequestEncryption', () => {
     { description: 'a non-JWE body', jwe: 'not-a-jwe' },
     { description: 'an undecodable header', jwe: 'bm90LWpzb24.eA.eA.eA.eA' },
     { description: 'a missing kid', jwe: compactJwe({ alg: jwk.alg, enc: 'A128GCM' }) },
+    { description: 'a missing alg', jwe: compactJwe({ kid: jwk.kid, enc: 'A128GCM' }) },
     { description: 'an unknown kid', jwe: compactJwe({ kid: 'unknown-key', alg: jwk.alg, enc: 'A128GCM' }) },
     { description: 'an alg mismatch', jwe: compactJwe({ kid: jwk.kid, alg: 'RSA-OAEP', enc: 'A128GCM' }) },
     { description: 'an unadvertised enc', jwe: compactJwe({ kid: jwk.kid, alg: jwk.alg, enc: 'A128CBC-HS256' }) },
