@@ -72,7 +72,7 @@ export async function resolveOpenid4vpAuthorizationRequest(
   )
 
   let jar: VerifiedJarRequest | undefined
-  let parsedAuthorizationRequestPayload: Openid4vpAuthorizationRequestPayload
+  let authorizationRequestPayload: Openid4vpAuthorizationRequestPayload
   if (isJarAuthorizationRequest(parsed)) {
     jar = await verifyJarRequest({
       jarRequestParams: parsed,
@@ -82,16 +82,16 @@ export async function resolveOpenid4vpAuthorizationRequest(
       allowRequestUri: options.responseMode.type === 'direct_post',
     })
 
-    parsedAuthorizationRequestPayload = parseWithErrorHandling(
+    authorizationRequestPayload = parseWithErrorHandling(
       zOpenid4vpAuthorizationRequestPayload,
       jar.authorizationRequestPayload,
       'Invalid authorization request. Could not parse jar request payload as openid4vp auth request.'
     )
   } else {
-    parsedAuthorizationRequestPayload = parsed
+    authorizationRequestPayload = parsed
   }
 
-  const validateClient = async (authorizationRequestPayload: Openid4vpAuthorizationRequestPayload) => {
+  const validateClient = async () => {
     const version = parseAuthorizationRequestVersion(authorizationRequestPayload)
     let clientMetadata = authorizationRequestPayload.client_metadata
     if (
@@ -118,11 +118,10 @@ export async function resolveOpenid4vpAuthorizationRequest(
     return { version, client }
   }
 
-  let authorizationRequestPayload: Openid4vpAuthorizationRequestPayload | undefined
   let payloadValidationError: Oauth2ServerErrorResponseError | undefined
   try {
-    authorizationRequestPayload = validateOpenId4vpAuthorizationRequestPayload({
-      authorizationRequestPayload: parsedAuthorizationRequestPayload,
+    validateOpenId4vpAuthorizationRequestPayload({
+      authorizationRequestPayload,
       wallet,
       jar: jar !== undefined,
       responseMode: options.responseMode,
@@ -132,26 +131,17 @@ export async function resolveOpenid4vpAuthorizationRequest(
     payloadValidationError = error
   }
 
-  const { version, client } = await validateClient(
-    authorizationRequestPayload ?? parsedAuthorizationRequestPayload
-  ).catch((error) => {
+  const { version, client } = await validateClient().catch((error) => {
     // The payload validation error takes precedence, as the payload is validated first
     const requestError = payloadValidationError ?? error
     if (!(requestError instanceof Oauth2ServerErrorResponseError)) throw requestError
 
     // Without `client`, as the client is not authenticated
-    throw new Openid4vpAuthorizationRequestError(requestError, {
-      authorizationRequestPayload: parsedAuthorizationRequestPayload,
-      jar,
-    })
+    throw new Openid4vpAuthorizationRequestError(requestError, { authorizationRequestPayload, jar })
   })
 
-  if (!authorizationRequestPayload) {
-    throw new Openid4vpAuthorizationRequestError(payloadValidationError as Oauth2ServerErrorResponseError, {
-      authorizationRequestPayload: parsedAuthorizationRequestPayload,
-      client,
-      jar,
-    })
+  if (payloadValidationError) {
+    throw new Openid4vpAuthorizationRequestError(payloadValidationError, { authorizationRequestPayload, client, jar })
   }
 
   try {
@@ -256,7 +246,7 @@ function validateOpenId4vpAuthorizationRequestPayload(options: {
       origin: responseMode.expectedOrigin,
     })
 
-    return authorizationRequestPayload
+    return
   }
 
   if (isOpenid4vpAuthorizationRequestIae(authorizationRequestPayload)) {
@@ -272,7 +262,7 @@ function validateOpenId4vpAuthorizationRequestPayload(options: {
       expectedUrl: responseMode.expectedUrl,
     })
 
-    return authorizationRequestPayload
+    return
   }
 
   if (responseMode.type !== 'direct_post') {
@@ -285,5 +275,4 @@ function validateOpenId4vpAuthorizationRequestPayload(options: {
     params: authorizationRequestPayload,
     walletVerificationOptions: wallet,
   })
-  return authorizationRequestPayload
 }
