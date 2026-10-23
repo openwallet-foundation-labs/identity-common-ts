@@ -19,6 +19,7 @@ Which package(s) would this feature belong to?
 - [ ] `@owf/cose` (planned)
 - [ ] `@owf/x509` (planned)
 - [ ] `@owf/token-status-list` (planned)
+- [ ] `@owf/openid-federation`
 - [ ] `@owf/eudi-*` (EUDI-specific)
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
