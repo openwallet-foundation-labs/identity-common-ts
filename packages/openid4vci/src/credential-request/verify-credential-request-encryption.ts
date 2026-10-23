@@ -27,27 +27,27 @@ const invalidEncryptionParameters = (error_description: string) =>
  * @throws Oauth2ServerErrorResponseError with `invalid_encryption_parameters` when the JWE is
  * malformed, uses an unadvertised key or algorithm, or includes unsupported encryption parameters.
  */
-export function verifyCredentialRequestEncryption(options: {
-  jwe: string
+export function verifyCredentialRequestEncryption(
+  jwe: string,
   credentialIssuerMetadata: Pick<CredentialIssuerMetadata, 'credential_request_encryption'>
-}): {
+): {
   jwk: NonNullable<CredentialIssuerMetadata['credential_request_encryption']>['jwks']['keys'][number]
   header: CredentialRequestJweHeader
 } {
-  const supported = options.credentialIssuerMetadata.credential_request_encryption
+  const supported = credentialIssuerMetadata.credential_request_encryption
 
   if (!supported) {
     throw invalidEncryptionParameters('Credential request encryption is not supported')
   }
 
-  if (!zCompactJwe.safeParse(options.jwe).success) {
+  if (!zCompactJwe.safeParse(jwe).success) {
     throw invalidEncryptionParameters('Credential request is not a compact JWE')
   }
 
   let header: CredentialRequestJweHeader
   try {
     header = decodeJwtHeader({
-      jwt: options.jwe,
+      jwt: jwe,
       headerSchema: zCredentialRequestJweHeader,
     }).header
   } catch (error) {

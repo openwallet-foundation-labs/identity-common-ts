@@ -60,10 +60,7 @@ async function decodeRequest(options: DecodeCredentialRequestOptions): Promise<D
       throw invalidEncryptionParameters('Encrypted Credential Request body must be a compact JWE string')
     }
 
-    const { jwk, header } = verifyCredentialRequestEncryption({
-      jwe: options.body,
-      credentialIssuerMetadata: options.issuerMetadata.credentialIssuer,
-    })
+    const { jwk, header } = verifyCredentialRequestEncryption(options.body, options.issuerMetadata.credentialIssuer)
     if (header.zip !== undefined) {
       throw invalidEncryptionParameters('Compressed Credential Requests are not supported')
     }

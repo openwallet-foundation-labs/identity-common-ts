@@ -23,7 +23,7 @@ const compactJwe = (header: Record<string, unknown>) =>
 const verify = (
   jwe: string,
   credential_request_encryption?: CredentialIssuerMetadata['credential_request_encryption']
-) => verifyCredentialRequestEncryption({ jwe, credentialIssuerMetadata: { credential_request_encryption } })
+) => verifyCredentialRequestEncryption(jwe, { credential_request_encryption })
 
 const invalidEncryptionParameters = expect.objectContaining({
   errorResponse: expect.objectContaining({ error: 'invalid_encryption_parameters' }),
