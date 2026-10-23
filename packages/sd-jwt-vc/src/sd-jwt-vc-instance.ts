@@ -474,7 +474,7 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
     // We start at one, as the base is already fetched when this method is first called
     depth: number = 1,
     // By default include the parent vct, in case of the first call
-    visitedVcts: Set<string> = new Set(parentTypeMetadata.vct)
+    visitedVcts: Set<string> = new Set([parentTypeMetadata.vct])
   ): Promise<ResolvedTypeMetadata> {
     const maxDepth = this.userConfig.maxVctExtendsDepth ?? 5
 
@@ -550,6 +550,14 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
     const validated = TypeMetadataFormatSchema.safeParse(data)
     if (!validated.success) {
       throw new SDJWTException(`Invalid VCT type metadata for vct '${vct}':\n${z.prettifyError(validated.error)}`)
+    }
+
+    // The vct values of a resolved chain are read from the documents, so a document describing
+    // another type would let whoever hosts it choose the types a credential matches.
+    if (validated.data.vct !== vct) {
+      throw new SDJWTException(
+        `Type metadata fetched for vct '${vct}' describes vct '${validated.data.vct}'. The vct of the type metadata must match.`
+      )
     }
 
     return validated.data
