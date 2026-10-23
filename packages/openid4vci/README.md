@@ -70,22 +70,21 @@ response-encryption key. The client encrypts requests when required by the
 issuer or when V1 response-encryption parameters require it, and fails before
 sending if request encryption is required but unsupported or unavailable.
 
-For **both** Credential and Deferred Credential HTTP endpoints, decode the
-transport body before parsing its contents:
+For **both** Credential and Deferred Credential HTTP endpoints, pass the
+transport body and content type to the issuer library for decoding and validation:
 
 ```ts
 const issuer = new Openid4vciIssuer({
   callbacks: { ...issuerCallbacks, decryptJwe },
 })
 
-// requestBody is a JWE string for application/jwt or an already-parsed
-// JSON object for application/json; contentType is the HTTP Content-Type.
-const { credentialRequest } = await issuer.decodeCredentialRequest({
+// requestBody is raw JSON text for application/json or a compact JWE string
+// for application/jwt; contentType is the HTTP Content-Type.
+const parsed = await issuer.parseCredentialRequestFromBody({
   body: requestBody,
   contentType,
   issuerMetadata,
 })
-const parsed = issuer.parseCredentialRequest({ issuerMetadata, credentialRequest })
 const { credentialResponse, credentialResponseJwt } = await issuer.createCredentialResponse({
   credentialRequest: parsed,
   credential: issuedCredential,
@@ -95,13 +94,19 @@ const { credentialResponse, credentialResponseJwt } = await issuer.createCredent
 // otherwise send credentialResponse with application/json.
 ```
 
-At the deferred endpoint use `decodeDeferredCredentialRequest`, followed by
-`parseDeferredCredentialRequest` and `createDeferredCredentialResponse`. Pass
-the parsed request's `credential_response_encryption` to response creation.
-Raw-request handlers **must** decode before parsing: parsers only validate
-request objects and cannot determine whether the HTTP body was encrypted.
-Decoding rejects plaintext requests containing `credential_response_encryption`
-or sent to an issuer that requires request encryption. Credential request and
+At the deferred endpoint, pass the raw body and content type to
+`parseDeferredCredentialRequestFromBody`. Pass the parsed request's
+`credential_response_encryption` to `createDeferredCredentialResponse`.
+The body parsing methods decode raw JSON text or decrypt JWE requests, then
+validate the request. Already-parsed JSON objects are also accepted for
+`application/json`. HTTP adapters only need to read the body and preserve JWE
+strings; they do not need to implement protocol-specific decryption or validation.
+The synchronous `parseCredentialRequest` and `parseDeferredCredentialRequest`
+methods remain available for already-decoded objects, but are deprecated in
+favor of the body parsing methods.
+The body parsing methods reject plaintext requests when the issuer requires
+request encryption, or when response-encryption parameters require an encrypted
+request for V1 or an issuer advertising request encryption. Credential request and
 response encryption do not support compression: requests with a `zip` header
 and response-encryption parameters with `zip` are rejected, even when the
 issuer advertises the value. Issuers must not advertise compression until it

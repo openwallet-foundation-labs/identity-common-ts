@@ -16,18 +16,12 @@ export type {
   CreateCredentialResponseOptions,
   CreateCredentialResponseReturn,
 } from './credential-request/credential-response'
-export {
-  type DecodeCredentialRequestOptions,
-  type DecodeCredentialRequestReturn,
-  decodeCredentialRequest,
-  decodeDeferredCredentialRequest,
-} from './credential-request/decode-credential-request'
+export type { CredentialRequestBodyOptions } from './credential-request/decode-credential-request'
 export type { ParseCredentialRequestReturn } from './credential-request/parse-credential-request'
 export type {
   RetrieveCredentialsResponseNotOk,
   RetrieveCredentialsResponseOk,
 } from './credential-request/retrieve-credentials'
-export { verifyCredentialRequestEncryption } from './credential-request/verify-credential-request-encryption'
 export { verifyCredentialResponseEncryption } from './credential-request/verify-credential-response-encryption'
 export type {
   CredentialRequest,

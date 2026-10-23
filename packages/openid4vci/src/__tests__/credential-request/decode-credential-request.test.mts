@@ -1,15 +1,15 @@
 import crypto from 'node:crypto'
-import type { CallbackContext, Jwk } from '@openid4vc/oauth2'
+import { type CallbackContext, type Jwk, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { ContentType } from '@openid4vc/utils'
 import * as jose from 'jose'
 import { describe, expect, test, vi } from 'vitest'
-import { parseCredentialRequest } from '../../credential-request/parse-credential-request'
-import { parseDeferredCredentialRequest } from '../../credential-request/parse-deferred-credential-request'
 import {
   type DecodeCredentialRequestOptions,
   decodeCredentialRequest,
   decodeDeferredCredentialRequest,
-} from '../../index'
+} from '../../credential-request/decode-credential-request'
+import { parseCredentialRequest } from '../../credential-request/parse-credential-request'
+import { parseDeferredCredentialRequest } from '../../credential-request/parse-deferred-credential-request'
 import type { IssuerMetadataResult } from '../../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../../version'
 
@@ -102,7 +102,21 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
     await expect(decode(options())).resolves.toEqual({ credentialRequest: body })
   })
 
-  test('rejects plaintext when issuer metadata requires encryption', async () => {
+  test('parses raw JSON text without invoking decryption', async () => {
+    const decrypt = vi.fn(decryptJwe)
+    await expect(
+      decode(
+        options({
+          body: JSON.stringify(body),
+          contentType: 'Application/JSON; charset=utf-8',
+          callbacks: { decryptJwe: decrypt },
+        })
+      )
+    ).resolves.toEqual({ credentialRequest: body })
+    expect(decrypt).not.toHaveBeenCalled()
+  })
+
+  test.each(['object', 'text'])('rejects plaintext %s when issuer metadata requires encryption', async (input) => {
     const requiredIssuerMetadata = {
       ...issuerMetadata,
       credentialIssuer: {
@@ -113,9 +127,14 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
         },
       },
     }
-    await expect(decode(options({ issuerMetadata: requiredIssuerMetadata }))).rejects.toThrow(
-      invalidEncryptionParameters
-    )
+    await expect(
+      decode(
+        options({
+          issuerMetadata: requiredIssuerMetadata,
+          body: input === 'text' ? JSON.stringify(body) : body,
+        })
+      )
+    ).rejects.toThrow(invalidEncryptionParameters)
   })
 
   test.each([true, false])(
@@ -171,6 +190,12 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
     ).rejects.toThrow(invalidEncryptionParameters)
   })
 
+  test('rejects response-encryption parameters in raw JSON when request encryption is advertised', async () => {
+    await expect(
+      decode(options({ body: JSON.stringify({ ...body, credential_response_encryption: responseEncryption }) }))
+    ).rejects.toThrow(invalidEncryptionParameters)
+  })
+
   test('rejects an encrypted request without advertised request encryption', async () => {
     const metadata = {
       ...issuerMetadata,
@@ -218,8 +243,10 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
     ).rejects.toThrow(invalidEncryptionParameters)
   })
 
-  test('propagates callback failures unchanged', async () => {
-    const failure = new Error('KMS unavailable')
+  test.each([
+    new Error('KMS unavailable'),
+    new Oauth2ServerErrorResponseError({ error: 'invalid_encryption_parameters' }),
+  ])('maps callback failures to server_error while preserving their cause', async (failure) => {
     await expect(
       decode(
         options({
@@ -232,7 +259,26 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
           },
         })
       )
-    ).rejects.toBe(failure)
+    ).rejects.toMatchObject({
+      status: 500,
+      errorResponse: { error: 'server_error' },
+      cause: failure,
+    })
+  })
+
+  test('reports a missing decryption callback as server_error', async () => {
+    await expect(
+      decode(options({ body: await encryptRequest(body), contentType: ContentType.Jwt, callbacks: {} }))
+    ).rejects.toMatchObject({
+      status: 500,
+      errorResponse: { error: 'server_error' },
+      message: expect.stringContaining('No decryptJwe callback'),
+      cause: undefined,
+    })
+  })
+
+  test('allows plaintext without a decryption callback', async () => {
+    await expect(decode(options({ callbacks: {} }))).resolves.toEqual({ credentialRequest: body })
   })
 
   test.each(['invalid JSON', 'null', '[]'])('rejects decrypted non-object payload: %s', async (payload) => {
@@ -250,6 +296,13 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
   test.each([null, [], 'not JSON', 123])('rejects a non-object plaintext body: %s', async (value) => {
     await expect(decode(options({ body: value }))).rejects.toThrow(invalidCredentialRequest)
   })
+
+  test.each(['', '{', 'null', '[]', '123', 'true', '"text"'])(
+    'rejects malformed or non-object raw JSON: %s',
+    async (payload) => {
+      await expect(decode(options({ body: payload }))).rejects.toThrow(invalidCredentialRequest)
+    }
+  )
 
   test.each([undefined, 'text/plain', 'application/jsonp', 'application/jwt, application/json'])(
     'rejects unsupported Content-Type: %s',

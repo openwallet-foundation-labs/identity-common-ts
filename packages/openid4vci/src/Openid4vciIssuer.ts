@@ -15,7 +15,7 @@ import {
   createDeferredCredentialResponse,
 } from './credential-request/credential-response'
 import {
-  type DecodeCredentialRequestOptions,
+  type CredentialRequestBodyOptions,
   decodeCredentialRequest,
   decodeDeferredCredentialRequest,
 } from './credential-request/decode-credential-request'
@@ -253,63 +253,23 @@ export class Openid4vciIssuer {
   }
 
   /**
-   * Decode a raw Credential Request before passing it to parseCredentialRequest.
+   * Parses and validates a Credential Request from a plaintext JSON or encrypted JWE transport body.
    * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
    */
-  public decodeCredentialRequest(options: Omit<DecodeCredentialRequestOptions, 'callbacks'>) {
-    return this.decodeRequest(options, decodeCredentialRequest)
+  public async parseCredentialRequestFromBody(
+    options: CredentialRequestBodyOptions
+  ): Promise<ParseCredentialRequestReturn> {
+    const { credentialRequest } = await decodeCredentialRequest({
+      ...options,
+      callbacks: this.options.callbacks,
+    })
+    return this.parseCredentialRequest({ issuerMetadata: options.issuerMetadata, credentialRequest })
   }
 
   /**
-   * Decode a raw Deferred Credential Request before passing it to parseDeferredCredentialRequest.
-   * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
-   */
-  public decodeDeferredCredentialRequest(options: Omit<DecodeCredentialRequestOptions, 'callbacks'>) {
-    return this.decodeRequest(options, decodeDeferredCredentialRequest)
-  }
-
-  private async decodeRequest(
-    options: Omit<DecodeCredentialRequestOptions, 'callbacks'>,
-    decoder: typeof decodeCredentialRequest
-  ) {
-    try {
-      return await decoder({
-        ...options,
-        callbacks: {
-          decryptJwe: async (jwe, decryptOptions) => {
-            try {
-              if (!this.options.callbacks.decryptJwe) {
-                throw new Error('No decryptJwe callback was provided for encrypted Credential Requests')
-              }
-              return await this.options.callbacks.decryptJwe(jwe, decryptOptions)
-            } catch (error) {
-              throw this.decodeRequestServerError(error)
-            }
-          },
-        },
-      })
-    } catch (error) {
-      if (error instanceof Oauth2ServerErrorResponseError) throw error
-
-      throw this.decodeRequestServerError(error)
-    }
-  }
-
-  private decodeRequestServerError(error: unknown) {
-    return new Oauth2ServerErrorResponseError(
-      {
-        error: Oauth2ErrorCodes.ServerError,
-        error_description: 'Unable to decrypt Credential Request',
-      },
-      {
-        status: 500,
-        cause: error,
-        internalMessage: 'Error decoding encrypted Credential Request',
-      }
-    )
-  }
-
-  /**
+   * @deprecated Pass transport bodies to `parseCredentialRequestFromBody`. This method only parses
+   * an already-decoded Credential Request object.
+   *
    * @throws Oauth2ServerErrorResponseError - when validation of the credential request fails
    *  You can extract the credential error response from this.
    */
@@ -341,6 +301,26 @@ export class Openid4vciIssuer {
   }
 
   /**
+   * Parses and validates a Deferred Credential Request from a plaintext JSON or encrypted JWE transport body.
+   * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
+   */
+  public async parseDeferredCredentialRequestFromBody(
+    options: CredentialRequestBodyOptions
+  ): Promise<ParseDeferredCredentialRequestReturn> {
+    const { credentialRequest } = await decodeDeferredCredentialRequest({
+      ...options,
+      callbacks: this.options.callbacks,
+    })
+    return this.parseDeferredCredentialRequest({
+      issuerMetadata: options.issuerMetadata,
+      deferredCredentialRequest: credentialRequest,
+    })
+  }
+
+  /**
+   * @deprecated Pass transport bodies to `parseDeferredCredentialRequestFromBody`. This method only parses
+   * an already-decoded Deferred Credential Request object.
+   *
    * @throws Oauth2ServerErrorResponseError - when validation of the deferred credential request fails
    */
   public parseDeferredCredentialRequest(
