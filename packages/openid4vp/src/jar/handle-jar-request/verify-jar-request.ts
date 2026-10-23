@@ -8,6 +8,7 @@ import {
   type JwtSignerWithJwk,
   jwtSignerFromJwt,
   Oauth2ErrorCodes,
+  Oauth2JwtVerificationError,
   Oauth2ServerErrorResponseError,
   signedAuthorizationRequestJwtHeaderTyp,
   validateJarRequestParams,
@@ -16,8 +17,10 @@ import {
   zCompactJwt,
   zJarRequestObjectPayload,
 } from '@openid4vc/oauth2'
+import { Openid4vpAuthorizationRequestError } from '../../authorization-request/Openid4vpAuthorizationRequestError'
 import { isOpenid4vpResponseModeDcApi } from '../../authorization-request/z-authorization-request-dc-api'
 import { isOpenid4vpResponseModeIae } from '../../authorization-request/z-authorization-request-iae'
+import { zOpenid4vpAuthorizationRequestPayload } from '../../authorization-request/z-authorization-request-payload'
 import { getOpenid4vpClientId } from '../../client-identifier-prefix/parse-client-identifier-prefix'
 import {
   type ClientIdPrefix,
@@ -112,45 +115,81 @@ export async function verifyJarRequest(options: VerifyJarRequestOptions): Promis
     })
   }
 
-  const { authorizationRequestPayload, signer, jwt } = await verifyJarRequestObject({
-    decryptedRequestObject,
-    callbacks,
-  })
-  if (!authorizationRequestPayload.client_id) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequestObject,
-      error_description: 'Jar Request Object is missing the required "client_id" field.',
+  try {
+    const { authorizationRequestPayload, signer, jwt } = await verifyJarRequestObject({
+      decryptedRequestObject,
+      callbacks,
     })
+    if (!authorizationRequestPayload.client_id) {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidRequestObject,
+        error_description: 'Jar Request Object is missing the required "client_id" field.',
+      })
+    }
+
+    // Expect the client_id from the jar request to match the payload, but only if we're not using DC API / IAE
+    if (
+      !isOpenid4vpResponseModeDcApi(authorizationRequestPayload.response_mode) &&
+      !isOpenid4vpResponseModeIae(authorizationRequestPayload.response_mode) &&
+      jarRequestParams.client_id !== authorizationRequestPayload.client_id
+    ) {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'client_id does not match the request object client_id.',
+      })
+    }
+    if (
+      jarRequestParams.client_id_scheme &&
+      jarRequestParams.client_id_scheme !== authorizationRequestPayload.client_id_scheme
+    ) {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'client_id_scheme does not match the request object client_id_scheme.',
+      })
+    }
+
+    return {
+      sendBy,
+      jwt,
+      authorizationRequestPayload,
+      signer,
+      decryptionJwk,
+    }
+  } catch (error) {
+    throw withUnverifiedAuthorizationRequest(error, decryptedRequestObject)
+  }
+}
+
+/**
+ * The request object could be decoded, but not verified. The error can still be sent to the
+ * `response_uri` in the request object, which is why the unverified payload is attached.
+ */
+function withUnverifiedAuthorizationRequest(error: unknown, requestObject: string) {
+  const serverError =
+    error instanceof Oauth2ServerErrorResponseError
+      ? error
+      : error instanceof Oauth2JwtVerificationError
+        ? new Oauth2ServerErrorResponseError(
+            {
+              error: Oauth2ErrorCodes.InvalidRequestObject,
+              error_description: 'The signature of the request object could not be verified.',
+            },
+            { cause: error, internalMessage: error.message }
+          )
+        : undefined
+  if (!serverError) return error
+
+  let payload: unknown
+  try {
+    payload = decodeJwt({ jwt: requestObject }).payload
+  } catch {
+    return error
   }
 
-  // Expect the client_id from the jar request to match the payload, but only if we're not using DC API / IAE
-  if (
-    !isOpenid4vpResponseModeDcApi(authorizationRequestPayload.response_mode) &&
-    !isOpenid4vpResponseModeIae(authorizationRequestPayload.response_mode) &&
-    jarRequestParams.client_id !== authorizationRequestPayload.client_id
-  ) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: 'client_id does not match the request object client_id.',
-    })
-  }
-  if (
-    jarRequestParams.client_id_scheme &&
-    jarRequestParams.client_id_scheme !== authorizationRequestPayload.client_id_scheme
-  ) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: 'client_id_scheme does not match the request object client_id_scheme.',
-    })
-  }
+  const parsed = zOpenid4vpAuthorizationRequestPayload.safeParse(payload)
+  if (!parsed.success) return error
 
-  return {
-    sendBy,
-    jwt,
-    authorizationRequestPayload,
-    signer,
-    decryptionJwk,
-  }
+  return new Openid4vpAuthorizationRequestError(serverError, { authorizationRequestPayload: parsed.data })
 }
 
 async function decryptJarRequest(options: { jwe: string; callbacks: Pick<CallbackContext, 'decryptJwe'> }) {
