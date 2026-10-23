@@ -4,7 +4,9 @@ import {
   zCredentialConfigurationSupportedWithFormats,
   zCredentialIssuerMetadata,
   zCredentialIssuerMetadataDraft11ToV1,
+  zCredentialIssuerMetadataWithDraftVersion,
 } from '../../../metadata/credential-issuer/z-credential-issuer-metadata'
+import { Openid4vciVersion } from '../../../version'
 import { paradymDraft13 } from '../../__fixtures__/paradym'
 
 describe('Credential Issuer Metadata', () => {
@@ -241,6 +243,61 @@ describe('Credential Issuer Metadata', () => {
       success: true,
       data: { credential_request_encryption: credentialRequestEncryption },
     })
+    expect(zCredentialIssuerMetadataWithDraftVersion.safeParse(metadata)).toMatchObject({
+      success: true,
+      data: { originalDraftVersion: Openid4vciVersion.V1 },
+    })
+  })
+
+  test('credential request encryption takes precedence over Draft 15 indicators', () => {
+    const metadata = {
+      credential_issuer: 'https://credential-issuer.com',
+      credential_endpoint: 'https://credential-issuer.com/credential',
+      credential_configurations_supported: {
+        pid: {
+          format: 'dc+sd-jwt',
+          vct: 'https://credential-issuer.com/pid',
+        },
+      },
+    }
+
+    expect(zCredentialIssuerMetadataWithDraftVersion.safeParse(metadata)).toMatchObject({
+      success: true,
+      data: { originalDraftVersion: Openid4vciVersion.Draft15 },
+    })
+
+    expect(
+      zCredentialIssuerMetadataWithDraftVersion.safeParse({
+        ...metadata,
+        credential_request_encryption: {
+          jwks: {
+            keys: [{ kty: 'EC', kid: 'request-key', alg: 'ECDH-ES', crv: 'P-256', x: 'x', y: 'y' }],
+          },
+          enc_values_supported: ['A128GCM'],
+          encryption_required: false,
+        },
+      })
+    ).toMatchObject({
+      success: true,
+      data: { originalDraftVersion: Openid4vciVersion.V1 },
+    })
+  })
+
+  test('does not parse credential request encryption metadata as Draft 11', () => {
+    expect(
+      zCredentialIssuerMetadataDraft11ToV1.safeParse({
+        credential_endpoint: 'https://credential-issuer.com/credential',
+        credential_issuer: 'https://credential-issuer.com',
+        credentials_supported: [],
+        credential_request_encryption: {
+          jwks: {
+            keys: [{ kty: 'EC', kid: 'request-key', alg: 'ECDH-ES', crv: 'P-256', x: 'x', y: 'y' }],
+          },
+          enc_values_supported: ['A128GCM'],
+          encryption_required: false,
+        },
+      }).success
+    ).toBe(false)
   })
 
   test.each([

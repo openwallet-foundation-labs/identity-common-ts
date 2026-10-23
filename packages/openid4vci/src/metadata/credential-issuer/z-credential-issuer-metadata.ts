@@ -413,6 +413,7 @@ const zCredentialConfigurationSupportedV1ToDraft11 = zCredentialConfigurationSup
 export const zCredentialIssuerMetadataDraft11ToV1 = z
   .object({
     authorization_server: z.string().optional(),
+    credential_request_encryption: z.never().optional(),
     credentials_supported: z.array(
       z
         .object({
@@ -501,14 +502,16 @@ export const zCredentialIssuerMetadataWithDraftVersion = z.union([
     })
 
     // we assume V1 is used when we detect V1
-    const isV1 = credentialConfigurations.some(
-      (configuration) =>
-        // Added in draft 16, but since there's no other breaking changes
-        configuration.credential_metadata ||
-        // Was changed to COSE algorithms in Draft 16 (which we detect as v1)
-        (configuration.format === 'mso_mdoc' &&
-          configuration.credential_signing_alg_values_supported?.some((supported) => typeof supported === 'number'))
-    )
+    const isV1 =
+      credentialIssuerMetadata.credential_request_encryption !== undefined ||
+      credentialConfigurations.some(
+        (configuration) =>
+          // Added in draft 16, but since there's no other breaking changes
+          configuration.credential_metadata ||
+          // Was changed to COSE algorithms in Draft 16 (which we detect as v1)
+          (configuration.format === 'mso_mdoc' &&
+            configuration.credential_signing_alg_values_supported?.some((supported) => typeof supported === 'number'))
+      )
 
     return {
       credentialIssuerMetadata,
