@@ -126,15 +126,14 @@ interface RetrieveCredentialsBaseOptions {
   credentialResponseEncryption?: CredentialResponseEncryption
 
   /**
-   * Request encryption options. Requests are encrypted automatically when the issuer requires
-   * encryption or when `credentialResponseEncryption` is provided.
+   * Encrypt the Credential Request, selecting from the issuer's advertised keys and algorithms.
+   * Requests are encrypted automatically when the issuer requires encryption or when
+   * `credentialResponseEncryption` is provided.
    */
   credentialRequestEncryption?: {
-    /** Encrypt even when not required. Default false. */
-    encrypt?: boolean
-    /** kid of the advertised key to use. Default: first key in jwks.keys */
+    /** kid of the advertised key to use. Defaults to the first advertised key. */
     kid?: string
-    /** enc to use. Must be in enc_values_supported. Default: first supported value */
+    /** enc to use. Must be advertised. Defaults to the first supported value. */
     enc?: string
   }
 }
@@ -484,7 +483,7 @@ async function encodeCredentialRequest(options: {
   const encryptionRequested =
     encryptionRequired ||
     responseEncryptionRequiresEncryptedRequest ||
-    options.credentialRequestEncryption?.encrypt === true
+    options.credentialRequestEncryption !== undefined
 
   if (!encryptionRequested) {
     return {

@@ -354,7 +354,20 @@ describe('Credential Response Encryption', () => {
 })
 
 describe('Credential Request Encryption', () => {
-  test('encrypts a regular request when explicitly requested', async () => {
+  test('encrypts a regular request using the first advertised key and enc when selectors are omitted', async () => {
+    const alternateKey = { ...encryptionPublicJwk, kid: 'alternate-request-key', alg: 'RSA-OAEP' }
+    const issuerMetadataWithChoices = {
+      ...issuerMetadata,
+      credentialIssuer: {
+        ...credentialIssuerMetadata,
+        credential_request_encryption: {
+          ...credentialRequestEncryption,
+          jwks: { keys: [{ ...encryptionPublicJwk, kid: 'credential-request-key', alg: 'RSA-OAEP' }, alternateKey] },
+          enc_values_supported: ['A256GCM', 'A128GCM'],
+        },
+      },
+    } satisfies IssuerMetadataResult
+
     server.resetHandlers(
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
         expect(request.headers.get('Content-Type')).toBe(ContentType.Jwt)
@@ -373,13 +386,48 @@ describe('Credential Request Encryption', () => {
     )
 
     const result = await client.retrieveCredentials({
-      issuerMetadata,
+      issuerMetadata: issuerMetadataWithChoices,
       accessToken: 'test-access-token',
       credentialConfigurationId: 'pidSdJwt',
-      credentialRequestEncryption: { encrypt: true },
+      credentialRequestEncryption: {},
     })
 
     expect(result.credentialResponse.credential).toBe('request-encrypted-credential')
+  })
+
+  test('uses explicitly selected advertised kid and enc values', async () => {
+    const alternateKey = { ...encryptionPublicJwk, kid: 'alternate-request-key', alg: 'RSA-OAEP' }
+    const issuerMetadataWithChoices = {
+      ...issuerMetadata,
+      credentialIssuer: {
+        ...credentialIssuerMetadata,
+        credential_request_encryption: {
+          ...credentialRequestEncryption,
+          jwks: { keys: [{ ...encryptionPublicJwk, kid: 'credential-request-key', alg: 'RSA-OAEP' }, alternateKey] },
+          enc_values_supported: ['A256GCM', 'A128GCM'],
+        },
+      },
+    } satisfies IssuerMetadataResult
+
+    server.resetHandlers(
+      http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
+        expect(request.headers.get('Content-Type')).toBe(ContentType.Jwt)
+        const { protectedHeader } = await jose.compactDecrypt(await request.text(), encryptionJosePrivateKey)
+        expect(protectedHeader).toEqual({
+          alg: 'RSA-OAEP',
+          enc: 'A128GCM',
+          kid: 'alternate-request-key',
+        })
+        return HttpResponse.json({ credential: 'request-encrypted-credential' })
+      })
+    )
+
+    await client.retrieveCredentials({
+      issuerMetadata: issuerMetadataWithChoices,
+      accessToken: 'test-access-token',
+      credentialConfigurationId: 'pidSdJwt',
+      credentialRequestEncryption: { kid: 'alternate-request-key', enc: 'A128GCM' },
+    })
   })
 
   test('encrypts a deferred request when explicitly requested', async () => {
@@ -402,7 +450,7 @@ describe('Credential Request Encryption', () => {
       issuerMetadata,
       accessToken: 'test-access-token',
       transactionId: 'txn-encrypted',
-      credentialRequestEncryption: { encrypt: true },
+      credentialRequestEncryption: {},
     })
 
     expect(result.deferredCredentialResponse.credentials).toEqual([{ credential: 'deferred-encrypted-credential' }])
@@ -527,7 +575,7 @@ describe('Credential Request Encryption', () => {
         issuerMetadata,
         accessToken: 'test-access-token',
         credentialConfigurationId: 'pidSdJwt',
-        credentialRequestEncryption: { encrypt: true, kid: 'unknown-key' },
+        credentialRequestEncryption: { kid: 'unknown-key' },
       })
     ).rejects.toThrow(/not advertised by the issuer/)
 
@@ -536,7 +584,7 @@ describe('Credential Request Encryption', () => {
         issuerMetadata,
         accessToken: 'test-access-token',
         transactionId: 'txn-bad-enc',
-        credentialRequestEncryption: { encrypt: true, enc: 'A128CBC-HS256' },
+        credentialRequestEncryption: { enc: 'A128CBC-HS256' },
       })
     ).rejects.toThrow(/Credential request encryption 'enc'/)
 
@@ -548,7 +596,7 @@ describe('Credential Request Encryption', () => {
         issuerMetadata,
         accessToken: 'test-access-token',
         credentialConfigurationId: 'pidSdJwt',
-        credentialRequestEncryption: { encrypt: true },
+        credentialRequestEncryption: {},
       })
     ).rejects.toThrow(/no encryptJwe callback/)
 

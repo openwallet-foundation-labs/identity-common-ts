@@ -56,7 +56,7 @@ await client.retrieveCredentials({
   issuerMetadata,
   accessToken,
   credentialConfigurationId,
-  credentialRequestEncryption: { encrypt: true }, // Optional: can also select kid and enc
+  credentialRequestEncryption: {}, // Optional: can also select an advertised kid and enc
 })
 ```
 
@@ -66,9 +66,9 @@ it or the request contains `credential_response_encryption`. To request
 response encryption, supply `credentialResponseEncryption` with the wallet's
 public JWK (including `alg`) and `enc`; the wallet also needs a `decryptJwe`
 callback to read the encrypted response. A deferred request can supply a fresh
-response-encryption key. The client refuses to send response-encryption
-parameters in plaintext and fails before sending if the issuer does not
-advertise request encryption or the client cannot encrypt.
+response-encryption key. The client encrypts requests when required by the
+issuer or when V1 response-encryption parameters require it, and fails before
+sending if request encryption is required but unsupported or unavailable.
 
 For **both** Credential and Deferred Credential HTTP endpoints, decode the
 transport body before parsing its contents:
