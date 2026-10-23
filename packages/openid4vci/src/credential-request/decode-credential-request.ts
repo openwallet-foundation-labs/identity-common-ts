@@ -1,6 +1,7 @@
 import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { ContentType } from '@openid4vc/utils'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
+import { Openid4vciVersion } from '../version'
 import { verifyCredentialRequestEncryption } from './verify-credential-request-encryption'
 
 export interface DecodeCredentialRequestOptions {
@@ -75,7 +76,11 @@ async function decodeRequest(options: DecodeCredentialRequestOptions): Promise<D
     if (options.issuerMetadata.credentialIssuer.credential_request_encryption?.encryption_required) {
       throw invalidEncryptionParameters('The credential issuer requires encrypted Credential Requests')
     }
-    if (Reflect.getOwnPropertyDescriptor(options.body, 'credential_response_encryption') !== undefined) {
+    if (
+      Reflect.getOwnPropertyDescriptor(options.body, 'credential_response_encryption') !== undefined &&
+      (options.issuerMetadata.credentialIssuer.credential_request_encryption !== undefined ||
+        options.issuerMetadata.originalDraftVersion === Openid4vciVersion.V1)
+    ) {
       throw invalidEncryptionParameters(
         'Credential Requests containing credential_response_encryption must be encrypted'
       )

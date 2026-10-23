@@ -119,7 +119,7 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
   })
 
   test.each([true, false])(
-    'rejects plaintext response-encryption parameters with metadata present: %s',
+    'rejects plaintext response-encryption parameters for V1 (request encryption advertised: %s)',
     async (advertised) => {
       const metadata = advertised
         ? issuerMetadata
@@ -134,6 +134,42 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
       ).rejects.toThrow(invalidEncryptionParameters)
     }
   )
+
+  test('allows plaintext response-encryption parameters for Draft 15 without request-encryption metadata', async () => {
+    const draft15IssuerMetadata = {
+      ...issuerMetadata,
+      originalDraftVersion: Openid4vciVersion.Draft15,
+      credentialIssuer: {
+        ...issuerMetadata.credentialIssuer,
+        credential_request_encryption: undefined,
+      },
+    }
+
+    await expect(
+      decode(
+        options({
+          issuerMetadata: draft15IssuerMetadata,
+          body: { ...body, credential_response_encryption: responseEncryption },
+        })
+      )
+    ).resolves.toEqual({ credentialRequest: { ...body, credential_response_encryption: responseEncryption } })
+  })
+
+  test('rejects plaintext response-encryption parameters when request encryption is advertised', async () => {
+    const draft15IssuerMetadata = {
+      ...issuerMetadata,
+      originalDraftVersion: Openid4vciVersion.Draft15,
+    }
+
+    await expect(
+      decode(
+        options({
+          issuerMetadata: draft15IssuerMetadata,
+          body: { ...body, credential_response_encryption: responseEncryption },
+        })
+      )
+    ).rejects.toThrow(invalidEncryptionParameters)
+  })
 
   test('rejects an encrypted request without advertised request encryption', async () => {
     const metadata = {

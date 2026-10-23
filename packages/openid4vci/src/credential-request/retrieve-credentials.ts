@@ -478,8 +478,13 @@ async function encodeCredentialRequest(options: {
   const supported = options.issuerMetadata.credentialIssuer.credential_request_encryption
   const responseEncryptionRequested = options.credentialRequest.credential_response_encryption !== undefined
   const encryptionRequired = supported?.encryption_required === true
+  const responseEncryptionRequiresEncryptedRequest =
+    responseEncryptionRequested &&
+    (supported !== undefined || options.issuerMetadata.originalDraftVersion === Openid4vciVersion.V1)
   const encryptionRequested =
-    encryptionRequired || responseEncryptionRequested || options.credentialRequestEncryption?.encrypt === true
+    encryptionRequired ||
+    responseEncryptionRequiresEncryptedRequest ||
+    options.credentialRequestEncryption?.encrypt === true
 
   if (!encryptionRequested) {
     return {
@@ -490,7 +495,7 @@ async function encodeCredentialRequest(options: {
 
   if (!supported) {
     throw new Openid4vciError(
-      responseEncryptionRequested
+      responseEncryptionRequiresEncryptedRequest
         ? 'Credential response encryption cannot be requested because the issuer does not support credential request encryption.'
         : 'Credential request encryption configured, but the issuer does not support credential request encryption.'
     )

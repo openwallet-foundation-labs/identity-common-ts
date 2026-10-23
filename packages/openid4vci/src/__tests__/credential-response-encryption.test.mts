@@ -109,7 +109,7 @@ const credentialIssuerMetadata = issuer.createCredentialIssuerMetadata({
 const issuerMetadata = {
   credentialIssuer: credentialIssuerMetadata,
   authorizationServers: [],
-  originalDraftVersion: Openid4vciVersion.Draft15,
+  originalDraftVersion: Openid4vciVersion.V1,
   knownCredentialConfigurations: credentialConfigurationsSupported,
 } satisfies IssuerMetadataResult
 
@@ -124,6 +124,62 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe('Credential Response Encryption', () => {
+  test('preserves plaintext requests for response encryption with a Draft 15 issuer', async () => {
+    const draft15Metadata = {
+      ...issuerMetadata,
+      credentialIssuer: {
+        ...credentialIssuerMetadata,
+        credential_request_encryption: undefined,
+      },
+      originalDraftVersion: Openid4vciVersion.Draft15,
+    } satisfies IssuerMetadataResult
+
+    const encryptResponse = async (response: Record<string, unknown>) =>
+      new jose.CompactEncrypt(new TextEncoder().encode(JSON.stringify(response)))
+        .setProtectedHeader({ alg: 'RSA-OAEP', enc: 'A256GCM' })
+        .encrypt(encryptionPublicKey)
+    const encryptedResponse = await encryptResponse({ credential: 'legacy-response' })
+    const encryptedDeferredResponse = await encryptResponse({
+      credentials: [{ credential: 'legacy-deferred-response' }],
+    })
+
+    const fetchLegacyIssuer: typeof fetch = async (_input, init) => {
+      expect(new Headers(init?.headers).get('Content-Type')).toBe(ContentType.Json)
+      if (typeof init?.body !== 'string') {
+        throw new Error('Expected a JSON Credential Request body')
+      }
+      const requestBody = JSON.parse(init.body)
+      expect(requestBody.credential_response_encryption).toEqual(credentialResponseEncryption)
+      if (requestBody.transaction_id) {
+        expect(requestBody.transaction_id).toBe('txn-legacy')
+      } else {
+        expect(requestBody.credential_configuration_id).toBe('pidSdJwt')
+      }
+      return new Response(requestBody.transaction_id ? encryptedDeferredResponse : encryptedResponse, {
+        headers: { 'Content-Type': ContentType.Jwt },
+      })
+    }
+    const legacyClient = new Openid4vciClient({ callbacks: { ...callbacks, fetch: fetchLegacyIssuer } })
+
+    const result = await legacyClient.retrieveCredentials({
+      issuerMetadata: draft15Metadata,
+      accessToken: 'test-access-token',
+      credentialConfigurationId: 'pidSdJwt',
+      credentialResponseEncryption,
+    })
+
+    expect(result.credentialResponse.credential).toBe('legacy-response')
+
+    const deferredResult = await legacyClient.retrieveDeferredCredentials({
+      issuerMetadata: draft15Metadata,
+      accessToken: 'test-access-token',
+      transactionId: 'txn-legacy',
+      credentialResponseEncryption,
+    })
+
+    expect(deferredResult.deferredCredentialResponse.credentials).toEqual([{ credential: 'legacy-deferred-response' }])
+  })
+
   test('issuer encrypts credential response and client decrypts it', async () => {
     server.resetHandlers(
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
