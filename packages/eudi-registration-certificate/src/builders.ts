@@ -269,6 +269,15 @@ export class WRPRCBuilder {
   }
 
   /**
+   * Set the `act` claim (GEN-5.2.4-09). `sub` must equal the intermediary's semantic identifier
+   * (`intermediary.sub`); the match is enforced by the validator (ACT_SUB_MISMATCH).
+   */
+  act(act: { sub: string }): this {
+    this.payload.act = act
+    return this
+  }
+
+  /**
    * Mark the WRP as a public sector body (Table 10)
    */
   publicBody(value: boolean): this {
