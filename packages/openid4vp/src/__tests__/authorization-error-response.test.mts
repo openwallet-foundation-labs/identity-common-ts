@@ -6,6 +6,8 @@ import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oaut
 import { parseOpenid4VpAuthorizationResponsePayload } from '../authorization-response/parse-authorization-response-payload.js'
 import {
   createOpenid4vpAuthorizationResponse,
+  isOpenid4vpAuthorizationRequestDcApi,
+  isOpenid4vpAuthorizationRequestIae,
   Openid4vpAuthorizationRequestError,
   Openid4vpAuthorizationResponseError,
   resolveOpenid4vpAuthorizationRequest,
@@ -184,6 +186,57 @@ describe('authorization error responses', () => {
       Openid4vpAuthorizationResponseError
     )
     expect(await submissionResponse.json()).toEqual({ redirect_uri: 'https://example.com/cb' })
+  })
+
+  test('creates and submits an error response for a request with an unsupported client identifier', async () => {
+    let receivedPayload: Record<string, unknown> | undefined
+    server.resetHandlers(
+      http.post(responseUri, async ({ request }) => {
+        receivedPayload = Object.fromEntries((await request.formData()).entries())
+        return HttpResponse.json({})
+      })
+    )
+
+    const error = await resolveOpenid4vpAuthorizationRequest({
+      authorizationRequestPayload: { ...authenticatedRequest, client_id: 'unsupported_prefix:client' },
+      callbacks,
+      responseMode: { type: 'direct_post' },
+    }).catch((error) => error)
+
+    expect(error).toBeInstanceOf(Openid4vpAuthorizationRequestError)
+    expect(error).toMatchObject({ isClientAuthenticated: false, errorResponse: { error: 'invalid_request' } })
+
+    const authorizationRequestPayload = (error as Openid4vpAuthorizationRequestError).authorizationRequestPayload
+    if (
+      isOpenid4vpAuthorizationRequestDcApi(authorizationRequestPayload) ||
+      isOpenid4vpAuthorizationRequestIae(authorizationRequestPayload)
+    ) {
+      throw new Error('Expected a direct_post authorization request')
+    }
+
+    const { authorizationResponsePayload } = await createOpenid4vpAuthorizationResponse({
+      authorizationRequestPayload,
+      authorizationResponsePayload: { error: error.errorResponse.error },
+      callbacks,
+    })
+    await submitOpenid4vpAuthorizationResponse({ authorizationRequestPayload, authorizationResponsePayload, callbacks })
+
+    expect(receivedPayload).toEqual({ error: 'invalid_request', state: 'state' })
+  })
+
+  test('creates an error response for an unsigned DC API request without an origin', async () => {
+    const response = await createOpenid4vpAuthorizationResponse({
+      authorizationRequestPayload: {
+        response_type: 'vp_token',
+        response_mode: 'dc_api',
+        nonce: 'nonce',
+        dcql_query: dcqlQuery,
+      },
+      authorizationResponsePayload: { error: 'access_denied' },
+      callbacks,
+    })
+
+    expect(response).toEqual({ authorizationResponsePayload: { error: 'access_denied' } })
   })
 
   test('creates an unencrypted error response for a jarm response mode without jarm options', async () => {

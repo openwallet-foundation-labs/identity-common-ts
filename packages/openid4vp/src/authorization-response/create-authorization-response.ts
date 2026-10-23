@@ -96,13 +96,6 @@ export async function createOpenid4vpAuthorizationResponse<
   } as ResponsePayload
   const isErrorResponse = typeof authorizationResponsePayload.error === 'string'
 
-  const { clientIdPrefix } = getOpenid4vpClientId({
-    responseMode: authorizationRequestPayload.response_mode,
-    clientId: authorizationRequestPayload.client_id,
-    legacyClientIdScheme: authorizationRequestPayload.client_id_scheme,
-    origin,
-  })
-
   if (
     authorizationRequestPayload.response_mode &&
     isJarmResponseMode(authorizationRequestPayload.response_mode) &&
@@ -119,6 +112,14 @@ export async function createOpenid4vpAuthorizationResponse<
       authorizationResponsePayload,
     }
   }
+
+  // Parsed after the early return, so an error response can still be created when the client identifier is invalid
+  const { clientIdPrefix } = getOpenid4vpClientId({
+    responseMode: authorizationRequestPayload.response_mode,
+    clientId: authorizationRequestPayload.client_id,
+    legacyClientIdScheme: authorizationRequestPayload.client_id_scheme,
+    origin,
+  })
 
   // When using OpenID Federation, we must not rely on the client metadata from the request
   if (clientIdPrefix === 'openid_federation' && !options.clientMetadata) {

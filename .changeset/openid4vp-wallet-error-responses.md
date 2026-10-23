@@ -10,14 +10,23 @@ Wallets can create and submit OpenID4VP Authorization Error Responses (OpenID4VP
 try {
   await resolveOpenid4vpAuthorizationRequest({ authorizationRequestPayload, responseMode, callbacks })
 } catch (error) {
-  if (error instanceof Openid4vpAuthorizationRequestError) {
-    const { authorizationResponsePayload } = await createOpenid4vpAuthorizationResponse({
-      authorizationRequestPayload: error.authorizationRequestPayload,
-      authorizationResponsePayload: { error: error.errorResponse.error },
-      callbacks,
-    })
+  if (!(error instanceof Openid4vpAuthorizationRequestError)) throw error
+
+  const request = error.authorizationRequestPayload
+  // IAE requests are answered through the OpenID4VCI Interactive Authorization Endpoint instead
+  if (isOpenid4vpAuthorizationRequestIae(request)) throw error
+
+  const { authorizationResponsePayload } = await createOpenid4vpAuthorizationResponse({
+    authorizationRequestPayload: request,
+    authorizationResponsePayload: { error: error.errorResponse.error },
+    callbacks,
+  })
+
+  if (isOpenid4vpAuthorizationRequestDcApi(request)) {
+    // Return the authorizationResponsePayload through the Digital Credentials API
+  } else {
     const { response } = await submitOpenid4vpAuthorizationResponse({
-      authorizationRequestPayload: error.authorizationRequestPayload,
+      authorizationRequestPayload: request,
       authorizationResponsePayload,
       callbacks,
     })
