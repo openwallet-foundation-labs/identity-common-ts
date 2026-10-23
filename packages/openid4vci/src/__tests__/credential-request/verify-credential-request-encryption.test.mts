@@ -65,9 +65,9 @@ describe('verifyCredentialRequestEncryption', () => {
       jwe: compactJwe({ kid: jwk.kid, alg: jwk.alg, enc: 'A128GCM', zip: 'DEF' }),
     },
     {
-      description: 'an unadvertised zip',
+      description: 'zip when compression is advertised',
       jwe: compactJwe({ kid: jwk.kid, alg: jwk.alg, enc: 'A128GCM', zip: 'DEF' }),
-      metadata: { ...supported, zip_values_supported: ['GZIP'] },
+      metadata: { ...supported, zip_values_supported: ['DEF'] },
     },
     {
       description: 'a crit header',
@@ -77,13 +77,5 @@ describe('verifyCredentialRequestEncryption', () => {
 
   test.each(invalidJweTestCases)('rejects $description', ({ jwe, metadata = supported }) => {
     expect(() => verify(jwe, metadata)).toThrow(invalidEncryptionParameters)
-  })
-
-  test('accepts zip when it is advertised', () => {
-    const header = { kid: jwk.kid, alg: jwk.alg, enc: 'A128GCM', zip: 'DEF' }
-    expect(verify(compactJwe(header), { ...supported, zip_values_supported: ['DEF'] })).toEqual({
-      jwk,
-      header,
-    })
   })
 })

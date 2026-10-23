@@ -67,13 +67,11 @@ describe('verifyCredentialResponseEncryption', () => {
       )
     )
     expect(verify({ jwk, enc: 'A256GCM', zip: 'DEF' }, supported)).toThrow(
-      expect.objectContaining(
-        invalidEncryptionParameters(
-          "The credential issuer does not support compression of the credential response ('zip')"
-        )
-      )
+      expect.objectContaining(invalidEncryptionParameters('Compressed credential responses are not supported'))
     )
-    expect(verify({ jwk, enc: 'A256GCM', zip: 'DEF' }, { ...supported, zip_values_supported: ['DEF'] })).not.toThrow()
+    expect(verify({ jwk, enc: 'A256GCM', zip: 'DEF' }, { ...supported, zip_values_supported: ['DEF'] })).toThrow(
+      expect.objectContaining(invalidEncryptionParameters('Compressed credential responses are not supported'))
+    )
   })
 })
 

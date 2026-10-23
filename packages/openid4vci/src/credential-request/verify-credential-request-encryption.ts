@@ -73,12 +73,8 @@ export function verifyCredentialRequestEncryption(options: {
     )
   }
 
-  if (header.zip !== undefined && !supported.zip_values_supported?.includes(header.zip)) {
-    throw invalidEncryptionParameters(
-      supported.zip_values_supported
-        ? `Credential Request JWE 'zip' must be one of ${supported.zip_values_supported.map((value) => `'${value}'`).join(', ')}`
-        : "The credential issuer does not support compression of the Credential Request ('zip')"
-    )
+  if (header.zip !== undefined) {
+    throw invalidEncryptionParameters('Compressed Credential Requests are not supported')
   }
 
   if (header.crit !== undefined) {

@@ -101,9 +101,11 @@ the parsed request's `credential_response_encryption` to response creation.
 Raw-request handlers **must** decode before parsing: parsers only validate
 request objects and cannot determine whether the HTTP body was encrypted.
 Decoding rejects plaintext requests containing `credential_response_encryption`
-or sent to an issuer that requires request encryption. It also rejects
-compressed (`zip`) requests even if `zip_values_supported` is present in
-metadata; issuers must not advertise compression until it is implemented.
+or sent to an issuer that requires request encryption. Credential request and
+response encryption do not support compression: requests with a `zip` header
+and response-encryption parameters with `zip` are rejected, even when the
+issuer advertises the value. Issuers must not advertise compression until it
+is implemented.
 The client never compresses requests.
 
 ## Dependencies
