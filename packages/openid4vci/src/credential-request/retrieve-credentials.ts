@@ -1,5 +1,6 @@
 import {
   type CallbackContext,
+  type JweEncryptor,
   Oauth2Error,
   type RequestDpopOptions,
   type ResourceRequestResponseNotOk,
@@ -102,7 +103,8 @@ interface RetrieveCredentialsBaseOptions {
   /**
    * Callbacks used in retrieve credentials endpoints.
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJwt' | 'decryptJwe'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJwt' | 'decryptJwe'> &
+    Partial<Pick<CallbackContext, 'encryptJwe'>>
 
   /**
    * Access token authorized to retrieve the credential(s)
@@ -122,6 +124,19 @@ interface RetrieveCredentialsBaseOptions {
    * The `decryptJwe` callback must be provided to decrypt the response.
    */
   credentialResponseEncryption?: CredentialResponseEncryption
+
+  /**
+   * Request encryption options. Requests are encrypted automatically when the issuer requires
+   * encryption or when `credentialResponseEncryption` is provided.
+   */
+  credentialRequestEncryption?: {
+    /** Encrypt even when not required. Default false. */
+    encrypt?: boolean
+    /** kid of the advertised key to use. Default: first key in jwks.keys */
+    kid?: string
+    /** enc to use. Must be in enc_values_supported. Default: first supported value */
+    enc?: string
+  }
 }
 
 export interface RetrieveCredentialsWithCredentialConfigurationIdOptions extends RetrieveCredentialsBaseOptions {
@@ -170,6 +185,7 @@ export async function retrieveCredentialsWithCredentialConfigurationId(
     accessToken: options.accessToken,
     dpop: options.dpop,
     credentialResponseEncryption: options.credentialResponseEncryption,
+    credentialRequestEncryption: options.credentialRequestEncryption,
   })
 }
 
@@ -215,6 +231,7 @@ export async function retrieveCredentialsWithFormat(options: RetrieveCredentials
     accessToken: options.accessToken,
     dpop: options.dpop,
     credentialResponseEncryption: options.credentialResponseEncryption,
+    credentialRequestEncryption: options.credentialRequestEncryption,
   })
 }
 
@@ -284,6 +301,13 @@ async function retrieveCredentials(
     )
   }
 
+  const encodedRequest = await encodeCredentialRequest({
+    credentialRequest,
+    callbacks: options.callbacks,
+    issuerMetadata: options.issuerMetadata,
+    credentialRequestEncryption: options.credentialRequestEncryption,
+  })
+
   const resourceResponse = await resourceRequest({
     dpop: options.dpop,
     accessToken: options.accessToken,
@@ -292,9 +316,9 @@ async function retrieveCredentials(
     requestOptions: {
       method: 'POST',
       headers: {
-        'Content-Type': ContentType.Json,
+        'Content-Type': encodedRequest.contentType,
       },
-      body: JSON.stringify(credentialRequest),
+      body: encodedRequest.body,
     },
   })
 
@@ -384,6 +408,13 @@ export async function retrieveDeferredCredentials(
     'Error validating deferred credential request'
   )
 
+  const encodedRequest = await encodeCredentialRequest({
+    credentialRequest: deferredCredentialRequest,
+    callbacks: options.callbacks,
+    issuerMetadata: options.issuerMetadata,
+    credentialRequestEncryption: options.credentialRequestEncryption,
+  })
+
   const resourceResponse = await resourceRequest({
     dpop: options.dpop,
     accessToken: options.accessToken,
@@ -392,9 +423,9 @@ export async function retrieveDeferredCredentials(
     requestOptions: {
       method: 'POST',
       headers: {
-        'Content-Type': ContentType.Json,
+        'Content-Type': encodedRequest.contentType,
       },
-      body: JSON.stringify(deferredCredentialRequest),
+      body: encodedRequest.body,
     },
   })
 
@@ -435,5 +466,69 @@ export async function retrieveDeferredCredentials(
   return {
     ...resourceResponse,
     deferredCredentialResponse: result.data,
+  }
+}
+
+async function encodeCredentialRequest(options: {
+  credentialRequest: Record<string, unknown>
+  callbacks: RetrieveCredentialsBaseOptions['callbacks']
+  issuerMetadata: IssuerMetadataResult
+  credentialRequestEncryption?: RetrieveCredentialsBaseOptions['credentialRequestEncryption']
+}): Promise<{ contentType: ContentType; body: string }> {
+  const supported = options.issuerMetadata.credentialIssuer.credential_request_encryption
+  const responseEncryptionRequested = options.credentialRequest.credential_response_encryption !== undefined
+  const encryptionRequired = supported?.encryption_required === true
+  const encryptionRequested =
+    encryptionRequired || responseEncryptionRequested || options.credentialRequestEncryption?.encrypt === true
+
+  if (!encryptionRequested) {
+    return {
+      contentType: ContentType.Json,
+      body: JSON.stringify(options.credentialRequest),
+    }
+  }
+
+  if (!supported) {
+    throw new Openid4vciError(
+      responseEncryptionRequested
+        ? 'Credential response encryption cannot be requested because the issuer does not support credential request encryption.'
+        : 'Credential request encryption was requested, but the issuer does not support credential request encryption.'
+    )
+  }
+
+  const encryptJwe = options.callbacks.encryptJwe
+  if (!encryptJwe) {
+    throw new Openid4vciError('Credential request encryption is required, but no encryptJwe callback was provided.')
+  }
+
+  const keyId = options.credentialRequestEncryption?.kid
+  const jwk = keyId ? supported.jwks.keys.find((key) => key.kid === keyId) : supported.jwks.keys[0]
+  if (!jwk) {
+    throw new Openid4vciError(
+      keyId
+        ? `Credential request encryption key with kid '${keyId}' is not advertised by the issuer.`
+        : 'The issuer does not advertise a key for credential request encryption.'
+    )
+  }
+
+  const enc = options.credentialRequestEncryption?.enc ?? supported.enc_values_supported[0]
+  if (!supported.enc_values_supported.includes(enc)) {
+    throw new Openid4vciError(
+      `Credential request encryption 'enc' must be one of ${supported.enc_values_supported.map((value) => `'${value}'`).join(', ')}.`
+    )
+  }
+
+  const encryptor: JweEncryptor = {
+    method: 'jwk',
+    publicJwk: jwk,
+    alg: jwk.alg,
+    kid: jwk.kid,
+    enc,
+  }
+  const { jwe } = await encryptJwe(encryptor, JSON.stringify(options.credentialRequest))
+
+  return {
+    contentType: ContentType.Jwt,
+    body: jwe,
   }
 }

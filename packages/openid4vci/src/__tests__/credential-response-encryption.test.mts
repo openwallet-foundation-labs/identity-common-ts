@@ -36,7 +36,11 @@ const server = setupServer()
 const encryptJwe: CallbackContext['encryptJwe'] = async (encryptor, payload) => {
   const josePublicKey = await jose.importJWK(encryptor.publicJwk as jose.JWK, encryptor.alg)
   const jwe = await new jose.CompactEncrypt(new TextEncoder().encode(payload))
-    .setProtectedHeader({ alg: encryptor.alg, enc: encryptor.enc })
+    .setProtectedHeader({
+      alg: encryptor.alg,
+      enc: encryptor.enc,
+      ...(encryptor.kid ? { kid: encryptor.kid } : {}),
+    })
     .encrypt(josePublicKey)
   return { jwe, encryptionJwk: encryptor.publicJwk }
 }
@@ -81,6 +85,14 @@ const credentialConfigurationsSupported = {
   },
 } satisfies Record<string, CredentialConfigurationSupportedWithFormats>
 
+const credentialRequestEncryption = {
+  jwks: {
+    keys: [{ ...encryptionPublicJwk, kid: 'credential-request-key', alg: 'RSA-OAEP' }],
+  },
+  enc_values_supported: ['A256GCM'],
+  encryption_required: false,
+}
+
 const credentialIssuerMetadata = issuer.createCredentialIssuerMetadata({
   credential_issuer: 'https://oid4vc-ts-issuer.com',
   credential_endpoint: 'https://oid4vc-ts-issuer.com/credential',
@@ -91,6 +103,7 @@ const credentialIssuerMetadata = issuer.createCredentialIssuerMetadata({
     enc_values_supported: ['A256GCM'],
     encryption_required: false,
   },
+  credential_request_encryption: credentialRequestEncryption,
 })
 
 const issuerMetadata = {
@@ -106,15 +119,21 @@ const credentialResponseEncryption = {
   enc: 'A256GCM',
 }
 
-describe('Credential Response Encryption', () => {
-  beforeAll(() => server.listen())
-  afterEach(() => server.resetHandlers())
-  afterAll(() => server.close())
+async function decryptCredentialRequest(request: Request) {
+  expect(request.headers.get('Content-Type')).toBe(ContentType.Jwt)
+  const { plaintext } = await jose.compactDecrypt(await request.text(), encryptionJosePrivateKey)
+  return JSON.parse(new TextDecoder().decode(plaintext)) as Record<string, unknown>
+}
 
+beforeAll(() => server.listen())
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
+
+describe('Credential Response Encryption', () => {
   test('issuer encrypts credential response and client decrypts it', async () => {
     server.resetHandlers(
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
-        const credentialRequest = (await request.json()) as Record<string, unknown>
+        const credentialRequest = await decryptCredentialRequest(request)
 
         // Verify the request includes credential_response_encryption
         expect(credentialRequest.credential_response_encryption).toEqual(credentialResponseEncryption)
@@ -189,7 +208,7 @@ describe('Credential Response Encryption', () => {
   test('issuer encrypts deferred credential response and client decrypts it', async () => {
     server.resetHandlers(
       http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, async ({ request }) => {
-        const body = (await request.json()) as Record<string, unknown>
+        const body = await decryptCredentialRequest(request)
         expect(body.transaction_id).toBe('txn-456')
 
         const { deferredCredentialResponse, deferredCredentialResponseJwt } =
@@ -268,5 +287,204 @@ describe('Credential Response Encryption', () => {
     ).rejects.toThrow(
       "Encryption was requested via 'credential_response_encryption' but the credential response was not encrypted"
     )
+  })
+})
+
+describe('Credential Request Encryption', () => {
+  test('encrypts a regular request when explicitly requested', async () => {
+    server.resetHandlers(
+      http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
+        expect(request.headers.get('Content-Type')).toBe(ContentType.Jwt)
+        const encryptedRequest = await request.text()
+        const { plaintext, protectedHeader } = await jose.compactDecrypt(encryptedRequest, encryptionJosePrivateKey)
+        expect(protectedHeader).toEqual({
+          alg: 'RSA-OAEP',
+          enc: 'A256GCM',
+          kid: 'credential-request-key',
+        })
+        expect(JSON.parse(new TextDecoder().decode(plaintext))).toMatchObject({
+          credential_configuration_id: 'pidSdJwt',
+        })
+        return HttpResponse.json({ credential: 'request-encrypted-credential' })
+      })
+    )
+
+    const result = await client.retrieveCredentials({
+      issuerMetadata,
+      accessToken: 'test-access-token',
+      credentialConfigurationId: 'pidSdJwt',
+      credentialRequestEncryption: { encrypt: true },
+    })
+
+    expect(result.credentialResponse.credential).toBe('request-encrypted-credential')
+  })
+
+  test('encrypts a deferred request when explicitly requested', async () => {
+    server.resetHandlers(
+      http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, async ({ request }) => {
+        expect(request.headers.get('Content-Type')).toBe(ContentType.Jwt)
+        const encryptedRequest = await request.text()
+        const { plaintext, protectedHeader } = await jose.compactDecrypt(encryptedRequest, encryptionJosePrivateKey)
+        expect(protectedHeader).toEqual({
+          alg: 'RSA-OAEP',
+          enc: 'A256GCM',
+          kid: 'credential-request-key',
+        })
+        expect(JSON.parse(new TextDecoder().decode(plaintext))).toMatchObject({ transaction_id: 'txn-encrypted' })
+        return HttpResponse.json({ credentials: [{ credential: 'deferred-encrypted-credential' }] })
+      })
+    )
+
+    const result = await client.retrieveDeferredCredentials({
+      issuerMetadata,
+      accessToken: 'test-access-token',
+      transactionId: 'txn-encrypted',
+      credentialRequestEncryption: { encrypt: true },
+    })
+
+    expect(result.deferredCredentialResponse.credentials).toEqual([{ credential: 'deferred-encrypted-credential' }])
+  })
+
+  test('encrypts regular requests when the issuer requires request encryption', async () => {
+    const issuerMetadataWithRequiredEncryption = {
+      ...issuerMetadata,
+      credentialIssuer: {
+        ...credentialIssuerMetadata,
+        credential_request_encryption: {
+          ...credentialRequestEncryption,
+          encryption_required: true,
+        },
+      },
+    } satisfies IssuerMetadataResult
+
+    server.resetHandlers(
+      http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
+        const body = await decryptCredentialRequest(request)
+        expect(body.credential_configuration_id).toBe('pidSdJwt')
+        return HttpResponse.json({ credential: 'required-encryption-credential' })
+      })
+    )
+
+    const result = await client.retrieveCredentials({
+      issuerMetadata: issuerMetadataWithRequiredEncryption,
+      accessToken: 'test-access-token',
+      credentialConfigurationId: 'pidSdJwt',
+    })
+
+    expect(result.credentialResponse.credential).toBe('required-encryption-credential')
+  })
+
+  test('keeps regular and deferred requests as JSON when encryption is not needed', async () => {
+    const receivedRequests: Array<{ contentType: string | null; body: Record<string, unknown> }> = []
+    server.resetHandlers(
+      http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
+        receivedRequests.push({
+          contentType: request.headers.get('Content-Type'),
+          body: (await request.json()) as Record<string, unknown>,
+        })
+        return HttpResponse.json({ credential: 'plain-credential' })
+      }),
+      http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, async ({ request }) => {
+        receivedRequests.push({
+          contentType: request.headers.get('Content-Type'),
+          body: (await request.json()) as Record<string, unknown>,
+        })
+        return HttpResponse.json({ credentials: [{ credential: 'plain-deferred-credential' }] })
+      })
+    )
+
+    await client.retrieveCredentials({
+      issuerMetadata,
+      accessToken: 'test-access-token',
+      credentialConfigurationId: 'pidSdJwt',
+    })
+    await client.retrieveDeferredCredentials({
+      issuerMetadata,
+      accessToken: 'test-access-token',
+      transactionId: 'txn-plain',
+    })
+
+    expect(receivedRequests).toEqual([
+      {
+        contentType: ContentType.Json,
+        body: expect.objectContaining({ credential_configuration_id: 'pidSdJwt' }),
+      },
+      {
+        contentType: ContentType.Json,
+        body: expect.objectContaining({ transaction_id: 'txn-plain' }),
+      },
+    ])
+  })
+
+  test('fails before sending when required request encryption is unavailable', async () => {
+    let requestCount = 0
+    server.resetHandlers(
+      http.post(credentialIssuerMetadata.credential_endpoint, () => {
+        requestCount += 1
+        return HttpResponse.json({ credential: 'unexpected' })
+      }),
+      http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, () => {
+        requestCount += 1
+        return HttpResponse.json({ credentials: [{ credential: 'unexpected' }] })
+      })
+    )
+
+    const metadataWithoutRequestEncryption = {
+      ...issuerMetadata,
+      credentialIssuer: {
+        ...credentialIssuerMetadata,
+        credential_request_encryption: undefined,
+      },
+    } satisfies IssuerMetadataResult
+
+    await expect(
+      client.retrieveCredentials({
+        issuerMetadata: metadataWithoutRequestEncryption,
+        accessToken: 'test-access-token',
+        credentialConfigurationId: 'pidSdJwt',
+        credentialResponseEncryption,
+      })
+    ).rejects.toThrow(/does not support credential request encryption/)
+
+    await expect(
+      client.retrieveDeferredCredentials({
+        issuerMetadata: metadataWithoutRequestEncryption,
+        accessToken: 'test-access-token',
+        transactionId: 'txn-no-support',
+        credentialResponseEncryption,
+      })
+    ).rejects.toThrow(/does not support credential request encryption/)
+
+    await expect(
+      client.retrieveCredentials({
+        issuerMetadata,
+        accessToken: 'test-access-token',
+        credentialConfigurationId: 'pidSdJwt',
+        credentialRequestEncryption: { encrypt: true, kid: 'unknown-key' },
+      })
+    ).rejects.toThrow(/not advertised by the issuer/)
+
+    await expect(
+      client.retrieveDeferredCredentials({
+        issuerMetadata,
+        accessToken: 'test-access-token',
+        transactionId: 'txn-bad-enc',
+        credentialRequestEncryption: { encrypt: true, enc: 'A128CBC-HS256' },
+      })
+    ).rejects.toThrow(/Credential request encryption 'enc'/)
+
+    const clientWithoutEncryptJwe = new Openid4vciClient({
+      callbacks: { ...callbacks, encryptJwe: undefined },
+    })
+    await expect(
+      clientWithoutEncryptJwe.retrieveCredentials({
+        issuerMetadata,
+        accessToken: 'test-access-token',
+        credentialConfigurationId: 'pidSdJwt',
+        credentialRequestEncryption: { encrypt: true },
+      })
+    ).rejects.toThrow(/no encryptJwe callback/)
+
+    expect(requestCount).toBe(0)
   })
 })
