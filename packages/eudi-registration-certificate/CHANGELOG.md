@@ -1,5 +1,11 @@
 # @owf/eudi-registration-certificate
 
+## 0.5.1
+
+### Patch Changes
+
+- @owf/eudi-jades@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes
