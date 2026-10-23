@@ -140,6 +140,12 @@ const zCredentialIssuerMetadataDisplayEntry = z
   .loose()
 export type CredentialIssuerMetadataDisplayEntry = z.infer<typeof zCredentialIssuerMetadataDisplayEntry>
 
+export const zCredentialRequestEncryptionJwk = zJwk.extend({
+  kid: z.string().min(1),
+  alg: zAlgValueNotNone.min(1),
+})
+export type CredentialRequestEncryptionJwk = z.infer<typeof zCredentialRequestEncryptionJwk>
+
 export type CredentialIssuerMetadata = z.infer<typeof zCredentialIssuerMetadataDraft14Draft15V1>
 export const zCredentialIssuerMetadataDraft14Draft15V1 = z
   .object({
@@ -164,14 +170,7 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
       .object({
         jwks: z
           .object({
-            keys: z
-              .array(
-                zJwk.extend({
-                  kid: z.string().min(1),
-                  alg: zAlgValueNotNone.min(1),
-                })
-              )
-              .min(1),
+            keys: z.array(zCredentialRequestEncryptionJwk).min(1),
           })
           .loose()
           .superRefine(({ keys }, ctx) => {

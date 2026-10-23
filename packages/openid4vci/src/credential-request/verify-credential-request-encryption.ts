@@ -1,6 +1,9 @@
 import { decodeJwtHeader, Oauth2ErrorCodes, Oauth2ServerErrorResponseError, zCompactJwe } from '@openid4vc/oauth2'
 import z from 'zod'
-import type { CredentialIssuerMetadata } from '../metadata/credential-issuer/z-credential-issuer-metadata'
+import type {
+  CredentialIssuerMetadata,
+  CredentialRequestEncryptionJwk,
+} from '../metadata/credential-issuer/z-credential-issuer-metadata'
 
 const zCredentialRequestJweHeader = z
   .object({
@@ -31,7 +34,7 @@ export function verifyCredentialRequestEncryption(
   jwe: string,
   credentialIssuerMetadata: Pick<CredentialIssuerMetadata, 'credential_request_encryption'>
 ): {
-  jwk: NonNullable<CredentialIssuerMetadata['credential_request_encryption']>['jwks']['keys'][number]
+  jwk: CredentialRequestEncryptionJwk
   header: CredentialRequestJweHeader
 } {
   const supported = credentialIssuerMetadata.credential_request_encryption
