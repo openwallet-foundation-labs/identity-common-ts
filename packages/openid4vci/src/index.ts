@@ -19,6 +19,7 @@ export type {
 export type { CredentialRequestBodyOptions } from './credential-request/decode-credential-request'
 export type { ParseCredentialRequestReturn } from './credential-request/parse-credential-request'
 export type {
+  CredentialRequestEncryption,
   RetrieveCredentialsResponseNotOk,
   RetrieveCredentialsResponseOk,
 } from './credential-request/retrieve-credentials'

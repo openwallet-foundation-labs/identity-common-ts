@@ -1,8 +1,8 @@
 import {
   fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray,
   jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray,
+  zAlgValueNotNone,
   zJwk,
-  zJwkSet,
 } from '@openid4vc/oauth2'
 import { type InferOutputUnion, type Simplify, zDataUrl, zHttpsUrl } from '@openid4vc/utils'
 import z from 'zod'
@@ -162,17 +162,18 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
       .optional(),
     credential_request_encryption: z
       .object({
-        jwks: zJwkSet
-          .extend({
+        jwks: z
+          .object({
             keys: z
               .array(
                 zJwk.extend({
                   kid: z.string().min(1),
-                  alg: z.string().min(1),
+                  alg: zAlgValueNotNone.min(1),
                 })
               )
               .min(1),
           })
+          .loose()
           .superRefine(({ keys }, ctx) => {
             const keyIds = new Set<string>()
             for (const [index, key] of keys.entries()) {

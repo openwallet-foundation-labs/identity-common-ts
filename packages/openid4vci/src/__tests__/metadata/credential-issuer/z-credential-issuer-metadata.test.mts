@@ -227,6 +227,7 @@ describe('Credential Issuer Metadata', () => {
   test('parses credential request encryption metadata', () => {
     const credentialRequestEncryption = {
       jwks: {
+        custom: 'preserved',
         keys: [{ kty: 'EC', kid: 'request-key', alg: 'ECDH-ES', crv: 'P-256', x: 'x', y: 'y' }],
       },
       enc_values_supported: ['A128GCM'],
@@ -303,6 +304,22 @@ describe('Credential Issuer Metadata', () => {
   test.each([
     ['missing jwks', { enc_values_supported: ['A128GCM'], encryption_required: false }],
     ['empty keys', { jwks: { keys: [] }, enc_values_supported: ['A128GCM'], encryption_required: false }],
+    [
+      'a key with alg none',
+      {
+        jwks: { keys: [{ kty: 'EC', kid: 'request-key', alg: 'none' }] },
+        enc_values_supported: ['A128GCM'],
+        encryption_required: false,
+      },
+    ],
+    [
+      'a key with empty alg',
+      {
+        jwks: { keys: [{ kty: 'EC', kid: 'request-key', alg: '' }] },
+        enc_values_supported: ['A128GCM'],
+        encryption_required: false,
+      },
+    ],
     [
       'a key without kid',
       {

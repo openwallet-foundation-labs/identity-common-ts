@@ -94,6 +94,13 @@ async function handleCredentialResponse<T, Schema extends z.ZodType<T>>(options:
   return { ok: true, data: parseResult.data }
 }
 
+export interface CredentialRequestEncryption {
+  /** kid of the advertised key to use. Defaults to the first advertised key. */
+  kid?: string
+  /** enc to use. Must be advertised. Defaults to the first supported value. */
+  enc?: string
+}
+
 interface RetrieveCredentialsBaseOptions {
   /**
    * Metadata of the credential issuer and authorization servers.
@@ -128,14 +135,9 @@ interface RetrieveCredentialsBaseOptions {
   /**
    * Encrypt the Credential Request, selecting from the issuer's advertised keys and algorithms.
    * Requests are encrypted automatically when the issuer requires encryption or when
-   * `credentialResponseEncryption` is provided.
+   * response-encryption parameters require it for V1 or an issuer advertising request encryption.
    */
-  credentialRequestEncryption?: {
-    /** kid of the advertised key to use. Defaults to the first advertised key. */
-    kid?: string
-    /** enc to use. Must be advertised. Defaults to the first supported value. */
-    enc?: string
-  }
+  credentialRequestEncryption?: CredentialRequestEncryption
 }
 
 export interface RetrieveCredentialsWithCredentialConfigurationIdOptions extends RetrieveCredentialsBaseOptions {
@@ -472,20 +474,20 @@ async function encodeCredentialRequest(options: {
   credentialRequest: Record<string, unknown>
   callbacks: RetrieveCredentialsBaseOptions['callbacks']
   issuerMetadata: IssuerMetadataResult
-  credentialRequestEncryption?: RetrieveCredentialsBaseOptions['credentialRequestEncryption']
+  credentialRequestEncryption?: CredentialRequestEncryption
 }): Promise<{ contentType: ContentType; body: string }> {
   const supported = options.issuerMetadata.credentialIssuer.credential_request_encryption
   const responseEncryptionRequested = options.credentialRequest.credential_response_encryption !== undefined
-  const encryptionRequired = supported?.encryption_required === true
+  const issuerRequiresEncryption = supported?.encryption_required === true
   const responseEncryptionRequiresEncryptedRequest =
     responseEncryptionRequested &&
     (supported !== undefined || options.issuerMetadata.originalDraftVersion === Openid4vciVersion.V1)
-  const encryptionRequested =
-    encryptionRequired ||
+  const shouldEncrypt =
+    issuerRequiresEncryption ||
     responseEncryptionRequiresEncryptedRequest ||
     options.credentialRequestEncryption !== undefined
 
-  if (!encryptionRequested) {
+  if (!shouldEncrypt) {
     return {
       contentType: ContentType.Json,
       body: JSON.stringify(options.credentialRequest),
@@ -502,7 +504,12 @@ async function encodeCredentialRequest(options: {
 
   const encryptJwe = options.callbacks.encryptJwe
   if (!encryptJwe) {
-    throw new Openid4vciError('Credential request encryption is required, but no encryptJwe callback was provided.')
+    const reason = issuerRequiresEncryption
+      ? 'Credential request encryption is required by the issuer'
+      : responseEncryptionRequiresEncryptedRequest
+        ? 'Credential request encryption is required for credential response encryption'
+        : 'Credential request encryption is configured'
+    throw new Openid4vciError(`${reason}, but no encryptJwe callback was provided.`)
   }
 
   const keyId = options.credentialRequestEncryption?.kid

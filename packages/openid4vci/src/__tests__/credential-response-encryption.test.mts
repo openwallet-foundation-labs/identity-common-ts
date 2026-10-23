@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
 import {
   type CredentialConfigurationSupportedWithFormats,
+  type CredentialRequestEncryption,
   type IssuerMetadataResult,
   Openid4vciClient,
   Openid4vciIssuer,
@@ -590,10 +591,47 @@ describe('Credential Request Encryption', () => {
         credentialConfigurationId: 'pidSdJwt',
         credentialRequestEncryption: {},
       })
-    ).rejects.toThrow(/no encryptJwe callback/)
+    ).rejects.toThrow('Credential request encryption is configured, but no encryptJwe callback was provided.')
 
     expect(requestCount).toBe(0)
   })
+
+  test.each([
+    [true, false, 'required by the issuer'],
+    [false, true, 'required for credential response encryption'],
+    [false, false, 'configured'],
+  ] as const)(
+    'explains missing encryptJwe for issuer-required=%s and response-encryption=%s',
+    async (encryptionRequired, responseEncryption, reason) => {
+      const client = new Openid4vciClient({
+        callbacks: { ...callbacks, encryptJwe: undefined },
+      })
+      const metadata: IssuerMetadataResult = {
+        ...issuerMetadata,
+        credentialIssuer: {
+          ...credentialIssuerMetadata,
+          credential_request_encryption: {
+            ...credentialRequestEncryption,
+            encryption_required: encryptionRequired,
+          },
+        },
+      }
+      const requestEncryptionOptions: CredentialRequestEncryption = {}
+      const options = {
+        issuerMetadata: metadata,
+        accessToken: 'test-access-token',
+        credentialResponseEncryption: responseEncryption ? credentialResponseEncryption : undefined,
+        credentialRequestEncryption: encryptionRequired || responseEncryption ? undefined : requestEncryptionOptions,
+      }
+      const message = `Credential request encryption is ${reason}, but no encryptJwe callback was provided.`
+      await expect(client.retrieveCredentials({ ...options, credentialConfigurationId: 'pidSdJwt' })).rejects.toThrow(
+        message
+      )
+      await expect(
+        client.retrieveDeferredCredentials({ ...options, transactionId: 'txn-missing-callback' })
+      ).rejects.toThrow(message)
+    }
+  )
 
   test.each(['parseCredentialRequestFromBody', 'parseDeferredCredentialRequestFromBody'] as const)(
     '%s parses raw JSON and validates its contents without a decryptJwe callback',
