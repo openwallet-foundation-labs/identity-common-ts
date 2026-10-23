@@ -221,4 +221,80 @@ describe('Credential Issuer Metadata', () => {
       success: true,
     })
   })
+
+  test('parses credential request encryption metadata', () => {
+    const credentialRequestEncryption = {
+      jwks: {
+        keys: [{ kty: 'EC', kid: 'request-key', alg: 'ECDH-ES', crv: 'P-256', x: 'x', y: 'y' }],
+      },
+      enc_values_supported: ['A128GCM'],
+      encryption_required: false,
+    }
+    const metadata = {
+      credential_issuer: 'https://credential-issuer.com',
+      credential_endpoint: 'https://credential-issuer.com/credential',
+      credential_configurations_supported: {},
+      credential_request_encryption: credentialRequestEncryption,
+    }
+
+    expect(zCredentialIssuerMetadata.safeParse(metadata)).toMatchObject({
+      success: true,
+      data: { credential_request_encryption: credentialRequestEncryption },
+    })
+  })
+
+  test.each([
+    ['missing jwks', { enc_values_supported: ['A128GCM'], encryption_required: false }],
+    ['empty keys', { jwks: { keys: [] }, enc_values_supported: ['A128GCM'], encryption_required: false }],
+    [
+      'a key without kid',
+      {
+        jwks: { keys: [{ kty: 'EC', alg: 'ECDH-ES' }] },
+        enc_values_supported: ['A128GCM'],
+        encryption_required: false,
+      },
+    ],
+    [
+      'a key without alg',
+      {
+        jwks: { keys: [{ kty: 'EC', kid: 'request-key' }] },
+        enc_values_supported: ['A128GCM'],
+        encryption_required: false,
+      },
+    ],
+    [
+      'duplicate kid values',
+      {
+        jwks: {
+          keys: [
+            { kty: 'EC', kid: 'request-key', alg: 'ECDH-ES' },
+            { kty: 'EC', kid: 'request-key', alg: 'ECDH-ES' },
+          ],
+        },
+        enc_values_supported: ['A128GCM'],
+        encryption_required: false,
+      },
+    ],
+    [
+      'empty enc_values_supported',
+      {
+        jwks: { keys: [{ kty: 'EC', kid: 'request-key', alg: 'ECDH-ES' }] },
+        enc_values_supported: [],
+        encryption_required: false,
+      },
+    ],
+    [
+      'missing encryption_required',
+      { jwks: { keys: [{ kty: 'EC', kid: 'request-key', alg: 'ECDH-ES' }] }, enc_values_supported: ['A128GCM'] },
+    ],
+  ])('rejects invalid credential request encryption metadata: %s', (_description, credentialRequestEncryption) => {
+    expect(
+      zCredentialIssuerMetadata.safeParse({
+        credential_issuer: 'https://credential-issuer.com',
+        credential_endpoint: 'https://credential-issuer.com/credential',
+        credential_configurations_supported: {},
+        credential_request_encryption: credentialRequestEncryption,
+      }).success
+    ).toBe(false)
+  })
 })

@@ -1,6 +1,8 @@
 import {
   fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray,
   jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray,
+  zJwk,
+  zJwkSet,
 } from '@openid4vc/oauth2'
 import { type InferOutputUnion, type Simplify, zDataUrl, zHttpsUrl } from '@openid4vc/utils'
 import z from 'zod'
@@ -154,6 +156,38 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
         alg_values_supported: z.array(z.string()),
         enc_values_supported: z.array(z.string()),
         zip_values_supported: z.array(z.string()).optional(),
+        encryption_required: z.boolean(),
+      })
+      .loose()
+      .optional(),
+    credential_request_encryption: z
+      .object({
+        jwks: zJwkSet
+          .extend({
+            keys: z
+              .array(
+                zJwk.extend({
+                  kid: z.string().min(1),
+                  alg: z.string().min(1),
+                })
+              )
+              .min(1),
+          })
+          .superRefine(({ keys }, ctx) => {
+            const keyIds = new Set<string>()
+            for (const [index, key] of keys.entries()) {
+              if (keyIds.has(key.kid)) {
+                ctx.addIssue({
+                  code: 'custom',
+                  message: `Duplicate JWK kid '${key.kid}'`,
+                  path: ['keys', index, 'kid'],
+                })
+              }
+              keyIds.add(key.kid)
+            }
+          }),
+        enc_values_supported: z.array(z.string()).min(1),
+        zip_values_supported: z.array(z.string()).min(1).optional(),
         encryption_required: z.boolean(),
       })
       .loose()
