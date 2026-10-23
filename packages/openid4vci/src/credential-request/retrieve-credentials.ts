@@ -492,7 +492,7 @@ async function encodeCredentialRequest(options: {
     throw new Openid4vciError(
       responseEncryptionRequested
         ? 'Credential response encryption cannot be requested because the issuer does not support credential request encryption.'
-        : 'Credential request encryption was requested, but the issuer does not support credential request encryption.'
+        : 'Credential request encryption configured, but the issuer does not support credential request encryption.'
     )
   }
 
