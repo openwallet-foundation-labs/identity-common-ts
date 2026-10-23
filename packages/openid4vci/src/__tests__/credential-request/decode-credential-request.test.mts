@@ -3,13 +3,13 @@ import type { CallbackContext, Jwk } from '@openid4vc/oauth2'
 import { ContentType } from '@openid4vc/utils'
 import * as jose from 'jose'
 import { describe, expect, test, vi } from 'vitest'
+import { parseCredentialRequest } from '../../credential-request/parse-credential-request'
+import { parseDeferredCredentialRequest } from '../../credential-request/parse-deferred-credential-request'
 import {
   type DecodeCredentialRequestOptions,
   decodeCredentialRequest,
   decodeDeferredCredentialRequest,
-} from '../../credential-request/decode-credential-request'
-import { parseCredentialRequest } from '../../credential-request/parse-credential-request'
-import { parseDeferredCredentialRequest } from '../../credential-request/parse-deferred-credential-request'
+} from '../../index'
 import type { IssuerMetadataResult } from '../../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../../version'
 

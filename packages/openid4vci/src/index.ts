@@ -16,6 +16,12 @@ export type {
   CreateCredentialResponseOptions,
   CreateCredentialResponseReturn,
 } from './credential-request/credential-response'
+export {
+  type DecodeCredentialRequestOptions,
+  type DecodeCredentialRequestReturn,
+  decodeCredentialRequest,
+  decodeDeferredCredentialRequest,
+} from './credential-request/decode-credential-request'
 export type { ParseCredentialRequestReturn } from './credential-request/parse-credential-request'
 export type {
   RetrieveCredentialsResponseNotOk,
