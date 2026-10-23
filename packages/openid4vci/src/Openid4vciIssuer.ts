@@ -15,6 +15,11 @@ import {
   createDeferredCredentialResponse,
 } from './credential-request/credential-response'
 import {
+  type DecodeCredentialRequestOptions,
+  decodeCredentialRequest,
+  decodeDeferredCredentialRequest,
+} from './credential-request/decode-credential-request'
+import {
   type ParseCredentialRequestOptions,
   type ParseCredentialRequestReturn,
   parseCredentialRequest,
@@ -72,7 +77,7 @@ export interface Openid4vciIssuerOptions {
   /**
    * Callbacks required for the openid4vc issuer.
    */
-  callbacks: Omit<CallbackContext, 'decryptJwe'>
+  callbacks: Omit<CallbackContext, 'decryptJwe'> & Partial<Pick<CallbackContext, 'decryptJwe'>>
 }
 
 export class Openid4vciIssuer {
@@ -245,6 +250,63 @@ export class Openid4vciIssuer {
         }
       )
     }
+  }
+
+  /**
+   * Decode a raw Credential Request before passing it to parseCredentialRequest.
+   * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
+   */
+  public decodeCredentialRequest(options: Omit<DecodeCredentialRequestOptions, 'callbacks'>) {
+    return this.decodeRequest(options, decodeCredentialRequest)
+  }
+
+  /**
+   * Decode a raw Deferred Credential Request before passing it to parseDeferredCredentialRequest.
+   * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
+   */
+  public decodeDeferredCredentialRequest(options: Omit<DecodeCredentialRequestOptions, 'callbacks'>) {
+    return this.decodeRequest(options, decodeDeferredCredentialRequest)
+  }
+
+  private async decodeRequest(
+    options: Omit<DecodeCredentialRequestOptions, 'callbacks'>,
+    decoder: typeof decodeCredentialRequest
+  ) {
+    try {
+      return await decoder({
+        ...options,
+        callbacks: {
+          decryptJwe: async (jwe, decryptOptions) => {
+            try {
+              if (!this.options.callbacks.decryptJwe) {
+                throw new Error('No decryptJwe callback was provided for encrypted Credential Requests')
+              }
+              return await this.options.callbacks.decryptJwe(jwe, decryptOptions)
+            } catch (error) {
+              throw this.decodeRequestServerError(error)
+            }
+          },
+        },
+      })
+    } catch (error) {
+      if (error instanceof Oauth2ServerErrorResponseError) throw error
+
+      throw this.decodeRequestServerError(error)
+    }
+  }
+
+  private decodeRequestServerError(error: unknown) {
+    return new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.ServerError,
+        error_description: 'Unable to decrypt Credential Request',
+      },
+      {
+        status: 500,
+        cause: error,
+        internalMessage: 'Error decoding encrypted Credential Request',
+      }
+    )
   }
 
   /**

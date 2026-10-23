@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import type { CallbackContext, Jwk } from '@openid4vc/oauth2'
+import { type CallbackContext, type Jwk, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { ContentType } from '@openid4vc/utils'
 import * as jose from 'jose'
 import { HttpResponse, http } from 'msw'
@@ -119,12 +119,6 @@ const credentialResponseEncryption = {
   enc: 'A256GCM',
 }
 
-async function decryptCredentialRequest(request: Request) {
-  expect(request.headers.get('Content-Type')).toBe(ContentType.Jwt)
-  const { plaintext } = await jose.compactDecrypt(await request.text(), encryptionJosePrivateKey)
-  return JSON.parse(new TextDecoder().decode(plaintext)) as Record<string, unknown>
-}
-
 beforeAll(() => server.listen())
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
@@ -133,7 +127,11 @@ describe('Credential Response Encryption', () => {
   test('issuer encrypts credential response and client decrypts it', async () => {
     server.resetHandlers(
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
-        const credentialRequest = await decryptCredentialRequest(request)
+        const { credentialRequest } = await issuer.decodeCredentialRequest({
+          issuerMetadata,
+          body: await request.text(),
+          contentType: request.headers.get('Content-Type') ?? undefined,
+        })
 
         // Verify the request includes credential_response_encryption
         expect(credentialRequest.credential_response_encryption).toEqual(credentialResponseEncryption)
@@ -208,13 +206,22 @@ describe('Credential Response Encryption', () => {
   test('issuer encrypts deferred credential response and client decrypts it', async () => {
     server.resetHandlers(
       http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, async ({ request }) => {
-        const body = await decryptCredentialRequest(request)
-        expect(body.transaction_id).toBe('txn-456')
+        const { credentialRequest } = await issuer.decodeDeferredCredentialRequest({
+          issuerMetadata,
+          body: await request.text(),
+          contentType: request.headers.get('Content-Type') ?? undefined,
+        })
+        const { deferredCredentialRequest } = issuer.parseDeferredCredentialRequest({
+          issuerMetadata,
+          deferredCredentialRequest: credentialRequest,
+        })
+        expect(deferredCredentialRequest.transaction_id).toBe('txn-456')
+        expect(deferredCredentialRequest.credential_response_encryption).toEqual(credentialResponseEncryption)
 
         const { deferredCredentialResponse, deferredCredentialResponseJwt } =
           await issuer.createDeferredCredentialResponse({
             credentials: [{ credential: 'deferred-credential-value' }],
-            credentialResponseEncryption,
+            credentialResponseEncryption: deferredCredentialRequest.credential_response_encryption,
           })
 
         expect(deferredCredentialResponse.credentials).toEqual([{ credential: 'deferred-credential-value' }])
@@ -359,8 +366,12 @@ describe('Credential Request Encryption', () => {
 
     server.resetHandlers(
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
-        const body = await decryptCredentialRequest(request)
-        expect(body.credential_configuration_id).toBe('pidSdJwt')
+        const { credentialRequest } = await issuer.decodeCredentialRequest({
+          issuerMetadata: issuerMetadataWithRequiredEncryption,
+          body: await request.text(),
+          contentType: request.headers.get('Content-Type') ?? undefined,
+        })
+        expect(credentialRequest.credential_configuration_id).toBe('pidSdJwt')
         return HttpResponse.json({ credential: 'required-encryption-credential' })
       })
     )
@@ -487,4 +498,88 @@ describe('Credential Request Encryption', () => {
 
     expect(requestCount).toBe(0)
   })
+
+  test.each(['decodeCredentialRequest', 'decodeDeferredCredentialRequest'] as const)(
+    '%s preserves protocol errors and allows plaintext without a decryption callback',
+    async (method) => {
+      const issuerWithoutDecryptJwe = new Openid4vciIssuer({
+        callbacks: { ...callbacks, decryptJwe: undefined },
+      })
+      const body =
+        method === 'decodeCredentialRequest'
+          ? { credential_identifier: 'credential-id' }
+          : { transaction_id: 'txn-456' }
+
+      await expect(
+        issuerWithoutDecryptJwe[method]({ issuerMetadata, body, contentType: ContentType.Json })
+      ).resolves.toEqual({ credentialRequest: body })
+
+      await expect(
+        issuerWithoutDecryptJwe[method]({
+          issuerMetadata,
+          body: { ...body, credential_response_encryption: credentialResponseEncryption },
+          contentType: ContentType.Json,
+        })
+      ).rejects.toMatchObject({
+        status: 400,
+        errorResponse: { error: 'invalid_encryption_parameters' },
+      })
+
+      await expect(
+        issuerWithoutDecryptJwe[method]({
+          issuerMetadata,
+          body: 'not-a-jwe',
+          contentType: ContentType.Jwt,
+        })
+      ).rejects.toMatchObject({
+        status: 400,
+        errorResponse: { error: 'invalid_encryption_parameters' },
+      })
+    }
+  )
+
+  test.each(['decodeCredentialRequest', 'decodeDeferredCredentialRequest'] as const)(
+    '%s maps a missing or failing decryption callback to server_error',
+    async (method) => {
+      const { jwe } = await encryptJwe(
+        {
+          method: 'jwk',
+          publicJwk: credentialRequestEncryption.jwks.keys[0],
+          alg: 'RSA-OAEP',
+          enc: 'A256GCM',
+          kid: 'credential-request-key',
+        },
+        JSON.stringify({ transaction_id: 'txn-456' })
+      )
+      const options = { issuerMetadata, body: jwe, contentType: ContentType.Jwt }
+      const issuerWithoutDecryptJwe = new Openid4vciIssuer({
+        callbacks: { ...callbacks, decryptJwe: undefined },
+      })
+
+      await expect(issuerWithoutDecryptJwe[method](options)).rejects.toMatchObject({
+        status: 500,
+        errorResponse: { error: 'server_error' },
+        cause: expect.objectContaining({ message: expect.stringContaining('No decryptJwe callback') }),
+      })
+
+      for (const failure of [
+        new Error('KMS unavailable'),
+        new Oauth2ServerErrorResponseError({ error: 'invalid_encryption_parameters' }),
+      ]) {
+        const issuerWithFailingDecryptJwe = new Openid4vciIssuer({
+          callbacks: {
+            ...callbacks,
+            decryptJwe: () => {
+              throw failure
+            },
+          },
+        })
+        await expect(issuerWithFailingDecryptJwe[method](options)).rejects.toMatchObject({
+          status: 500,
+          errorResponse: { error: 'server_error' },
+          cause: failure,
+        })
+      }
+    }
+  )
 })
