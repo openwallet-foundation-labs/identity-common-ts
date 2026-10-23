@@ -101,6 +101,18 @@ export const IntermediarySchema = z.object({
   sname: z.string().min(1),
 })
 
+/**
+ * `act` claim — present when the WRPRC is issued to a WRP acting through an intermediary
+ * (ETSI TS 119 475 v1.2.1, GEN-5.2.4-09). `sub` matches the intermediary's semantic identifier
+ * (clause 5.1), i.e. equals `intermediary.sub`. The equality is enforced in the validator
+ * (ACT_SUB_MISMATCH / GEN-5.2.4-09), not here, so this schema stays `.extend()`-able by the
+ * Legal/NaturalPersonSubjectSchema.
+ */
+export const ActSchema = z.object({
+  /** Semantic identifier of the intermediary the WRP acts through (GEN-5.2.4-09) */
+  sub: z.string().min(1),
+})
+
 // ============================================================================
 // WRPRC Payload Schema
 // ============================================================================
@@ -182,6 +194,9 @@ export const WRPRCPayloadSchema = z.object({
 
   /** Intermediary information when WRP acts through an intermediary (Table 10) */
   intermediary: IntermediarySchema.optional(),
+
+  /** `act.sub` = the intermediary's semantic identifier when acting through one (GEN-5.2.4-09) */
+  act: ActSchema.optional(),
 
   /** Whether the WRP is a public sector body (Table 10) */
   public_body: z.boolean().optional(),

@@ -35,6 +35,7 @@ export {
 } from './entitlements'
 // Schemas
 export {
+  ActSchema,
   ClaimSchema,
   CredentialSchema,
   IntermediarySchema,

@@ -54,6 +54,8 @@ export const WRPRC_VALIDATION_CODES = {
   EXP_BEFORE_IAT: 'exp_before_iat',
   /** Selected WRPRC identity does not match the access certificate subject */
   ACCESS_CERTIFICATE_IDENTITY_MISMATCH: 'access_certificate_identity_mismatch',
+  /** act is present but act.sub does not equal intermediary.sub (GEN-5.2.4-09) */
+  ACT_SUB_MISMATCH: 'act_sub_mismatch',
 } as const
 
 /** A semantic validation code emitted by this validator */
@@ -223,6 +225,20 @@ export function validateWRPRCPayload(payload: unknown, accessCertificateSub: str
         path: ['exp'],
         message: 'exp must be after iat',
         code: WRPRC_VALIDATION_CODES.EXP_BEFORE_IAT,
+      })
+    }
+  }
+
+  // GEN-5.2.4-09: if act is present, act.sub must equal intermediary.sub. (This enforces the match the
+  // spec requires; it does NOT make `act` mandatory under intermediation, to avoid rejecting existing
+  // intermediated payloads/fixtures that predate `act` — whether to require `act` is left to a separate
+  // decision.)
+  if (validPayload.act) {
+    if (!validPayload.intermediary || validPayload.act.sub !== validPayload.intermediary.sub) {
+      errors.push({
+        path: ['act', 'sub'],
+        message: 'act.sub must equal intermediary.sub (GEN-5.2.4-09)',
+        code: WRPRC_VALIDATION_CODES.ACT_SUB_MISMATCH,
       })
     }
   }
