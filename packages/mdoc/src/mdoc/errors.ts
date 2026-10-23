@@ -79,6 +79,7 @@ export class InvalidValidityInfoError extends MdlError {}
 export class UnsupportedDeviceMacAlgorithmError extends MdlError {}
 export class SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError extends MdlError {}
 export class UnableToExtractX5ChainFromCwtError extends MdlError {}
+export class UnableToExtractX5ChainFromJwtError extends MdlError {}
 export class NoPublicKeySetOnStatusListError extends MdlError {}
 export class InvalidSignatureError extends MdlError {}
 
@@ -89,9 +90,8 @@ export class InvalidSignatureError extends MdlError {}
 export class UnprotectedX5ChainNotBoundError extends MdlError {}
 
 /**
- * ISO/IEC 18013-5 second edition § 12.3.6.3 requires the status list of an MSO to be a Status List
- * Token in CWT format, "since the IssuerAuth structure is a CWT". A list served as a JWT is a
- * deviation, and is rejected rather than verified.
+ * @deprecated A status list served as a JWT is now verified as a fallback rather than rejected, so
+ * this error is no longer thrown.
  */
 export class JwtNotSupportForStatusListError extends MdlError {}
 export class TrustedRevocationCertificatesMustContainAtleastOneCertificateError extends MdlError {}
@@ -100,10 +100,13 @@ export class InvalidIdentifierListSignatureError extends MdlError {}
 export class IdentifierFoundInRevokedListError extends MdlError {}
 
 /**
- * An MSO revocation list — status list or identifier list — was well-formed and correctly
- * signed, but one of the claim requirements from ISO/IEC 18013-5 second edition 12.3.6 /
- * the Token Status List specification was not met (missing or mismatched subject, missing
- * or passed expiration, or an issuance time in the future).
+ * An MSO revocation list — status list or identifier list — could not be used. Either one of the
+ * claim requirements from ISO/IEC 18013-5 second edition 12.3.6 / the Token Status List
+ * specification was not met (missing or mismatched subject, missing or passed expiration, or an
+ * issuance time in the future), or a status list served as a JWT is malformed: not a well-formed
+ * JWS, an unsupported `alg` or a `crit` header, or no readable `status_list`. Most of those JWT
+ * checks run before the signature is verified, so this error does not by itself mean the list was
+ * signed by its issuer.
  */
 export class InvalidRevocationListError extends MdlError {}
 

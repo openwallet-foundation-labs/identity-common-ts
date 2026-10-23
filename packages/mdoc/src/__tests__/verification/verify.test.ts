@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import { base64, base64url, stringToBytes } from '@owf/identity-common'
 import { MediaTypes, StatusList, StatusListCwt, StatusListInfo, StatusType } from '@owf/token-status-list'
 import { X509Certificate } from '@peculiar/x509'
 import { HttpResponse, http } from 'msw'
@@ -479,6 +480,35 @@ suite('Verification', () => {
     return uri
   }
 
+  /** Serves a status list in JWT format, signed like the CWT ones, with `status` at `idx`. */
+  const mockStatusListJwt = async (path: string, { idx, status }: { idx: number; status: StatusType }) => {
+    const uri = `https://example.org${path}`
+    const statusList = new StatusList(new Array(10).fill(StatusType.Valid), 2)
+    statusList.setStatus(idx, status)
+
+    const encodeJson = (value: unknown) => base64url.encode(stringToBytes(JSON.stringify(value)))
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const signingInput = `${encodeJson({
+      alg: 'ES256',
+      typ: 'statuslist+jwt',
+      x5c: [base64.encode(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))],
+    })}.${encodeJson({
+      sub: uri,
+      iat: nowSeconds,
+      exp: nowSeconds + 3600,
+      status_list: { bits: 2, lst: base64url.encode(statusList.compressStatusListToBytes()) },
+    })}`
+    const signature = await mdocContext.cose.sign1.sign({
+      toBeSigned: stringToBytes(signingInput),
+      key: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+      algorithm: SignatureAlgorithm.ES256,
+    })
+
+    mockGet(uri, `${signingInput}.${base64url.encode(signature)}`, MediaTypes.StatusListJwt)
+
+    return uri
+  }
+
   // Token Status List, made binding by § 12.3.6.1: `sub` shall equal the uri the list was
   // referenced by.
   test('Verify mdoc with a status list whose subject does not match the uri it was fetched from', async () => {
@@ -555,6 +585,32 @@ suite('Verification', () => {
     await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '2'`)
     await expect(verification).rejects.toMatchObject({
       assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Suspended } },
+    })
+  })
+
+  // NOT allowed by § 12.3.6.3, but accepted as a fallback when a CWT is not served.
+  test('Verify mdoc with a status list served as a JWT', async () => {
+    const idx = 3
+    const uri = await mockStatusListJwt('/status-list/jwt', { idx, status: StatusType.Valid })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    // The JWT list is verified, but only a CWT list is returned as `statusList`.
+    const { statusList, trustedStatusListChain } = await verifyIssuerSigned(credential)
+    expect(statusList).toBeUndefined()
+    expect(trustedStatusListChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
+  })
+
+  test('Verify mdoc with a revoked entry in a status list served as a JWT', async () => {
+    const idx = 3
+    const uri = await mockStatusListJwt('/status-list/jwt-revoked', { idx, status: StatusType.Invalid })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    const verification = verifyIssuerSigned(credential)
+    await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
+    await expect(verification).rejects.toMatchObject({
+      assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Invalid } },
     })
   })
 
@@ -1024,7 +1080,7 @@ suite('Verification', () => {
     )
   })
 
-  test('Verify mdoc with status status_list invalid status list format of JWT', async () => {
+  test('Verify mdoc with status status_list served as a malformed JWT', async () => {
     const idx = 3
     const uri = 'https://example.org/status-list/30'
     const statusList = new StatusList(new Array(10).fill(StatusType.Invalid), 2)
@@ -1076,7 +1132,7 @@ suite('Verification', () => {
         },
         mdocContext
       )
-    ).rejects.toThrow(`The status list at ${uri} was served in JWT format`)
+    ).rejects.toThrow(`The status list at ${uri} is not a valid JWT`)
   })
 
   test('Verify mdoc with status invalid no trusted certificates supplied', async () => {

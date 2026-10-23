@@ -9,9 +9,7 @@ export const fetchStatusList = async ({
 }: {
   uri: string
   /**
-   *
-   * If none is supplied either can be returned
-   *
+   * The formats to ask for, in order of preference. If none is supplied either can be returned.
    */
   acceptedFormats?: Array<'cwt' | 'jwt'>
   customFetcher?: typeof fetch
@@ -21,9 +19,12 @@ export const fetchStatusList = async ({
       throw new SLException(`At least one accepted format (cwt, jwt) needs to be provided`)
     }
 
-    const acceptHeaders = acceptedFormats.map((format) =>
-      format === 'jwt' ? MediaTypes.StatusListJwt : MediaTypes.StatusListCwt
-    )
+    // The order of the values alone expresses no preference (RFC 9110 § 12.5.1), so every format
+    // after the first gets a lower quality value. Duplicates are dropped, which keeps it at 0.9.
+    const acceptHeaders = Array.from(new Set(acceptedFormats)).map((format, index) => {
+      const mediaType = format === 'jwt' ? MediaTypes.StatusListJwt : MediaTypes.StatusListCwt
+      return index === 0 ? mediaType : `${mediaType};q=${(10 - index) / 10}`
+    })
 
     const response = await customFetcher(uri, {
       headers: {

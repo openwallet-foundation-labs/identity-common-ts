@@ -33,6 +33,10 @@ export type IssuerAuthVerificationResult = {
    * certificate chain validation is disabled, or when it failed and the verification callback did not throw.
    */
   trustedIssuanceChain?: Uint8Array[]
+  /**
+   * Only a status list served in CWT format is returned here. One served as a JWT is verified but
+   * leaves this unset; `trustedStatusListChain` is set for either when its chain was validated.
+   */
   statusList?: StatusListCwt
   trustedStatusListChain?: Uint8Array[]
   identifierList?: IdentifierListCwt
@@ -91,7 +95,7 @@ export class IssuerAuth extends Sign1 {
 
   /**
    * Verifies the MSO's revocation status. Throws on revocation or
-   * a CWT-signature failure; succeeds silently otherwise.
+   * a revocation list that fails verification; succeeds silently otherwise.
    *
    * @todo return the full verified chain for audit / compliance.
    */
