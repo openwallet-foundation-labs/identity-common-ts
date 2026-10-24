@@ -184,7 +184,7 @@ describe('Credential Response Encryption', () => {
   test('issuer encrypts credential response and client decrypts it', async () => {
     server.resetHandlers(
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
-        const parsedCredentialRequest = await issuer.parseCredentialRequestFromBody({
+        const parsedCredentialRequest = await issuer.parseCredentialRequest({
           issuerMetadata,
           body: await request.text(),
           contentType: request.headers.get('Content-Type') ?? undefined,
@@ -259,7 +259,7 @@ describe('Credential Response Encryption', () => {
   test('issuer encrypts deferred credential response and client decrypts it', async () => {
     server.resetHandlers(
       http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, async ({ request }) => {
-        const { deferredCredentialRequest } = await issuer.parseDeferredCredentialRequestFromBody({
+        const { deferredCredentialRequest } = await issuer.parseDeferredCredentialRequest({
           issuerMetadata,
           body: await request.text(),
           contentType: request.headers.get('Content-Type') ?? undefined,
@@ -463,7 +463,7 @@ describe('Credential Request Encryption', () => {
 
     server.resetHandlers(
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
-        const parsed = await issuer.parseCredentialRequestFromBody({
+        const parsed = await issuer.parseCredentialRequest({
           issuerMetadata: issuerMetadataWithRequiredEncryption,
           body: await request.text(),
           contentType: request.headers.get('Content-Type') ?? undefined,
@@ -633,21 +633,21 @@ describe('Credential Request Encryption', () => {
     }
   )
 
-  test.each(['parseCredentialRequestFromBody', 'parseDeferredCredentialRequestFromBody'] as const)(
+  test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
     '%s parses raw JSON and validates its contents without a decryptJwe callback',
     async (method) => {
       const plaintextIssuer = new Openid4vciIssuer({
         callbacks: { ...callbacks, decryptJwe: undefined },
       })
       const options = { issuerMetadata, contentType: ContentType.Json }
-      if (method === 'parseCredentialRequestFromBody') {
-        const parsed = await plaintextIssuer.parseCredentialRequestFromBody({
+      if (method === 'parseCredentialRequest') {
+        const parsed = await plaintextIssuer.parseCredentialRequest({
           ...options,
           body: JSON.stringify({ credential_configuration_id: 'pidSdJwt' }),
         })
         expect(parsed.credentialConfigurationId).toBe('pidSdJwt')
       } else {
-        const parsed = await plaintextIssuer.parseDeferredCredentialRequestFromBody({
+        const parsed = await plaintextIssuer.parseDeferredCredentialRequest({
           ...options,
           body: JSON.stringify({ transaction_id: 'txn-plaintext' }),
         })
@@ -662,7 +662,7 @@ describe('Credential Request Encryption', () => {
     }
   )
 
-  test.each(['parseCredentialRequestFromBody', 'parseDeferredCredentialRequestFromBody'] as const)(
+  test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
     '%s reports a missing decryptJwe callback as server_error',
     async (method) => {
       const jwe = await encryptJwe(
@@ -684,9 +684,9 @@ describe('Credential Request Encryption', () => {
         contentType: ContentType.Jwt,
       }
       const parsing =
-        method === 'parseCredentialRequestFromBody'
-          ? issuerWithoutDecryptJwe.parseCredentialRequestFromBody(options)
-          : issuerWithoutDecryptJwe.parseDeferredCredentialRequestFromBody(options)
+        method === 'parseCredentialRequest'
+          ? issuerWithoutDecryptJwe.parseCredentialRequest(options)
+          : issuerWithoutDecryptJwe.parseDeferredCredentialRequest(options)
 
       await expect(parsing).rejects.toMatchObject({
         status: 500,

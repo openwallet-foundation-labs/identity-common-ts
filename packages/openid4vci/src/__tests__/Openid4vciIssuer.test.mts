@@ -1,5 +1,5 @@
 import { preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
-import { addSecondsToDate } from '@openid4vc/utils'
+import { addSecondsToDate, ContentType } from '@openid4vc/utils'
 import { describe, expect, test } from 'vitest'
 import { callbacks, getSignJwtCallback } from '../../../oauth2/src/__tests__/util.mjs'
 import { parseCredentialRequest } from '../credential-request/parse-credential-request.js'
@@ -96,16 +96,17 @@ const issuerMetadata = {
 } as const satisfies IssuerMetadataResult
 
 describe('Openid4vciIssuer', () => {
-  test('parseCredentialRequest keeps unknown_credential_configuration for an unknown credential_configuration_id', () => {
-    expect(() =>
+  test('parseCredentialRequest keeps unknown_credential_configuration for an unknown credential_configuration_id', async () => {
+    await expect(
       issuer.parseCredentialRequest({
         issuerMetadata: { ...issuerMetadata, originalDraftVersion: Openid4vciVersion.Draft15 },
-        credentialRequest: {
+        body: {
           credential_configuration_id: 'not-offered',
           proof: { proof_type: 'jwt', jwt: 'ey.ey.S' },
         },
+        contentType: ContentType.Json,
       })
-    ).toThrow(
+    ).rejects.toMatchObject(
       expect.objectContaining({
         status: 400,
         errorResponse: expect.objectContaining({ error: 'unknown_credential_configuration' }),

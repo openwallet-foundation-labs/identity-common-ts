@@ -43,11 +43,11 @@ provide an `encryptJwe` callback and can opt in with
 Requests are encrypted automatically when required by the issuer or by
 response-encryption parameters for V1 or an issuer advertising request encryption.
 
-Issuers provide a `decryptJwe` callback and call `parseCredentialRequestFromBody`
-or `parseDeferredCredentialRequestFromBody` with `{ body, contentType, issuerMetadata }`.
-These async methods accept raw JSON text, parsed JSON objects, or compact JWE
-strings as appropriate for the content type, and handle decryption and validation.
-The synchronous parsed-object methods remain available but are deprecated.
+Issuers provide a `decryptJwe` callback and call the async
+`parseCredentialRequest` or `parseDeferredCredentialRequest` methods with
+`{ body, contentType, issuerMetadata }`. For `application/json`, pass the parsed
+request object; for `application/jwt`, pass the compact JWE string. These methods
+handle decryption and validation.
 
 Request and response compression are not supported; `zip` parameters are rejected
 and issuers must not advertise compression support.

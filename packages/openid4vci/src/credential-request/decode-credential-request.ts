@@ -5,7 +5,7 @@ import { Openid4vciVersion } from '../version'
 import { verifyCredentialRequestEncryption } from './verify-credential-request-encryption'
 
 export interface CredentialRequestBodyOptions {
-  /** Raw JWE string for application/jwt, or raw JSON text or a parsed object for application/json. */
+  /** Parsed JSON object for application/json, or raw compact JWE string for application/jwt. */
   body: unknown
   contentType: string | undefined
   issuerMetadata: IssuerMetadataResult

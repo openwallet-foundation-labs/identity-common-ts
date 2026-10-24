@@ -20,12 +20,10 @@ import {
   decodeDeferredCredentialRequest,
 } from './credential-request/decode-credential-request'
 import {
-  type ParseCredentialRequestOptions,
   type ParseCredentialRequestReturn,
   parseCredentialRequest,
 } from './credential-request/parse-credential-request'
 import {
-  type ParseDeferredCredentialRequestOptions,
   type ParseDeferredCredentialRequestReturn,
   parseDeferredCredentialRequest,
 } from './credential-request/parse-deferred-credential-request'
@@ -253,30 +251,17 @@ export class Openid4vciIssuer {
   }
 
   /**
-   * Parses and validates a Credential Request from a plaintext JSON or encrypted JWE transport body.
+   * Parses and validates a Credential Request from its plaintext JSON object or encrypted JWE transport body.
    * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
    */
-  public async parseCredentialRequestFromBody(
-    options: CredentialRequestBodyOptions
-  ): Promise<ParseCredentialRequestReturn> {
+  public async parseCredentialRequest(options: CredentialRequestBodyOptions): Promise<ParseCredentialRequestReturn> {
     const { credentialRequest } = await decodeCredentialRequest({
       ...options,
       callbacks: this.options.callbacks,
     })
-    return this.parseCredentialRequest({ issuerMetadata: options.issuerMetadata, credentialRequest })
-  }
-
-  /**
-   * @deprecated Pass transport bodies to `parseCredentialRequestFromBody`. This method only parses
-   * an already-decoded Credential Request object.
-   *
-   * @throws Oauth2ServerErrorResponseError - when validation of the credential request fails
-   *  You can extract the credential error response from this.
-   */
-  public parseCredentialRequest(options: ParseCredentialRequestOptions): ParseCredentialRequestReturn {
     try {
       // TODO: method should include reason for parsing - (e.g. unsupported format etc..)
-      return parseCredentialRequest(options)
+      return parseCredentialRequest({ issuerMetadata: options.issuerMetadata, credentialRequest })
     } catch (error) {
       if (error instanceof Oauth2ServerErrorResponseError) throw error
 
@@ -301,33 +286,21 @@ export class Openid4vciIssuer {
   }
 
   /**
-   * Parses and validates a Deferred Credential Request from a plaintext JSON or encrypted JWE transport body.
+   * Parses and validates a Deferred Credential Request from its plaintext JSON object or encrypted JWE transport body.
    * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
    */
-  public async parseDeferredCredentialRequestFromBody(
+  public async parseDeferredCredentialRequest(
     options: CredentialRequestBodyOptions
   ): Promise<ParseDeferredCredentialRequestReturn> {
     const { credentialRequest } = await decodeDeferredCredentialRequest({
       ...options,
       callbacks: this.options.callbacks,
     })
-    return this.parseDeferredCredentialRequest({
-      issuerMetadata: options.issuerMetadata,
-      deferredCredentialRequest: credentialRequest,
-    })
-  }
-
-  /**
-   * @deprecated Pass transport bodies to `parseDeferredCredentialRequestFromBody`. This method only parses
-   * an already-decoded Deferred Credential Request object.
-   *
-   * @throws Oauth2ServerErrorResponseError - when validation of the deferred credential request fails
-   */
-  public parseDeferredCredentialRequest(
-    options: ParseDeferredCredentialRequestOptions
-  ): ParseDeferredCredentialRequestReturn {
     try {
-      return parseDeferredCredentialRequest(options)
+      return parseDeferredCredentialRequest({
+        issuerMetadata: options.issuerMetadata,
+        deferredCredentialRequest: credentialRequest,
+      })
     } catch (error) {
       if (error instanceof Oauth2ServerErrorResponseError) throw error
 
