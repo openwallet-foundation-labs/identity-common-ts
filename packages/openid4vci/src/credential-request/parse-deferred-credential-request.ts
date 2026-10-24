@@ -4,7 +4,7 @@ import { verifyCredentialResponseEncryption } from './verify-credential-response
 import { type DeferredCredentialRequest, zDeferredCredentialRequest } from './z-credential-request'
 
 export interface ParseDeferredCredentialRequestOptions {
-  deferredCredentialRequest: Record<string, unknown>
+  deferredCredentialRequest: unknown
 
   /**
    * The `credential_response_encryption` of the request is checked against the

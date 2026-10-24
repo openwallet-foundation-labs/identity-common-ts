@@ -6,7 +6,6 @@ import { describe, expect, test, vi } from 'vitest'
 import {
   type DecodeCredentialRequestOptions,
   decodeCredentialRequest,
-  decodeDeferredCredentialRequest,
 } from '../../credential-request/decode-credential-request'
 import { parseCredentialRequest } from '../../credential-request/parse-credential-request'
 import { parseDeferredCredentialRequest } from '../../credential-request/parse-deferred-credential-request'
@@ -62,11 +61,21 @@ async function encryptRequest(body: unknown, header: Record<string, unknown> = {
 }
 
 const decoders = [
-  { name: 'credential', decode: decodeCredentialRequest, body: { credential_identifier: 'credential-id' } },
-  { name: 'deferred credential', decode: decodeDeferredCredentialRequest, body: { transaction_id: 'transaction-id' } },
+  {
+    name: 'credential',
+    decode: decodeCredentialRequest,
+    body: { credential_identifier: 'credential-id' },
+    deferred: false,
+  },
+  {
+    name: 'deferred credential',
+    decode: decodeCredentialRequest,
+    body: { transaction_id: 'transaction-id' },
+    deferred: true,
+  },
 ] as const
 
-describe.each(decoders)('$name request decoding', ({ decode, body }) => {
+describe.each(decoders)('$name request decoding', ({ decode, body, deferred }) => {
   const options = (overrides: Partial<DecodeCredentialRequestOptions> = {}): DecodeCredentialRequestOptions => ({
     body,
     contentType: ContentType.Json,
@@ -85,7 +94,7 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
 
     expect(decrypt).toHaveBeenCalledWith(jwe, { jwk })
     expect(result.credentialRequest).toEqual(request)
-    if (decode === decodeCredentialRequest) {
+    if (!deferred) {
       expect(
         parseCredentialRequest({ issuerMetadata, credentialRequest: result.credentialRequest })
           .credentialResponseEncryption
@@ -101,24 +110,26 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
   test('returns an ordinary plaintext request when encryption is not required', async () => {
     await expect(decode(options({ contentType: 'Application/JSON; charset=utf-8' }))).resolves.toEqual({
       credentialRequest: body,
+      transport: 'json',
     })
   })
 
-  test('rejects raw JSON text without invoking decryption', async () => {
+  test('passes JSON text to the request parser without invoking decryption', async () => {
     const decrypt = vi.fn(decryptJwe)
+    const rawBody = JSON.stringify(body)
     await expect(
       decode(
         options({
-          body: JSON.stringify(body),
+          body: rawBody,
           contentType: 'Application/JSON; charset=utf-8',
           callbacks: { decryptJwe: decrypt },
         })
       )
-    ).rejects.toThrow(invalidCredentialRequest)
+    ).resolves.toEqual({ credentialRequest: rawBody, transport: 'json' })
     expect(decrypt).not.toHaveBeenCalled()
   })
 
-  test('rejects plaintext when issuer metadata requires encryption', async () => {
+  test('leaves request-encryption policy to the request parser', async () => {
     const requiredIssuerMetadata = {
       ...issuerMetadata,
       credentialIssuer: {
@@ -136,11 +147,11 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
           body,
         })
       )
-    ).rejects.toThrow(invalidEncryptionParameters)
+    ).resolves.toEqual({ credentialRequest: body, transport: 'json' })
   })
 
   test.each([true, false])(
-    'rejects plaintext response-encryption parameters for V1 (request encryption advertised: %s)',
+    'leaves V1 response-encryption policy to the request parser (request encryption advertised: %s)',
     async (advertised) => {
       const metadata = advertised
         ? issuerMetadata
@@ -148,11 +159,11 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
             ...issuerMetadata,
             credentialIssuer: { ...issuerMetadata.credentialIssuer, credential_request_encryption: undefined },
           }
-      await expect(
-        decode(
-          options({ issuerMetadata: metadata, body: { ...body, credential_response_encryption: responseEncryption } })
-        )
-      ).rejects.toThrow(invalidEncryptionParameters)
+      const request = { ...body, credential_response_encryption: responseEncryption }
+      await expect(decode(options({ issuerMetadata: metadata, body: request }))).resolves.toEqual({
+        credentialRequest: request,
+        transport: 'json',
+      })
     }
   )
 
@@ -173,29 +184,35 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
           body: { ...body, credential_response_encryption: responseEncryption },
         })
       )
-    ).resolves.toEqual({ credentialRequest: { ...body, credential_response_encryption: responseEncryption } })
+    ).resolves.toEqual({
+      credentialRequest: { ...body, credential_response_encryption: responseEncryption },
+      transport: 'json',
+    })
   })
 
-  test('rejects plaintext response-encryption parameters when request encryption is advertised', async () => {
+  test('leaves advertised request-encryption policy to the request parser', async () => {
     const draft15IssuerMetadata = {
       ...issuerMetadata,
       originalDraftVersion: Openid4vciVersion.Draft15,
     }
 
+    const request = { ...body, credential_response_encryption: responseEncryption }
     await expect(
       decode(
         options({
           issuerMetadata: draft15IssuerMetadata,
-          body: { ...body, credential_response_encryption: responseEncryption },
+          body: request,
         })
       )
-    ).rejects.toThrow(invalidEncryptionParameters)
+    ).resolves.toEqual({ credentialRequest: request, transport: 'json' })
   })
 
-  test('rejects response-encryption parameters in a JSON object when request encryption is advertised', async () => {
-    await expect(
-      decode(options({ body: { ...body, credential_response_encryption: responseEncryption } }))
-    ).rejects.toThrow(invalidEncryptionParameters)
+  test('returns plaintext request objects for validation by the request parser', async () => {
+    const request = { ...body, credential_response_encryption: responseEncryption }
+    await expect(decode(options({ body: request }))).resolves.toEqual({
+      credentialRequest: request,
+      transport: 'json',
+    })
   })
 
   test('rejects an encrypted request without advertised request encryption', async () => {
@@ -280,10 +297,26 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
   })
 
   test('allows plaintext without a decryption callback', async () => {
-    await expect(decode(options({ callbacks: {} }))).resolves.toEqual({ credentialRequest: body })
+    await expect(decode(options({ callbacks: {} }))).resolves.toEqual({ credentialRequest: body, transport: 'json' })
   })
 
-  test.each(['invalid JSON', 'null', '[]'])('rejects decrypted non-object payload: %s', async (payload) => {
+  test('rejects invalid JSON in decrypted payload', async () => {
+    await expect(
+      decode(
+        options({
+          body: await encryptRequest(body),
+          contentType: ContentType.Jwt,
+          callbacks: { decryptJwe: () => ({ decrypted: true, payload: 'invalid JSON', decryptionJwk: jwk }) },
+        })
+      )
+    ).rejects.toThrow(invalidCredentialRequest)
+  })
+
+  test.each([null, [], 'not JSON', 123])('passes JSON body to schema validation: %s', async (value) => {
+    await expect(decode(options({ body: value }))).resolves.toEqual({ credentialRequest: value, transport: 'json' })
+  })
+
+  test.each(['null', '[]'])('passes decrypted JSON to schema validation: %s', async (payload) => {
     await expect(
       decode(
         options({
@@ -292,11 +325,7 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
           callbacks: { decryptJwe: () => ({ decrypted: true, payload, decryptionJwk: jwk }) },
         })
       )
-    ).rejects.toThrow(invalidCredentialRequest)
-  })
-
-  test.each([null, [], 'not JSON', 123])('rejects a non-object plaintext body: %s', async (value) => {
-    await expect(decode(options({ body: value }))).rejects.toThrow(invalidCredentialRequest)
+    ).resolves.toEqual({ credentialRequest: JSON.parse(payload), transport: 'jwe' })
   })
 
   test.each([undefined, 'text/plain', 'application/jsonp', 'application/jwt, application/json'])(

@@ -654,11 +654,75 @@ describe('Credential Request Encryption', () => {
         expect(parsed.deferredCredentialRequest.transaction_id).toBe('txn-plaintext')
       }
 
-      for (const body of ['not JSON', '{}']) {
+      for (const body of ['not JSON', '{}', null, [], 123]) {
         await expect(plaintextIssuer[method]({ ...options, body })).rejects.toMatchObject({
           errorResponse: { error: 'invalid_credential_request' },
         })
       }
+    }
+  )
+
+  test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
+    '%s applies request-encryption policy after schema validation',
+    async (method) => {
+      const issuerWithoutRequestEncryption = new Openid4vciIssuer({ callbacks })
+      const requiredMetadata: IssuerMetadataResult = {
+        ...issuerMetadata,
+        credentialIssuer: {
+          ...credentialIssuerMetadata,
+          credential_request_encryption: {
+            ...credentialRequestEncryption,
+            encryption_required: true,
+          },
+        },
+      }
+      const draft15Metadata: IssuerMetadataResult = {
+        ...issuerMetadata,
+        originalDraftVersion: Openid4vciVersion.Draft15,
+        credentialIssuer: {
+          ...credentialIssuerMetadata,
+          credential_request_encryption: undefined,
+        },
+      }
+      const regularRequest = {
+        credential_configuration_id: 'pidSdJwt',
+        proof: { proof_type: 'jwt', jwt: 'ey.ey.S' },
+      }
+      const deferredRequest = { transaction_id: 'txn-plaintext' }
+      const plaintextRequest = (issuerMetadata: IssuerMetadataResult, additionalPayload: Record<string, unknown>) =>
+        method === 'parseCredentialRequest'
+          ? issuerWithoutRequestEncryption.parseCredentialRequest({
+              issuerMetadata,
+              body: { ...regularRequest, ...additionalPayload },
+              contentType: ContentType.Json,
+            })
+          : issuerWithoutRequestEncryption.parseDeferredCredentialRequest({
+              issuerMetadata,
+              body: { ...deferredRequest, ...additionalPayload },
+              contentType: ContentType.Json,
+            })
+
+      await expect(plaintextRequest(requiredMetadata, {})).rejects.toMatchObject({
+        errorResponse: { error: 'invalid_encryption_parameters' },
+      })
+      await expect(
+        plaintextRequest(draft15Metadata, { credential_response_encryption: credentialResponseEncryption })
+      ).resolves.toBeDefined()
+
+      const v1MetadataWithoutRequestEncryption: IssuerMetadataResult = {
+        ...issuerMetadata,
+        credentialIssuer: {
+          ...credentialIssuerMetadata,
+          credential_request_encryption: undefined,
+        },
+      }
+      await expect(
+        plaintextRequest(v1MetadataWithoutRequestEncryption, {
+          credential_response_encryption: credentialResponseEncryption,
+        })
+      ).rejects.toMatchObject({
+        errorResponse: { error: 'invalid_encryption_parameters' },
+      })
     }
   )
 

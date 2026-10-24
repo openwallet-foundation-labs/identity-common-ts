@@ -24,7 +24,7 @@ import {
 
 export interface ParseCredentialRequestOptions {
   issuerMetadata: IssuerMetadataResult
-  credentialRequest: Record<string, unknown>
+  credentialRequest: unknown
 }
 
 export interface ParseCredentialRequestReturn {

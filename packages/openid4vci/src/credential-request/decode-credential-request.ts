@@ -2,7 +2,6 @@ import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError 
 import { ContentType } from '@openid4vc/utils'
 import { isMediaType } from '@owf/identity-common'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
-import { Openid4vciVersion } from '../version'
 import { verifyCredentialRequestEncryption } from './verify-credential-request-encryption'
 
 export interface CredentialRequestBodyOptions {
@@ -17,7 +16,8 @@ export interface DecodeCredentialRequestOptions extends CredentialRequestBodyOpt
 }
 
 export interface DecodeCredentialRequestReturn {
-  credentialRequest: Record<string, unknown>
+  credentialRequest: unknown
+  transport: 'json' | 'jwe'
 }
 
 const invalidCredentialRequest = (error_description: string) =>
@@ -36,27 +36,25 @@ const decodeRequestServerError = (cause: unknown) =>
   new Oauth2ServerErrorResponseError(
     {
       error: Oauth2ErrorCodes.ServerError,
-      error_description: 'Unable to decrypt Credential Request',
+      error_description: 'Unable to decrypt credential request',
     },
     {
       status: 500,
       cause,
-      internalMessage: 'Error decoding encrypted Credential Request',
+      internalMessage: 'Error decoding encrypted credential request',
     }
   )
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 /**
  * Decodes the transport envelope before the existing request parsers validate its contents.
  * Missing callbacks and callback exceptions are reported as server failures, not protocol errors.
  */
-async function decodeRequest(options: DecodeCredentialRequestOptions): Promise<DecodeCredentialRequestReturn> {
+export async function decodeCredentialRequest(
+  options: DecodeCredentialRequestOptions
+): Promise<DecodeCredentialRequestReturn> {
   if (isMediaType(options.contentType, ContentType.Jwt)) {
     if (typeof options.body !== 'string') {
-      throw invalidEncryptionParameters('Encrypted Credential Request body must be a compact JWE string')
+      throw invalidEncryptionParameters('Encrypted credential request body must be a compact JWE string')
     }
 
     const { jwk, header } = verifyCredentialRequestEncryption(options.body, options.issuerMetadata.credentialIssuer)
@@ -68,11 +66,11 @@ async function decodeRequest(options: DecodeCredentialRequestOptions): Promise<D
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.ServerError,
-          error_description: 'Unable to decrypt Credential Request',
+          error_description: 'Unable to decrypt credential request',
         },
         {
           status: 500,
-          internalMessage: 'No decryptJwe callback was provided for encrypted Credential Requests',
+          internalMessage: 'No decryptJwe callback was provided for encrypted credential requests',
         }
       )
     }
@@ -84,52 +82,22 @@ async function decodeRequest(options: DecodeCredentialRequestOptions): Promise<D
       throw decodeRequestServerError(error)
     }
     if (!result.decrypted) {
-      throw invalidEncryptionParameters('Unable to decrypt Credential Request')
+      throw invalidEncryptionParameters('Unable to decrypt credential request')
     }
 
     let credentialRequest: unknown
     try {
       credentialRequest = JSON.parse(result.payload)
     } catch {
-      throw invalidCredentialRequest('Decrypted Credential Request is not valid JSON')
+      throw invalidCredentialRequest('Decrypted credential request is not valid JSON')
     }
-    if (!isRecord(credentialRequest)) {
-      throw invalidCredentialRequest('Decrypted Credential Request must be a JSON object')
-    }
-    return { credentialRequest }
+    return { credentialRequest, transport: 'jwe' }
   }
 
   if (isMediaType(options.contentType, ContentType.Json)) {
     const credentialRequest: unknown = options.body
-    if (!isRecord(credentialRequest)) {
-      throw invalidCredentialRequest('Plaintext Credential Request body must be a JSON object')
-    }
-    if (options.issuerMetadata.credentialIssuer.credential_request_encryption?.encryption_required) {
-      throw invalidEncryptionParameters('The credential issuer requires encrypted Credential Requests')
-    }
-    if (
-      Reflect.getOwnPropertyDescriptor(credentialRequest, 'credential_response_encryption') !== undefined &&
-      (options.issuerMetadata.credentialIssuer.credential_request_encryption !== undefined ||
-        options.issuerMetadata.originalDraftVersion === Openid4vciVersion.V1)
-    ) {
-      throw invalidEncryptionParameters(
-        'Credential Requests containing credential_response_encryption must be encrypted'
-      )
-    }
-    return { credentialRequest }
+    return { credentialRequest, transport: 'json' }
   }
 
-  throw invalidCredentialRequest('Credential Request Content-Type must be application/json or application/jwt')
-}
-
-export function decodeCredentialRequest(
-  options: DecodeCredentialRequestOptions
-): Promise<DecodeCredentialRequestReturn> {
-  return decodeRequest(options)
-}
-
-export function decodeDeferredCredentialRequest(
-  options: DecodeCredentialRequestOptions
-): Promise<DecodeCredentialRequestReturn> {
-  return decodeRequest(options)
+  throw invalidCredentialRequest('Credential request content-type must be application/json or application/jwt')
 }

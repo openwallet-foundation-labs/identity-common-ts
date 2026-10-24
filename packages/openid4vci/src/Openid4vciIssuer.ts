@@ -6,7 +6,7 @@ import {
   Oauth2ServerErrorResponseError,
   type VerifyClientAttestationOptions,
 } from '@openid4vc/oauth2'
-import { parseWithErrorHandling, ValidationError } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@openid4vc/utils'
 import { type CreateCredentialOfferOptions, createCredentialOffer } from './credential-offer/credential-offer'
 import {
   type CreateCredentialResponseOptions,
@@ -14,19 +14,13 @@ import {
   createCredentialResponse,
   createDeferredCredentialResponse,
 } from './credential-request/credential-response'
+import type { CredentialRequestBodyOptions } from './credential-request/decode-credential-request'
+import type { ParseCredentialRequestReturn } from './credential-request/parse-credential-request'
 import {
-  type CredentialRequestBodyOptions,
-  decodeCredentialRequest,
-  decodeDeferredCredentialRequest,
-} from './credential-request/decode-credential-request'
-import {
-  type ParseCredentialRequestReturn,
-  parseCredentialRequest,
-} from './credential-request/parse-credential-request'
-import {
-  type ParseDeferredCredentialRequestReturn,
-  parseDeferredCredentialRequest,
-} from './credential-request/parse-deferred-credential-request'
+  parseCredentialRequestBody,
+  parseDeferredCredentialRequestBody,
+} from './credential-request/parse-credential-request-body'
+import type { ParseDeferredCredentialRequestReturn } from './credential-request/parse-deferred-credential-request'
 import { Openid4vciError } from './error/Openid4vciError'
 import {
   type VerifyCredentialRequestAttestationProofOptions,
@@ -255,34 +249,10 @@ export class Openid4vciIssuer {
    * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
    */
   public async parseCredentialRequest(options: CredentialRequestBodyOptions): Promise<ParseCredentialRequestReturn> {
-    const { credentialRequest } = await decodeCredentialRequest({
+    return parseCredentialRequestBody({
       ...options,
       callbacks: this.options.callbacks,
     })
-    try {
-      // TODO: method should include reason for parsing - (e.g. unsupported format etc..)
-      return parseCredentialRequest({ issuerMetadata: options.issuerMetadata, credentialRequest })
-    } catch (error) {
-      if (error instanceof Oauth2ServerErrorResponseError) throw error
-
-      throw new Oauth2ServerErrorResponseError(
-        {
-          error: Oauth2ErrorCodes.InvalidCredentialRequest,
-          error_description:
-            // TODO: error should have a internalErrorMessage and a publicErrorMessage
-            error instanceof ValidationError ? error.message : 'Invalid request',
-        },
-        {
-          internalMessage: 'Error verifying credential request proof jwt',
-          cause: error,
-        }
-      )
-    }
-
-    // TODO: might be nice to add some extra validation params here so it's
-    // easy for an issuer to verify whether the request matches with the configuration
-    // e.g. alg of holder binding, key_attestations_required, proof_types_supported,
-    // request matches offer, etc..
   }
 
   /**
@@ -292,29 +262,10 @@ export class Openid4vciIssuer {
   public async parseDeferredCredentialRequest(
     options: CredentialRequestBodyOptions
   ): Promise<ParseDeferredCredentialRequestReturn> {
-    const { credentialRequest } = await decodeDeferredCredentialRequest({
+    return parseDeferredCredentialRequestBody({
       ...options,
       callbacks: this.options.callbacks,
     })
-    try {
-      return parseDeferredCredentialRequest({
-        issuerMetadata: options.issuerMetadata,
-        deferredCredentialRequest: credentialRequest,
-      })
-    } catch (error) {
-      if (error instanceof Oauth2ServerErrorResponseError) throw error
-
-      throw new Oauth2ServerErrorResponseError(
-        {
-          error: Oauth2ErrorCodes.InvalidCredentialRequest,
-          error_description: error instanceof ValidationError ? error.message : 'Invalid request',
-        },
-        {
-          internalMessage: 'Error parsing deferred credential request',
-          cause: error,
-        }
-      )
-    }
   }
 
   /**

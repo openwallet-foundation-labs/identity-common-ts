@@ -55,33 +55,33 @@ export function verifyCredentialRequestEncryption(
     }).header
   } catch (error) {
     throw invalidEncryptionParameters(
-      `Unable to decode Credential Request JWE header: ${error instanceof Error ? error.message : 'Invalid header'}`
+      `Unable to decode credential request JWE header: ${error instanceof Error ? error.message : 'invalid header'}`
     )
   }
 
   const jwk = supported.jwks.keys.find((key) => key.kid === header.kid)
   if (!jwk) {
-    throw invalidEncryptionParameters('Credential Request is not encrypted to a key advertised by the issuer')
+    throw invalidEncryptionParameters('Credential request is not encrypted to a key advertised by the issuer')
   }
 
   if (header.alg !== jwk.alg) {
     throw invalidEncryptionParameters(
-      `Credential Request JWE 'alg' must match the advertised key algorithm '${jwk.alg}'`
+      `Credential request JWE 'alg' must match the advertised key algorithm '${jwk.alg}'`
     )
   }
 
   if (!supported.enc_values_supported.includes(header.enc)) {
     throw invalidEncryptionParameters(
-      `Credential Request JWE 'enc' must be one of ${supported.enc_values_supported.map((value) => `'${value}'`).join(', ')}`
+      `Credential request JWE 'enc' must be one of ${supported.enc_values_supported.map((value) => `'${value}'`).join(', ')}`
     )
   }
 
   if (header.zip !== undefined) {
-    throw invalidEncryptionParameters('Compressed Credential Requests are not supported')
+    throw invalidEncryptionParameters('Compressed credential requests are not supported')
   }
 
   if (header.crit !== undefined) {
-    throw invalidEncryptionParameters("Credential Request JWE must not contain a critical ('crit') header parameter")
+    throw invalidEncryptionParameters("Credential request JWE must not contain a critical ('crit') header parameter")
   }
 
   return { jwk, header }
