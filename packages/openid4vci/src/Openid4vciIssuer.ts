@@ -6,7 +6,7 @@ import {
   Oauth2ServerErrorResponseError,
   type VerifyClientAttestationOptions,
 } from '@openid4vc/oauth2'
-import { parseWithErrorHandling, ValidationError } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@openid4vc/utils'
 import { type CreateCredentialOfferOptions, createCredentialOffer } from './credential-offer/credential-offer'
 import {
   type CreateCredentialResponseOptions,
@@ -14,16 +14,13 @@ import {
   createCredentialResponse,
   createDeferredCredentialResponse,
 } from './credential-request/credential-response'
+import type { CredentialRequestBodyOptions } from './credential-request/decode-credential-request'
+import type { ParseCredentialRequestReturn } from './credential-request/parse-credential-request'
 import {
-  type ParseCredentialRequestOptions,
-  type ParseCredentialRequestReturn,
-  parseCredentialRequest,
-} from './credential-request/parse-credential-request'
-import {
-  type ParseDeferredCredentialRequestOptions,
-  type ParseDeferredCredentialRequestReturn,
-  parseDeferredCredentialRequest,
-} from './credential-request/parse-deferred-credential-request'
+  parseCredentialRequestBody,
+  parseDeferredCredentialRequestBody,
+} from './credential-request/parse-credential-request-body'
+import type { ParseDeferredCredentialRequestReturn } from './credential-request/parse-deferred-credential-request'
 import { Openid4vciError } from './error/Openid4vciError'
 import {
   type VerifyCredentialRequestAttestationProofOptions,
@@ -72,7 +69,7 @@ export interface Openid4vciIssuerOptions {
   /**
    * Callbacks required for the openid4vc issuer.
    */
-  callbacks: Omit<CallbackContext, 'decryptJwe'>
+  callbacks: Omit<CallbackContext, 'decryptJwe'> & Partial<Pick<CallbackContext, 'decryptJwe'>>
 }
 
 export class Openid4vciIssuer {
@@ -248,58 +245,27 @@ export class Openid4vciIssuer {
   }
 
   /**
-   * @throws Oauth2ServerErrorResponseError - when validation of the credential request fails
-   *  You can extract the credential error response from this.
+   * Parses and validates a Credential Request from its plaintext JSON object or encrypted JWE transport body.
+   * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
    */
-  public parseCredentialRequest(options: ParseCredentialRequestOptions): ParseCredentialRequestReturn {
-    try {
-      // TODO: method should include reason for parsing - (e.g. unsupported format etc..)
-      return parseCredentialRequest(options)
-    } catch (error) {
-      if (error instanceof Oauth2ServerErrorResponseError) throw error
-
-      throw new Oauth2ServerErrorResponseError(
-        {
-          error: Oauth2ErrorCodes.InvalidCredentialRequest,
-          error_description:
-            // TODO: error should have a internalErrorMessage and a publicErrorMessage
-            error instanceof ValidationError ? error.message : 'Invalid request',
-        },
-        {
-          internalMessage: 'Error verifying credential request proof jwt',
-          cause: error,
-        }
-      )
-    }
-
-    // TODO: might be nice to add some extra validation params here so it's
-    // easy for an issuer to verify whether the request matches with the configuration
-    // e.g. alg of holder binding, key_attestations_required, proof_types_supported,
-    // request matches offer, etc..
+  public async parseCredentialRequest(options: CredentialRequestBodyOptions): Promise<ParseCredentialRequestReturn> {
+    return parseCredentialRequestBody({
+      ...options,
+      callbacks: this.options.callbacks,
+    })
   }
 
   /**
-   * @throws Oauth2ServerErrorResponseError - when validation of the deferred credential request fails
+   * Parses and validates a Deferred Credential Request from its plaintext JSON object or encrypted JWE transport body.
+   * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
    */
-  public parseDeferredCredentialRequest(
-    options: ParseDeferredCredentialRequestOptions
-  ): ParseDeferredCredentialRequestReturn {
-    try {
-      return parseDeferredCredentialRequest(options)
-    } catch (error) {
-      if (error instanceof Oauth2ServerErrorResponseError) throw error
-
-      throw new Oauth2ServerErrorResponseError(
-        {
-          error: Oauth2ErrorCodes.InvalidCredentialRequest,
-          error_description: error instanceof ValidationError ? error.message : 'Invalid request',
-        },
-        {
-          internalMessage: 'Error parsing deferred credential request',
-          cause: error,
-        }
-      )
-    }
+  public async parseDeferredCredentialRequest(
+    options: CredentialRequestBodyOptions
+  ): Promise<ParseDeferredCredentialRequestReturn> {
+    return parseDeferredCredentialRequestBody({
+      ...options,
+      callbacks: this.options.callbacks,
+    })
   }
 
   /**

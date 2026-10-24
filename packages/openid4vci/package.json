@@ -38,6 +38,7 @@
     "build": "tsdown src/index.ts --format esm --dts --sourcemap"
   },
   "dependencies": {
+    "@owf/identity-common": "workspace:^",
     "@openid4vc/oauth2": "workspace:^",
     "@openid4vc/utils": "workspace:^",
     "zod": "catalog:"

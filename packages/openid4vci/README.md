@@ -34,6 +34,24 @@ yarn add @openid4vc/openid4vci
 import { Openid4vciClient, Openid4vciIssuer } from '@openid4vc/openid4vci'
 ```
 
+### Credential Request encryption
+
+Issuers advertise `credential_request_encryption` in their metadata. Clients
+provide an `encryptJwe` callback and can opt in with
+`credentialRequestEncryption: {}` on `retrieveCredentials` or
+`retrieveDeferredCredentials`, optionally selecting an advertised `kid` and `enc`.
+Requests are encrypted automatically when required by the issuer or by
+response-encryption parameters for V1 or an issuer advertising request encryption.
+
+Issuers provide a `decryptJwe` callback and call the async
+`parseCredentialRequest` or `parseDeferredCredentialRequest` methods with
+`{ body, contentType, issuerMetadata }`. For `application/json`, pass the parsed
+request object; for `application/jwt`, pass the compact JWE string. These methods
+handle decryption and validation.
+
+Request and response compression are not supported; `zip` parameters are rejected
+and issuers must not advertise compression support.
+
 ## Dependencies
 
 - [@openid4vc/oauth2](https://www.npmjs.com/package/@openid4vc/oauth2)

@@ -68,6 +68,13 @@ const credentialIssuerMetadata = issuer.createCredentialIssuerMetadata({
   credential_endpoint: 'https://oid4vc-ts-issuer.com/credential',
   credential_configurations_supported: credentialConfigurationsSupported,
   authorization_servers: [authorizationServerMetadata.issuer],
+  credential_request_encryption: {
+    jwks: {
+      keys: [{ ...credentialIssuerJwkPublic, kid: 'credential-request-key', alg: 'ECDH-ES' }],
+    },
+    enc_values_supported: ['A128GCM'],
+    encryption_required: true,
+  },
 })
 
 describe('Signed Credential Issuer Metadata', () => {
@@ -131,6 +138,9 @@ describe('Signed Credential Issuer Metadata', () => {
     const resolvedIssuerMetadata = await client.resolveIssuerMetadata(credentialIssuerMetadata.credential_issuer)
     expect(resolvedIssuerMetadata.credentialIssuer.credential_issuer).toStrictEqual(
       credentialIssuerMetadata.credential_issuer
+    )
+    expect(resolvedIssuerMetadata.credentialIssuer.credential_request_encryption).toEqual(
+      credentialIssuerMetadata.credential_request_encryption
     )
 
     expect(resolvedIssuerMetadata.signedCredentialIssuer).toStrictEqual({
