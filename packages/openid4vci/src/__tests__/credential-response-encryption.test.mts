@@ -634,7 +634,7 @@ describe('Credential Request Encryption', () => {
   )
 
   test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
-    '%s parses raw JSON and validates its contents without a decryptJwe callback',
+    '%s parses JSON objects and validates its contents without a decryptJwe callback',
     async (method) => {
       const plaintextIssuer = new Openid4vciIssuer({
         callbacks: { ...callbacks, decryptJwe: undefined },
@@ -643,13 +643,13 @@ describe('Credential Request Encryption', () => {
       if (method === 'parseCredentialRequest') {
         const parsed = await plaintextIssuer.parseCredentialRequest({
           ...options,
-          body: JSON.stringify({ credential_configuration_id: 'pidSdJwt' }),
+          body: { credential_configuration_id: 'pidSdJwt' },
         })
         expect(parsed.credentialConfigurationId).toBe('pidSdJwt')
       } else {
         const parsed = await plaintextIssuer.parseDeferredCredentialRequest({
           ...options,
-          body: JSON.stringify({ transaction_id: 'txn-plaintext' }),
+          body: { transaction_id: 'txn-plaintext' },
         })
         expect(parsed.deferredCredentialRequest.transaction_id).toBe('txn-plaintext')
       }

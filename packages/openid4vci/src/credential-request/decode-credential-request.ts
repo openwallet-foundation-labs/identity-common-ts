@@ -1,5 +1,6 @@
 import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { ContentType } from '@openid4vc/utils'
+import { isMediaType } from '@owf/identity-common'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../version'
 import { verifyCredentialRequestEncryption } from './verify-credential-request-encryption'
@@ -53,16 +54,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Missing callbacks and callback exceptions are reported as server failures, not protocol errors.
  */
 async function decodeRequest(options: DecodeCredentialRequestOptions): Promise<DecodeCredentialRequestReturn> {
-  const contentType = options.contentType?.split(';', 1)[0].trim().toLowerCase()
-
-  if (contentType === ContentType.Jwt) {
+  if (isMediaType(options.contentType, ContentType.Jwt)) {
     if (typeof options.body !== 'string') {
       throw invalidEncryptionParameters('Encrypted Credential Request body must be a compact JWE string')
     }
 
     const { jwk, header } = verifyCredentialRequestEncryption(options.body, options.issuerMetadata.credentialIssuer)
     if (header.zip !== undefined) {
-      throw invalidEncryptionParameters('Compressed Credential Requests are not supported')
+      throw invalidEncryptionParameters('Compressed credential requests are not supported')
     }
 
     if (!options.callbacks.decryptJwe) {
@@ -100,15 +99,8 @@ async function decodeRequest(options: DecodeCredentialRequestOptions): Promise<D
     return { credentialRequest }
   }
 
-  if (contentType === ContentType.Json) {
-    let credentialRequest: unknown = options.body
-    if (typeof credentialRequest === 'string') {
-      try {
-        credentialRequest = JSON.parse(credentialRequest)
-      } catch {
-        throw invalidCredentialRequest('Plaintext Credential Request is not valid JSON')
-      }
-    }
+  if (isMediaType(options.contentType, ContentType.Json)) {
+    const credentialRequest: unknown = options.body
     if (!isRecord(credentialRequest)) {
       throw invalidCredentialRequest('Plaintext Credential Request body must be a JSON object')
     }

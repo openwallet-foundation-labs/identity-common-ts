@@ -99,10 +99,12 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
   })
 
   test('returns an ordinary plaintext request when encryption is not required', async () => {
-    await expect(decode(options())).resolves.toEqual({ credentialRequest: body })
+    await expect(decode(options({ contentType: 'Application/JSON; charset=utf-8' }))).resolves.toEqual({
+      credentialRequest: body,
+    })
   })
 
-  test('parses raw JSON text without invoking decryption', async () => {
+  test('rejects raw JSON text without invoking decryption', async () => {
     const decrypt = vi.fn(decryptJwe)
     await expect(
       decode(
@@ -112,11 +114,11 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
           callbacks: { decryptJwe: decrypt },
         })
       )
-    ).resolves.toEqual({ credentialRequest: body })
+    ).rejects.toThrow(invalidCredentialRequest)
     expect(decrypt).not.toHaveBeenCalled()
   })
 
-  test.each(['object', 'text'])('rejects plaintext %s when issuer metadata requires encryption', async (input) => {
+  test('rejects plaintext when issuer metadata requires encryption', async () => {
     const requiredIssuerMetadata = {
       ...issuerMetadata,
       credentialIssuer: {
@@ -131,7 +133,7 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
       decode(
         options({
           issuerMetadata: requiredIssuerMetadata,
-          body: input === 'text' ? JSON.stringify(body) : body,
+          body,
         })
       )
     ).rejects.toThrow(invalidEncryptionParameters)
@@ -190,9 +192,9 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
     ).rejects.toThrow(invalidEncryptionParameters)
   })
 
-  test('rejects response-encryption parameters in raw JSON when request encryption is advertised', async () => {
+  test('rejects response-encryption parameters in a JSON object when request encryption is advertised', async () => {
     await expect(
-      decode(options({ body: JSON.stringify({ ...body, credential_response_encryption: responseEncryption }) }))
+      decode(options({ body: { ...body, credential_response_encryption: responseEncryption } }))
     ).rejects.toThrow(invalidEncryptionParameters)
   })
 
@@ -296,13 +298,6 @@ describe.each(decoders)('$name request decoding', ({ decode, body }) => {
   test.each([null, [], 'not JSON', 123])('rejects a non-object plaintext body: %s', async (value) => {
     await expect(decode(options({ body: value }))).rejects.toThrow(invalidCredentialRequest)
   })
-
-  test.each(['', '{', 'null', '[]', '123', 'true', '"text"'])(
-    'rejects malformed or non-object raw JSON: %s',
-    async (payload) => {
-      await expect(decode(options({ body: payload }))).rejects.toThrow(invalidCredentialRequest)
-    }
-  )
 
   test.each([undefined, 'text/plain', 'application/jsonp', 'application/jwt, application/json'])(
     'rejects unsupported Content-Type: %s',
