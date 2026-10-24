@@ -662,6 +662,33 @@ describe('Credential Request Encryption', () => {
     }
   )
 
+  test.each([
+    { description: 'missing Content-Type', contentType: undefined },
+    { description: 'unsupported text media type', contentType: 'text/plain' },
+    { description: 'unsupported JSON-like media type', contentType: 'application/jsonp' },
+    { description: 'combined media types', contentType: 'application/jwt, application/json' },
+  ])('rejects unsupported Content-Type: $description', async ({ contentType }) => {
+    const issuer = new Openid4vciIssuer({ callbacks })
+    await expect(
+      issuer.parseCredentialRequest({
+        issuerMetadata,
+        body: {},
+        contentType,
+      })
+    ).rejects.toMatchObject({
+      errorResponse: { error: 'invalid_credential_request' },
+    })
+    await expect(
+      issuer.parseDeferredCredentialRequest({
+        issuerMetadata,
+        body: {},
+        contentType,
+      })
+    ).rejects.toMatchObject({
+      errorResponse: { error: 'invalid_credential_request' },
+    })
+  })
+
   test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
     '%s applies request-encryption policy after schema validation',
     async (method) => {
