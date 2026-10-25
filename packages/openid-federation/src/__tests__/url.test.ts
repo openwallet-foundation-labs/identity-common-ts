@@ -49,6 +49,31 @@ const addSearchParamsFixtures: Array<{
     searchParams: { foo: 'bar', baz: 'foo' },
     expected: 'https://example.org?foo=bar&baz=foo',
   },
+  {
+    baseUrl: 'https://example.org/fetch?tenant=a',
+    searchParams: { sub: 'https://one.example.org' },
+    expected: 'https://example.org/fetch?tenant=a&sub=https%3A%2F%2Fone.example.org',
+  },
+  {
+    baseUrl: 'https://example.org/fetch?tenant=a&region=eu',
+    searchParams: { foo: 'bar', baz: 'foo' },
+    expected: 'https://example.org/fetch?tenant=a&region=eu&foo=bar&baz=foo',
+  },
+  {
+    baseUrl: 'https://example.org/fetch?tenant=a&',
+    searchParams: { one: 'two' },
+    expected: 'https://example.org/fetch?tenant=a&one=two',
+  },
+  {
+    baseUrl: 'https://example.org/fetch?flag',
+    searchParams: { one: 'two' },
+    expected: 'https://example.org/fetch?flag&one=two',
+  },
+  {
+    baseUrl: 'https://example.org/a&b',
+    searchParams: { one: 'two' },
+    expected: 'https://example.org/a&b?one=two',
+  },
 ]
 
 describe('url parsing', () => {

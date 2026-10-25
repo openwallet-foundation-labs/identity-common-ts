@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { resolveTrustChains } from '../resolveTrustChains'
 import type { SignCallback, VerifyCallback } from '../utils'
-import { setupMockServer } from './utils/mockServer'
+import { mockGet, setupMockServer } from './utils/mockServer'
 import { setupConfigurationChain } from './utils/setupConfigurationChain'
 
 setupMockServer()
@@ -25,6 +25,49 @@ describe('fetch trust chains', () => {
     const trustChains = await resolveTrustChains({
       entityId: leafEntityId,
       trustAnchors: [trustAnchorEntityId].map((entityId) => ({ entityId })),
+      verifyJwtCallback,
+    })
+
+    expect(trustChains.length).toBe(1)
+    expect(trustChains[0]?.chain.length).toBe(2)
+
+    for (const mockedResponse of mockedResponses) {
+      mockedResponse.done()
+    }
+  })
+
+  it('should fetch a subordinate statement from a fetch endpoint with a query component', async () => {
+    const leafEntityId = 'https://leaf.example.org'
+    const trustAnchorEntityId = 'https://trust.example.org'
+
+    const { chainData } = await setupConfigurationChain(
+      [
+        { entityId: leafEntityId, authorityHints: [trustAnchorEntityId] },
+        {
+          entityId: trustAnchorEntityId,
+          subordinates: [leafEntityId],
+          claims: {
+            metadata: { federation_entity: { federation_fetch_endpoint: `${trustAnchorEntityId}/fetch?tenant=a` } },
+          },
+        },
+      ],
+      { signJwtCallback }
+    )
+    const [leaf, trustAnchor] = chainData
+
+    // The query of the fetch endpoint is kept, `sub` is added to it
+    const mockedResponses = [
+      mockGet(`${leafEntityId}/.well-known/openid-federation`, { body: leaf?.jwt }),
+      mockGet(`${trustAnchorEntityId}/.well-known/openid-federation`, { body: trustAnchor?.jwt }),
+      mockGet(`${trustAnchorEntityId}/fetch`, {
+        body: trustAnchor?.subordinateStatements?.[0]?.jwt,
+        query: { tenant: 'a', sub: leafEntityId },
+      }),
+    ]
+
+    const trustChains = await resolveTrustChains({
+      entityId: leafEntityId,
+      trustAnchors: [{ entityId: trustAnchorEntityId }],
       verifyJwtCallback,
     })
 

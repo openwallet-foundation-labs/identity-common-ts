@@ -38,10 +38,32 @@ export const addPaths = (baseUrl: string, ...paths: Array<string>) => {
   return `${scheme}://${urlWithoutScheme}`
 }
 
-export const addSearchParams = (baseUrl: string, searchParams: URLSearchParams | Record<string, string>) =>
-  baseUrl.endsWith('?')
-    ? `${baseUrl}${searchParams instanceof URLSearchParams ? searchParams : new URLSearchParams(searchParams)}`
-    : `${baseUrl}?${searchParams instanceof URLSearchParams ? searchParams : new URLSearchParams(searchParams)}`
+/**
+ *
+ * Add search params to a url, keeping the query component it already has (Section 5.1.1 allows one for the
+ * endpoints)
+ *
+ * ## example
+ *
+ * ```typescript
+ * const url = addSearchParams('https://example.org', { one: 'two' })
+ * assert(url, "https://example.org?one=two")
+ *
+ * const url = addSearchParams('https://example.org?tenant=a', { one: 'two' })
+ * assert(url, "https://example.org?tenant=a&one=two")
+ * ```
+ *
+ */
+export const addSearchParams = (baseUrl: string, searchParams: URLSearchParams | Record<string, string>) => {
+  const query = searchParams instanceof URLSearchParams ? searchParams : new URLSearchParams(searchParams)
+
+  if (!baseUrl.includes('?')) {
+    return `${baseUrl}?${query}`
+  }
+
+  // Do not add a separator when the query component is empty or already ends with one
+  return baseUrl.endsWith('?') || baseUrl.endsWith('&') ? `${baseUrl}${query}` : `${baseUrl}&${query}`
+}
 
 /**
  *
