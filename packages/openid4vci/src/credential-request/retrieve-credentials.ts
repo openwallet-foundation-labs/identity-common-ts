@@ -478,6 +478,16 @@ async function encodeCredentialRequest(options: {
 }): Promise<{ contentType: ContentType; body: string }> {
   const supported = options.issuerMetadata.credentialIssuer.credential_request_encryption
   const responseEncryptionRequested = options.credentialRequest.credential_response_encryption !== undefined
+  const responseEncryptionRequired =
+    options.issuerMetadata.credentialIssuer.credential_response_encryption?.encryption_required === true
+  const responseEncryptionRequirementApplies = options.issuerMetadata.originalDraftVersion !== Openid4vciVersion.Draft11
+
+  if (responseEncryptionRequired && responseEncryptionRequirementApplies && !responseEncryptionRequested) {
+    throw new Openid4vciError(
+      'The credential issuer requires credential response encryption, but no credentialResponseEncryption was provided.'
+    )
+  }
+
   const issuerRequiresEncryption = supported?.encryption_required === true
   const responseEncryptionRequiresEncryptedRequest =
     responseEncryptionRequested &&
@@ -513,11 +523,22 @@ async function encodeCredentialRequest(options: {
   }
 
   const keyId = options.credentialRequestEncryption?.kid
-  const jwk = keyId ? supported.jwks.keys.find((key) => key.kid === keyId) : supported.jwks.keys[0]
+  const key = keyId ? supported.jwks.keys.find((key) => key.kid === keyId) : undefined
+  let jwk: (typeof supported.jwks.keys)[number] | undefined
+  if (keyId) {
+    if (key?.use === undefined || key.use === 'enc') {
+      jwk = key
+    }
+  } else {
+    jwk = supported.jwks.keys.find((key) => key.use === undefined || key.use === 'enc')
+  }
+
   if (!jwk) {
     throw new Openid4vciError(
       keyId
-        ? `Credential request encryption key with kid '${keyId}' is not advertised by the issuer.`
+        ? !key
+          ? `Credential request encryption key with kid '${keyId}' is not advertised by the issuer.`
+          : `Credential request encryption key with kid '${keyId}' is not intended for encryption.`
         : 'The issuer does not advertise a key for credential request encryption.'
     )
   }
