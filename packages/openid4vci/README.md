@@ -44,10 +44,12 @@ Requests are encrypted automatically when required by the issuer or by
 response-encryption parameters for V1 or an issuer advertising request encryption.
 
 Issuers provide a `decryptJwe` callback and call the async
-`parseCredentialRequest` or `parseDeferredCredentialRequest` methods with
-`{ body, contentType, issuerMetadata }`. For `application/json`, pass the parsed
-request object; for `application/jwt`, pass the compact JWE string. These methods
-handle decryption and validation.
+`parseCredentialRequest` with `{ credentialRequest, contentType, issuerMetadata }`
+or `parseDeferredCredentialRequest` with
+`{ deferredCredentialRequest, contentType, issuerMetadata }`.
+For `application/json`, deserialize the HTTP body into an object before calling
+these methods. For `application/jwt`, pass the raw compact JWE string; the library
+decrypts it and JSON-parses the payload. Both paths validate the request object.
 
 The `decryptJwe` callback must return `{ decrypted: false }` for invalid ciphertext,
 authentication tags, or key mismatches. Unexpected callback exceptions are reported

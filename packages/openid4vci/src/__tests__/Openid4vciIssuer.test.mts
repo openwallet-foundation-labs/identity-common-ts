@@ -100,7 +100,7 @@ describe('Openid4vciIssuer', () => {
     await expect(
       issuer.parseCredentialRequest({
         issuerMetadata: { ...issuerMetadata, originalDraftVersion: Openid4vciVersion.Draft15 },
-        body: {
+        credentialRequest: {
           credential_configuration_id: 'not-offered',
           proof: { proof_type: 'jwt', jwt: 'ey.ey.S' },
         },

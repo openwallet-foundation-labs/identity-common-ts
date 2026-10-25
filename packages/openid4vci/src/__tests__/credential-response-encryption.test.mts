@@ -187,7 +187,7 @@ describe('Credential Response Encryption', () => {
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
         const parsedCredentialRequest = await issuer.parseCredentialRequest({
           issuerMetadata,
-          body: await request.text(),
+          credentialRequest: await request.text(),
           contentType: request.headers.get('Content-Type') ?? undefined,
         })
 
@@ -262,7 +262,7 @@ describe('Credential Response Encryption', () => {
       http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, async ({ request }) => {
         const { deferredCredentialRequest } = await issuer.parseDeferredCredentialRequest({
           issuerMetadata,
-          body: await request.text(),
+          deferredCredentialRequest: await request.text(),
           contentType: request.headers.get('Content-Type') ?? undefined,
         })
         expect(deferredCredentialRequest.transaction_id).toBe('txn-456')
@@ -467,7 +467,7 @@ describe('Credential Request Encryption', () => {
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
         const parsed = await issuer.parseCredentialRequest({
           issuerMetadata: issuerMetadataWithRequiredEncryption,
-          body: await request.text(),
+          credentialRequest: await request.text(),
           contentType: request.headers.get('Content-Type') ?? undefined,
         })
         expect(parsed.credentialRequest.credential_configuration_id).toBe('pidSdJwt')
@@ -783,19 +783,23 @@ describe('Credential Request Encryption', () => {
       if (method === 'parseCredentialRequest') {
         const parsed = await plaintextIssuer.parseCredentialRequest({
           ...options,
-          body: { credential_configuration_id: 'pidSdJwt' },
+          credentialRequest: { credential_configuration_id: 'pidSdJwt' },
         })
         expect(parsed.credentialConfigurationId).toBe('pidSdJwt')
       } else {
         const parsed = await plaintextIssuer.parseDeferredCredentialRequest({
           ...options,
-          body: { transaction_id: 'txn-plaintext' },
+          deferredCredentialRequest: { transaction_id: 'txn-plaintext' },
         })
         expect(parsed.deferredCredentialRequest.transaction_id).toBe('txn-plaintext')
       }
 
       for (const body of ['not JSON', '{}', null, [], 123]) {
-        await expect(plaintextIssuer[method]({ ...options, body })).rejects.toMatchObject({
+        const parsing =
+          method === 'parseCredentialRequest'
+            ? plaintextIssuer.parseCredentialRequest({ ...options, credentialRequest: body })
+            : plaintextIssuer.parseDeferredCredentialRequest({ ...options, deferredCredentialRequest: body })
+        await expect(parsing).rejects.toMatchObject({
           errorResponse: { error: 'invalid_credential_request' },
         })
       }
@@ -812,7 +816,7 @@ describe('Credential Request Encryption', () => {
     await expect(
       issuer.parseCredentialRequest({
         issuerMetadata,
-        body: {},
+        credentialRequest: {},
         contentType,
       })
     ).rejects.toMatchObject({
@@ -821,7 +825,7 @@ describe('Credential Request Encryption', () => {
     await expect(
       issuer.parseDeferredCredentialRequest({
         issuerMetadata,
-        body: {},
+        deferredCredentialRequest: {},
         contentType,
       })
     ).rejects.toMatchObject({
@@ -860,12 +864,12 @@ describe('Credential Request Encryption', () => {
         method === 'parseCredentialRequest'
           ? issuerWithoutRequestEncryption.parseCredentialRequest({
               issuerMetadata,
-              body: { ...regularRequest, ...additionalPayload },
+              credentialRequest: { ...regularRequest, ...additionalPayload },
               contentType: ContentType.Json,
             })
           : issuerWithoutRequestEncryption.parseDeferredCredentialRequest({
               issuerMetadata,
-              body: { ...deferredRequest, ...additionalPayload },
+              deferredCredentialRequest: { ...deferredRequest, ...additionalPayload },
               contentType: ContentType.Json,
             })
 
@@ -937,15 +941,25 @@ describe('Credential Request Encryption', () => {
           : { transaction_id: 'txn-plaintext' }
 
       for (const body of [null, {}, { ...request, credential_response_encryption: { enc: 'invalid' } }]) {
-        await expect(
-          issuer[method]({ issuerMetadata: requiredMetadata, contentType: ContentType.Json, body })
-        ).rejects.toMatchObject({
+        const parse = (metadata: IssuerMetadataResult) =>
+          method === 'parseCredentialRequest'
+            ? issuer.parseCredentialRequest({
+                issuerMetadata: metadata,
+                contentType: ContentType.Json,
+                credentialRequest: body,
+              })
+            : issuer.parseDeferredCredentialRequest({
+                issuerMetadata: metadata,
+                contentType: ContentType.Json,
+                deferredCredentialRequest: body,
+              })
+        await expect(parse(requiredMetadata)).rejects.toMatchObject({
           errorResponse: {
             error: 'invalid_encryption_parameters',
             error_description: 'The credential issuer requires encrypted credential requests',
           },
         })
-        await expect(issuer[method]({ issuerMetadata, contentType: ContentType.Json, body })).rejects.toMatchObject({
+        await expect(parse(issuerMetadata)).rejects.toMatchObject({
           errorResponse: { error: 'invalid_credential_request' },
         })
       }
@@ -970,13 +984,12 @@ describe('Credential Request Encryption', () => {
       })
       const options = {
         issuerMetadata,
-        body: jwe.jwe,
         contentType: ContentType.Jwt,
       }
       const parsing =
         method === 'parseCredentialRequest'
-          ? issuerWithoutDecryptJwe.parseCredentialRequest(options)
-          : issuerWithoutDecryptJwe.parseDeferredCredentialRequest(options)
+          ? issuerWithoutDecryptJwe.parseCredentialRequest({ ...options, credentialRequest: jwe.jwe })
+          : issuerWithoutDecryptJwe.parseDeferredCredentialRequest({ ...options, deferredCredentialRequest: jwe.jwe })
 
       await expect(parsing).rejects.toMatchObject({
         status: 500,

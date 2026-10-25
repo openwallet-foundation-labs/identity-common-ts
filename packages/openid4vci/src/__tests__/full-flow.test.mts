@@ -317,7 +317,7 @@ describe('Full E2E test', () => {
             originalDraftVersion: Openid4vciVersion.Draft14,
             knownCredentialConfigurations: credentialConfigurationsSupported,
           },
-          body: credentialRequest as Record<string, unknown>,
+          credentialRequest: credentialRequest as Record<string, unknown>,
           contentType: ContentType.Json,
         })
 
@@ -762,7 +762,7 @@ describe('Full E2E test', () => {
             originalDraftVersion: Openid4vciVersion.Draft14,
             knownCredentialConfigurations: credentialConfigurationsSupported,
           },
-          body: credentialRequest as Record<string, unknown>,
+          credentialRequest: credentialRequest as Record<string, unknown>,
           contentType: ContentType.Json,
         })
 

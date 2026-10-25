@@ -248,9 +248,13 @@ export class Openid4vciIssuer {
    * Parses and validates a Credential Request from its plaintext JSON object or encrypted JWE transport body.
    * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
    */
-  public async parseCredentialRequest(options: CredentialRequestBodyOptions): Promise<ParseCredentialRequestReturn> {
+  public async parseCredentialRequest(
+    options: Omit<CredentialRequestBodyOptions, 'body'> & { credentialRequest: unknown }
+  ): Promise<ParseCredentialRequestReturn> {
     return parseCredentialRequestBody({
-      ...options,
+      body: options.credentialRequest,
+      contentType: options.contentType,
+      issuerMetadata: options.issuerMetadata,
       callbacks: this.options.callbacks,
     })
   }
@@ -260,10 +264,12 @@ export class Openid4vciIssuer {
    * @throws Oauth2ServerErrorResponseError - protocol errors are preserved; callback failures are server_error.
    */
   public async parseDeferredCredentialRequest(
-    options: CredentialRequestBodyOptions
+    options: Omit<CredentialRequestBodyOptions, 'body'> & { deferredCredentialRequest: unknown }
   ): Promise<ParseDeferredCredentialRequestReturn> {
     return parseDeferredCredentialRequestBody({
-      ...options,
+      body: options.deferredCredentialRequest,
+      contentType: options.contentType,
+      issuerMetadata: options.issuerMetadata,
       callbacks: this.options.callbacks,
     })
   }
