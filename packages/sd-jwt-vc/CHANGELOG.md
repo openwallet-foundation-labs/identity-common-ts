@@ -1,5 +1,13 @@
 # @sd-jwt/sd-jwt-vc
 
+## 0.23.2
+
+### Patch Changes
+
+- @owf/identity-common@0.6.0
+  - @owf/token-status-list@0.6.0
+  - @sd-jwt/core@0.23.2
+
 ## 0.23.1
 
 ### Patch Changes

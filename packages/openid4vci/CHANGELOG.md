@@ -1,5 +1,12 @@
 # @openid4vc/openid4vci
 
+## 0.8.2
+
+### Patch Changes
+
+- @openid4vc/oauth2@0.8.2
+  - @openid4vc/utils@0.8.2
+
 ## 0.8.1
 
 ### Patch Changes
