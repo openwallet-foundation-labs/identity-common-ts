@@ -40,8 +40,13 @@ const issuerMetadata = {
 } satisfies IssuerMetadataResult
 
 const decryptJwe: CallbackContext['decryptJwe'] = async (jwe) => {
-  const { plaintext } = await jose.compactDecrypt(jwe, privateKey)
-  return { decrypted: true, payload: new TextDecoder().decode(plaintext), decryptionJwk: jwk }
+  try {
+    const { plaintext } = await jose.compactDecrypt(jwe, privateKey)
+    return { decrypted: true, payload: new TextDecoder().decode(plaintext), decryptionJwk: jwk }
+  } catch (error) {
+    if (error instanceof jose.errors.JWEDecryptionFailed) return { decrypted: false }
+    throw error
+  }
 }
 
 const callbacks = { decryptJwe }
@@ -145,6 +150,40 @@ describe.each(decoders)('$name request decoding', ({ decode, body, deferred }) =
         })
       )
     ).rejects.toThrow(invalidEncryptionParameters)
+  })
+
+  test('rejects a corrupted authentication tag as invalid_encryption_parameters', async () => {
+    const parts = (await encryptRequest(body)).split('.')
+    const tag = Buffer.from(parts[4], 'base64url')
+    tag[0] ^= 1
+    parts[4] = tag.toString('base64url')
+
+    await expect(decode(options({ body: parts.join('.') }))).rejects.toThrow(invalidEncryptionParameters)
+  })
+
+  test('reports a throwing callback on corrupted ciphertext as server_error', async () => {
+    const parts = (await encryptRequest(body)).split('.')
+    const tag = Buffer.from(parts[4], 'base64url')
+    tag[0] ^= 1
+    parts[4] = tag.toString('base64url')
+
+    await expect(
+      decode(
+        options({
+          body: parts.join('.'),
+          callbacks: {
+            decryptJwe: async (jwe) => {
+              const { plaintext } = await jose.compactDecrypt(jwe, privateKey)
+              return { decrypted: true, payload: new TextDecoder().decode(plaintext), decryptionJwk: jwk }
+            },
+          },
+        })
+      )
+    ).rejects.toMatchObject({
+      status: 500,
+      errorResponse: { error: 'server_error' },
+      cause: expect.any(jose.errors.JWEDecryptionFailed),
+    })
   })
 
   test.each([

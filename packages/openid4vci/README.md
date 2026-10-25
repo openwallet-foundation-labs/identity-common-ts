@@ -49,6 +49,11 @@ Issuers provide a `decryptJwe` callback and call the async
 request object; for `application/jwt`, pass the compact JWE string. These methods
 handle decryption and validation.
 
+The `decryptJwe` callback must return `{ decrypted: false }` for invalid ciphertext,
+authentication tags, or key mismatches. Unexpected callback exceptions are reported
+as `server_error`. The callback must use the private key corresponding to the
+advertised JWK passed to it.
+
 Request and response compression are not supported; `zip` parameters are rejected
 and issuers must not advertise compression support.
 

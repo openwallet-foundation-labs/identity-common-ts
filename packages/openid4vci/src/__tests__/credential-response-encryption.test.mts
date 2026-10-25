@@ -14,6 +14,7 @@ import {
   Openid4vciIssuer,
   Openid4vciVersion,
 } from '../index.js'
+import { zCredentialIssuerMetadataWithDraftVersion } from '../metadata/credential-issuer/z-credential-issuer-metadata.js'
 
 // EC key pair for credential request proofs (same as full-flow test)
 const credentialRequestProofJwk = {
@@ -347,15 +348,16 @@ describe('Credential Response Encryption', () => {
 })
 
 describe('Credential Request Encryption', () => {
-  test('encrypts a regular request using the first advertised key and enc when selectors are omitted', async () => {
-    const alternateKey = { ...encryptionPublicJwk, kid: 'alternate-request-key', alg: 'RSA-OAEP' }
+  test('encrypts a regular request using the first eligible advertised key and enc when selectors are omitted', async () => {
+    const signingKey = { ...encryptionPublicJwk, kid: 'signing-key', alg: 'RSA-OAEP', use: 'sig' }
+    const encryptionKey = { ...encryptionPublicJwk, kid: 'encryption-key', alg: 'RSA-OAEP', use: 'enc' }
     const issuerMetadataWithChoices = {
       ...issuerMetadata,
       credentialIssuer: {
         ...credentialIssuerMetadata,
         credential_request_encryption: {
           ...credentialRequestEncryption,
-          jwks: { keys: [{ ...encryptionPublicJwk, kid: 'credential-request-key', alg: 'RSA-OAEP' }, alternateKey] },
+          jwks: { keys: [signingKey, encryptionKey] },
           enc_values_supported: ['A256GCM', 'A128GCM'],
         },
       },
@@ -369,7 +371,7 @@ describe('Credential Request Encryption', () => {
         expect(protectedHeader).toEqual({
           alg: 'RSA-OAEP',
           enc: 'A256GCM',
-          kid: 'credential-request-key',
+          kid: 'encryption-key',
         })
         expect(JSON.parse(new TextDecoder().decode(plaintext))).toMatchObject({
           credential_configuration_id: 'pidSdJwt',
@@ -522,6 +524,144 @@ describe('Credential Request Encryption', () => {
         body: expect.objectContaining({ transaction_id: 'txn-plain' }),
       },
     ])
+  })
+
+  test('requires response encryption before sending Draft 14, Draft 15, and V1 requests', async () => {
+    let requestCount = 0
+    const requiredResponseEncryption = {
+      alg_values_supported: ['RSA-OAEP'],
+      enc_values_supported: ['A256GCM'],
+      encryption_required: true,
+    }
+    server.resetHandlers(
+      http.post(credentialIssuerMetadata.credential_endpoint, () => {
+        requestCount += 1
+        return HttpResponse.json({ credential: 'unexpected' })
+      }),
+      http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, () => {
+        requestCount += 1
+        return HttpResponse.json({ credentials: [{ credential: 'unexpected' }] })
+      })
+    )
+
+    for (const version of [Openid4vciVersion.Draft14, Openid4vciVersion.Draft15, Openid4vciVersion.V1]) {
+      const metadata: IssuerMetadataResult = {
+        ...issuerMetadata,
+        originalDraftVersion: version,
+        credentialIssuer: {
+          ...credentialIssuerMetadata,
+          credential_response_encryption: requiredResponseEncryption,
+        },
+      }
+      const message =
+        'The credential issuer requires credential response encryption, but no credentialResponseEncryption was provided.'
+
+      await expect(
+        client.retrieveCredentials({
+          issuerMetadata: metadata,
+          accessToken: 'test-access-token',
+          credentialConfigurationId: 'pidSdJwt',
+        })
+      ).rejects.toThrow(message)
+
+      await expect(
+        client.retrieveDeferredCredentials({
+          issuerMetadata: metadata,
+          accessToken: 'test-access-token',
+          transactionId: `txn-required-${version}`,
+        })
+      ).rejects.toThrow(message)
+    }
+
+    expect(requestCount).toBe(0)
+  })
+
+  test('enforces required response encryption when V1-shaped metadata is inferred as Draft 14', async () => {
+    const { credentialIssuerMetadata: inferredMetadata, originalDraftVersion } =
+      zCredentialIssuerMetadataWithDraftVersion.parse({
+        ...credentialIssuerMetadata,
+        credential_request_encryption: undefined,
+        credential_response_encryption: {
+          alg_values_supported: ['RSA-OAEP'],
+          enc_values_supported: ['A256GCM'],
+          encryption_required: true,
+        },
+        credential_configurations_supported: {
+          pidSdJwt: {
+            ...credentialConfigurationsSupported.pidSdJwt,
+            format: 'vc+sd-jwt',
+          },
+        },
+      })
+
+    expect(originalDraftVersion).toBe(Openid4vciVersion.Draft14)
+
+    let requestCount = 0
+    server.resetHandlers(
+      http.post(credentialIssuerMetadata.credential_endpoint, () => {
+        requestCount += 1
+        return HttpResponse.json({ credential: 'unexpected' })
+      }),
+      http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, () => {
+        requestCount += 1
+        return HttpResponse.json({ credentials: [{ credential: 'unexpected' }] })
+      })
+    )
+    const metadata: IssuerMetadataResult = {
+      ...issuerMetadata,
+      originalDraftVersion,
+      credentialIssuer: inferredMetadata,
+    }
+    const message =
+      'The credential issuer requires credential response encryption, but no credentialResponseEncryption was provided.'
+
+    await expect(
+      client.retrieveCredentials({
+        issuerMetadata: metadata,
+        accessToken: 'test-access-token',
+        credentialConfigurationId: 'pidSdJwt',
+      })
+    ).rejects.toThrow(message)
+    await expect(
+      client.retrieveDeferredCredentials({
+        issuerMetadata: metadata,
+        accessToken: 'test-access-token',
+        transactionId: 'txn-v1-inferred-draft-14',
+      })
+    ).rejects.toThrow(message)
+    expect(requestCount).toBe(0)
+  })
+
+  test('does not apply response-encryption requirements to Draft 11', async () => {
+    let requestCount = 0
+    const requiredResponseEncryption = {
+      alg_values_supported: ['RSA-OAEP'],
+      enc_values_supported: ['A256GCM'],
+      encryption_required: true,
+    }
+    server.resetHandlers(
+      http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, () => {
+        requestCount += 1
+        return HttpResponse.json({ credentials: [{ credential: 'draft-11-credential' }] })
+      })
+    )
+    const draft11Metadata: IssuerMetadataResult = {
+      ...issuerMetadata,
+      originalDraftVersion: Openid4vciVersion.Draft11,
+      credentialIssuer: {
+        ...credentialIssuerMetadata,
+        credential_request_encryption: undefined,
+        credential_response_encryption: requiredResponseEncryption,
+      },
+    }
+
+    await client.retrieveDeferredCredentials({
+      issuerMetadata: draft11Metadata,
+      accessToken: 'test-access-token',
+      transactionId: 'txn-draft-11',
+    })
+
+    expect(requestCount).toBe(1)
   })
 
   test('fails before sending when required request encryption is unavailable', async () => {
@@ -690,7 +830,7 @@ describe('Credential Request Encryption', () => {
   })
 
   test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
-    '%s applies request-encryption policy after schema validation',
+    '%s applies payload-dependent request-encryption policy after schema validation',
     async (method) => {
       const issuerWithoutRequestEncryption = new Openid4vciIssuer({ callbacks })
       const requiredMetadata: IssuerMetadataResult = {
@@ -733,6 +873,11 @@ describe('Credential Request Encryption', () => {
         errorResponse: { error: 'invalid_encryption_parameters' },
       })
       await expect(
+        plaintextRequest(issuerMetadata, { credential_response_encryption: credentialResponseEncryption })
+      ).rejects.toMatchObject({
+        errorResponse: { error: 'invalid_encryption_parameters' },
+      })
+      await expect(
         plaintextRequest(draft15Metadata, { credential_response_encryption: credentialResponseEncryption })
       ).resolves.toBeDefined()
 
@@ -748,8 +893,62 @@ describe('Credential Request Encryption', () => {
           credential_response_encryption: credentialResponseEncryption,
         })
       ).rejects.toMatchObject({
+        status: 500,
+        errorResponse: {
+          error: 'server_error',
+          error_description: 'Unable to process credential response encryption',
+        },
+        message: expect.stringContaining(
+          'V1 issuer advertises credential response encryption without credential request encryption support'
+        ),
+      })
+      await expect(plaintextRequest(v1MetadataWithoutRequestEncryption, {})).resolves.toBeDefined()
+      await expect(
+        plaintextRequest(
+          {
+            ...v1MetadataWithoutRequestEncryption,
+            credentialIssuer: {
+              ...v1MetadataWithoutRequestEncryption.credentialIssuer,
+              credential_response_encryption: undefined,
+            },
+          },
+          { credential_response_encryption: credentialResponseEncryption }
+        )
+      ).rejects.toMatchObject({
         errorResponse: { error: 'invalid_encryption_parameters' },
       })
+    }
+  )
+
+  test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
+    '%s rejects required-encryption plaintext before validating its payload',
+    async (method) => {
+      const issuer = new Openid4vciIssuer({ callbacks })
+      const requiredMetadata: IssuerMetadataResult = {
+        ...issuerMetadata,
+        credentialIssuer: {
+          ...issuerMetadata.credentialIssuer,
+          credential_request_encryption: { ...credentialRequestEncryption, encryption_required: true },
+        },
+      }
+      const request =
+        method === 'parseCredentialRequest'
+          ? { credential_configuration_id: 'pidSdJwt' }
+          : { transaction_id: 'txn-plaintext' }
+
+      for (const body of [null, {}, { ...request, credential_response_encryption: { enc: 'invalid' } }]) {
+        await expect(
+          issuer[method]({ issuerMetadata: requiredMetadata, contentType: ContentType.Json, body })
+        ).rejects.toMatchObject({
+          errorResponse: {
+            error: 'invalid_encryption_parameters',
+            error_description: 'The credential issuer requires encrypted credential requests',
+          },
+        })
+        await expect(issuer[method]({ issuerMetadata, contentType: ContentType.Json, body })).rejects.toMatchObject({
+          errorResponse: { error: 'invalid_credential_request' },
+        })
+      }
     }
   )
 
@@ -787,4 +986,27 @@ describe('Credential Request Encryption', () => {
       })
     }
   )
+})
+
+test('does not allow explicitly selecting a signing-only request encryption key', async () => {
+  const signingKey = { ...encryptionPublicJwk, kid: 'signing-key', alg: 'RSA-OAEP', use: 'sig' }
+  const issuerMetadataWithSigningKey = {
+    ...issuerMetadata,
+    credentialIssuer: {
+      ...credentialIssuerMetadata,
+      credential_request_encryption: {
+        ...credentialRequestEncryption,
+        jwks: { keys: [signingKey] },
+      },
+    },
+  } satisfies IssuerMetadataResult
+
+  await expect(
+    client.retrieveCredentials({
+      issuerMetadata: issuerMetadataWithSigningKey,
+      accessToken: 'test-access-token',
+      credentialConfigurationId: 'pidSdJwt',
+      credentialRequestEncryption: { kid: 'signing-key' },
+    })
+  ).rejects.toThrow("Credential request encryption key with kid 'signing-key' is not intended for encryption.")
 })

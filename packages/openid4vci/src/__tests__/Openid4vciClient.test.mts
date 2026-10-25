@@ -4,7 +4,7 @@ import {
   decodeJwt,
   preAuthorizedCodeGrantIdentifier,
 } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling, ValidationError } from '@openid4vc/utils'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
@@ -714,6 +714,45 @@ describe('Openid4vciClient', () => {
       },
     })
     expect(credentialResponse.credentialResponse).toStrictEqual(presentationDuringIssuance.credentialResponse)
+  })
+
+  test.each([
+    ['missing jwks', { enc_values_supported: ['A128GCM'], encryption_required: false }],
+    ['empty keys', { jwks: { keys: [] }, enc_values_supported: ['A128GCM'], encryption_required: false }],
+    [
+      'missing key algorithm',
+      {
+        jwks: { keys: [{ kty: 'EC', kid: 'request-key' }] },
+        enc_values_supported: ['A128GCM'],
+        encryption_required: false,
+      },
+    ],
+    [
+      'empty enc_values_supported',
+      {
+        jwks: { keys: [{ kty: 'EC', kid: 'request-key', alg: 'ECDH-ES' }] },
+        enc_values_supported: [],
+        encryption_required: false,
+      },
+    ],
+  ])('rejects malformed request encryption during issuer metadata resolution: %s', async (_description, encryption) => {
+    const credentialIssuer = 'https://example.com/issuer-id'
+    const metadata = {
+      credential_issuer: credentialIssuer,
+      credential_endpoint: `${credentialIssuer}/credential`,
+      credential_configurations_supported: {},
+      credential_request_encryption: encryption,
+    }
+    server.resetHandlers(
+      http.get('https://example.com/.well-known/openid-credential-issuer/issuer-id', () => HttpResponse.json(metadata)),
+      http.get(`${credentialIssuer}/.well-known/openid-credential-issuer`, () => HttpResponse.json(metadata))
+    )
+    const client = new Openid4vciClient({ callbacks: { ...callbacks, fetch, signJwt: getSignJwtCallback([]) } })
+
+    await expect(client.resolveIssuerMetadata(credentialIssuer)).rejects.toMatchObject({
+      constructor: ValidationError,
+      message: expect.stringContaining('credential_request_encryption'),
+    })
   })
 
   test('correctly fetches issuer and authorization metadata', async () => {
