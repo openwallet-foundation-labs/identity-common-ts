@@ -18,11 +18,23 @@ function validatePlaintextCredentialRequestEncryption(options: {
   issuerMetadata: IssuerMetadataResult
   hasCredentialResponseEncryption: boolean
 }) {
-  if (options.issuerMetadata.credentialIssuer.credential_request_encryption?.encryption_required) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidEncryptionParameters,
-      error_description: 'The credential issuer requires encrypted credential requests',
-    })
+  if (
+    options.hasCredentialResponseEncryption &&
+    options.issuerMetadata.originalDraftVersion === Openid4vciVersion.V1 &&
+    options.issuerMetadata.credentialIssuer.credential_response_encryption !== undefined &&
+    options.issuerMetadata.credentialIssuer.credential_request_encryption === undefined
+  ) {
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.ServerError,
+        error_description: 'Unable to process credential response encryption',
+      },
+      {
+        status: 500,
+        internalMessage:
+          'V1 issuer advertises credential response encryption without credential request encryption support',
+      }
+    )
   }
 
   if (
@@ -67,6 +79,13 @@ function invalidCredentialRequestContentType(): Oauth2ServerErrorResponseError {
   })
 }
 
+function credentialRequestEncryptionRequired(): Oauth2ServerErrorResponseError {
+  return new Oauth2ServerErrorResponseError({
+    error: Oauth2ErrorCodes.InvalidEncryptionParameters,
+    error_description: 'The credential issuer requires encrypted credential requests',
+  })
+}
+
 export async function parseCredentialRequestBody(
   options: ParseCredentialRequestBodyOptions
 ): Promise<ParseCredentialRequestReturn> {
@@ -84,6 +103,9 @@ export async function parseCredentialRequestBody(
   }
 
   if (isMediaType(options.contentType, ContentType.Json)) {
+    if (options.issuerMetadata.credentialIssuer.credential_request_encryption?.encryption_required) {
+      throw credentialRequestEncryptionRequired()
+    }
     const parsedCredentialRequest = parseRequestPayload(
       parseCredentialRequest,
       { issuerMetadata: options.issuerMetadata, credentialRequest: options.body },
@@ -116,6 +138,9 @@ export async function parseDeferredCredentialRequestBody(
   }
 
   if (isMediaType(options.contentType, ContentType.Json)) {
+    if (options.issuerMetadata.credentialIssuer.credential_request_encryption?.encryption_required) {
+      throw credentialRequestEncryptionRequired()
+    }
     const parsedDeferredCredentialRequest = parseRequestPayload(
       parseDeferredCredentialRequest,
       { issuerMetadata: options.issuerMetadata, deferredCredentialRequest: options.body },

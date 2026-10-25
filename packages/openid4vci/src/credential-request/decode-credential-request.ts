@@ -50,10 +50,7 @@ export async function decodeCredentialRequest(options: DecodeCredentialRequestOp
     throw invalidEncryptionParameters('Encrypted credential request body must be a compact JWE string')
   }
 
-  const { jwk, header } = verifyCredentialRequestEncryption(options.body, options.issuerMetadata.credentialIssuer)
-  if (header.zip !== undefined) {
-    throw invalidEncryptionParameters('Compressed credential requests are not supported')
-  }
+  const { jwk } = verifyCredentialRequestEncryption(options.body, options.issuerMetadata.credentialIssuer)
 
   if (!options.callbacks.decryptJwe) {
     throw new Oauth2ServerErrorResponseError(
