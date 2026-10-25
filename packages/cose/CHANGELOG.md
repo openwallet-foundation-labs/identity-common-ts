@@ -1,5 +1,11 @@
 # @owf/cose
 
+## 0.6.0
+
+### Patch Changes
+
+- @owf/identity-common@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes

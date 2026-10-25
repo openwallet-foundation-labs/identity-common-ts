@@ -1,5 +1,14 @@
 # @owf/mdoc
 
+## 0.9.1
+
+### Patch Changes
+
+- @owf/cose@0.6.0
+  - @owf/identity-common@0.6.0
+  - @owf/token-status-list@0.6.0
+  - @owf/x509@0.6.0
+
 ## 0.9.0
 
 ### Minor Changes

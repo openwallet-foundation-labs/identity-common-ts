@@ -1,5 +1,9 @@
 # @openid4vc/utils
 
+## 0.8.2
+
+No changes in this release.
+
 ## 0.8.1
 
 ### Patch Changes

@@ -300,6 +300,15 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
 
+  packages/openid-federation:
+    dependencies:
+      '@owf/identity-common':
+        specifier: workspace:*
+        version: link:../identity-common
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+
   packages/openid4vc-utils:
     dependencies:
       buffer:
