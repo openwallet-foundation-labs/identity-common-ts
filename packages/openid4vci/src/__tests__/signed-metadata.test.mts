@@ -9,6 +9,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
 import { type CredentialConfigurationSupportedWithFormats, Openid4vciClient, Openid4vciIssuer } from '../index.js'
+import { fetchCredentialIssuerMetadata } from '../metadata/credential-issuer/credential-issuer-metadata.js'
 
 const credentialIssuerJwk = {
   kty: 'EC',
@@ -113,10 +114,15 @@ describe('Signed Credential Issuer Metadata', () => {
       },
     })
 
+    const acceptHeaders: Array<string | null> = []
     server.resetHandlers(
-      http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-credential-issuer`, () =>
-        HttpResponse.text(credentialIssuerMetadataJwt, { headers: { 'Content-Type': 'application/jwt' } })
-      ),
+      // Like issuers that support both, only return the signed metadata if the client accepts a JWT
+      http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-credential-issuer`, ({ request }) => {
+        acceptHeaders.push(request.headers.get('Accept'))
+        return request.headers.get('Accept')?.includes('application/jwt')
+          ? HttpResponse.text(credentialIssuerMetadataJwt, { headers: { 'Content-Type': 'application/jwt' } })
+          : HttpResponse.json(credentialIssuerMetadata)
+      }),
       http.get(`${authorizationServerMetadata.issuer}/.well-known/openid-configuration`, () =>
         HttpResponse.text(undefined, { status: 404 })
       ),
@@ -129,6 +135,7 @@ describe('Signed Credential Issuer Metadata', () => {
     callbacks.fetch = fetch
 
     const resolvedIssuerMetadata = await client.resolveIssuerMetadata(credentialIssuerMetadata.credential_issuer)
+    expect(acceptHeaders).toEqual(['application/jwt, application/json;q=0.9'])
     expect(resolvedIssuerMetadata.credentialIssuer.credential_issuer).toStrictEqual(
       credentialIssuerMetadata.credential_issuer
     )
@@ -165,4 +172,126 @@ describe('Signed Credential Issuer Metadata', () => {
       },
     })
   })
+
+  test('Request only unsigned credential issuer metadata by default without a verifyJwt callback', async () => {
+    const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
+      credentialIssuerMetadata,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: credentialIssuerJwkPublic,
+      },
+    })
+
+    const acceptHeaders: Array<string | null> = []
+    server.resetHandlers(
+      http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-credential-issuer`, ({ request }) => {
+        acceptHeaders.push(request.headers.get('Accept'))
+        return request.headers.get('Accept')?.includes('application/jwt')
+          ? HttpResponse.text(credentialIssuerMetadataJwt, { headers: { 'Content-Type': 'application/jwt' } })
+          : HttpResponse.json(credentialIssuerMetadata)
+      })
+    )
+
+    const result = await fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+      callbacks: { fetch },
+    })
+
+    expect(acceptHeaders).toEqual(['application/json'])
+    expect(result?.credentialIssuerMetadata.credential_issuer).toStrictEqual(credentialIssuerMetadata.credential_issuer)
+    expect(result?.signed).toBeUndefined()
+  })
+
+  test('Request only unsigned credential issuer metadata if signed metadata is disallowed', async () => {
+    const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
+      credentialIssuerMetadata,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: credentialIssuerJwkPublic,
+      },
+    })
+
+    const acceptHeaders: Array<string | null> = []
+    server.resetHandlers(
+      http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-credential-issuer`, ({ request }) => {
+        acceptHeaders.push(request.headers.get('Accept'))
+        return request.headers.get('Accept')?.includes('application/jwt')
+          ? HttpResponse.text(credentialIssuerMetadataJwt, { headers: { 'Content-Type': 'application/jwt' } })
+          : HttpResponse.json(credentialIssuerMetadata)
+      })
+    )
+
+    const result = await fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+      callbacks: { fetch, verifyJwt: callbacks.verifyJwt },
+      signedMetadata: 'disallowed',
+    })
+
+    expect(acceptHeaders).toEqual(['application/json'])
+    expect(result?.credentialIssuerMetadata.credential_issuer).toStrictEqual(credentialIssuerMetadata.credential_issuer)
+    expect(result?.signed).toBeUndefined()
+  })
+
+  test('Request only signed credential issuer metadata if signed metadata is required', async () => {
+    const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
+      credentialIssuerMetadata,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: credentialIssuerJwkPublic,
+      },
+    })
+
+    const acceptHeaders: Array<string | null> = []
+    server.resetHandlers(
+      http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-credential-issuer`, ({ request }) => {
+        acceptHeaders.push(request.headers.get('Accept'))
+        return HttpResponse.text(credentialIssuerMetadataJwt, { headers: { 'Content-Type': 'application/jwt' } })
+      })
+    )
+
+    const result = await fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+      callbacks: { fetch, verifyJwt: callbacks.verifyJwt },
+      signedMetadata: 'required',
+    })
+
+    expect(acceptHeaders).toEqual(['application/jwt'])
+    expect(result?.credentialIssuerMetadata.credential_issuer).toStrictEqual(credentialIssuerMetadata.credential_issuer)
+    expect(result?.signed?.jwt.compact).toStrictEqual(credentialIssuerMetadataJwt)
+  })
+
+  test('Throw an error for unsigned credential issuer metadata if signed metadata is required', async () => {
+    server.resetHandlers(
+      http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-credential-issuer`, () =>
+        HttpResponse.json(credentialIssuerMetadata)
+      )
+    )
+
+    await expect(
+      client.resolveIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+        signedMetadata: 'required',
+      })
+    ).rejects.toThrow("Expected response to match content type application/jwt, but received 'application/json'")
+  })
+
+  test('Throw an error if signed metadata is preferred without a verifyJwt callback', async () => {
+    await expect(
+      fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+        callbacks: { fetch },
+        signedMetadata: 'preferred',
+      })
+    ).rejects.toThrow("Signed credential issuer metadata is preferred, but no 'verifyJwt' callback provided")
+  })
+
+  test.each(['signed', 'application/jwt', 'constructor'])(
+    "Throw an error for an unsupported 'signedMetadata' value %j",
+    async (signedMetadata) => {
+      await expect(
+        fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+          callbacks: { fetch, verifyJwt: callbacks.verifyJwt },
+          signedMetadata: signedMetadata as 'required',
+        })
+      ).rejects.toThrow("The 'signedMetadata' option must be one of 'required', 'preferred' or 'disallowed'")
+    }
+  )
 })

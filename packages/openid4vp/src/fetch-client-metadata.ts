@@ -11,9 +11,6 @@ export async function fetchClientMetadata(options: {
 
   const { result, response } = await fetcher(zClientMetadata, ContentType.Json, clientMetadataUri, {
     method: 'GET',
-    headers: {
-      Accept: ContentType.Json,
-    },
   })
 
   if (!response.ok) {

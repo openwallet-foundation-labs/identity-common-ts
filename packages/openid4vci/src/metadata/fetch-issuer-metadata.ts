@@ -12,6 +12,7 @@ import type { Openid4vciVersion } from '../version'
 import {
   type CredentialIssuerMetadataSigned,
   extractKnownCredentialConfigurationSupportedFormats,
+  type FetchCredentialIssuerMetadataOptions,
   fetchCredentialIssuerMetadata,
 } from './credential-issuer/credential-issuer-metadata'
 import type {
@@ -37,12 +38,22 @@ export interface ResolveIssuerMetadataOptions {
   allowAuthorizationMetadataFromCredentialIssuerMetadata?: boolean
 
   /**
-   * Callbacks for fetching the credential issuer metadata.
-   * If no `verifyJwt` callback is provided, the request
-   * will not include the `application/jwt` Accept header
-   * for signed metadata.
+   * Callbacks for fetching the credential issuer metadata. The `verifyJwt` callback is
+   * required unless `signedMetadata` is `disallowed`.
    */
   callbacks: Partial<Pick<CallbackContext, 'fetch' | 'verifyJwt' | 'getAuthorizationServerMetadata'>>
+
+  /**
+   * Whether the credential issuer metadata must be signed. This is sent as the `Accept` header.
+   * Authorization server metadata is always unsigned.
+   * - `required`: only accept signed metadata
+   * - `preferred`: accept signed and unsigned metadata, asking the issuer for signed metadata first.
+   *   Signed metadata that fails verification results in an error, without falling back to unsigned metadata.
+   * - `disallowed`: only accept unsigned metadata
+   *
+   * @default 'preferred' if a `verifyJwt` callback is provided, otherwise 'disallowed'
+   */
+  signedMetadata?: FetchCredentialIssuerMetadataOptions['signedMetadata']
 
   /**
    * Only used for verifying signed issuer metadata. If not provided
@@ -81,6 +92,7 @@ export async function resolveIssuerMetadata(
 
   const credentialIssuerMetadataWithDraftVersion = await fetchCredentialIssuerMetadata(credentialIssuer, {
     callbacks: options?.callbacks,
+    signedMetadata: options?.signedMetadata,
     now: options?.now,
   })
   if (!credentialIssuerMetadataWithDraftVersion) {
