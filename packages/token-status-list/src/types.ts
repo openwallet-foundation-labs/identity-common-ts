@@ -20,10 +20,10 @@ export enum StatusType {
 }
 
 /**
- * Media types for Status List Tokens
+ * Media types for Status List Tokens.
  * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-14.7
  */
-export const MediaTypes = {
+export const StatusListMediaTypes = {
   /** Media type for JWT-based Status List Token */
   StatusListJwt: 'application/statuslist+jwt',
   /** Media type for CWT-based Status List Token */

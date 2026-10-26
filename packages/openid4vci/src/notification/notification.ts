@@ -6,7 +6,8 @@ import {
   type ResourceRequestResponseOk,
   resourceRequest,
 } from '@openid4vc/oauth2'
-import { ContentType, isResponseContentType, parseWithErrorHandling } from '@openid4vc/utils'
+import { ContentType, parseWithErrorHandling } from '@openid4vc/utils'
+import { isMediaType } from '@owf/identity-common'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import {
   type NotificationEvent,
@@ -104,7 +105,10 @@ export async function sendNotification(
   })
 
   if (!resourceResponse.ok) {
-    const notificationErrorResponseResult = isResponseContentType(ContentType.Json, resourceResponse.response)
+    const notificationErrorResponseResult = isMediaType(
+      resourceResponse.response.headers.get('Content-Type'),
+      ContentType.Json
+    )
       ? zNotificationErrorResponse.safeParse(await resourceResponse.response.clone().json())
       : undefined
 

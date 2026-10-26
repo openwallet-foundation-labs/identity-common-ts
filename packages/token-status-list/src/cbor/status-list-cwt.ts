@@ -16,7 +16,7 @@ import {
 } from '@owf/cose'
 import { StatusList } from '../status-list'
 import { SLException } from '../status-list-exception'
-import { type BitsPerStatus, MediaTypes } from '../types'
+import { type BitsPerStatus, StatusListMediaTypes } from '../types'
 import { StatusListCbor } from './status-list-cbor'
 import { StatusListCwtProtectedHeaders } from './status-list-cwt-headers'
 import { type CreateStatusListCwtPayloadOptions, StatusListCwtPayload } from './status-list-cwt-payload'
@@ -50,7 +50,7 @@ function statusListProtectedHeaders(
     protectedHeaders instanceof ProtectedHeaders ? protectedHeaders.decodedStructure : protectedHeaders
   )
   if (headers.get(RegisteredCwtHeaderClaimKey.Typ) === undefined) {
-    headers.set(RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListCwt)
+    headers.set(RegisteredCwtHeaderClaimKey.Typ, StatusListMediaTypes.StatusListCwt)
   }
 
   return StatusListCwtProtectedHeaders.fromDecodedStructure(TypedMap.fromMap(headers))

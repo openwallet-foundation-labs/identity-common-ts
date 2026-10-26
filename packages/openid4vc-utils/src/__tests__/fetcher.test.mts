@@ -47,4 +47,30 @@ describe('createZodFetcher', () => {
 
     expect(acceptHeaders).toEqual(['application/json;q=0.9'])
   })
+
+  test.each(['application/json-seq', 'multipart/related; type="application/json"'])(
+    'rejects a lookalike response Content-Type: %s',
+    async (contentType) => {
+      const fetchWithZod = createZodFetcher(
+        async () => new Response('{"hello":"world"}', { headers: { 'Content-Type': contentType } })
+      )
+
+      await expect(
+        fetchWithZod(z.object({ hello: z.string() }), ContentType.Json, 'https://example.com')
+      ).rejects.toThrow('Expected response to match content type application/json')
+    }
+  )
+
+  test.each(['application/json; charset=UTF-8', 'Application/JSON'])(
+    'accepts a matching response Content-Type: %s',
+    async (contentType) => {
+      const fetchWithZod = createZodFetcher(
+        async () => new Response('{"hello":"world"}', { headers: { 'Content-Type': contentType } })
+      )
+
+      await expect(
+        fetchWithZod(z.object({ hello: z.string() }), ContentType.Json, 'https://example.com')
+      ).resolves.toMatchObject({ result: { success: true, data: { hello: 'world' } } })
+    }
+  )
 })

@@ -11,10 +11,10 @@ import {
 import {
   ContentType,
   type FetchResponse,
-  isResponseContentType,
   parseWithErrorHandling,
   stringToJsonWithErrorHandling,
 } from '@openid4vc/utils'
+import { isMediaType } from '@owf/identity-common'
 import type z from 'zod'
 import { Openid4vciError } from '../error/Openid4vciError'
 import { getKnownCredentialConfigurationSupportedById } from '../metadata/credential-issuer/credential-issuer-metadata'
@@ -53,7 +53,7 @@ async function handleCredentialResponse<T, Schema extends z.ZodType<T>>(options:
   const { response, decryptJwe, credentialResponseEncryption, schema, responseType } = options
 
   // Check if the response is encrypted (Content-Type: application/jwt)
-  if (isResponseContentType(ContentType.Jwt, response)) {
+  if (isMediaType(response.headers.get('Content-Type'), ContentType.Jwt)) {
     const jwe = await response.clone().text()
     const decryptResult = await decryptJwe(jwe)
 
@@ -84,7 +84,9 @@ async function handleCredentialResponse<T, Schema extends z.ZodType<T>>(options:
 
   // Try to parse the response (non-encrypted)
   const parseResult = (
-    isResponseContentType(ContentType.Json, response) ? schema.safeParse(await response.clone().json()) : undefined
+    isMediaType(response.headers.get('Content-Type'), ContentType.Json)
+      ? schema.safeParse(await response.clone().json())
+      : undefined
   ) as ReturnType<Schema['safeParse']> | undefined
 
   if (!parseResult?.success) {
@@ -324,7 +326,10 @@ async function retrieveCredentials(
   })
 
   if (!resourceResponse.ok) {
-    const credentialErrorResponseResult = isResponseContentType(ContentType.Json, resourceResponse.response)
+    const credentialErrorResponseResult = isMediaType(
+      resourceResponse.response.headers.get('Content-Type'),
+      ContentType.Json
+    )
       ? zCredentialErrorResponse.safeParse(await resourceResponse.response.clone().json())
       : undefined
 
@@ -431,7 +436,10 @@ export async function retrieveDeferredCredentials(
   })
 
   if (!resourceResponse.ok) {
-    const deferredCredentialErrorResponseResult = isResponseContentType(ContentType.Json, resourceResponse.response)
+    const deferredCredentialErrorResponseResult = isMediaType(
+      resourceResponse.response.headers.get('Content-Type'),
+      ContentType.Json
+    )
       ? zCredentialErrorResponse.safeParse(await resourceResponse.response.clone().json())
       : undefined
 

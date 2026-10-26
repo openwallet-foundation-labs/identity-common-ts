@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractMediaType, isMediaType } from '../../src'
+import { extractMediaType, isJoseTyp, isMediaType, normalizeJoseTyp } from '../../src'
 
 describe('content type', () => {
   describe('extractMediaType', () => {
@@ -51,6 +51,36 @@ describe('content type', () => {
       expect(isMediaType(null, 'application/statuslist+jwt')).toBe(false)
       expect(isMediaType('', 'application/statuslist+jwt')).toBe(false)
       expect(isMediaType('application/statuslist+jwt', [])).toBe(false)
+    })
+  })
+
+  describe('normalizeJoseTyp', () => {
+    it('should prepend application/ when the typ is in short form', () => {
+      expect(normalizeJoseTyp('statuslist+jwt')).toBe('application/statuslist+jwt')
+    })
+
+    it('should normalize the full media type and strip parameters', () => {
+      expect(normalizeJoseTyp('Application/StatusList+JWT; charset=utf-8')).toBe('application/statuslist+jwt')
+    })
+  })
+
+  describe('isJoseTyp', () => {
+    it.each([
+      ['short forms', 'statuslist+jwt', 'application/statuslist+jwt'],
+      ['full forms', 'application/statuslist+jwt', 'statuslist+jwt'],
+      ['mixed-case forms', 'Application/StatusList+JWT', 'STATUSLIST+JWT'],
+    ])('should match %s', (_description, value, expected) => {
+      expect(isJoseTyp(value, expected)).toBe(true)
+    })
+
+    it('should match against an array of expected values', () => {
+      expect(isJoseTyp('statuslist+cwt', ['statuslist+jwt', 'application/statuslist+cwt'])).toBe(true)
+    })
+
+    it('should return false for non-string values and non-matching types', () => {
+      expect(isJoseTyp(1, 'statuslist+jwt')).toBe(false)
+      expect(isJoseTyp(undefined, 'statuslist+jwt')).toBe(false)
+      expect(isJoseTyp('application/statuslist+cwt', 'statuslist+jwt')).toBe(false)
     })
   })
 })

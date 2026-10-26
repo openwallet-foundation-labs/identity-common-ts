@@ -1,5 +1,6 @@
+import { isMediaType } from '@owf/identity-common'
 import type z from 'zod'
-import { ContentType, isResponseContentType } from './content-type'
+import { ContentType } from './content-type'
 import { FetchError } from './error/FetchError'
 import { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
 import { type Fetch, Headers, URLSearchParams } from './globals'
@@ -80,7 +81,7 @@ export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
 
     const response = await createFetcher(fetcher)(input, { ...init, headers })
 
-    if (response.ok && !isResponseContentType(expectedContentTypeArray, response)) {
+    if (response.ok && !isMediaType(response.headers.get('Content-Type'), expectedContentTypeArray)) {
       throw new InvalidFetchResponseError(
         `Expected response to match content type ${expectedContentTypeArray.join(' | ')}, but received '${response.headers.get('Content-Type')}'`,
         await response.clone().text(),
@@ -88,7 +89,9 @@ export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
       )
     }
 
-    if (isResponseContentType([ContentType.OAuthAuthorizationRequestJwt, ContentType.Jwt], response)) {
+    if (
+      isMediaType(response.headers.get('Content-Type'), [ContentType.OAuthAuthorizationRequestJwt, ContentType.Jwt])
+    ) {
       return {
         response,
         result: response.ok ? schema.safeParse(await response.text()) : undefined,

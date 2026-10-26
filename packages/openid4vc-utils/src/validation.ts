@@ -1,3 +1,4 @@
+import { isJoseTyp } from '@owf/identity-common'
 import z from 'zod'
 import { getGlobalConfig } from './config'
 
@@ -31,10 +32,7 @@ export const zNumericDate = z.number()
  * case-insensitive (RFC 7515 Section 4.1.9).
  */
 export function isJwtTyp(value: unknown, typ: string): boolean {
-  if (typeof value !== 'string') return false
-
-  const lowerCaseValue = value.toLowerCase()
-  return lowerCaseValue === typ || lowerCaseValue === `application/${typ}`
+  return isJoseTyp(value, typ)
 }
 
 /**

@@ -1,6 +1,6 @@
 export { arrayEqualsIgnoreOrder } from './array'
 export { getGlobalConfig, type Oid4vcTsConfig, setGlobalConfig } from './config'
-export { ContentType, isContentType, isResponseContentType } from './content-type'
+export { ContentType } from './content-type'
 export { addSecondsToDate, dateToSeconds } from './date'
 export {
   decodeBase64,

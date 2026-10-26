@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { MediaTypes, StatusList, StatusListCwt, StatusType } from '@owf/token-status-list'
+import { StatusList, StatusListCwt, StatusListMediaTypes, StatusType } from '@owf/token-status-list'
 import { X509Certificate } from '@peculiar/x509'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -77,7 +77,10 @@ suite('verifyStatusListToken with an x5chain in the unprotected header', () => {
     server.use(
       http.get(
         uri,
-        () => new HttpResponse(new Uint8Array(token), { headers: { 'Content-Type': MediaTypes.StatusListCwt } })
+        () =>
+          new HttpResponse(new Uint8Array(token), {
+            headers: { 'Content-Type': StatusListMediaTypes.StatusListCwt },
+          })
       )
     )
 
@@ -151,7 +154,7 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
     )
     const fetch = (async () =>
       new Response(new Uint8Array(token), {
-        headers: { 'Content-Type': MediaTypes.StatusListCwt },
+        headers: { 'Content-Type': StatusListMediaTypes.StatusListCwt },
       })) as typeof globalThis.fetch
 
     return verifyStatusListToken({ statusListInfo, trustedCertificates: [certificate] }, { ...mdocContext, fetch })

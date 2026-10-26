@@ -810,6 +810,8 @@ describe('Credential Request Encryption', () => {
     { description: 'missing Content-Type', contentType: undefined },
     { description: 'unsupported text media type', contentType: 'text/plain' },
     { description: 'unsupported JSON-like media type', contentType: 'application/jsonp' },
+    { description: 'JSON sequence media type', contentType: 'application/json-seq' },
+    { description: 'media type in a parameter', contentType: 'multipart/related; type="application/json"' },
     { description: 'combined media types', contentType: 'application/jwt, application/json' },
   ])('rejects unsupported Content-Type: $description', async ({ contentType }) => {
     const issuer = new Openid4vciIssuer({ callbacks })
@@ -924,6 +926,69 @@ describe('Credential Request Encryption', () => {
     }
   )
 
+  test.each(['Application/JSON', 'application/json; charset=UTF-8'])(
+    'accepts the JSON Content-Type form %s',
+    async (contentType) => {
+      const plaintextIssuer = new Openid4vciIssuer({
+        callbacks: { ...callbacks, decryptJwe: undefined },
+      })
+
+      const regular = await plaintextIssuer.parseCredentialRequest({
+        issuerMetadata,
+        contentType,
+        credentialRequest: { credential_configuration_id: 'pidSdJwt' },
+      })
+      const deferred = await plaintextIssuer.parseDeferredCredentialRequest({
+        issuerMetadata,
+        contentType,
+        deferredCredentialRequest: { transaction_id: 'txn-plaintext' },
+      })
+
+      expect(regular.credentialConfigurationId).toBe('pidSdJwt')
+      expect(deferred.deferredCredentialRequest.transaction_id).toBe('txn-plaintext')
+    }
+  )
+
+  test.each(['Application/JWT', 'application/jwt; charset=UTF-8'])(
+    'accepts the JWT Content-Type form %s for regular and deferred requests',
+    async (contentType) => {
+      const credentialRequestJwe = await encryptJwe(
+        {
+          method: 'jwk',
+          publicJwk: credentialRequestEncryption.jwks.keys[0],
+          alg: 'RSA-OAEP',
+          enc: 'A256GCM',
+          kid: 'credential-request-key',
+        },
+        JSON.stringify({ credential_configuration_id: 'pidSdJwt' })
+      )
+      const deferredCredentialRequestJwe = await encryptJwe(
+        {
+          method: 'jwk',
+          publicJwk: credentialRequestEncryption.jwks.keys[0],
+          alg: 'RSA-OAEP',
+          enc: 'A256GCM',
+          kid: 'credential-request-key',
+        },
+        JSON.stringify({ transaction_id: 'txn-encrypted' })
+      )
+
+      const regular = await issuer.parseCredentialRequest({
+        issuerMetadata,
+        contentType,
+        credentialRequest: credentialRequestJwe.jwe,
+      })
+      const deferred = await issuer.parseDeferredCredentialRequest({
+        issuerMetadata,
+        contentType,
+        deferredCredentialRequest: deferredCredentialRequestJwe.jwe,
+      })
+
+      expect(regular.credentialConfigurationId).toBe('pidSdJwt')
+      expect(deferred.deferredCredentialRequest.transaction_id).toBe('txn-encrypted')
+    }
+  )
+
   test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
     '%s rejects required-encryption plaintext before validating its payload',
     async (method) => {
@@ -966,9 +1031,12 @@ describe('Credential Request Encryption', () => {
     }
   )
 
-  test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
-    '%s reports a missing decryptJwe callback as server_error',
-    async (method) => {
+  test.each([
+    ['parseCredentialRequest', 'Application/JWT'],
+    ['parseDeferredCredentialRequest', 'application/jwt; charset=UTF-8'],
+  ] as const)(
+    '%s accepts %s and reports a missing decryptJwe callback as server_error',
+    async (method, contentType) => {
       const jwe = await encryptJwe(
         {
           method: 'jwk',
@@ -984,7 +1052,7 @@ describe('Credential Request Encryption', () => {
       })
       const options = {
         issuerMetadata,
-        contentType: ContentType.Jwt,
+        contentType,
       }
       const parsing =
         method === 'parseCredentialRequest'

@@ -43,3 +43,28 @@ export const isMediaType = (
   const expectedMediaTypes = typeof expected === 'string' ? [expected] : expected
   return expectedMediaTypes.some((expectedMediaType) => extractMediaType(expectedMediaType) === mediaType)
 }
+
+/**
+ * Normalize a JOSE `typ` value to a media type.
+ *
+ * RFC 7515 §4.1.9 requires recipients to treat a `typ` value without `/` as if
+ * `application/` were prepended.
+ */
+export const normalizeJoseTyp = (typ: string): string => {
+  const mediaType = typ.includes('/') ? typ : `application/${typ}`
+  return extractMediaType(mediaType) ?? mediaType
+}
+
+/**
+ * Compare a JOSE `typ` value with one or more expected media types.
+ *
+ * Both short and full forms are accepted on either side, as required by
+ * RFC 7515 §4.1.9.
+ */
+export const isJoseTyp = (value: unknown, expected: string | ReadonlyArray<string>): boolean => {
+  if (typeof value !== 'string') return false
+
+  const normalizedValue = normalizeJoseTyp(value)
+  const expectedTypes = typeof expected === 'string' ? [expected] : expected
+  return expectedTypes.some((expectedType) => normalizeJoseTyp(expectedType) === normalizedValue)
+}
