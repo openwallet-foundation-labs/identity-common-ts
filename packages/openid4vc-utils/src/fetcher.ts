@@ -2,7 +2,7 @@ import type z from 'zod'
 import { ContentType, isResponseContentType } from './content-type'
 import { FetchError } from './error/FetchError'
 import { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
-import { type Fetch, URLSearchParams } from './globals'
+import { type Fetch, Headers, URLSearchParams } from './globals'
 
 /**
  * A type utility which represents the function returned
@@ -43,7 +43,10 @@ export function createFetcher(fetcher = defaultFetcher): Fetch {
 /**
  * Creates a `fetchWithZod` function that takes in a schema of
  * the expected response, and the arguments to the fetcher
- * you provided.
+ * you provided. The expected content types are sent as the
+ * `Accept` header, unless the request already has one. The
+ * order of the expected content types is the order of preference,
+ * expressed with decreasing `q` values.
  *
  * @example
  *
@@ -59,10 +62,23 @@ export function createFetcher(fetcher = defaultFetcher): Fetch {
  * );
  */
 export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
-  return async (schema, expectedContentType, ...args) => {
-    const response = await createFetcher(fetcher)(...args)
-
+  return async (schema, expectedContentType, input, init) => {
     const expectedContentTypeArray = Array.isArray(expectedContentType) ? expectedContentType : [expectedContentType]
+
+    // Ask for the expected content types in order of preference, unless the caller already set an Accept header
+    const headers = new Headers(init?.headers)
+    if (!headers.has('Accept')) {
+      headers.set(
+        'Accept',
+        expectedContentTypeArray
+          .map((contentType, index) =>
+            index === 0 ? contentType : `${contentType};q=${Math.max(0.1, 1 - index / 10).toFixed(1)}`
+          )
+          .join(', ')
+      )
+    }
+
+    const response = await createFetcher(fetcher)(input, { ...init, headers })
 
     if (response.ok && !isResponseContentType(expectedContentTypeArray, response)) {
       throw new InvalidFetchResponseError(

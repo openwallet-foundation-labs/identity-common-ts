@@ -79,6 +79,21 @@ describe('fetchAuthorizationServerMetadata', () => {
     expect(wellKnownRequestCount).toEqual(1)
   })
 
+  test('sends an Accept header for JSON when fetching the metadata', async () => {
+    const acceptHeaders: Array<string | null> = []
+    server.resetHandlers(
+      http.get('https://authorization-server.com/.well-known/oauth-authorization-server', ({ request }) => {
+        acceptHeaders.push(request.headers.get('Accept'))
+        return HttpResponse.json(authorizationServerMetadata)
+      })
+    )
+
+    const metadata = await fetchAuthorizationServerMetadata(issuer, { fetch })
+
+    expect(metadata).toEqual(authorizationServerMetadata)
+    expect(acceptHeaders).toEqual(['application/json'])
+  })
+
   test('throws if the callback returns metadata that does not pass validation', async () => {
     await expect(
       fetchAuthorizationServerMetadata(issuer, {

@@ -31,12 +31,21 @@ const wellKnownCredentialIssuerSuffix = '.well-known/openid-credential-issuer'
 
 export interface FetchCredentialIssuerMetadataOptions {
   /**
-   * Callbacks for fetching the credential issur metadata.
-   * If no `verifyJwt` callback is provided, the request
-   * will not include the `application/jwt` Accept header
-   * for signed metadata.
+   * Callbacks for fetching the credential issuer metadata. The `verifyJwt`
+   * callback is required unless `signedMetadata` is `disallowed`.
    */
   callbacks?: Partial<Pick<CallbackContext, 'fetch' | 'verifyJwt'>>
+
+  /**
+   * Whether the credential issuer metadata must be signed. This is sent as the `Accept` header.
+   * - `required`: only accept signed metadata
+   * - `preferred`: accept signed and unsigned metadata, asking the issuer for signed metadata first.
+   *   Signed metadata that fails verification results in an error, without falling back to unsigned metadata.
+   * - `disallowed`: only accept unsigned metadata
+   *
+   * @default 'preferred' if a `verifyJwt` callback is provided, otherwise 'disallowed'
+   */
+  signedMetadata?: 'required' | 'preferred' | 'disallowed'
 
   /**
    * Only used for verifying signed issuer metadata. If not provided
@@ -82,10 +91,27 @@ export async function fetchCredentialIssuerMetadata(
     parsedIssuerUrl.pathname,
   ])
 
-  // If verify jwt callback is provided, we accept both signed and unsigned issuer metadata
-  const acceptedContentType: [ContentType, ...ContentType[]] = options?.callbacks?.verifyJwt
-    ? [ContentType.Jwt, ContentType.Json]
-    : [ContentType.Json]
+  const signedMetadata = options?.signedMetadata ?? (options?.callbacks?.verifyJwt ? 'preferred' : 'disallowed')
+  const acceptedContentTypeBySignedMetadata = {
+    required: [ContentType.Jwt],
+    preferred: [ContentType.Jwt, ContentType.Json],
+    disallowed: [ContentType.Json],
+  } satisfies Record<typeof signedMetadata, [ContentType, ...ContentType[]]>
+
+  // The value determines the Accept header, so we only allow the supported values
+  if (signedMetadata !== 'required' && signedMetadata !== 'preferred' && signedMetadata !== 'disallowed') {
+    throw new Oauth2Error(
+      `The 'signedMetadata' option must be one of 'required', 'preferred' or 'disallowed', received '${signedMetadata}'.`
+    )
+  }
+
+  if (signedMetadata !== 'disallowed' && !options?.callbacks?.verifyJwt) {
+    throw new Oauth2Error(
+      `Signed credential issuer metadata is ${signedMetadata}, but no 'verifyJwt' callback provided to fetch credential issuer metadata method.`
+    )
+  }
+
+  const acceptedContentType: [ContentType, ...ContentType[]] = acceptedContentTypeBySignedMetadata[signedMetadata]
 
   // Either unsigned metadata or signed JWT
   const responseSchema = zCredentialIssuerMetadataWithDraftVersion.or(zCompactJwt)
@@ -127,7 +153,7 @@ export async function fetchCredentialIssuerMetadata(
   let issuerMetadataWithVersion: FetchCredentialIssuerMetadataReturn | null = null
 
   if (typeof result === 'string') {
-    // We won't reach this, as we already handle this with accepted content types.
+    // We won't reach this, as we already check this for the signed metadata option.
     // Mainly to make TS happy
     if (!options?.callbacks?.verifyJwt) {
       throw new Oauth2Error(

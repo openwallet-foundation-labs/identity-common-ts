@@ -6,7 +6,7 @@
   "pnpm": {
     "overrides": {
       "smol-toml": "1.7.1",
-      "vite": "8.3.4"
+      "vite": "8.3.5"
     }
   },
   "repository": {
@@ -50,15 +50,15 @@
     "fast-check": "^4.10.2",
     "hpke": "^1.1.7",
     "husky": "^9.1.7",
-    "jose": "^6.2.12",
+    "jose": "^6.2.13",
     "lint-staged": "^17.6.0",
-    "markdownlint-cli2": "^0.23.3",
+    "markdownlint-cli2": "^0.24.0",
     "msw": "^2.15.0",
     "reflect-metadata": "^0.2.2",
     "tsdown": "0.23.1",
     "tsx": "^4.23.15",
     "typescript": "catalog:",
-    "vite": "8.3.4",
+    "vite": "8.3.5",
     "vitest": "catalog:"
   },
   "engines": {

@@ -8,7 +8,7 @@ catalog:
   '@peculiar/asn1-x509': ^2.11.0
   '@peculiar/asn1-x509-qualified': ^2.11.0
   '@peculiar/asn1-x509-qualified-etsi': ^2.11.0
-  cbor-x: ^1.6.6
+  cbor-x: ^1.6.8
   typescript: ~7.0.2
   vitest: ^5.0.5
   zod: ^4.6.7
