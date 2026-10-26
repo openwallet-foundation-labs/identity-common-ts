@@ -3,7 +3,7 @@ import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { verifyCredentialResponseEncryption } from './verify-credential-response-encryption'
 import { type DeferredCredentialRequest, zDeferredCredentialRequest } from './z-credential-request'
 
-export interface ParseDeferredCredentialRequestOptions {
+export interface ParseDeferredCredentialRequestPayloadOptions {
   deferredCredentialRequest: unknown
 
   /**
@@ -21,8 +21,8 @@ export interface ParseDeferredCredentialRequestReturn {
   deferredCredentialRequest: DeferredCredentialRequest
 }
 
-export function parseDeferredCredentialRequest(
-  options: ParseDeferredCredentialRequestOptions
+export function parseDeferredCredentialRequestPayload(
+  options: ParseDeferredCredentialRequestPayloadOptions
 ): ParseDeferredCredentialRequestReturn {
   const deferredCredentialRequest = parseWithErrorHandling(
     zDeferredCredentialRequest,

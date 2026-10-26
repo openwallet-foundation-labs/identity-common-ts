@@ -15,12 +15,9 @@ import {
   createDeferredCredentialResponse,
 } from './credential-request/credential-response'
 import type { CredentialRequestBodyOptions } from './credential-request/decrypt-credential-request'
-import type { ParseCredentialRequestReturn } from './credential-request/parse-credential-request'
-import {
-  parseCredentialRequestBody,
-  parseDeferredCredentialRequestBody,
-} from './credential-request/parse-credential-request-body'
-import type { ParseDeferredCredentialRequestReturn } from './credential-request/parse-deferred-credential-request'
+import { parseCredentialRequest, parseDeferredCredentialRequest } from './credential-request/parse-credential-request'
+import type { ParseCredentialRequestReturn } from './credential-request/parse-credential-request-payload'
+import type { ParseDeferredCredentialRequestReturn } from './credential-request/parse-deferred-credential-request-payload'
 import { Openid4vciError } from './error/Openid4vciError'
 import {
   type VerifyCredentialRequestAttestationProofOptions,
@@ -251,7 +248,7 @@ export class Openid4vciIssuer {
   public async parseCredentialRequest(
     options: Omit<CredentialRequestBodyOptions, 'body'> & { credentialRequest: unknown }
   ): Promise<ParseCredentialRequestReturn> {
-    return parseCredentialRequestBody({
+    return parseCredentialRequest({
       body: options.credentialRequest,
       contentType: options.contentType,
       issuerMetadata: options.issuerMetadata,
@@ -266,7 +263,7 @@ export class Openid4vciIssuer {
   public async parseDeferredCredentialRequest(
     options: Omit<CredentialRequestBodyOptions, 'body'> & { deferredCredentialRequest: unknown }
   ): Promise<ParseDeferredCredentialRequestReturn> {
-    return parseDeferredCredentialRequestBody({
+    return parseDeferredCredentialRequest({
       body: options.deferredCredentialRequest,
       contentType: options.contentType,
       issuerMetadata: options.issuerMetadata,

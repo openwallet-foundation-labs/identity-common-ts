@@ -6,8 +6,8 @@ import {
   type DecryptCredentialRequestOptions,
   decryptCredentialRequest,
 } from '../../credential-request/decrypt-credential-request'
-import { parseCredentialRequest } from '../../credential-request/parse-credential-request'
-import { parseDeferredCredentialRequest } from '../../credential-request/parse-deferred-credential-request'
+import { parseCredentialRequestPayload } from '../../credential-request/parse-credential-request-payload'
+import { parseDeferredCredentialRequestPayload } from '../../credential-request/parse-deferred-credential-request-payload'
 import type { IssuerMetadataResult } from '../../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../../version'
 
@@ -97,12 +97,12 @@ describe.each(decoders)('$name request decryption', ({ decode, body, deferred })
     expect(result).toEqual(request)
     if (!deferred) {
       expect(
-        parseCredentialRequest({ issuerMetadata, credentialRequest: result }).credentialResponseEncryption
+        parseCredentialRequestPayload({ issuerMetadata, credentialRequest: result }).credentialResponseEncryption
       ).toEqual(responseEncryption)
     } else {
       expect(
-        parseDeferredCredentialRequest({ issuerMetadata, deferredCredentialRequest: result }).deferredCredentialRequest
-          .credential_response_encryption
+        parseDeferredCredentialRequestPayload({ issuerMetadata, deferredCredentialRequest: result })
+          .deferredCredentialRequest.credential_response_encryption
       ).toEqual(responseEncryption)
     }
   })
