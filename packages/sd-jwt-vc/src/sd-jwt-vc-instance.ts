@@ -281,18 +281,20 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
   ): Promise<TypeMetadataVerificationResult> {
     const sdjwt = await this.decodeForTypeMetadata(encodedSDJwt)
 
+    // Fetched type metadata is checked against the vct in fetchSingleVct
+    if (typeMetadata) {
+      const vct = sdjwt.jwt?.payload?.vct
+      const metadataVct = isResolvedTypeMetadata(typeMetadata) ? typeMetadata.vctValues[0] : typeMetadata.vct
+      if (vct !== metadataVct) {
+        throw new SDJWTException(`Type metadata vct '${metadataVct}' does not match the vct '${vct}' of the SD-JWT VC`)
+      }
+    }
+
     const resolvedMetadata = typeMetadata
       ? await this.toResolvedTypeMetadata(typeMetadata)
       : await this.getVct(encodedSDJwt)
     if (!resolvedMetadata) {
       throw new SDJWTException('Type metadata not found or could not be resolved')
-    }
-
-    const vct = sdjwt.jwt?.payload?.vct
-    if (vct !== resolvedMetadata.vctValues[0]) {
-      throw new SDJWTException(
-        `Type metadata vct '${resolvedMetadata.vctValues[0]}' does not match the vct '${vct}' of the SD-JWT VC`
-      )
     }
 
     return this.checkTypeMetadata(sdjwt, resolvedMetadata, { validateDisclosures: true })

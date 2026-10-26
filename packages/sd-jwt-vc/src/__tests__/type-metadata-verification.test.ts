@@ -1,7 +1,7 @@
 import Crypto from 'node:crypto'
 import { hasher as digest, generateSalt } from '@owf/crypto'
 import { createHashMapping, type DisclosureFrame, SDJwt, type Signer, type Verifier } from '@sd-jwt/core'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { type SDJWTVCConfig, SDJwtVcInstance, type TypeMetadataFormat, verifyClaimsAgainstTypeMetadata } from '..'
 
 const generateKeyPair = () => {
@@ -407,6 +407,17 @@ describe('SD-JWT VC Type Metadata Verification', () => {
     ).rejects.toThrow("Type metadata vct 'urn:other' does not match")
   })
 
+  test('rejects type metadata for a different vct before resolving its extends chain', async () => {
+    const vctFetcher = vi.fn(async () => ({ vct: 'urn:base' }))
+    const sdJwtVc = createInstance({ vctFetcher })
+
+    const compact = await sdJwtVc.issue({ vct: 'urn:x', iss: 'https://issuer.example.com' })
+    await expect(sdJwtVc.verifyTypeMetadata(compact, { vct: 'urn:other', extends: 'urn:base' })).rejects.toThrow(
+      "Type metadata vct 'urn:other' does not match the vct 'urn:x' of the SD-JWT VC"
+    )
+    expect(vctFetcher).not.toHaveBeenCalled()
+  })
+
   test('does not report a duplicate error in safeVerify when the SD-JWT is invalid', async () => {
     const sdJwtVc = createInstance({
       loadTypeMetadataFormat: true,
@@ -528,6 +539,50 @@ describe('SD-JWT VC Type Metadata Verification', () => {
     const result = await sdJwtVc.verifyTypeMetadata(compact, metadata)
 
     expect(result.missingMandatoryClaims).toEqual([['degrees', null, 'type']])
+  })
+
+  test('checks a mandatory claim under an array path when all elements are withheld or the value is no array', async () => {
+    const metadata: TypeMetadataFormat = {
+      vct: 'urn:degrees',
+      claims: [
+        { path: ['degrees'] },
+        { path: ['degrees', null] },
+        { path: ['degrees', null, 'type'], mandatory: true },
+      ],
+    }
+    const sdJwtVc = createInstance()
+
+    const payload = {
+      vct: 'urn:degrees',
+      iss: 'https://issuer.example.com',
+      degrees: [{ type: 'BSc' }, { type: 'MSc' }],
+    }
+    const compact = await sdJwtVc.issue(payload, { degrees: { _sd: [0, 1] } })
+    const presentation = await sdJwtVc.present<typeof payload>(compact, {})
+    const withheldResult = await sdJwtVc.verifyTypeMetadata(presentation, metadata)
+    expect(withheldResult.missingMandatoryClaims).toEqual([])
+    expect(withheldResult.undisclosedMandatoryClaims).toEqual([['degrees', null, 'type']])
+
+    const notArray = await sdJwtVc.issue({ vct: 'urn:degrees', iss: 'https://issuer.example.com', degrees: 'BSc' })
+    const notArrayResult = await sdJwtVc.verifyTypeMetadata(notArray, metadata)
+    expect(notArrayResult.missingMandatoryClaims).toEqual([['degrees', null, 'type']])
+    expect(notArrayResult.undisclosedMandatoryClaims).toEqual([])
+  })
+
+  test('does not treat claim names inherited from Object.prototype as present', async () => {
+    const metadata: TypeMetadataFormat = {
+      vct: 'urn:x',
+      claims: [
+        { path: ['constructor'], sd: 'never', mandatory: true },
+        { path: ['toString'], mandatory: true },
+      ],
+    }
+    const sdJwtVc = createInstance()
+    const compact = await sdJwtVc.issue({ vct: 'urn:x', iss: 'https://issuer.example.com' })
+
+    const result = await sdJwtVc.verifyTypeMetadata(compact, metadata)
+
+    expect(result.missingMandatoryClaims).toEqual([['constructor'], ['toString']])
   })
 
   test('only reports an absent mandatory claim as undisclosed when its parent withholds a disclosure', async () => {

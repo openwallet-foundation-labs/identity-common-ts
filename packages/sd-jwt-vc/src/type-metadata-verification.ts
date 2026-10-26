@@ -106,7 +106,10 @@ function childEntries(node: unknown, segment: string | null, disclosures: Record
 
   if (typeof node !== 'object' || node === null || Array.isArray(node)) return { present, hidden }
   const record = node as Record<string, unknown>
-  if (segment !== SD_DIGEST && segment in record) present.push({ index: segment, value: record[segment] })
+  // biome-ignore lint/suspicious/noPrototypeBuiltins: `Object.hasOwn` is not in the ES2020 lib this package targets
+  if (segment !== SD_DIGEST && Object.prototype.hasOwnProperty.call(record, segment)) {
+    present.push({ index: segment, value: record[segment] })
+  }
 
   const digests = Array.isArray(record[SD_DIGEST]) ? record[SD_DIGEST] : []
   for (const digest of digests) {
@@ -129,7 +132,8 @@ function mandatoryClaimStatus(
   const walk = (node: unknown, depth: number): ClaimStatus => {
     if (depth === claim.path.length) return 'present'
 
-    const { present, hidden } = childEntries(node, claim.path[depth], disclosures)
+    const segment = claim.path[depth]
+    const { present, hidden } = childEntries(node, segment, disclosures)
     let status: ClaimStatus = 'present'
     for (const child of present) {
       const childStatus = walk(child.value, depth + 1)
@@ -137,7 +141,11 @@ function mandatoryClaimStatus(
       if (childStatus === 'undisclosed') status = 'undisclosed'
     }
 
-    if (claim.path[depth] === null || present.length > 0) return status
+    if (segment === null) {
+      if (!Array.isArray(node)) return 'missing'
+      return present.length === 0 && hidden ? 'undisclosed' : status
+    }
+    if (present.length > 0) return status
 
     return hidden && sdOf(depth + 1) !== 'never' ? 'undisclosed' : 'missing'
   }
