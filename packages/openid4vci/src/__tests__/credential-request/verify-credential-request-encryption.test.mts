@@ -79,4 +79,19 @@ describe('verifyCredentialRequestEncryption', () => {
   test.each(invalidJweTestCases)('rejects $description', ({ jwe, metadata = supported }) => {
     expect(() => verify(jwe, metadata)).toThrow(invalidEncryptionParameters)
   })
+
+  test.each([
+    { kid: '', alg: jwk.alg, enc: 'A128GCM' },
+    { kid: jwk.kid, alg: '', enc: 'A128GCM' },
+    { kid: jwk.kid, alg: 'none', enc: 'A128GCM' },
+  ])('rejects invalid header parameters before key selection: %j', (header) => {
+    expect(() => verify(compactJwe(header), supported)).toThrow(
+      expect.objectContaining({
+        errorResponse: expect.objectContaining({
+          error: 'invalid_encryption_parameters',
+          error_description: expect.stringContaining('Unable to decode credential request JWE header:'),
+        }),
+      })
+    )
+  })
 })

@@ -3,9 +3,9 @@ import { type CallbackContext, type Jwk, Oauth2ServerErrorResponseError } from '
 import * as jose from 'jose'
 import { describe, expect, test, vi } from 'vitest'
 import {
-  type DecodeCredentialRequestOptions,
-  decodeCredentialRequest,
-} from '../../credential-request/decode-credential-request'
+  type DecryptCredentialRequestOptions,
+  decryptCredentialRequest,
+} from '../../credential-request/decrypt-credential-request'
 import { parseCredentialRequest } from '../../credential-request/parse-credential-request'
 import { parseDeferredCredentialRequest } from '../../credential-request/parse-deferred-credential-request'
 import type { IssuerMetadataResult } from '../../metadata/fetch-issuer-metadata'
@@ -67,20 +67,20 @@ async function encryptRequest(body: unknown, header: Record<string, unknown> = {
 const decoders = [
   {
     name: 'credential',
-    decode: decodeCredentialRequest,
+    decode: decryptCredentialRequest,
     body: { credential_identifier: 'credential-id' },
     deferred: false,
   },
   {
     name: 'deferred credential',
-    decode: decodeCredentialRequest,
+    decode: decryptCredentialRequest,
     body: { transaction_id: 'transaction-id' },
     deferred: true,
   },
 ] as const
 
-describe.each(decoders)('$name request decoding', ({ decode, body, deferred }) => {
-  const options = (overrides: Partial<DecodeCredentialRequestOptions> = {}): DecodeCredentialRequestOptions => ({
+describe.each(decoders)('$name request decryption', ({ decode, body, deferred }) => {
+  const options = (overrides: Partial<DecryptCredentialRequestOptions> = {}): DecryptCredentialRequestOptions => ({
     body,
     issuerMetadata,
     callbacks,

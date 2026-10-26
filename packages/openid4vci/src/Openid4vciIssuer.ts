@@ -14,7 +14,7 @@ import {
   createCredentialResponse,
   createDeferredCredentialResponse,
 } from './credential-request/credential-response'
-import type { CredentialRequestBodyOptions } from './credential-request/decode-credential-request'
+import type { CredentialRequestBodyOptions } from './credential-request/decrypt-credential-request'
 import type { ParseCredentialRequestReturn } from './credential-request/parse-credential-request'
 import {
   parseCredentialRequestBody,

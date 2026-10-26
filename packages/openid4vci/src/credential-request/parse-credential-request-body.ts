@@ -3,7 +3,7 @@ import { ContentType, ValidationError } from '@openid4vc/utils'
 import { isMediaType } from '@owf/identity-common'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../version'
-import { type CredentialRequestBodyOptions, decodeCredentialRequest } from './decode-credential-request'
+import { type CredentialRequestBodyOptions, decryptCredentialRequest } from './decrypt-credential-request'
 import { type ParseCredentialRequestReturn, parseCredentialRequest } from './parse-credential-request'
 import {
   type ParseDeferredCredentialRequestReturn,
@@ -90,7 +90,7 @@ export async function parseCredentialRequestBody(
   options: ParseCredentialRequestBodyOptions
 ): Promise<ParseCredentialRequestReturn> {
   if (isMediaType(options.contentType, ContentType.Jwt)) {
-    const credentialRequest = await decodeCredentialRequest({
+    const credentialRequest = await decryptCredentialRequest({
       body: options.body,
       issuerMetadata: options.issuerMetadata,
       callbacks: options.callbacks,
@@ -125,7 +125,7 @@ export async function parseDeferredCredentialRequestBody(
   options: ParseCredentialRequestBodyOptions
 ): Promise<ParseDeferredCredentialRequestReturn> {
   if (isMediaType(options.contentType, ContentType.Jwt)) {
-    const credentialRequest = await decodeCredentialRequest({
+    const credentialRequest = await decryptCredentialRequest({
       body: options.body,
       issuerMetadata: options.issuerMetadata,
       callbacks: options.callbacks,

@@ -9,7 +9,7 @@ export interface CredentialRequestBodyOptions {
   issuerMetadata: IssuerMetadataResult
 }
 
-export interface DecodeCredentialRequestOptions {
+export interface DecryptCredentialRequestOptions {
   /** Raw compact JWE string. */
   body: unknown
   issuerMetadata: IssuerMetadataResult
@@ -45,7 +45,7 @@ const decodeRequestServerError = (cause: unknown) =>
  * Decrypts an encrypted request before the existing parser validates its contents.
  * Missing callbacks and callback exceptions are reported as server failures, not protocol errors.
  */
-export async function decodeCredentialRequest(options: DecodeCredentialRequestOptions): Promise<unknown> {
+export async function decryptCredentialRequest(options: DecryptCredentialRequestOptions): Promise<unknown> {
   if (typeof options.body !== 'string') {
     throw invalidEncryptionParameters('Encrypted credential request body must be a compact JWE string')
   }
