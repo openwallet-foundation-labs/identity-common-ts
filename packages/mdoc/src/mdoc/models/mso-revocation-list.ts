@@ -302,7 +302,11 @@ export async function verifyStatusListToken(
   const { uri, idx } = statusListInfo
   // CWT is preferred, so that an issuer that serves both returns the format § 12.3.6.3 requires. The
   // JWT is asked for with a lower quality value, and still accepted if a server returns it anyway.
-  const token = await fetchStatusList({ uri, customFetcher: ctx.fetch, acceptedFormats: ['cwt', 'jwt'] })
+  const token = await fetchStatusList({
+    uri,
+    customFetcher: (input, init) => ctx.fetch(input, init, { type: 'statusList' }),
+    acceptedFormats: ['cwt', 'jwt'],
+  })
 
   // NOTE: a JWT is NOT allowed by § 12.3.6.3, but some issuers serve the status list of an mdoc
   // as JWT only. So it is accepted as a fallback, with the same checks and status handling as a CWT.
