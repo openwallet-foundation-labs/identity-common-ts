@@ -106,7 +106,9 @@ export class Holder {
    * answer which doc request. See {@link matchCredentialsToDeviceRequest} for what is matched.
    *
    * `createDeviceResponseForDeviceRequest` selects the elements to disclose the same way, so a
-   * credential that matches can answer the doc request with the same `deviceNamespaces`.
+   * credential that matches can answer the doc request with the same `deviceNamespaces`. A requested
+   * element the credential only answers with an alternative set is the exception: the holder has to
+   * choose the set with `alternatives`.
    */
   public static matchDeviceRequest(options: {
     deviceRequest: Uint8Array | DeviceRequest
@@ -127,6 +129,23 @@ export class Holder {
     })
   }
 
+  /**
+   * Create a device response for a device request, with one document per entry of `documents`.
+   *
+   * Throws an `UnsatisfiedDeviceRequestError` when the documents do not answer the device request
+   * the way its request information asks (ISO/IEC TS 23220-4 7.2.1.3):
+   *
+   * - a document of an issuer its doc request does not name
+   * - more than one document for a doc request with `uniqueDocSetRequired`
+   * - when the device request carries use cases, a mandatory use case, or every use case, left
+   *   without a document for each doc request of one of its document sets. A document counts for
+   *   the doc requests its `docRequestIndex` names, so one document can answer several doc
+   *   requests of its docType. Without use cases this is not checked, as the iOS DC API presents
+   *   several doc requests as alternatives, see `treatAmbiguousMultipleDocRequestsAsAlternatives`
+   * - a response larger than the smallest `maximumResponseSize` of the doc requests
+   *
+   * Elements can still be left out, and an empty `documents` declines the request.
+   */
   public static async createDeviceResponseForDeviceRequest(
     options: {
       deviceRequest: DeviceRequest

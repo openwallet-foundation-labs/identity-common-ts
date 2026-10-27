@@ -50,16 +50,22 @@ import {
   type SendInteractiveAuthorizationRequestOptions,
   sendInteractiveAuthorizationRequest,
 } from './interactive-authorization/send-interactive-authorization-request'
-import { type IssuerMetadataResult, resolveIssuerMetadata } from './metadata/fetch-issuer-metadata'
+import {
+  type IssuerMetadataResult,
+  type ResolveIssuerMetadataOptions,
+  resolveIssuerMetadata,
+} from './metadata/fetch-issuer-metadata'
 import { type RequestNonceOptions, requestNonce } from './nonce/nonce-request'
 import { type SendNotificationOptions, sendNotification } from './notification/notification'
 import { Openid4vciVersion } from './version'
 
 export interface Openid4vciClientOptions {
   /**
-   * Callbacks required for the openid4vc client.
+   * Callbacks required for the openid4vc client. The `verifyJwt` callback is only
+   * needed for verifying signed credential issuer metadata.
    */
-  callbacks: Omit<CallbackContext, 'verifyJwt' | 'encryptJwe'>
+  callbacks: Omit<CallbackContext, 'verifyJwt' | 'encryptJwe'> &
+    Partial<Pick<CallbackContext, 'verifyJwt' | 'encryptJwe'>>
 }
 
 export class Openid4vciClient {
@@ -81,9 +87,13 @@ export class Openid4vciClient {
     })
   }
 
-  public async resolveIssuerMetadata(credentialIssuer: string): Promise<IssuerMetadataResult> {
+  public async resolveIssuerMetadata(
+    credentialIssuer: string,
+    options?: Pick<ResolveIssuerMetadataOptions, 'signedMetadata'>
+  ): Promise<IssuerMetadataResult> {
     return resolveIssuerMetadata(credentialIssuer, {
       callbacks: this.options.callbacks,
+      signedMetadata: options?.signedMetadata,
     })
   }
 
@@ -612,6 +622,7 @@ export class Openid4vciClient {
     accessToken,
     dpop,
     credentialResponseEncryption,
+    credentialRequestEncryption,
   }: Pick<
     RetrieveCredentialsWithFormatOptions,
     | 'accessToken'
@@ -621,6 +632,7 @@ export class Openid4vciClient {
     | 'proofs'
     | 'dpop'
     | 'credentialResponseEncryption'
+    | 'credentialRequestEncryption'
   > & { credentialConfigurationId: string }) {
     let credentialResponse: RetrieveCredentialsResponseNotOk | RetrieveCredentialsResponseOk
 
@@ -638,6 +650,7 @@ export class Openid4vciClient {
         callbacks: this.options.callbacks,
         dpop,
         credentialResponseEncryption,
+        credentialRequestEncryption,
       })
     } else {
       const formatPayload = getCredentialRequestFormatPayloadForCredentialConfigurationId({
@@ -655,6 +668,7 @@ export class Openid4vciClient {
         callbacks: this.options.callbacks,
         dpop,
         credentialResponseEncryption,
+        credentialRequestEncryption,
       })
     }
 
@@ -682,6 +696,7 @@ export class Openid4vciClient {
       | 'dpop'
       | 'additionalRequestPayload'
       | 'credentialResponseEncryption'
+      | 'credentialRequestEncryption'
     >
   ): Promise<RetrieveDeferredCredentialsResponseOk> {
     const credentialResponse = await retrieveDeferredCredentials({

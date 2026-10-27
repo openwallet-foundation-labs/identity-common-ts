@@ -1,12 +1,12 @@
 import { zJwtHeader, zJwtPayload } from '@openid4vc/oauth2'
-import { zNumericDate } from '@openid4vc/utils'
+import { zNumericDate, zTyp } from '@openid4vc/utils'
 import z from 'zod'
 import { zCredentialIssuerMetadataDraft14Draft15V1 } from './z-credential-issuer-metadata'
 
 export const zSignedCredentialIssuerMetadataHeader = z
   .object({
     ...zJwtHeader.shape,
-    typ: z.literal('openidvci-issuer-metadata+jwt'),
+    typ: zTyp('openidvci-issuer-metadata+jwt'),
   })
   .loose()
 

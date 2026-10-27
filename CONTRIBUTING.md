@@ -60,6 +60,7 @@ identity-common-ts/
 │   ├── cose/                    # COSE/CWT implementation (planned)
 │   ├── x509/                    # X.509 certificate utilities (planned)
 │   ├── token-status-list/       # JWT/CWT Token Status List (planned)
+│   ├── openid-federation/       # OpenID Federation 1.0 (@owf/openid-federation)
 │   ├── sd-jwt-*/                # SD-JWT and SD-JWT VC packages (@sd-jwt/*)
 │   ├── mdoc/                    # ISO/IEC 18013-5 mDOC and mDL (@owf/mdoc)
 │   ├── dcql/                    # Digital Credentials Query Language (dcql)

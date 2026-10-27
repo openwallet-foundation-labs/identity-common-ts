@@ -95,6 +95,18 @@ const circularVctm: TypeMetadataFormat = {
   extends: 'http://example.com/circular',
 }
 
+const cycleStartVctm: TypeMetadataFormat = {
+  vct: 'http://example.com/cycle-start',
+  name: 'CycleStartCredentialType',
+  extends: 'http://example.com/cycle-end',
+}
+
+const cycleEndVctm: TypeMetadataFormat = {
+  vct: 'http://example.com/cycle-end',
+  name: 'CycleEndCredentialType',
+  extends: 'http://example.com/cycle-start',
+}
+
 const deepVctm: TypeMetadataFormat = {
   vct: 'http://example.com/deep',
   name: 'DeepCredentialType',
@@ -179,6 +191,23 @@ const restHandlers = [
   }),
   http.get('http://example.com/circular', () => {
     return HttpResponse.json(circularVctm)
+  }),
+  http.get('http://example.com/cycle-start', () => {
+    return HttpResponse.json(cycleStartVctm)
+  }),
+  http.get('http://example.com/cycle-end', () => {
+    return HttpResponse.json(cycleEndVctm)
+  }),
+  http.get('http://example.com/other-type', () => {
+    // Describes another type than the one it is served for
+    return HttpResponse.json({ ...baseVctm, vct: 'urn:eudi:pid:1' })
+  }),
+  http.get('http://example.com/extends-other-type', () => {
+    return HttpResponse.json({
+      ...extendingVctm,
+      vct: 'http://example.com/extends-other-type',
+      extends: 'http://example.com/other-type',
+    })
   }),
   http.get('http://example.com/deep', () => {
     return HttpResponse.json(deepVctm)
@@ -486,6 +515,33 @@ describe('App', () => {
 
     await expect(sdjwt.getVct(encodedSdjwt)).rejects.toThrowError(
       'Circular dependency detected in VCT extends chain: http://example.com/circular'
+    )
+  })
+
+  test('VCT with a circular dependency back to the credential vct should throw error', async () => {
+    const payload: SdJwtVcPayload = { iat, iss, vct: 'http://example.com/cycle-start', ...claims }
+    const encodedSdjwt = await sdjwt.issue(payload, disclosureFrame as unknown as DisclosureFrame<SdJwtVcPayload>)
+
+    await expect(sdjwt.getVct(encodedSdjwt)).rejects.toThrowError(
+      'Circular dependency detected in VCT extends chain: http://example.com/cycle-start'
+    )
+  })
+
+  test('VCT Metadata retrieval fails when the type metadata describes another vct', async () => {
+    const payload: SdJwtVcPayload = { iat, iss, vct: 'http://example.com/other-type', ...claims }
+    const encodedSdjwt = await sdjwt.issue(payload, disclosureFrame as unknown as DisclosureFrame<SdJwtVcPayload>)
+
+    await expect(sdjwt.getVct(encodedSdjwt)).rejects.toThrowError(
+      "Type metadata fetched for vct 'http://example.com/other-type' describes vct 'urn:eudi:pid:1'"
+    )
+  })
+
+  test('VCT with extends fails when the extended type metadata describes another vct', async () => {
+    const payload: SdJwtVcPayload = { iat, iss, vct: 'http://example.com/extends-other-type', ...claims }
+    const encodedSdjwt = await sdjwt.issue(payload, disclosureFrame as unknown as DisclosureFrame<SdJwtVcPayload>)
+
+    await expect(sdjwt.getVct(encodedSdjwt)).rejects.toThrowError(
+      "Type metadata fetched for vct 'http://example.com/other-type' describes vct 'urn:eudi:pid:1'"
     )
   })
 

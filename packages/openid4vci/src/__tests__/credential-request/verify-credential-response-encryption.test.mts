@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { parseCredentialRequest } from '../../credential-request/parse-credential-request'
-import { parseDeferredCredentialRequest } from '../../credential-request/parse-deferred-credential-request'
+import { parseCredentialRequestPayload } from '../../credential-request/parse-credential-request-payload'
+import { parseDeferredCredentialRequestPayload } from '../../credential-request/parse-deferred-credential-request-payload'
 import { verifyCredentialResponseEncryption } from '../../credential-request/verify-credential-response-encryption'
 import type { CredentialIssuerMetadata } from '../../metadata/credential-issuer/z-credential-issuer-metadata'
 import { Openid4vciVersion } from '../../version'
@@ -67,13 +67,11 @@ describe('verifyCredentialResponseEncryption', () => {
       )
     )
     expect(verify({ jwk, enc: 'A256GCM', zip: 'DEF' }, supported)).toThrow(
-      expect.objectContaining(
-        invalidEncryptionParameters(
-          "The credential issuer does not support compression of the credential response ('zip')"
-        )
-      )
+      expect.objectContaining(invalidEncryptionParameters('Compressed credential responses are not supported'))
     )
-    expect(verify({ jwk, enc: 'A256GCM', zip: 'DEF' }, { ...supported, zip_values_supported: ['DEF'] })).not.toThrow()
+    expect(verify({ jwk, enc: 'A256GCM', zip: 'DEF' }, { ...supported, zip_values_supported: ['DEF'] })).toThrow(
+      expect.objectContaining(invalidEncryptionParameters('Compressed credential responses are not supported'))
+    )
   })
 })
 
@@ -90,22 +88,22 @@ describe('credential request parsing', () => {
     knownCredentialConfigurations: { my_credential: { format: 'dc+sd-jwt' as const, vct: 'hello' } },
   }
 
-  test('parseCredentialRequest checks the encryption against the issuer metadata', () => {
+  test('parseCredentialRequestPayload checks the encryption against the issuer metadata', () => {
     expect(() =>
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata,
         credentialRequest: { credential_configuration_id: 'my_credential', proofs: { jwt: ['ey.ey.S'] } },
       })
     ).toThrow("the request does not contain 'credential_response_encryption'")
   })
 
-  test('parseDeferredCredentialRequest checks the encryption against the issuer metadata', () => {
+  test('parseDeferredCredentialRequestPayload checks the encryption against the issuer metadata', () => {
     const deferredCredentialRequest = {
       transaction_id: 'tx',
       credential_response_encryption: { jwk, enc: 'A128CBC-HS256' },
     }
 
-    expect(() => parseDeferredCredentialRequest({ deferredCredentialRequest, issuerMetadata })).toThrow(
+    expect(() => parseDeferredCredentialRequestPayload({ deferredCredentialRequest, issuerMetadata })).toThrow(
       "Credential response encryption 'enc' must be one of 'A128GCM', 'A256GCM'"
     )
   })

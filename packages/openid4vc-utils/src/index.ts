@@ -36,6 +36,7 @@ export type { NonEmptyArray, Optional, OrPromise, Simplify, StringWithAutoComple
 export { getQueryParams, objectToQueryParams } from './url'
 export {
   type HttpMethod,
+  isJwtTyp,
   zDataUrl,
   zHttpMethod,
   zHttpsUrl,
@@ -43,6 +44,7 @@ export {
   zIs,
   zNumericDate,
   zStringToJson,
+  zTyp,
 } from './validation'
 export {
   encodeWwwAuthenticateHeader,

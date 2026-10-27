@@ -30,6 +30,7 @@ export {
 export {
   type ClaimMatch,
   type ClaimMatchFailure,
+  type ClaimMatchOption,
   type ClaimMatchSuccess,
   type ClaimsMatchFailure,
   type ClaimsMatchResult,
@@ -37,6 +38,7 @@ export {
   type CredentialMatch,
   type CredentialMatchFailure,
   type CredentialMatchSuccess,
+  type DeviceRequestAttribution,
   type DeviceRequestMatchFailure,
   type DeviceRequestMatchOptions,
   type DeviceRequestMatchResult,
@@ -65,8 +67,14 @@ export {
   type HolderDocRequestMatchFailure,
   type HolderDocRequestMatchSuccess,
   type InvalidDocRequest,
+  type IssuerMatchFailure,
+  type IssuerMatchResult,
+  type IssuerMatchSuccess,
   matchCredentialsToDeviceRequest,
   matchDeviceRequest,
   reportDeviceRequestMatch,
+  type UseCaseMatch,
+  type UseCasesMatch,
+  type UseCasesSource,
 } from './utils/matchDeviceRequest'
 export * from './verifier'

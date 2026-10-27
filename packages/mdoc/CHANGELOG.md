@@ -1,5 +1,31 @@
 # @owf/mdoc
 
+## 0.9.1
+
+### Patch Changes
+
+- @owf/cose@0.6.0
+  - @owf/identity-common@0.6.0
+  - @owf/token-status-list@0.6.0
+  - @owf/x509@0.6.0
+
+## 0.9.0
+
+### Minor Changes
+
+- 5b19cc4: Match the request information of ISO/IEC TS 23220-4 7.2.1, which the second edition of ISO/IEC 18013-5 takes up, holder side (`Holder.matchDeviceRequest`, `Holder.createDeviceResponseForDeviceRequest`) and verifier side (`matchDeviceRequest`, `Verifier.verifyDeviceResponse`).
+  
+  Breaking: a device request is now always matched by use cases. `docRequestsAsAlternatives` is replaced by `useCasesSource` and `useCases`, which every match result carries. Without a `deviceRequestInfo`, the doc requests are one mandatory use case (`'allDocRequests'`, the default), or one optional use case each with `treatAmbiguousMultipleDocRequestsAsAlternatives` (`'eachDocRequest'`). A match succeeds when every mandatory use case and at least one use case are satisfied.
+  
+  - use cases: each `UseCaseMatch` lists the document sets of the use case (`documentSets`) and those whose doc requests are all satisfied (`matchingDocumentSets`), for the holder to pick one, with its `purposeHints`
+  - alternative data elements: a requested element is answered by itself or by one of its alternative sets, and the claim lists every option (`options`), in order of preference. A response only discloses an alternative set the holder chooses with `alternatives` on the document it creates, never one that discloses an element it leaves out, and a holder is not offered one that would disclose more than two `age_over_NN` elements in a namespace. The verifier does not report the elements of an alternative set as over-disclosure
+  - issuer identifiers: an mdoc only answers a doc request that names issuers when a certificate in its chain has one of them as authority key identifier, reported as `issuer` on the credential or document match. A verifier matches them against the validated chain, never the x5chain, which is unprotected: `Verifier.verifyDeviceResponse` passes the chains it validates, and `matchDeviceRequest` and `Verifier.matchDeviceRequest` take them as `issuerCertificateChains`, without which, as with `disableCertificateChainValidation`, no document satisfies such a doc request. `x509.verifyCertificateChain` of the context must therefore return only the certificates of the path it validated, not the whole x5chain. The certificates are parsed with `@owf/x509`
+  - attribution: as a response does not say which document answers which doc request, the verifier match works it out as `attribution`: the doc requests each document answers, and the document set of each use case it is taken to answer. A document may answer every doc request of its docType and of an issuer it accepts, also with elements left out, and one document can answer several. A doc request with `uniqueDocSetRequired` takes one document only: it fails when the response has more documents than such doc requests can take, or when those documents leave it none that satisfies it, and doc requests and use cases that can each be answered but not together fail the match. This is exact and does not depend on the order of the documents. When a document may also answer a doc request without `uniqueDocSetRequired`, it is never counted as a second document for one with it. A document that answers no doc request of the sets the use cases are answered with, nor of a use case the response is not taken to answer, is reported as a `WARNING`, as a holder answers each use case with exactly one document set
+  - `Holder.createDeviceResponseForDeviceRequest` throws an `UnsatisfiedDeviceRequestError` for a document of an issuer the doc request does not name, a second document for a doc request with `uniqueDocSetRequired`, a mandatory use case, or every use case, without a document for each doc request of one of its document sets, or a response larger than the smallest `maximumResponseSize`. Without use cases, which doc requests get a document is not checked, as the iOS DC API presents several doc requests as alternatives
+  - `docRequestIndex` of a document the holder creates takes several doc requests of its docType: the document discloses what all of them request, and counts as the document of each of them
+  - `IsoMdocDcApi`: `createRequest` takes `requestInfo` per doc request and `deviceRequestInfo`, and `createResponse` takes `alternatives` per document
+- 448143e: Read and write the request information of ISO/IEC TS 23220-4 7.2.1, which the second edition of ISO/IEC 18013-5 takes up: `ItemsRequest.requestInfo` (`DocRequestInfo`: `AlternativeDataElementsSet`s, issuer identifiers, `uniqueDocSetRequired`, `maximumResponseSize`) and `DeviceRequest.deviceRequestInfo` (`DeviceRequestInfo`: `UseCase`s and their document sets). Unknown keys are ignored and kept, nested ones included, so a request carrying either still re-encodes byte for byte. An invalid value in a known key, or a document set pointing past the doc requests, fails decoding. `DeviceRequest.create` defaults to version `'1.1'` when given a `deviceRequestInfo`, as the second edition of 18013-5 asks.
+
 ## 0.8.3
 
 ### Patch Changes

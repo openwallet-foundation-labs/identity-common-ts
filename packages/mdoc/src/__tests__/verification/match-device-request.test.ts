@@ -515,7 +515,7 @@ describe('matchDeviceRequest', () => {
 
     const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse })
 
-    assert(match.success && !match.docRequestsAsAlternatives)
+    assert(match.success && match.useCasesSource === 'allDocRequests')
     const [document] = match.docRequests[0].validDocuments
     expectTypeOf(document.docType).toEqualTypeOf<DocTypeMatchSuccess>()
     expectTypeOf(document.claims).toEqualTypeOf<DocumentClaimsMatchSuccess>()
@@ -651,7 +651,7 @@ describe('matchDeviceRequest', () => {
 
       const match = Verifier.matchDeviceRequest({ deviceRequest, deviceResponse })
 
-      expect(match).toMatchObject({ success: false, docRequestsAsAlternatives: false })
+      expect(match).toMatchObject({ success: false, useCasesSource: 'allDocRequests' })
       expect(match.docRequests.map((docRequest) => docRequest.success)).toEqual([true, false])
     })
 
@@ -668,12 +668,12 @@ describe('matchDeviceRequest', () => {
         matchOptions: { treatAmbiguousMultipleDocRequestsAsAlternatives: true },
       })
 
-      expect(match).toMatchObject({ success: true, docRequestsAsAlternatives: true })
+      expect(match).toMatchObject({ success: true, useCasesSource: 'eachDocRequest' })
       expect(match.docRequests.map((docRequest) => docRequest.success)).toEqual([true, false])
 
       assert(match.success)
       // A successful match of alternatives does not narrow every doc request to successful.
-      if (match.docRequestsAsAlternatives) {
+      if (match.useCasesSource === 'eachDocRequest') {
         expectTypeOf<(typeof match.docRequests)[number]['success']>().toEqualTypeOf<boolean>()
       }
     })
@@ -693,7 +693,7 @@ describe('matchDeviceRequest', () => {
         matchOptions: { treatAmbiguousMultipleDocRequestsAsAlternatives: true },
       })
 
-      expect(match).toMatchObject({ success: false, docRequestsAsAlternatives: true })
+      expect(match).toMatchObject({ success: false, useCasesSource: 'eachDocRequest' })
     })
 
     test('a single doc request is not ambiguous, so it is not matched as an alternative', async () => {
@@ -706,7 +706,7 @@ describe('matchDeviceRequest', () => {
         matchOptions: { treatAmbiguousMultipleDocRequestsAsAlternatives: true },
       })
 
-      expect(match).toMatchObject({ success: true, docRequestsAsAlternatives: false })
+      expect(match).toMatchObject({ success: true, useCasesSource: 'allDocRequests' })
     })
 
     test('verify reports a single check for the alternatives', async () => {

@@ -3,8 +3,8 @@ import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { verifyCredentialResponseEncryption } from './verify-credential-response-encryption'
 import { type DeferredCredentialRequest, zDeferredCredentialRequest } from './z-credential-request'
 
-export interface ParseDeferredCredentialRequestOptions {
-  deferredCredentialRequest: Record<string, unknown>
+export interface ParseDeferredCredentialRequestPayloadOptions {
+  deferredCredentialRequest: unknown
 
   /**
    * The `credential_response_encryption` of the request is checked against the
@@ -21,8 +21,8 @@ export interface ParseDeferredCredentialRequestReturn {
   deferredCredentialRequest: DeferredCredentialRequest
 }
 
-export function parseDeferredCredentialRequest(
-  options: ParseDeferredCredentialRequestOptions
+export function parseDeferredCredentialRequestPayload(
+  options: ParseDeferredCredentialRequestPayloadOptions
 ): ParseDeferredCredentialRequestReturn {
   const deferredCredentialRequest = parseWithErrorHandling(
     zDeferredCredentialRequest,

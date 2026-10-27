@@ -1,179 +1,158 @@
-import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
-import z from 'zod'
-import { attestationProofTypeIdentifier } from '../formats/proof-type/attestation/z-attestation-proof-type'
-import { diVpProofTypeIdentifier } from '../formats/proof-type/di-vp/z-di-vp-proof-type'
-import { jwtProofTypeIdentifier } from '../formats/proof-type/jwt/z-jwt-proof-type'
-import { getKnownCredentialConfigurationSupportedById } from '../metadata/credential-issuer/credential-issuer-metadata'
-import type { CredentialConfigurationSupportedWithFormats } from '../metadata/credential-issuer/z-credential-issuer-metadata'
+import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
+import { ContentType, ValidationError } from '@openid4vc/utils'
+import { isMediaType } from '@owf/identity-common'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
-import { verifyCredentialResponseEncryption } from './verify-credential-response-encryption'
+import { Openid4vciVersion } from '../version'
+import { type CredentialRequestBodyOptions, decryptCredentialRequest } from './decrypt-credential-request'
+import { type ParseCredentialRequestReturn, parseCredentialRequestPayload } from './parse-credential-request-payload'
 import {
-  allCredentialRequestFormatIdentifiers,
-  allCredentialRequestFormats,
-  type CredentialRequest,
-  type CredentialRequestFormatSpecific,
-  zCredentialRequest,
-} from './z-credential-request'
-import {
-  allCredentialRequestProofs,
-  type CredentialRequestProofsFormatSpecific,
-  type CredentialResponseEncryption,
-  zCredentialRequestProofs,
-} from './z-credential-request-common'
+  type ParseDeferredCredentialRequestReturn,
+  parseDeferredCredentialRequestPayload,
+} from './parse-deferred-credential-request-payload'
 
-export interface ParseCredentialRequestOptions {
+interface ParseCredentialRequestOptions extends CredentialRequestBodyOptions {
+  callbacks: Partial<Pick<CallbackContext, 'decryptJwe'>>
+}
+
+function validatePlaintextCredentialRequestEncryption(options: {
   issuerMetadata: IssuerMetadataResult
-  credentialRequest: Record<string, unknown>
-}
-
-export interface ParseCredentialRequestReturn {
-  /**
-   * If the request was for a `format` that is known to this library it will have the
-   * format specific data defined here. Will not be defined if the request is for an unknown format,
-   * or if `credential_identifier` is used.
-   */
-  format?: CredentialRequestFormatSpecific
-
-  /**
-   * If the request contains `proof` or `proofs` with a `proof_type` that is known to this
-   * library it will have the proof type specific data defined here. Will not be defined
-   * if the `proof_type` is not known or no `proof` or `proofs` were included.
-   *
-   * The `proof` property is parsed to the new proofs structure and the entries will
-   * always only have a single entry in this case.
-   *
-   * NOTE: this value being `undefined` does NOT mean there were no proofs.
-   * It means that either there were no proofs, or that the proof format is not
-   * known to this library
-   */
-  proofs?: CredentialRequestProofsFormatSpecific
-
-  /**
-   * If authorization details were used a `credential_identifier` will be included
-   * in the request. Will not be defined if `format` is defined.
-   */
-  credentialIdentifier?: string
-
-  /**
-   * Starting from OID4VCI draft 15 the credential request can include a `credential_configuration_id`.
-   * This will only be defined if the request included the credential configuration id.
-   *
-   * An error will be thrown if a credential configuration id was included in the request that is not
-   * present in the credential configurations supported of the issuer metadata
-   */
-  credentialConfigurationId?: string
-
-  /**
-   * If the request included a `credential_configuration_id` with a known format, it will
-   * be included here. It's still possible `credential_configuration_id` was defined, but
-   * it's not a known format.
-   */
-  credentialConfiguration?: CredentialConfigurationSupportedWithFormats
-
-  /**
-   * The validated credential request. If both `format` and `credentialIdentifier` are
-   * undefined you can still handle the request by using this object directly.
-   */
-  credentialRequest: CredentialRequest
-
-  /**
-   * If the request includes `credential_response_encryption`, this contains the
-   * encryption parameters the client expects the issuer to use for encrypting the response.
-   *
-   * The parameters are checked against the `credential_response_encryption` of the issuer metadata.
-   *
-   * When defined, the issuer should encrypt the credential response using the provided
-   * JWK, algorithm, and content encryption algorithm, and return it with
-   * `Content-Type: application/jwt`.
-   */
-  credentialResponseEncryption?: CredentialResponseEncryption
-}
-
-export function parseCredentialRequest(options: ParseCredentialRequestOptions): ParseCredentialRequestReturn {
-  const credentialRequest = parseWithErrorHandling(
-    zCredentialRequest,
-    options.credentialRequest,
-    'Error validating credential request'
-  )
-  let proofs: CredentialRequestProofsFormatSpecific | undefined
-
-  // Try to parse the known proofs from the `proofs` object
-  const knownProofs = zCredentialRequestProofs.strict().safeParse(credentialRequest.proofs)
-  if (knownProofs.success) {
-    proofs = knownProofs.data
-  }
-
-  // Try to parse the known proof from the `proof`
-  const knownProof = z.union(allCredentialRequestProofs).safeParse(credentialRequest.proof)
-  if (knownProof.success && knownProof.data.proof_type === jwtProofTypeIdentifier) {
-    proofs = { [jwtProofTypeIdentifier]: [knownProof.data.jwt] }
-  } else if (knownProof.success && knownProof.data.proof_type === attestationProofTypeIdentifier) {
-    proofs = { [attestationProofTypeIdentifier]: [knownProof.data.attestation] }
-  } else if (knownProof.success && knownProof.data.proof_type === diVpProofTypeIdentifier) {
-    proofs = { [diVpProofTypeIdentifier]: [knownProof.data.di_vp] }
-  }
-
-  const credentialResponseEncryption = credentialRequest.credential_response_encryption
-  verifyCredentialResponseEncryption(credentialResponseEncryption, options.issuerMetadata.credentialIssuer)
-
-  if (credentialRequest.credential_configuration_id) {
-    if (
-      !options.issuerMetadata.credentialIssuer.credential_configurations_supported[
-        credentialRequest.credential_configuration_id
-      ]
-    ) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.UnknownCredentialConfiguration,
-        error_description: `Credential configuration with id '${credentialRequest.credential_configuration_id}' not found in credential configurations supported.`,
-      })
-    }
-
-    // This will throw an error if the credential configuration is not valid
-    getKnownCredentialConfigurationSupportedById(options.issuerMetadata, credentialRequest.credential_configuration_id)
-
-    const credentialConfigurations = options.issuerMetadata.knownCredentialConfigurations
-
-    return {
-      credentialConfiguration: credentialConfigurations[credentialRequest.credential_configuration_id],
-      credentialConfigurationId: credentialRequest.credential_configuration_id,
-      credentialRequest,
-      proofs,
-      credentialResponseEncryption,
-    }
-  }
-
-  if (credentialRequest.credential_identifier) {
-    return {
-      credentialIdentifier: credentialRequest.credential_identifier,
-      credentialRequest,
-      proofs,
-      credentialResponseEncryption,
-    }
+  hasCredentialResponseEncryption: boolean
+}) {
+  if (
+    options.hasCredentialResponseEncryption &&
+    options.issuerMetadata.originalDraftVersion === Openid4vciVersion.V1 &&
+    options.issuerMetadata.credentialIssuer.credential_response_encryption !== undefined &&
+    options.issuerMetadata.credentialIssuer.credential_request_encryption === undefined
+  ) {
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.ServerError,
+        error_description: 'Unable to process credential response encryption',
+      },
+      {
+        status: 500,
+        internalMessage:
+          'V1 issuer advertises credential response encryption without credential request encryption support',
+      }
+    )
   }
 
   if (
-    credentialRequest.format &&
-    allCredentialRequestFormatIdentifiers.includes(
-      credentialRequest.format as (typeof allCredentialRequestFormatIdentifiers)[number]
-    )
+    options.hasCredentialResponseEncryption &&
+    (options.issuerMetadata.credentialIssuer.credential_request_encryption !== undefined ||
+      options.issuerMetadata.originalDraftVersion === Openid4vciVersion.V1)
   ) {
-    return {
-      // Removes all claims that are not specific to this format
-      format: parseWithErrorHandling(
-        z.union(allCredentialRequestFormats),
-        credentialRequest,
-        'Unable to validate format specific properties from credential request'
-      ),
-      credentialRequest,
-      proofs,
-      credentialResponseEncryption,
-    }
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidEncryptionParameters,
+      error_description: 'Credential requests containing credential_response_encryption must be encrypted',
+    })
+  }
+}
+
+function parseRequestPayload<TOptions, TResult>(
+  parse: (options: TOptions) => TResult,
+  options: TOptions,
+  internalMessage: string
+): TResult {
+  try {
+    return parse(options)
+  } catch (error) {
+    if (error instanceof Oauth2ServerErrorResponseError) throw error
+
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.InvalidCredentialRequest,
+        error_description: error instanceof ValidationError ? error.message : 'Invalid request',
+      },
+      {
+        internalMessage,
+        cause: error,
+      }
+    )
+  }
+}
+
+function invalidCredentialRequestContentType(): Oauth2ServerErrorResponseError {
+  return new Oauth2ServerErrorResponseError({
+    error: Oauth2ErrorCodes.InvalidCredentialRequest,
+    error_description: 'Credential request content-type must be application/json or application/jwt',
+  })
+}
+
+function credentialRequestEncryptionRequired(): Oauth2ServerErrorResponseError {
+  return new Oauth2ServerErrorResponseError({
+    error: Oauth2ErrorCodes.InvalidEncryptionParameters,
+    error_description: 'The credential issuer requires encrypted credential requests',
+  })
+}
+
+export async function parseCredentialRequest(
+  options: ParseCredentialRequestOptions
+): Promise<ParseCredentialRequestReturn> {
+  if (isMediaType(options.contentType, ContentType.Jwt)) {
+    const credentialRequest = await decryptCredentialRequest({
+      body: options.body,
+      issuerMetadata: options.issuerMetadata,
+      callbacks: options.callbacks,
+    })
+    return parseRequestPayload(
+      parseCredentialRequestPayload,
+      { issuerMetadata: options.issuerMetadata, credentialRequest },
+      'Error verifying credential request proof jwt'
+    )
   }
 
-  return {
-    credentialRequest,
-    proofs,
-    credentialResponseEncryption,
+  if (isMediaType(options.contentType, ContentType.Json)) {
+    if (options.issuerMetadata.credentialIssuer.credential_request_encryption?.encryption_required) {
+      throw credentialRequestEncryptionRequired()
+    }
+    const parsedCredentialRequest = parseRequestPayload(
+      parseCredentialRequestPayload,
+      { issuerMetadata: options.issuerMetadata, credentialRequest: options.body },
+      'Error verifying credential request proof jwt'
+    )
+    validatePlaintextCredentialRequestEncryption({
+      issuerMetadata: options.issuerMetadata,
+      hasCredentialResponseEncryption: parsedCredentialRequest.credentialResponseEncryption !== undefined,
+    })
+    return parsedCredentialRequest
   }
+
+  throw invalidCredentialRequestContentType()
+}
+
+export async function parseDeferredCredentialRequest(
+  options: ParseCredentialRequestOptions
+): Promise<ParseDeferredCredentialRequestReturn> {
+  if (isMediaType(options.contentType, ContentType.Jwt)) {
+    const credentialRequest = await decryptCredentialRequest({
+      body: options.body,
+      issuerMetadata: options.issuerMetadata,
+      callbacks: options.callbacks,
+    })
+    return parseRequestPayload(
+      parseDeferredCredentialRequestPayload,
+      { issuerMetadata: options.issuerMetadata, deferredCredentialRequest: credentialRequest },
+      'Error parsing deferred credential request'
+    )
+  }
+
+  if (isMediaType(options.contentType, ContentType.Json)) {
+    if (options.issuerMetadata.credentialIssuer.credential_request_encryption?.encryption_required) {
+      throw credentialRequestEncryptionRequired()
+    }
+    const parsedDeferredCredentialRequest = parseRequestPayload(
+      parseDeferredCredentialRequestPayload,
+      { issuerMetadata: options.issuerMetadata, deferredCredentialRequest: options.body },
+      'Error parsing deferred credential request'
+    )
+    validatePlaintextCredentialRequestEncryption({
+      issuerMetadata: options.issuerMetadata,
+      hasCredentialResponseEncryption:
+        parsedDeferredCredentialRequest.deferredCredentialRequest.credential_response_encryption !== undefined,
+    })
+    return parsedDeferredCredentialRequest
+  }
+
+  throw invalidCredentialRequestContentType()
 }

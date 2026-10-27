@@ -60,6 +60,7 @@ Generic, reusable utilities that can be used across any identity solution:
 | `@owf/jose` | JOSE/JWT implementation with common validation methods | 📋 Planned |
 | `@owf/cose` | COSE/CWT implementation with common validation methods | 📋 Planned |
 | [`@owf/x509`](./packages/x509) | X.509 certificate and CRL parsing, creation, verification and revocation checking | ✅ Available |
+| [`@owf/openid-federation`](./packages/openid-federation) | OpenID Federation 1.0 entity statements, trust chain resolution and metadata policies | ✅ Available |
 
 #### EUDI-Specific Tools
 
@@ -163,6 +164,18 @@ npm install @owf/x509
 ```
 
 📖 [View package documentation](./packages/x509/README.md)
+
+### @owf/openid-federation
+
+[![@owf/openid-federation version](https://img.shields.io/npm/v/@owf/openid-federation)](https://npmjs.com/package/@owf/openid-federation)
+
+OpenID Federation 1.0: create, fetch and validate entity configurations and subordinate statements, resolve and validate trust chains, and apply metadata policies. Previously developed as `@openid-federation/core` in [openid-federation-ts](https://github.com/openwallet-foundation-labs/openid-federation-ts).
+
+```bash
+npm install @owf/openid-federation
+```
+
+📖 [View package documentation](./packages/openid-federation/README.md)
 
 ### @owf/eudi-lote
 

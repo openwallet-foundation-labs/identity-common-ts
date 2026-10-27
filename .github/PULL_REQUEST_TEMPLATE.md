@@ -20,6 +20,7 @@ Fixes #
 ## Packages Affected
 
 - [ ] `@owf/identity-common`
+- [ ] `@owf/openid-federation`
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
 - [ ] `@owf/mdoc`

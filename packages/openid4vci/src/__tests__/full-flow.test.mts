@@ -310,7 +310,7 @@ describe('Full E2E test', () => {
           },
         })
 
-        const parsedCredentialRequest = issuer.parseCredentialRequest({
+        const parsedCredentialRequest = await issuer.parseCredentialRequest({
           issuerMetadata: {
             authorizationServers: [],
             credentialIssuer: credentialIssuerMetadata,
@@ -318,6 +318,7 @@ describe('Full E2E test', () => {
             knownCredentialConfigurations: credentialConfigurationsSupported,
           },
           credentialRequest: credentialRequest as Record<string, unknown>,
+          contentType: ContentType.Json,
         })
 
         if (!parsedCredentialRequest.proofs?.jwt) {
@@ -754,7 +755,7 @@ describe('Full E2E test', () => {
           },
         })
 
-        const parsedCredentialRequest = issuer.parseCredentialRequest({
+        const parsedCredentialRequest = await issuer.parseCredentialRequest({
           issuerMetadata: {
             authorizationServers: [],
             credentialIssuer: credentialIssuerMetadata,
@@ -762,6 +763,7 @@ describe('Full E2E test', () => {
             knownCredentialConfigurations: credentialConfigurationsSupported,
           },
           credentialRequest: credentialRequest as Record<string, unknown>,
+          contentType: ContentType.Json,
         })
 
         if (!parsedCredentialRequest.proofs?.jwt) {

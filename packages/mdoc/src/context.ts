@@ -96,7 +96,13 @@ export interface MdocContext {
     }) => Promise<CoseKey>
 
     /**
-     * Verify a X.509 certificate chain, returning it with the leaf first and the trusted root last.
+     * Verify a X.509 certificate chain, returning the path it validated with the leaf first and the
+     * trusted root last.
+     *
+     * Only return the certificates of that path. The x5chain is in the unprotected header, so a
+     * holder can add any certificate to it, and the `issuerIdentifiers` of a doc request are matched
+     * against every certificate returned here: returning the whole x5chain with the trusted root
+     * appended lets a document pass for any issuer whose certificate is added to it.
      */
     verifyCertificateChain: (input: {
       trustedCertificates: Uint8Array[]

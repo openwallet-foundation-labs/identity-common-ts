@@ -1,4 +1,4 @@
-import { zHttpsUrl, zNumericDate } from '@openid4vc/utils'
+import { zHttpsUrl, zNumericDate, zTyp } from '@openid4vc/utils'
 import z from 'zod'
 import { zJwk } from '../common/jwk/z-jwk'
 import { zJwtHeader, zJwtPayload } from '../common/jwt/z-jwt'
@@ -27,7 +27,7 @@ export type ClientAttestationJwtPayload = z.infer<typeof zClientAttestationJwtPa
 export const zClientAttestationJwtHeader = z
   .object({
     ...zJwtHeader.shape,
-    typ: z.literal('oauth-client-attestation+jwt'),
+    typ: zTyp('oauth-client-attestation+jwt'),
   })
   .loose()
 
@@ -62,7 +62,7 @@ export type ClientAttestationPopJwtPayload = z.infer<typeof zClientAttestationPo
 export const zClientAttestationPopJwtHeader = z
   .object({
     ...zJwtHeader.shape,
-    typ: z.literal('oauth-client-attestation-pop+jwt'),
+    typ: zTyp('oauth-client-attestation-pop+jwt'),
   })
   .loose()
 export type ClientAttestationPopJwtHeader = z.infer<typeof zClientAttestationPopJwtHeader>

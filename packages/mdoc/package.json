@@ -1,6 +1,6 @@
 {
   "name": "@owf/mdoc",
-  "version": "0.8.3",
+  "version": "0.9.1",
   "description": "ISO 18013-5 Mdoc and MDL",
   "files": [
     "dist"
@@ -42,6 +42,7 @@
     "@owf/cose": "workspace:^",
     "@owf/identity-common": "workspace:^",
     "@owf/token-status-list": "workspace:^",
+    "@owf/x509": "workspace:^",
     "zod": "catalog:"
   }
 }

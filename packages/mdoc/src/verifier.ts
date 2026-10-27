@@ -51,9 +51,15 @@ export class Verifier {
     deviceRequest: Uint8Array | DeviceRequest
     deviceResponse: Uint8Array | DeviceResponse
     matchOptions?: DeviceRequestMatchOptions
+    /**
+     * See `issuerCertificateChains` of {@link matchDeviceRequest}: without them, no document
+     * satisfies a doc request that names issuers, as the x5chain is not trusted.
+     */
+    issuerCertificateChains?: Array<Array<Uint8Array> | undefined>
   }): DeviceRequestMatchResult {
     return matchDeviceRequest({
       matchOptions: options.matchOptions,
+      issuerCertificateChains: options.issuerCertificateChains,
       deviceRequest:
         options.deviceRequest instanceof DeviceRequest
           ? options.deviceRequest

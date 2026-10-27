@@ -1,5 +1,19 @@
 # @owf/eudi-registration-certificate
 
+## 0.5.2
+
+### Patch Changes
+
+- @owf/crypto@0.6.0
+  - @owf/identity-common@0.6.0
+  - @owf/eudi-jades@0.5.2
+
+## 0.5.1
+
+### Patch Changes
+
+- @owf/eudi-jades@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes

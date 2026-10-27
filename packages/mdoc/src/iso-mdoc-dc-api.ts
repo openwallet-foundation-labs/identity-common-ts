@@ -11,10 +11,14 @@ import { z } from 'zod'
 import { HpkeSuiteId, type MdocContext } from './context'
 import {
   DeviceRequest,
+  type DeviceRequestInfo,
+  type DeviceRequestInfoOptions,
   DeviceResponse,
   type DeviceResponseDocumentOptions,
   type DeviceResponseVerificationResult,
   DocRequest,
+  type DocRequestInfo,
+  type DocRequestInfoOptions,
   defaultVerificationCallback,
   EncryptedResponse,
   EncryptedResponseData,
@@ -132,7 +136,17 @@ export class IsoMdocDcApi {
       docRequests: Array<{
         docType: string
         namespaces: Record<string, Record<string, boolean>> | Map<string, Map<string, boolean>>
+        /**
+         * Alternative data elements, issuer identifiers and the other request information of the doc
+         * request (ISO/IEC TS 23220-4 7.2.1.3.2). Covered by its reader auth.
+         */
+        requestInfo?: DocRequestInfo | DocRequestInfoOptions
       }>
+      /**
+       * The use cases of the device request (ISO/IEC TS 23220-4 7.2.1.3.4): which doc requests answer
+       * what. `version` then defaults to `'1.1'`. Reader auth covers each doc request, not this.
+       */
+      deviceRequestInfo?: DeviceRequestInfo | DeviceRequestInfoOptions
       /**
        * Public key the response is encrypted to. Must be an EC P-256 key.
        */
@@ -169,8 +183,8 @@ export class IsoMdocDcApi {
       : undefined
 
     const docRequests = await Promise.all(
-      options.docRequests.map(async ({ docType, namespaces }) => {
-        const itemsRequest = ItemsRequest.create({ docType, namespaces })
+      options.docRequests.map(async ({ docType, namespaces, requestInfo }) => {
+        const itemsRequest = ItemsRequest.create({ docType, namespaces, requestInfo })
 
         if (!options.readerAuth || !sessionTranscript) {
           return DocRequest.create({ itemsRequest })
@@ -200,7 +214,11 @@ export class IsoMdocDcApi {
       })
     )
 
-    const deviceRequest = DeviceRequest.create({ version: options.version, docRequests })
+    const deviceRequest = DeviceRequest.create({
+      version: options.version,
+      docRequests,
+      deviceRequestInfo: options.deviceRequestInfo,
+    })
 
     return {
       request: {
@@ -313,12 +331,15 @@ export class IsoMdocDcApi {
     options: {
       parsedRequest: IsoMdocDcApiParsedRequest
       /**
-       * The documents to disclose, each naming the doc request of `parsedRequest.docRequests` it
+       * The documents to disclose, each naming the doc requests of `parsedRequest.docRequests` it
        * answers through `docRequestIndex`. See `DeviceResponse.createWithDeviceRequest` for how the
        * elements to disclose are selected.
        */
       documents: Array<
-        Pick<DeviceResponseDocumentOptions, 'issuerSigned' | 'docRequestIndex' | 'elements' | 'deviceNamespaces'> & {
+        Pick<
+          DeviceResponseDocumentOptions,
+          'issuerSigned' | 'docRequestIndex' | 'elements' | 'alternatives' | 'deviceNamespaces'
+        > & {
           deviceKey: CoseKey
         }
       >
@@ -336,6 +357,7 @@ export class IsoMdocDcApi {
           docRequestIndex: document.docRequestIndex,
           issuerSigned: document.issuerSigned,
           elements: document.elements,
+          alternatives: document.alternatives,
           deviceNamespaces: document.deviceNamespaces,
           signature: { signingKey: document.deviceKey },
         })),

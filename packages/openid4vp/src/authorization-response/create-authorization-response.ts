@@ -18,9 +18,13 @@ import { isJarmResponseMode } from '../jarm/jarm-response-mode'
 import { assertValueSupported, jarmAssertMetadataSupported } from '../jarm/metadata/jarm-assert-metadata-supported'
 import type { JarmServerMetadata } from '../jarm/metadata/z-jarm-authorization-server-metadata'
 import type { ClientMetadata } from '../models/z-client-metadata'
-import type { Openid4vpAuthorizationResponse } from './z-authorization-response'
+import type { Openid4vpAuthorizationErrorResponse, Openid4vpAuthorizationResponse } from './z-authorization-response'
 
-export interface CreateOpenid4vpAuthorizationResponseOptions {
+export interface CreateOpenid4vpAuthorizationResponseOptions<
+  ResponsePayload extends
+    | Openid4vpAuthorizationResponse
+    | Openid4vpAuthorizationErrorResponse = Openid4vpAuthorizationResponse,
+> {
   authorizationRequestPayload: Openid4vpAuthorizationRequest | Openid4vpAuthorizationRequestDcApi
 
   /**
@@ -34,7 +38,14 @@ export interface CreateOpenid4vpAuthorizationResponseOptions {
    */
   origin?: string
 
-  authorizationResponsePayload: Openid4vpAuthorizationResponse & { state?: never }
+  /**
+   * The authorization response, or an authorization error response (OpenID4VP 1.0 Section 8.5). The `state`
+   * is taken from the authorization request.
+   *
+   * An error response can be created without `jarm` for a JARM response mode, for when the wallet
+   * is unable to encrypt the response (OpenID4VP 1.0 Section 8.3.1).
+   */
+  authorizationResponsePayload: ResponsePayload & { state?: never }
   jarm?: {
     jwtSigner?: JwtSigner
     encryption?: {
@@ -55,8 +66,12 @@ export interface CreateOpenid4vpAuthorizationResponseOptions {
   callbacks: Pick<CallbackContext, 'signJwt' | 'encryptJwe' | 'fetch' | 'getJwks'>
 }
 
-export interface CreateOpenid4vpAuthorizationResponseResult {
-  authorizationResponsePayload: Openid4vpAuthorizationResponse
+export interface CreateOpenid4vpAuthorizationResponseResult<
+  ResponsePayload extends
+    | Openid4vpAuthorizationResponse
+    | Openid4vpAuthorizationErrorResponse = Openid4vpAuthorizationResponse,
+> {
+  authorizationResponsePayload: ResponsePayload
   jarm?: {
     responseJwt: string
     /**
@@ -66,27 +81,26 @@ export interface CreateOpenid4vpAuthorizationResponseResult {
   }
 }
 
-export async function createOpenid4vpAuthorizationResponse(
-  options: CreateOpenid4vpAuthorizationResponseOptions
-): Promise<CreateOpenid4vpAuthorizationResponseResult> {
+export async function createOpenid4vpAuthorizationResponse<
+  ResponsePayload extends
+    | Openid4vpAuthorizationResponse
+    | Openid4vpAuthorizationErrorResponse = Openid4vpAuthorizationResponse,
+>(
+  options: CreateOpenid4vpAuthorizationResponseOptions<ResponsePayload>
+): Promise<CreateOpenid4vpAuthorizationResponseResult<ResponsePayload>> {
   const { authorizationRequestPayload, jarm, callbacks, origin } = options
 
   const authorizationResponsePayload = {
     ...options.authorizationResponsePayload,
     state: authorizationRequestPayload.state,
-  } satisfies Openid4vpAuthorizationResponse
-
-  const { clientIdPrefix } = getOpenid4vpClientId({
-    responseMode: authorizationRequestPayload.response_mode,
-    clientId: authorizationRequestPayload.client_id,
-    legacyClientIdScheme: authorizationRequestPayload.client_id_scheme,
-    origin,
-  })
+  } as ResponsePayload
+  const isErrorResponse = typeof authorizationResponsePayload.error === 'string'
 
   if (
     authorizationRequestPayload.response_mode &&
     isJarmResponseMode(authorizationRequestPayload.response_mode) &&
-    !jarm
+    !jarm &&
+    !isErrorResponse
   ) {
     throw new Oauth2Error(
       `Missing jarm options for creating Jarm response with response mode '${authorizationRequestPayload.response_mode}'`
@@ -98,6 +112,14 @@ export async function createOpenid4vpAuthorizationResponse(
       authorizationResponsePayload,
     }
   }
+
+  // Parsed after the early return, so an error response can still be created when the client identifier is invalid
+  const { clientIdPrefix } = getOpenid4vpClientId({
+    responseMode: authorizationRequestPayload.response_mode,
+    clientId: authorizationRequestPayload.client_id,
+    legacyClientIdScheme: authorizationRequestPayload.client_id_scheme,
+    origin,
+  })
 
   // When using OpenID Federation, we must not rely on the client metadata from the request
   if (clientIdPrefix === 'openid_federation' && !options.clientMetadata) {
@@ -218,7 +240,7 @@ export async function createOpenid4vpAuthorizationResponse(
   const jarmResponsePayload = {
     ...authorizationResponsePayload,
     ...additionalJwtPayload,
-  } satisfies Openid4vpAuthorizationResponse
+  }
 
   const result = await createJarmAuthorizationResponse({
     jarmAuthorizationResponse: jarmResponsePayload,

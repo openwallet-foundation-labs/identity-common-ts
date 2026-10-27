@@ -10,14 +10,18 @@ import {
   verifyStatusListJwtHeader,
 } from '@owf/token-status-list'
 import {
+  createHashMapping,
+  type Disclosure,
   type DisclosureFrame,
   ensureError,
   getJwtTimeValidationOptions,
+  getSDAlgAndPayload,
   Jwt,
   type SafeVerifyResult,
   SDJWTException,
   SDJwt,
   SDJwtInstance,
+  unpackObj,
   type VerificationError,
   type VerificationErrorCode,
   type VerifierOptions,
@@ -34,11 +38,15 @@ import type {
 import type { SdJwtVcPayload } from './sd-jwt-vc-payload'
 import {
   type Claim,
-  type ClaimPath,
   type ResolvedTypeMetadata,
   type TypeMetadataFormat,
   TypeMetadataFormatSchema,
 } from './sd-jwt-vc-type-metadata-format'
+import {
+  claimPathsEqual,
+  type TypeMetadataVerificationResult,
+  verifyClaimsAgainstTypeMetadata,
+} from './type-metadata-verification'
 import type { VerificationResult } from './verification-result'
 
 // SRI hash algorithms, ordered from weakest to strongest
@@ -134,6 +142,13 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
     if (this.userConfig.loadTypeMetadataFormat) {
       const resolvedTypeMetadata = await this.fetchVct(result)
       result.typeMetadata = resolvedTypeMetadata
+      if (resolvedTypeMetadata) {
+        result.typeMetadataVerification = await this.checkTypeMetadata(
+          await this.decodeForTypeMetadata(encodedSDJwt),
+          resolvedTypeMetadata,
+          { validateDisclosures: false }
+        )
+      }
     }
     return result
   }
@@ -208,6 +223,13 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
           const resolvedTypeMetadata = await this.fetchVct(result)
           if (result) {
             result.typeMetadata = resolvedTypeMetadata
+            if (resolvedTypeMetadata && baseResult.success) {
+              result.typeMetadataVerification = await this.checkTypeMetadata(
+                await this.decodeForTypeMetadata(encodedSDJwt),
+                resolvedTypeMetadata,
+                { validateDisclosures: false }
+              )
+            }
           }
         } catch (e) {
           const error = ensureError(e)
@@ -241,6 +263,77 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
       success: true,
       data: result,
     }
+  }
+
+  /**
+   * Verifies the claims of an SD-JWT VC against its type metadata.
+   *
+   * @param encodedSDJwt The encoded SD-JWT VC or presentation.
+   * @param typeMetadata The type metadata to verify against. Type metadata that extends other type metadata is
+   * resolved first. When not provided, the type metadata of the SD-JWT VC is fetched.
+   * @returns The claims that do not conform to the type metadata.
+   * @throws SDJWTException when the type metadata cannot be resolved, describes a different vct, or the disclosures
+   * are invalid.
+   */
+  async verifyTypeMetadata(
+    encodedSDJwt: string,
+    typeMetadata?: ResolvedTypeMetadata | TypeMetadataFormat
+  ): Promise<TypeMetadataVerificationResult> {
+    const sdjwt = await this.decodeForTypeMetadata(encodedSDJwt)
+
+    // Fetched type metadata is checked against the vct in fetchSingleVct
+    if (typeMetadata) {
+      const vct = sdjwt.jwt?.payload?.vct
+      const metadataVct = isResolvedTypeMetadata(typeMetadata) ? typeMetadata.vctValues[0] : typeMetadata.vct
+      if (vct !== metadataVct) {
+        throw new SDJWTException(`Type metadata vct '${metadataVct}' does not match the vct '${vct}' of the SD-JWT VC`)
+      }
+    }
+
+    const resolvedMetadata = typeMetadata
+      ? await this.toResolvedTypeMetadata(typeMetadata)
+      : await this.getVct(encodedSDJwt)
+    if (!resolvedMetadata) {
+      throw new SDJWTException('Type metadata not found or could not be resolved')
+    }
+
+    return this.checkTypeMetadata(sdjwt, resolvedMetadata, { validateDisclosures: true })
+  }
+
+  private async decodeForTypeMetadata(encodedSDJwt: string) {
+    if (!this.userConfig.hasher) {
+      throw new SDJWTException('Hasher not found')
+    }
+    const sdjwt = await SDJwt.fromEncode(encodedSDJwt, this.userConfig.hasher)
+    if (!sdjwt.jwt?.payload) {
+      throw new SDJWTException('Invalid SD JWT: missing payload')
+    }
+    return sdjwt
+  }
+
+  private async checkTypeMetadata(
+    sdjwt: SDJwt,
+    resolvedMetadata: ResolvedTypeMetadata,
+    { validateDisclosures }: { validateDisclosures: boolean }
+  ): Promise<TypeMetadataVerificationResult> {
+    const hasher = this.userConfig.hasher
+    if (!hasher || !sdjwt.jwt?.payload) {
+      throw new SDJWTException('Invalid SD JWT: missing payload')
+    }
+
+    const { _sd_alg, payload } = getSDAlgAndPayload(sdjwt.jwt.payload)
+    const disclosures = await createHashMapping(sdjwt.disclosures ?? [], { hasher, alg: _sd_alg })
+    if (validateDisclosures) assertDisclosuresReferenced(payload, disclosures)
+
+    return verifyClaimsAgainstTypeMetadata(resolvedMetadata.mergedTypeMetadata, payload, disclosures)
+  }
+
+  private async toResolvedTypeMetadata(
+    typeMetadata: ResolvedTypeMetadata | TypeMetadataFormat
+  ): Promise<ResolvedTypeMetadata> {
+    if (isResolvedTypeMetadata(typeMetadata)) return typeMetadata
+    if (typeMetadata.extends) return this.resolveVctExtendsChain(typeMetadata)
+    return { mergedTypeMetadata: typeMetadata, typeMetadataChain: [typeMetadata], vctValues: [typeMetadata.vct] }
   }
 
   /**
@@ -355,17 +448,6 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
   }
 
   /**
-   * Checks if two claim paths are equal by comparing each element.
-   * @param path1 First claim path
-   * @param path2 Second claim path
-   * @returns True if paths are equal, false otherwise
-   */
-  private claimPathsEqual(path1: ClaimPath, path2: ClaimPath): boolean {
-    if (path1.length !== path2.length) return false
-    return path1.every((element, index) => element === path2[index])
-  }
-
-  /**
    * Validates that extending claim metadata respects the constraints from spec section 9.5.1.
    * @param baseClaim The base claim metadata
    * @param extendingClaim The extending claim metadata
@@ -415,9 +497,7 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
 
       // Validate extending claims that override base claims
       for (const extendingClaim of extendingClaims) {
-        const matchingBaseClaim = baseClaims.find((baseClaim) =>
-          this.claimPathsEqual(baseClaim.path, extendingClaim.path)
-        )
+        const matchingBaseClaim = baseClaims.find((baseClaim) => claimPathsEqual(baseClaim.path, extendingClaim.path))
 
         if (matchingBaseClaim) {
           this.validateClaimExtension(matchingBaseClaim, extendingClaim)
@@ -432,7 +512,7 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
       // Add base claims, replacing with extending version if path matches
       for (const baseClaim of baseClaims) {
         const extendingClaimIndex = extendedClaimsWithoutBase.findIndex((extendingClaim) =>
-          this.claimPathsEqual(baseClaim.path, extendingClaim.path)
+          claimPathsEqual(baseClaim.path, extendingClaim.path)
         )
         const extendingClaim = extendingClaimIndex !== -1 ? extendedClaimsWithoutBase[extendingClaimIndex] : undefined
 
@@ -474,7 +554,7 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
     // We start at one, as the base is already fetched when this method is first called
     depth: number = 1,
     // By default include the parent vct, in case of the first call
-    visitedVcts: Set<string> = new Set(parentTypeMetadata.vct)
+    visitedVcts: Set<string> = new Set([parentTypeMetadata.vct])
   ): Promise<ResolvedTypeMetadata> {
     const maxDepth = this.userConfig.maxVctExtendsDepth ?? 5
 
@@ -552,6 +632,14 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
       throw new SDJWTException(`Invalid VCT type metadata for vct '${vct}':\n${z.prettifyError(validated.error)}`)
     }
 
+    // The vct values of a resolved chain are read from the documents, so a document describing
+    // another type would let whoever hosts it choose the types a credential matches.
+    if (validated.data.vct !== vct) {
+      throw new SDJWTException(
+        `Type metadata fetched for vct '${vct}' describes vct '${validated.data.vct}'. The vct of the type metadata must match.`
+      )
+    }
+
     return validated.data
   }
 
@@ -617,4 +705,20 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
   public config(newConfig: SDJWTVCConfig<T>) {
     super.config(newConfig)
   }
+}
+
+function isResolvedTypeMetadata(
+  typeMetadata: ResolvedTypeMetadata | TypeMetadataFormat
+): typeMetadata is ResolvedTypeMetadata {
+  const candidate = typeMetadata as Partial<ResolvedTypeMetadata>
+  return (
+    Array.isArray(candidate.typeMetadataChain) &&
+    Array.isArray(candidate.vctValues) &&
+    typeof candidate.mergedTypeMetadata === 'object' &&
+    candidate.mergedTypeMetadata !== null
+  )
+}
+
+function assertDisclosuresReferenced(payload: Record<string, unknown>, disclosures: Record<string, Disclosure>) {
+  unpackObj(payload, disclosures)
 }

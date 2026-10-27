@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { parseCredentialRequest } from '../../credential-request/parse-credential-request'
+import { parseCredentialRequestPayload } from '../../credential-request/parse-credential-request-payload'
 import type { CredentialIssuerMetadata } from '../../metadata/credential-issuer/z-credential-issuer-metadata'
 import { Openid4vciVersion } from '../../version'
 
@@ -17,7 +17,7 @@ const issuerMetadata = {
 describe('Parse Credential Request', () => {
   test('parse draft 15 credential request with credential_configuration_id not in issuer metadata throws error', () => {
     expect(() =>
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -45,7 +45,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 15 credential request with unknown credential_configuration_id throws unknown_credential_configuration', () => {
     expect(() =>
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -70,7 +70,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 15 credential request with credential_configuration_id', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -115,7 +115,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with vc+sd-jwt format', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -160,7 +160,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with mso_mdoc format', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -205,7 +205,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with ldp_vc format', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -274,7 +274,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with jwt_vc_json-ld format', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -343,7 +343,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with jwt_vc_json format', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -409,7 +409,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with known jwt proof_type', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -449,7 +449,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with known di_vp proof_type', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -530,7 +530,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with unknown proof_type', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -568,7 +568,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with known proofs jwt array', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -606,7 +606,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request with unknown proofs array', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -642,7 +642,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request without format with credential_identifier', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -682,7 +682,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 14 credential request without recognized format', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -719,7 +719,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 11 credential request with jwt_vc_json format and transfrom to draft 14', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -783,7 +783,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 11 credential request with jwt_vc_json-ld format and transfrom to draft 14', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
@@ -852,7 +852,7 @@ describe('Parse Credential Request', () => {
 
   test('parse draft 11 credential request with ldp_vc format and transfrom to draft 14', () => {
     expect(
-      parseCredentialRequest({
+      parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
           credentialIssuer: issuerMetadata,
