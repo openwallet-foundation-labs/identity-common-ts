@@ -154,9 +154,12 @@ export function verifyStatusListJwtClaims(
  * The `alg` header is REQUIRED as well (RFC 7515 section 4.1.1). Which algorithms to accept is left
  * to the caller, which verifies the signature.
  *
+ * @returns the `header`, typed with the `alg` and `typ` it was checked to have.
  * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5.1
  */
-export function verifyStatusListJwtHeader(header: { typ?: unknown; alg?: unknown }): void {
+export function verifyStatusListJwtHeader<Header extends { typ?: unknown; alg?: unknown }>(
+  header: Header
+): Header & { alg: string; typ: string } {
   if (typeof header.alg !== 'string' || header.alg.length === 0) {
     throw new SLException('The status list token has no alg header, which is required')
   }
@@ -171,6 +174,8 @@ export function verifyStatusListJwtHeader(header: { typ?: unknown; alg?: unknown
   if (!isMediaType(mediaType, MediaTypes.StatusListJwt)) {
     throw new SLException(`The typ header '${typ}' must be equal to '${JWT_STATUS_LIST_TYPE}'`)
   }
+
+  return header as Header & { alg: string; typ: string }
 }
 
 /**

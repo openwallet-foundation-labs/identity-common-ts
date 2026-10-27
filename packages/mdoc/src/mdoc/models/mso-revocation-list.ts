@@ -16,6 +16,7 @@ import {
   type StatusListInfo,
   type StatusListJWTPayload,
   verifyStatus,
+  verifyStatusListJwtHeader,
 } from '@owf/token-status-list'
 import type { MdocContext } from '../../context'
 import {
@@ -169,11 +170,14 @@ async function verifyStatusListJwt(
     throw new InvalidRevocationListError(`The status list at ${uri} has a crit header, which is not supported`)
   }
 
-  const jwsAlgorithm = typeof header.alg === 'string' ? jwsSignatureAlgorithms.get(header.alg) : undefined
+  // `typ` and `alg` are checked before the signature too, as the signature check needs `alg`.
+  const { alg } = await asMdlRevocationListError(() => verifyStatusListJwtHeader(header), InvalidSignatureError)
+  const jwsAlgorithm = jwsSignatureAlgorithms.get(alg)
   if (jwsAlgorithm === undefined) {
     // The value is not echoed in full, as it comes from the list before its signature is verified.
-    const signedWith = typeof header.alg === 'string' ? `unsupported alg '${header.alg.slice(0, 32)}'` : 'no valid alg'
-    throw new InvalidRevocationListError(`The status list at ${uri} is signed with ${signedWith}`)
+    throw new InvalidRevocationListError(
+      `The status list at ${uri} is signed with unsupported alg '${alg.slice(0, 32)}'`
+    )
   }
   const { algorithm, signatureLength } = jwsAlgorithm
 

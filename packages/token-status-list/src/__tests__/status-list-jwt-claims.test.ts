@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { JWT_STATUS_LIST_TYPE } from '../jwt-types'
 import { StatusList } from '../status-list'
 import { SLException, StatusListEntryNotValidException } from '../status-list-exception'
-import { verifyStatus, verifyStatusListJwtClaims } from '../status-list-jwt'
+import { verifyStatus, verifyStatusListJwtClaims, verifyStatusListJwtHeader } from '../status-list-jwt'
 import { StatusType } from '../types'
 
 const uri = 'https://example.com/statuslists/1'
@@ -93,6 +93,15 @@ describe('verifyStatus (JWT)', () => {
     expect(verification).toThrow(StatusListEntryNotValidException)
     expect(verification).toThrow(SLException)
     expect(verification).toThrow(expect.objectContaining({ idx: 3, status: StatusType.Invalid }))
+  })
+
+  it('returns the header it verified, with its alg', () => {
+    const header = { alg: 'ES256', typ: JWT_STATUS_LIST_TYPE, kid: 'key-1' }
+
+    const verified = verifyStatusListJwtHeader(header)
+
+    expect(verified).toBe(header)
+    expect(verified.alg.toUpperCase()).toStrictEqual('ES256')
   })
 
   it('rejects a token without an alg header', () => {
