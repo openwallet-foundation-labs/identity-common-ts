@@ -1,3 +1,4 @@
+import { createAcceptHeader } from '@owf/identity-common'
 import type z from 'zod'
 import { ContentType, isResponseContentType } from './content-type'
 import { FetchError } from './error/FetchError'
@@ -68,14 +69,7 @@ export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
     // Ask for the expected content types in order of preference, unless the caller already set an Accept header
     const headers = new Headers(init?.headers)
     if (!headers.has('Accept')) {
-      headers.set(
-        'Accept',
-        expectedContentTypeArray
-          .map((contentType, index) =>
-            index === 0 ? contentType : `${contentType};q=${Math.max(0.1, 1 - index / 10).toFixed(1)}`
-          )
-          .join(', ')
-      )
+      headers.set('Accept', createAcceptHeader(expectedContentTypeArray))
     }
 
     const response = await createFetcher(fetcher)(input, { ...init, headers })

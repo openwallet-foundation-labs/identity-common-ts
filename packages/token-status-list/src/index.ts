@@ -18,7 +18,7 @@ export { fetchStatusList } from './fetch-status-list'
 export type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
 export { JWT_STATUS_LIST_TYPE, JWTClaimNames } from './jwt-types'
 export { StatusList } from './status-list'
-export { SLException } from './status-list-exception'
+export { SLException, StatusListEntryNotValidException } from './status-list-exception'
 export type {
   StatusListIndexAllocatorContext,
   StatusListIndexAllocatorOptions,

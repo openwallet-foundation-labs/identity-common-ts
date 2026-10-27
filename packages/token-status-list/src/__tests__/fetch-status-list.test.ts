@@ -26,15 +26,15 @@ describe('fetchStatusList', () => {
   })
 
   it.each([
-    { acceptedFormats: undefined, accept: `${MediaTypes.StatusListJwt},${MediaTypes.StatusListCwt};q=0.9` },
+    { acceptedFormats: undefined, accept: `${MediaTypes.StatusListJwt}, ${MediaTypes.StatusListCwt};q=0.9` },
     {
       acceptedFormats: ['cwt', 'jwt'] as const,
-      accept: `${MediaTypes.StatusListCwt},${MediaTypes.StatusListJwt};q=0.9`,
+      accept: `${MediaTypes.StatusListCwt}, ${MediaTypes.StatusListJwt};q=0.9`,
     },
     { acceptedFormats: ['cwt'] as const, accept: MediaTypes.StatusListCwt },
     {
       acceptedFormats: ['cwt', 'cwt', 'jwt'] as const,
-      accept: `${MediaTypes.StatusListCwt},${MediaTypes.StatusListJwt};q=0.9`,
+      accept: `${MediaTypes.StatusListCwt}, ${MediaTypes.StatusListJwt};q=0.9`,
     },
   ])('should prefer the first of $acceptedFormats in the Accept header', async ({ acceptedFormats, accept }) => {
     let sentAccept: string | null = null

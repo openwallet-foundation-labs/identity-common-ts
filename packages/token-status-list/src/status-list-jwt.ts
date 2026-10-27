@@ -3,7 +3,7 @@ import { base64url, decodeJwt, isMediaType } from '@owf/identity-common'
 import type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
 import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
-import { SLException } from './status-list-exception'
+import { SLException, StatusListEntryNotValidException } from './status-list-exception'
 import { MediaTypes, type StatusListEntry, StatusType } from './types'
 
 /**
@@ -151,9 +151,16 @@ export function verifyStatusListJwtClaims(
  * and requires a recipient to treat a value without a `/` as if the prefix were present. So
  * `application/statuslist+jwt` is accepted too.
  *
+ * The `alg` header is REQUIRED as well (RFC 7515 section 4.1.1). Which algorithms to accept is left
+ * to the caller, which verifies the signature.
+ *
  * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5.1
  */
-export function verifyStatusListJwtHeader(header: { typ?: unknown }): void {
+export function verifyStatusListJwtHeader(header: { typ?: unknown; alg?: unknown }): void {
+  if (typeof header.alg !== 'string' || header.alg.length === 0) {
+    throw new SLException('The status list token has no alg header, which is required')
+  }
+
   const typ = header.typ
 
   if (typeof typ !== 'string') {
@@ -167,7 +174,11 @@ export function verifyStatusListJwtHeader(header: { typ?: unknown }): void {
 }
 
 /**
- * Verify the header and the claims of a `token` and the status of an `idx` in it.
+ * Verify the header and the claims of a `token` and the status of an `idx` in it. The status list is
+ * only read once the header and the claims are verified.
+ *
+ * @throws StatusListEntryNotValidException if the status at `idx` is not Valid.
+ * @throws SLException if the header, the claims or the status list itself are not valid.
  *
  * @todo properly validate the JWT with zod + signature
  */
@@ -177,15 +188,25 @@ export function verifyStatus({
   ...claimsOptions
 }: { token: string; idx: number } & VerifyStatusListJwtClaimsOptions) {
   const { header, payload } = decodeJwt<Record<string, unknown>, StatusListJWTPayload>(token)
-  const compressed = base64url.decode(payload.status_list.lst)
-  const statusList = StatusList.decompressStatusListFromBytes(compressed, payload.status_list.bits)
 
   verifyStatusListJwtHeader(header)
   verifyStatusListJwtClaims(payload, claimsOptions)
 
-  if (statusList.getStatus(idx) !== StatusType.Valid) {
-    throw new SLException(
-      `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${statusList.getStatus(idx)}'`
+  let statusList: StatusList
+  try {
+    statusList = StatusList.decompressStatusListFromBytes(
+      base64url.decode(payload.status_list.lst),
+      payload.status_list.bits
+    )
+  } catch (error) {
+    throw Object.assign(new SLException('The status list token has no valid status_list claim'), { cause: error })
+  }
+
+  const status = statusList.getStatus(idx)
+  if (status !== StatusType.Valid) {
+    throw new StatusListEntryNotValidException(
+      `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`,
+      { idx, status }
     )
   }
   return true

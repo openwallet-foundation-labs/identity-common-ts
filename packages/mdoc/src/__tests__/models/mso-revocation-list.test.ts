@@ -407,7 +407,7 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
 
     const result = await verify(uri)
 
-    expect(accept).toBe(`${MediaTypes.StatusListCwt},${MediaTypes.StatusListJwt};q=0.9`)
+    expect(accept).toBe(`${MediaTypes.StatusListCwt}, ${MediaTypes.StatusListJwt};q=0.9`)
     expect(result.statusListCwt).toBeDefined()
     expect(result.statusListJwt).toBeUndefined()
   })

@@ -12,11 +12,10 @@ import {
   SLException,
   type StatusList,
   StatusListCwt,
+  StatusListEntryNotValidException,
   type StatusListInfo,
   type StatusListJWTPayload,
-  StatusType,
-  verifyStatusListJwtClaims,
-  verifyStatusListJwtHeader,
+  verifyStatus,
 } from '@owf/token-status-list'
 import type { MdocContext } from '../../context'
 import {
@@ -140,12 +139,16 @@ async function verifyStatusListJwt(
   {
     jwt,
     uri,
+    idx,
     trustedCertificates,
     disableCertificateChainValidation,
     now,
     skewSeconds,
     checkFreshness,
-  }: { jwt: string; uri: string; now: Date } & Omit<VerifyStatusListTokenOptions, 'statusListInfo' | 'now'>,
+  }: { jwt: string; uri: string; idx: number; now: Date } & Omit<
+    VerifyStatusListTokenOptions,
+    'statusListInfo' | 'now'
+  >,
   ctx: Pick<MdocContext, 'x509' | 'cose'>
 ) {
   let header: Record<string, unknown>
@@ -217,34 +220,20 @@ async function verifyStatusListJwt(
     throw new InvalidSignatureError(`The signature of the status list at ${uri} is not valid`)
   }
 
+  // The header, the claims and then the status at `idx`, only once the list verified, so that a list
+  // that does not verify is never reported as a status (Token Status List § 8.3).
   await asMdlRevocationListError(() => {
-    verifyStatusListJwtHeader(header)
-    verifyStatusListJwtClaims(payload, { uri, now, skewSeconds, checkFreshness, requireExpirationTime: true })
+    try {
+      verifyStatus({ token: jwt, idx, uri, now, skewSeconds, checkFreshness, requireExpirationTime: true })
+    } catch (error) {
+      if (error instanceof StatusListEntryNotValidException) {
+        throw new StatusListEntryNotValidError(error.message, { uri, idx, status: error.status })
+      }
+      throw error
+    }
   }, InvalidSignatureError)
 
-  let statusList: StatusList
-  try {
-    statusList = getListFromStatusListJWT(jwt)
-  } catch {
-    throw new InvalidRevocationListError(`The status list at ${uri} has no valid status_list claim`)
-  }
-
-  return { statusListJwt: { header, payload, statusList }, chain }
-}
-
-/**
- * The status at `idx` must be Valid, as § 12.3.6.1 allows "no other status besides 'revoked'".
- * Checked only once the list verified, so that a list that does not verify is never reported as a
- * status (Token Status List § 8.3), and the same way for a CWT and a JWT.
- */
-function assertStatusIsValid(statusList: StatusList, { uri, idx }: { uri: string; idx: number }) {
-  const status = statusList.getStatus(idx)
-  if (status !== StatusType.Valid) {
-    throw new StatusListEntryNotValidError(
-      `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`,
-      { uri, idx, status }
-    )
-  }
+  return { statusListJwt: { header, payload, statusList: getListFromStatusListJWT(jwt) }, chain }
 }
 
 export type VerifyStatusListTokenOptions = {
@@ -319,10 +308,18 @@ export async function verifyStatusListToken(
   // as JWT only. So it is accepted as a fallback, with the same checks and status handling as a CWT.
   if (typeof token === 'string') {
     const { statusListJwt, chain } = await verifyStatusListJwt(
-      { jwt: token, uri, trustedCertificates, disableCertificateChainValidation, now, skewSeconds, checkFreshness },
+      {
+        jwt: token,
+        uri,
+        idx,
+        trustedCertificates,
+        disableCertificateChainValidation,
+        now,
+        skewSeconds,
+        checkFreshness,
+      },
       ctx
     )
-    assertStatusIsValid(statusListJwt.statusList, { uri, idx })
 
     return { statusListJwt, chain }
   }
@@ -370,7 +367,20 @@ export async function verifyStatusListToken(
     InvalidSignatureError
   )
 
-  assertStatusIsValid(statusListCwt.payload.statusList, { uri, idx })
+  // The status at `idx` is checked only once the list verified, so that a list that does not verify
+  // is never reported as a status (Token Status List § 8.3).
+  try {
+    statusListCwt.verifyStatus(idx)
+  } catch (error) {
+    if (error instanceof SLException) {
+      throw new StatusListEntryNotValidError(error.message, {
+        uri,
+        idx,
+        status: statusListCwt.payload.statusList.getStatus(idx),
+      })
+    }
+    throw error
+  }
 
   return { statusListCwt, chain }
 }
