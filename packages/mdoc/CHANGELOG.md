@@ -1,5 +1,24 @@
 # @owf/mdoc
 
+## 0.9.2
+
+### Patch Changes
+
+- aede3c4: `MdocContext.fetch` receives a third argument naming what it is retrieving, `{ type: 'statusList' | 'identifierList' }`, so an implementation can cache or time out per resource. An implementation written with a rest parameter needs its parameters named:
+  
+  ```diff
+  -fetch: (...args) => fetch(...args),
+  +fetch: (input, init) => fetch(input, init),
+  ```
+
+- bf9b7c8: Accept a status list served as a JWT as a fallback. `verifyStatusListToken` still requests a CWT first, verifies a JWT (ES256/384/512, signer from `x5c`) with the same signer, claim and status checks, and returns it as `statusListJwt` (`IssuerAuth.verify` verifies it but does not return it); `statusListCwt` is now optional and `JwtNotSupportForStatusListError` is deprecated.
+- Updated dependencies [bf9b7c8]
+- Updated dependencies [bf9b7c8]
+  - @owf/identity-common@0.6.1
+  - @owf/token-status-list@0.6.1
+  - @owf/cose@0.6.1
+  - @owf/x509@0.6.1
+
 ## 0.9.1
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # @openid4vc/openid4vp
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [bf9b7c8]
+- Updated dependencies [fa1ce42]
+- Updated dependencies [34bd5c9]
+  - @openid4vc/utils@0.9.0
+  - @openid4vc/oauth2@0.9.0
+
 ## 0.8.2
 
 ### Patch Changes
