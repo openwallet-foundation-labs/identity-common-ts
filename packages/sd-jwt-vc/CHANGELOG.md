@@ -1,5 +1,21 @@
 # @sd-jwt/sd-jwt-vc
 
+## 0.24.0
+
+### Minor Changes
+
+- 1031dd7: Add `verifyTypeMetadata` to check the claims of an SD-JWT VC against its type metadata: extra claims, missing or undisclosed mandatory claims, and `sd` violations. `verify` and `safeVerify` add the result as `typeMetadataVerification` when `loadTypeMetadataFormat` is enabled.
+
+### Patch Changes
+
+- 0957fb1: Fix the mandatory claim checks of `verifyTypeMetadata`: claim names such as `constructor` are no longer found on `Object.prototype`, a mandatory claim under a `null` path is undisclosed when every element is withheld and missing when the value is not an array, and the vct of type metadata passed by the caller is compared before its `extends` chain is resolved.
+- 70f7b34: `vct#integrity` can no longer be made selectively disclosable, as required by SD-JWT VC.
+- Updated dependencies [bf9b7c8]
+- Updated dependencies [bf9b7c8]
+  - @owf/identity-common@0.6.1
+  - @owf/token-status-list@0.6.1
+  - @sd-jwt/core@0.24.0
+
 ## 0.23.2
 
 ### Patch Changes

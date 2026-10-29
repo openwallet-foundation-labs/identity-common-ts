@@ -1,5 +1,14 @@
 # @openid4vc/utils
 
+## 0.9.0
+
+### Patch Changes
+
+- bf9b7c8: Add `createAcceptHeader`, which asks for media types in order of preference with decreasing `q` values, never below 0.1, and drops duplicates. `createZodFetcher` now uses it, so `@openid4vc/utils` depends on `@owf/identity-common`.
+- 34bd5c9: Requests made with `createZodFetcher` now send the expected content types as the `Accept` header, unless the request already sets one. The first content type is preferred, and later ones get decreasing `q` values. Before, the expected content types were only checked against the response `Content-Type`.
+- Updated dependencies [bf9b7c8]
+  - @owf/identity-common@0.6.1
+
 ## 0.8.2
 
 No changes in this release.

@@ -1,5 +1,32 @@
 # @openid4vc/openid4vci
 
+## 0.9.0
+
+### Minor Changes
+
+- d8538f7: Support Credential Request encryption for regular and deferred issuance:
+  
+  - Reject plaintext requests before payload validation when issuer metadata requires request encryption.
+  - Validate issuer `credential_request_encryption` metadata and encrypt client requests when required or when callers provide `credentialRequestEncryption`, with optional `kid` and `enc` selectors.
+  - **Breaking:** Both `Openid4vciIssuer.parseCredentialRequest` and `Openid4vciIssuer.parseDeferredCredentialRequest` now return Promises and must be awaited. Their options require `contentType` alongside `issuerMetadata`, retaining the original `credentialRequest` and `deferredCredentialRequest` property names, respectively. Callers must deserialize plaintext `application/json` bodies into objects before calling these methods. For `application/jwt`, pass the raw compact JWE string; the library decrypts it using the issuer's `decryptJwe` callback and JSON-parses the payload. Both paths validate the resulting request object.
+  - Do not send plaintext requests containing `credential_response_encryption` to OpenID4VCI V1 issuers, per §8.2. Encrypt these requests, or fail locally if the issuer does not advertise request encryption. Also require encrypted requests when issuer metadata mandates encryption or when response-encryption parameters are included for an issuer advertising request encryption. Preserve plaintext requests with encrypted responses for earlier drafts when request encryption is not advertised.
+  - Align `verifyCredentialRequestEncryption` with the existing response verifier's positional arguments.
+  - Reject unsupported compression (`zip`) in credential requests and response-encryption parameters.
+  - Document that decryption callbacks return `{ decrypted: false }` for invalid ciphertext and throw only for internal failures, which are reported as server errors.
+  - Report a server error when a plaintext request requests response encryption from a V1 issuer advertising response encryption without request-encryption support.
+
+### Patch Changes
+
+- 34bd5c9: Add a `signedMetadata` option to `Openid4vciClient.resolveIssuerMetadata` to choose whether the credential issuer metadata must be signed: `required`, `preferred` or `disallowed`. The default is `preferred` with a `verifyJwt` callback, and `disallowed` without one. Accepting signed metadata requires the `verifyJwt` callback, which is now part of the `Openid4vciClient` callbacks type.
+  
+  The option is now sent as the `Accept` header. With `preferred` this is `application/jwt, application/json;q=0.9`, so issuers that only return signed metadata when the client asks for a JWT now return it.
+- Updated dependencies [bf9b7c8]
+- Updated dependencies [fa1ce42]
+- Updated dependencies [34bd5c9]
+  - @owf/identity-common@0.6.1
+  - @openid4vc/utils@0.9.0
+  - @openid4vc/oauth2@0.9.0
+
 ## 0.8.2
 
 ### Patch Changes
