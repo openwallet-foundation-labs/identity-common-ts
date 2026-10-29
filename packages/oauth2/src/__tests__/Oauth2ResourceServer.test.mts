@@ -377,4 +377,86 @@ describe('Oauth2ResourceServer', () => {
     expect(tokenPayload.sub).toEqual('pre-auth-code')
     expect(jwksRequestCount).toEqual(1)
   })
+
+  describe('token introspection', () => {
+    const firstAuthorizationServer = {
+      issuer: 'https://first-authorization-server.com',
+      token_endpoint: 'https://first-authorization-server.com/token',
+      introspection_endpoint: 'https://first-authorization-server.com/introspect',
+    } satisfies AuthorizationServerMetadata
+
+    const secondAuthorizationServer = {
+      issuer: 'https://second-authorization-server.com',
+      token_endpoint: 'https://second-authorization-server.com/token',
+      introspection_endpoint: 'https://second-authorization-server.com/introspect',
+    } satisfies AuthorizationServerMetadata
+
+    const verifyOpaqueToken = (authorizationServers: AuthorizationServerMetadata[]) =>
+      new Oauth2ResourceServer({
+        callbacks: {
+          ...callbacks,
+          fetch,
+          clientAuthentication: () => {},
+        },
+      }).verifyResourceRequest({
+        authorizationServers,
+        request: {
+          method: 'POST',
+          url: 'https://resource-server.com/endpoint',
+          headers: new Headers({ Authorization: 'Bearer opaque-token' }),
+        },
+        resourceServer: 'https://resource-server.com',
+      })
+
+    test('accepts a token that introspection reports as active', async () => {
+      server.resetHandlers(
+        http.post(firstAuthorizationServer.introspection_endpoint, () =>
+          HttpResponse.json({ active: true, sub: 'pre-auth-code' })
+        )
+      )
+
+      const { tokenPayload, authorizationServer } = await verifyOpaqueToken([firstAuthorizationServer])
+      expect(tokenPayload.sub).toEqual('pre-auth-code')
+      expect(authorizationServer).toEqual(firstAuthorizationServer.issuer)
+    })
+
+    test('rejects a token that introspection reports as inactive', async () => {
+      server.resetHandlers(
+        http.post(firstAuthorizationServer.introspection_endpoint, () =>
+          HttpResponse.json({ active: false, sub: 'pre-auth-code' })
+        )
+      )
+
+      await expect(verifyOpaqueToken([firstAuthorizationServer])).rejects.toThrow(
+        'Could not verify token as jwt or using token introspection.'
+      )
+    })
+
+    test('rejects an inactive token when introspection at another authorization server fails', async () => {
+      server.resetHandlers(
+        http.post(firstAuthorizationServer.introspection_endpoint, () => HttpResponse.json({ active: false })),
+        http.post(secondAuthorizationServer.introspection_endpoint, () => new HttpResponse(null, { status: 500 }))
+      )
+
+      await expect(verifyOpaqueToken([firstAuthorizationServer, secondAuthorizationServer])).rejects.toThrow(
+        'Could not verify token as jwt or using token introspection.'
+      )
+    })
+
+    test('uses the authorization server that reports the token as active', async () => {
+      server.resetHandlers(
+        http.post(firstAuthorizationServer.introspection_endpoint, () => HttpResponse.json({ active: false })),
+        http.post(secondAuthorizationServer.introspection_endpoint, () =>
+          HttpResponse.json({ active: true, sub: 'pre-auth-code' })
+        )
+      )
+
+      const { tokenPayload, authorizationServer } = await verifyOpaqueToken([
+        firstAuthorizationServer,
+        secondAuthorizationServer,
+      ])
+      expect(tokenPayload.sub).toEqual('pre-auth-code')
+      expect(authorizationServer).toEqual(secondAuthorizationServer.issuer)
+    })
+  })
 })

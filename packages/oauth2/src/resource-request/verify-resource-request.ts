@@ -114,16 +114,19 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
     // to use token introspection on all authorization servers until we've found the correct one
     for (const authorizationServerMetadata of options.authorizationServers) {
       try {
-        tokenPayload = await introspectToken({
+        const introspectionResult = await introspectToken({
           authorizationServerMetadata,
           callbacks: options.callbacks,
           token: accessToken,
           tokenTypeHint: scheme,
         })
-        authorizationServer = authorizationServerMetadata
 
-        // If we found the active token.
-        if (tokenPayload.active) break
+        // An inactive token is revoked, expired or unknown to this authorization server (RFC 7662 §2.2)
+        if (!introspectionResult.active) continue
+
+        tokenPayload = introspectionResult
+        authorizationServer = authorizationServerMetadata
+        break
       } catch (_error) {
         // No-op?
       }
