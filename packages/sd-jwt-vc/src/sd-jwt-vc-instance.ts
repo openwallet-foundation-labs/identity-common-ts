@@ -73,7 +73,7 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
    */
   protected validateDisclosureFrame(disclosureFrame?: DisclosureFrame<SdJwtVcPayload>): void {
     if (disclosureFrame?._sd && Array.isArray(disclosureFrame._sd) && disclosureFrame._sd.length > 0) {
-      const reservedNames = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'status']
+      const reservedNames = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'vct#integrity', 'status']
       const reservedNamesInDisclosureFrame = disclosureFrame._sd.filter((key) => reservedNames.includes(String(key)))
       if (reservedNamesInDisclosureFrame.length > 0) {
         throw new SDJWTException('Cannot disclose protected field')

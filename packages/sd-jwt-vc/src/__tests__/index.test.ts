@@ -81,6 +81,22 @@ describe('App', () => {
     const encodedSdjwt = sdjwt.issue(expectedPayload, disclosureFrame as unknown as DisclosureFrame<SdJwtVcPayload>)
     await expect(encodedSdjwt).rejects.toThrowError()
   })
+
+  test('rejects a disclosure frame that makes vct#integrity selectively disclosable', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    const sdjwt = new SDJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+    })
+
+    const payload: SdJwtVcPayload = { iat, iss, vct, 'vct#integrity': 'sha256-example' }
+    const disclosureFrame = { _sd: ['vct#integrity'] } as unknown as DisclosureFrame<SdJwtVcPayload>
+    await expect(sdjwt.issue(payload, disclosureFrame)).rejects.toThrowError('Cannot disclose protected field')
+  })
 })
 
 describe('Revocation', () => {
