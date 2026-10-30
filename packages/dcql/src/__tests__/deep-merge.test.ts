@@ -33,4 +33,21 @@ describe('deepMerge', () => {
     const merged = deepMerge({ a: null }, { a: DcqlNotDisclosed })
     expect(merged).toStrictEqual({ a: null })
   })
+
+  it.each(['constructor', 'toString', 'hasOwnProperty'])('merges a claim named %s as an own property', (key) => {
+    const merged = deepMerge({ [key]: { a: 1 } }, {})
+    const fullMerged = deepMerge({ [key]: { b: [2] } }, merged) as Record<string, unknown>
+
+    expect(Object.keys(fullMerged)).toStrictEqual([key])
+    expect(fullMerged[key]).toStrictEqual({ a: 1, b: [2] })
+    expect(Object.getPrototypeOf(fullMerged)).toBe(Object.prototype)
+  })
+
+  it('merges a __proto__ claim as an own property without changing the prototype', () => {
+    const merged = deepMerge(JSON.parse('{"__proto__": {"polluted": true}}'), {}) as Record<string, unknown>
+
+    expect(Object.getPrototypeOf(merged)).toBe(Object.prototype)
+    expect(Object.getOwnPropertyDescriptor(merged, '__proto__')?.value).toStrictEqual({ polluted: true })
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
 })
