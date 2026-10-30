@@ -1,5 +1,13 @@
 # @owf/eudi-lote
 
+## 0.5.4
+
+### Patch Changes
+
+- Updated dependencies [13a53dc]
+  - @owf/crypto@0.6.2
+  - @owf/identity-common@0.6.2
+
 ## 0.5.3
 
 ### Patch Changes

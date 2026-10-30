@@ -1,5 +1,11 @@
 # @openid4vc/utils
 
+## 0.9.1
+
+### Patch Changes
+
+- @owf/identity-common@0.6.2
+
 ## 0.9.0
 
 ### Patch Changes

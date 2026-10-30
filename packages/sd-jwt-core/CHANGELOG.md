@@ -1,5 +1,12 @@
 # @sd-jwt/core
 
+## 0.24.1
+
+### Patch Changes
+
+- 260114a: Verification now rejects an issuer-signed JWT or Key Binding JWT whose header has `crit`, as RFC 7515 requires for extensions the verifier does not understand, and an SD-JWT VC in which a protected claim (`iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity` or `status`) arrived in a Disclosure.
+- @owf/identity-common@0.6.2
+
 ## 0.24.0
 
 ### Patch Changes

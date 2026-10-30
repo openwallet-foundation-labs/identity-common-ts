@@ -1,5 +1,11 @@
 # @owf/eudi-tl
 
+## 0.5.4
+
+### Patch Changes
+
+- @owf/identity-common@0.6.2
+
 ## 0.5.3
 
 ### Patch Changes
