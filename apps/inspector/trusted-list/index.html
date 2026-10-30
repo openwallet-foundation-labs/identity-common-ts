@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- inspector:head -->
+  </head>
+  <body>
+    <!-- inspector:header -->
+
+    <main>
+      <section class="panel input" id="input-panel">
+        <!-- inspector:fetch -->
+        <form id="input-form">
+          <!-- inspector:document -->
+          <fieldset class="options">
+            <legend>Signer</legend>
+            <p class="help">
+              The EU List of Trusted Lists is checked against the signing certificates shipped with @owf/eudi-tl. For another
+              list, check its signer in one of these ways, or else its signature proves integrity only.
+            </p>
+            <label class="check">
+              <input type="checkbox" id="lotl" name="lotl" value="1" />
+              <span>Check it against the certificates the EU LOTL lists for the territory of the list. This fetches the LOTL
+              from ec.europa.eu.</span>
+            </label>
+            <div class="field">
+              <label class="field-label" for="signers">Signer certificates <span class="optional">optional</span></label>
+              <p class="help" id="signers-help">The certificates the list may be signed with, as PEM.</p>
+              <textarea id="signers" name="signers" class="short" spellcheck="false" aria-describedby="signers-help" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+            </div>
+          </fieldset>
+          <!-- inspector:actions -->
+        </form>
+      </section>
+
+      <!-- inspector:result -->
+    </main>
+
+    <!-- inspector:footer -->
+    <script type="module" src="/src/pages/trusted-list.ts"></script>
+  </body>
+</html>

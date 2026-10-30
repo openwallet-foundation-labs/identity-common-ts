@@ -5,8 +5,10 @@ import {
   type RegisteredCredential,
   validateWRPRC,
 } from '@owf/eudi-registration-certificate'
-import { decodeJwt, type Finding } from '@owf/identity-common'
-import { type Inspection, InspectionError } from './inspect'
+import { decodeJwt } from '@owf/identity-common'
+import { errorMessage, isRecord, JWS, typOf, withPathPrefix } from './input'
+import { type Inspection, InspectionError } from './inspection'
+import { registeredSubject } from './registration-certificate'
 
 interface Request {
   /** How the request was given */
@@ -18,16 +20,6 @@ interface Request {
   accessCertificate?: string
 }
 
-const JWS = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error))
-
-const withPathPrefix = (prefix: string, findings: Finding[]): Finding[] =>
-  findings.map((finding) => ({ ...finding, path: [prefix, ...finding.path] }))
-
 function decode(jwt: string, what: string) {
   try {
     return decodeJwt<Record<string, unknown>, Record<string, unknown>>(jwt)
@@ -35,9 +27,6 @@ function decode(jwt: string, what: string) {
     throw new InspectionError(`The ${what} cannot be decoded: ${errorMessage(error)}`)
   }
 }
-
-const typOf = (header: Record<string, unknown>) =>
-  typeof header.typ === 'string' ? header.typ.toLowerCase().replace(/^application\//, '') : undefined
 
 /** Read the request parameters, of an authorization request or the payload of a request object */
 function fromParameters(parameters: Record<string, unknown>, form: string): Request {
@@ -159,9 +148,8 @@ export function checkRequest(requestInput: string, registrationInput = ''): Insp
   }
   const normalized = normalizeWRPRCPayload(payload)
   const registered = isRecord(normalized) ? normalized : {}
-  const ownSubject = isRecord(registered.intermediary) ? registered.intermediary.sub : registered.sub
   if (subject) checks.push('Subject of the registration certificate against the access certificate')
-  const certificate = validateWRPRC(header, payload, subject ?? (typeof ownSubject === 'string' ? ownSubject : ''))
+  const certificate = validateWRPRC(header, payload, subject ?? registeredSubject(payload) ?? '')
 
   const credentials = Array.isArray(registered.credentials) ? (registered.credentials as RegisteredCredential[]) : []
   if (credentials.length === 0) notes.push('The registration certificate lists no credentials to request')

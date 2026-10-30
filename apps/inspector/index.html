@@ -1,108 +1,24 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta
-      name="description"
-      content="Parse and check EUDI trusted lists, Lists of Trusted Entities, registration certificates and access certificates in the browser."
-    />
-    <link rel="icon" href="data:," />
-    <title>EUDI Inspector</title>
+    <!-- inspector:head -->
   </head>
   <body>
-    <header class="site-header">
-      <h1>EUDI Inspector</h1>
-      <p class="lede">Parse a document and check each element against its specification.</p>
-      <div class="privacy" role="note">
-        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
-          <rect x="4" y="10" width="16" height="11" rx="2" />
-          <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-        </svg>
-        <p>
-          <strong>Everything stays in your browser.</strong> All parsing and checks run on this page, and nothing you
-          paste, drop or check is sent to a server. Once the page has loaded, the only request it makes is when you
-          fetch a URL, which your browser sends straight to that URL.
-        </p>
-      </div>
-      <ul class="formats" aria-label="Supported formats">
-        <li><strong>Trusted list</strong> ETSI TS 119 612, XML</li>
-        <li><strong>LoTE</strong> ETSI TS 119 602, JSON or JWS</li>
-        <li><strong>Registration certificate</strong> ETSI TS 119 475, JWS</li>
-        <li><strong>Access certificate</strong> ETSI TS 119 411-8, PEM, base64 or DER</li>
-        <li><strong>Token Status List</strong> draft-ietf-oauth-status-list, JWT</li>
-        <li><strong>SD-JWT VC</strong> RFC 9901, with or without Key Binding</li>
-        <li><strong>mdoc</strong> ISO/IEC 18013-5 IssuerSigned or DeviceResponse, CBOR</li>
-      </ul>
-    </header>
+    <!-- inspector:header -->
 
     <main>
-      <div class="modes" role="tablist" aria-label="Tool">
-        <button type="button" role="tab" id="mode-inspect" aria-selected="true" aria-controls="input-panel">
-          Inspect a document
-        </button>
-        <button type="button" role="tab" id="mode-over-asking" aria-selected="false" aria-controls="over-asking-panel">
-          Check a request for over-asking
-        </button>
-      </div>
-
-      <section class="panel input" id="input-panel" role="tabpanel" aria-labelledby="mode-inspect">
-        <form id="url-form" class="url-row">
-          <label class="visually-hidden" for="url">URL</label>
-          <input type="url" id="url" placeholder="https://… URL of a document" autocomplete="url" required />
-          <button type="submit" id="fetch">Fetch</button>
+      <section class="panel input" id="input-panel">
+        <!-- inspector:fetch -->
+        <form id="input-form">
+          <!-- inspector:document -->
+          <!-- inspector:actions -->
         </form>
-        <div class="divider"><span>or</span></div>
-        <label class="visually-hidden" for="source">Document</label>
-        <textarea
-          id="source"
-          spellcheck="false"
-          placeholder="Paste XML, JSON, a JWT or SD-JWT, CBOR as hex or base64url, or a PEM certificate, or drop a file here"
-        ></textarea>
-        <div class="actions">
-          <button type="button" id="inspect" class="primary">Inspect</button>
-          <button type="button" id="choose-file">Choose file</button>
-          <input type="file" id="file" hidden />
-          <span class="hint"><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd></span>
-        </div>
       </section>
 
-      <section class="panel" id="over-asking-panel" role="tabpanel" aria-labelledby="mode-over-asking" hidden>
-        <p class="panel-intro">
-          Compare the DCQL query of an OpenID4VP request with the credentials and claims the relying party registered
-          in its registration certificate.
-        </p>
-        <label class="field-label" for="request">OpenID4VP request</label>
-        <p class="help">A request object (JWT), an authorization request as URL or JSON, or only the DCQL query.</p>
-        <textarea id="request" spellcheck="false" placeholder="eyJ… or openid4vp://?… or { &quot;dcql_query&quot;: … }"></textarea>
-        <label class="field-label" for="registration">Registration certificate</label>
-        <p class="help">The WRPRC as JWT. Leave empty when the request carries it in verifier_info.</p>
-        <textarea id="registration" class="short" spellcheck="false" placeholder="eyJ…"></textarea>
-        <div class="actions">
-          <button type="button" id="check" class="primary">Check</button>
-          <span class="hint"><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd></span>
-        </div>
-      </section>
-
-      <div id="error" class="panel error-panel" role="alert" hidden></div>
-
-      <section id="result" aria-live="polite" hidden>
-        <div id="summary" class="panel summary"></div>
-        <div class="panel">
-          <h3 id="findings-title">Findings</h3>
-          <div id="findings"></div>
-        </div>
-        <div class="panel">
-          <h3>Document</h3>
-          <div id="tree"></div>
-        </div>
-      </section>
+      <!-- inspector:result -->
     </main>
 
-    <footer class="site-footer">
-      Built on
-      <a href="https://github.com/openwallet-foundation-labs/identity-common-ts" rel="noopener">identity-common-ts</a>
-    </footer>
-    <script type="module" src="/src/main.ts"></script>
+    <!-- inspector:footer -->
+    <script type="module" src="/src/pages/home.ts"></script>
   </body>
 </html>

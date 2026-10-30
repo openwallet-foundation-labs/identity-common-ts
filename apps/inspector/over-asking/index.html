@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- inspector:head -->
+  </head>
+  <body>
+    <!-- inspector:header -->
+
+    <main>
+      <section class="panel input" id="input-panel">
+        <form id="input-form">
+          <label class="field-label" for="request">OpenID4VP request</label>
+          <p class="help" id="request-help">A request object (JWT), an authorization request as URL or JSON, or only the DCQL query.</p>
+          <textarea id="request" name="request" spellcheck="false" aria-describedby="request-help" placeholder="eyJ… or openid4vp://?… or { &quot;dcql_query&quot;: … }"></textarea>
+          <label class="field-label" for="registration">Registration certificate</label>
+          <p class="help" id="registration-help">The WRPRC as JWT. Leave empty when the request carries it in verifier_info.</p>
+          <textarea id="registration" name="registration" class="short" spellcheck="false" aria-describedby="registration-help" placeholder="eyJ…"></textarea>
+          <div class="actions">
+            <button type="submit" class="primary">Check</button>
+            <span class="hint"><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd></span>
+          </div>
+        </form>
+      </section>
+
+      <!-- inspector:result -->
+    </main>
+
+    <!-- inspector:footer -->
+    <script type="module" src="/src/pages/over-asking.ts"></script>
+  </body>
+</html>

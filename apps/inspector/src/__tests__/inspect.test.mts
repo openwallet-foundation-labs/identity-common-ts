@@ -22,13 +22,16 @@ describe('inspect', () => {
     const inspection = inspect(SIGNED_TSL_XML)
     expect(inspection.kind).toBe('trusted-list')
     expect(inspection.checks[0]).toBe('ETSI TS 119 612 structure')
-    await expect(inspection.verifySignature?.()).resolves.toContain('Valid')
+    await expect(inspection.signatures?.[0].verify()).resolves.toMatchObject({
+      status: 'valid',
+      message: expect.stringContaining('This proves integrity only'),
+    })
   })
 
   it('rejects the signature of an unsigned trusted list', async () => {
     const inspection = inspect(UNSIGNED_TSL_XML)
     expect(inspection.kind).toBe('trusted-list')
-    await expect(inspection.verifySignature?.()).rejects.toThrow()
+    await expect(inspection.signatures?.[0].verify()).resolves.toMatchObject({ status: 'invalid' })
   })
 
   it('recognises an access certificate as PEM, base64 and DER', () => {

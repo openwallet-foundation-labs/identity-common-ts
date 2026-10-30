@@ -88,6 +88,71 @@ h3 {
   color: var(--text-muted);
 }
 
+.brand {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.brand a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.brand a:hover {
+  color: var(--accent);
+}
+
+.spec {
+  display: inline-block;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 12px;
+}
+
+.site-nav a {
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.site-nav a:hover {
+  color: var(--text);
+}
+
+.site-nav a[aria-current="page"] {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  /* One row to scroll through, rather than several above the input */
+  .site-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-right: -16px;
+    padding-right: 16px;
+  }
+
+  .site-nav a {
+    flex: none;
+  }
+}
+
 .privacy {
   display: flex;
   align-items: flex-start;
@@ -113,29 +178,6 @@ h3 {
   margin: 0;
 }
 
-.formats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.formats li {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-}
-
-.formats strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
 .panel {
   margin-bottom: 16px;
   padding: 16px;
@@ -144,34 +186,54 @@ h3 {
   background: var(--surface);
 }
 
-.modes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.modes [role="tab"] {
-  border-color: transparent;
-  background: none;
-  color: var(--text-muted);
-}
-
-.modes [role="tab"][aria-selected="true"] {
-  border-color: var(--border);
-  background: var(--surface);
-  color: var(--text);
-}
-
-.panel-intro {
-  margin: 0 0 12px;
-  color: var(--text-muted);
-}
-
 .field-label {
   display: block;
   margin-top: 12px;
   font-weight: 600;
+}
+
+.optional {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.options {
+  margin: 12px 0 0;
+  padding: 4px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.options legend {
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.options > .help:first-of-type {
+  margin-top: 4px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0 12px;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.check input {
+  margin-top: 4px;
 }
 
 .help {
@@ -195,6 +257,7 @@ textarea.short {
 }
 
 input[type="url"],
+input[type="text"],
 textarea {
   width: 100%;
   padding: 8px 10px;
@@ -206,6 +269,7 @@ textarea {
 }
 
 input[type="url"]:focus,
+input[type="text"]:focus,
 textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
@@ -376,6 +440,67 @@ kbd {
 
 .signature.bad {
   color: var(--error);
+}
+
+.signature.unverified {
+  color: var(--warning);
+}
+
+.summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.page-link {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.share {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.share-status {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.pointers {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.pointers th,
+.pointers td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.pointers th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.pointers a {
+  color: var(--accent);
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
 }
 
 .empty-note {

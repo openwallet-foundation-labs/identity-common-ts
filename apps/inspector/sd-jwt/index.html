@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- inspector:head -->
+  </head>
+  <body>
+    <!-- inspector:header -->
+
+    <main>
+      <section class="panel input" id="input-panel">
+        <!-- inspector:fetch -->
+        <form id="input-form">
+          <!-- inspector:document -->
+          <fieldset class="options">
+            <legend>Verification</legend>
+            <div class="field">
+              <label class="field-label" for="key">Issuer key <span class="optional">optional</span></label>
+              <p class="help" id="key-help">A JWK, a JWK Set, or certificates as PEM. Without it, the signature is verified with the x5c of the header; give the certificate of a trust anchor to check the x5c chain as well. The Key Binding JWT is verified with the key in cnf.</p>
+              <textarea id="key" name="key" class="short" spellcheck="false" aria-describedby="key-help" placeholder="{&quot;kty&quot;: …} or -----BEGIN CERTIFICATE-----"></textarea>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field-label" for="nonce">Expected nonce <span class="optional">optional</span></label>
+                <input type="text" id="nonce" name="nonce" spellcheck="false" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="aud">Expected aud <span class="optional">optional</span></label>
+                <input type="text" id="aud" name="aud" spellcheck="false" autocomplete="off" placeholder="client_id of the verifier" />
+              </div>
+            </div>
+          </fieldset>
+          <!-- inspector:actions -->
+        </form>
+      </section>
+
+      <!-- inspector:result -->
+    </main>
+
+    <!-- inspector:footer -->
+    <script type="module" src="/src/pages/sd-jwt.ts"></script>
+  </body>
+</html>

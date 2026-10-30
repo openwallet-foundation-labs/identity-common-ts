@@ -2,8 +2,9 @@ import { hasher } from '@owf/crypto'
 import { base64url, base64urlEncode } from '@owf/identity-common'
 import { Disclosure } from '@sd-jwt/core'
 import { describe, expect, it } from 'vitest'
-import { inspect } from '../inspect'
-import { SD_JWT_CODES as CODES } from '../sd-jwt'
+import { type Inspection, inspect } from '../inspect'
+import { SD_JWT_CODES as CODES, inspectSdJwt } from '../sd-jwt'
+import { generateKey, signJwt } from './keys.mjs'
 
 const NOW = Math.floor(Date.now() / 1000)
 const hasherSync = (data: string, alg: string) => hasher(data, alg)
@@ -124,5 +125,70 @@ describe('SD-JWT inspection', () => {
   it('reports an SD-JWT VC without the ~ separator', () => {
     const issuerJwt = sdJwt().split('~')[0]
     expect(codesAndPaths(issuerJwt)).toContainEqual({ severity: 'error', code: CODES.MISSING_SEPARATOR, path: [] })
+  })
+})
+
+describe('SD-JWT verification', () => {
+  async function presentation(kbClaims: Record<string, unknown> = {}) {
+    const issuer = await generateKey()
+    const holder = await generateKey()
+    const issued = `${await signJwt(
+      { typ: 'dc+sd-jwt' },
+      {
+        vct: 'urn:eudi:pid:1',
+        iss: 'https://issuer.example',
+        iat: NOW - 60,
+        cnf: { jwk: holder.publicJwk },
+        _sd_alg: 'sha-256',
+        _sd: [givenName.digest],
+      },
+      issuer.privateKey
+    )}~${givenName.encoded}~`
+    const sdHash = base64url.encode(hasher(issued, 'sha-256'))
+    const keyBinding = await signJwt(
+      { typ: 'kb+jwt' },
+      { iat: NOW, aud: 'https://verifier.example', nonce: 'n-0S6', sd_hash: sdHash, ...kbClaims },
+      holder.privateKey
+    )
+    return { text: `${issued}${keyBinding}`, issuer, holder }
+  }
+
+  const verifyAll = (inspection: Inspection) =>
+    Promise.all((inspection.signatures ?? []).map(async ({ label, verify }) => ({ label, ...(await verify()) })))
+
+  it('verifies the issuer signature with the given key, and the Key Binding JWT with the key in cnf', async () => {
+    const { text, issuer } = await presentation()
+    const inspection = inspectSdJwt(text, {
+      key: JSON.stringify(issuer.publicJwk),
+      nonce: 'n-0S6',
+      aud: 'https://verifier.example',
+    })
+    expect(inspection.findings).toEqual([])
+    expect(await verifyAll(inspection)).toEqual([
+      { label: 'Issuer signature', status: 'valid', message: 'Valid, signed with the key you gave (JWK).' },
+      {
+        label: 'Key Binding JWT',
+        status: 'valid',
+        message: 'Valid, signed with the cnf key of the SD-JWT (JWK).',
+      },
+    ])
+  })
+
+  it('reports another nonce and aud, and a Key Binding JWT not signed with the key in cnf', async () => {
+    const { text, holder } = await presentation({ nonce: 'old', aud: 'https://other.example' })
+    const inspection = inspectSdJwt(text, { nonce: 'n-0S6', aud: 'https://verifier.example' })
+    expect(inspection.findings.map(({ code, path }) => ({ code, path }))).toEqual([
+      { code: CODES.KB_NONCE_MISMATCH, path: ['key_binding', 'payload', 'nonce'] },
+      { code: CODES.KB_AUD_MISMATCH, path: ['key_binding', 'payload', 'aud'] },
+    ])
+
+    // Without a key or an x5c, the issuer signature cannot be verified
+    const [issuerSignature, keyBinding] = await verifyAll(inspection)
+    expect(issuerSignature.status).toBe('unverified')
+    expect(keyBinding.status).toBe('valid')
+
+    const tampered = `${text.slice(0, text.lastIndexOf('~') + 1)}${await signJwt({ typ: 'kb+jwt' }, {}, (await generateKey()).privateKey)}`
+    const [, forged] = await verifyAll(inspectSdJwt(tampered, { key: JSON.stringify(holder.publicJwk) }))
+    expect(forged).toMatchObject({ label: 'Key Binding JWT', status: 'invalid' })
   })
 })

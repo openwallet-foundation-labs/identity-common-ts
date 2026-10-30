@@ -10,6 +10,7 @@ import {
   type MobileSecurityObject,
 } from '@owf/mdoc'
 import { parseCertificate } from '@owf/x509'
+import { type DocumentInput, decodeBinaryText, errorMessage, isCborMap, isRecord, toText } from './input'
 import { type Inspection, InspectionError } from './inspection'
 
 /** Codes of the findings of an mdoc inspection */
@@ -49,14 +50,6 @@ type MdocFinding = Finding<MdocCode>
 type Path = (string | number)[]
 
 const C = MDOC_CODES
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error))
-
-/** Whether the bytes start with a CBOR map, or a map wrapped in tag 24 */
-export const isCborMap = (bytes: Uint8Array) => (bytes[0] & 0xe0) === 0xa0 || (bytes[0] === 0xd8 && bytes[1] === 0x18)
 
 /** The decoded CBOR as plain objects, arrays and leaves, for the document tree */
 export function toPlain(value: unknown): unknown {
@@ -265,7 +258,14 @@ const NOTES = ['The issuer signature and certificate chain are not verified', 'T
  * Decode an mdoc, as an IssuerSigned of OpenID4VCI or a DeviceResponse of OpenID4VP or
  * ISO/IEC 18013-5, and check it without verifying signatures.
  */
-export function inspectMdoc(bytes: Uint8Array): Inspection {
+export function inspectMdoc(input: DocumentInput): Inspection {
+  let bytes = typeof input === 'string' ? undefined : input
+  if (!bytes || !isCborMap(bytes)) {
+    const text = toText(input)
+    if (!text) throw new InspectionError('There is nothing to inspect')
+    bytes = decodeBinaryText(text)
+    if (!bytes) throw new InspectionError('An mdoc is CBOR, as bytes, hex or base64url, and this is none of them')
+  }
   let decoded: unknown
   try {
     decoded = cborDecode(bytes)

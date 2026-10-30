@@ -10,6 +10,19 @@ export type DocumentKind =
   | 'mdoc'
   | 'over-asking'
 
+/** The outcome of a signature check: `unverified` when it could not be checked, e.g. for want of a key */
+export interface SignatureResult {
+  status: 'valid' | 'invalid' | 'unverified'
+  message: string
+}
+
+/** A signature to verify, separately as it is asynchronous */
+export interface SignatureCheck {
+  /** What is signed, e.g. "Signature" or "Key Binding JWT" */
+  label: string
+  verify: () => Promise<SignatureResult>
+}
+
 export interface Inspection {
   kind: DocumentKind
   /** What the input was recognised as */
@@ -25,11 +38,7 @@ export interface Inspection {
   facts?: [string, string][]
   /** Look something up in the document, e.g. the status at an index of a status list */
   lookup?: { label: string; placeholder: string; find: (input: string) => string }
-  /**
-   * Verify the signature, separately as it is asynchronous. Resolves with a description of
-   * what was established, rejects when the signature is missing or invalid.
-   */
-  verifySignature?: () => Promise<string>
+  signatures?: SignatureCheck[]
 }
 
 /** The input could not be recognised or parsed */

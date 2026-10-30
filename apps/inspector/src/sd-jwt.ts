@@ -1,7 +1,18 @@
 import { hasher } from '@owf/crypto'
 import { base64url, decodeJwt, type Finding, type FindingSeverity } from '@owf/identity-common'
 import { Disclosure, getSDAlgAndPayload, unpackSync } from '@sd-jwt/core'
-import { type Inspection, InspectionError } from './inspection'
+import { type DocumentInput, errorMessage, isRecord, JWS, toText } from './input'
+import { type Inspection, InspectionError, type SignatureCheck } from './inspection'
+import { jwsSignatureCheck, parseKeys, verifyJwsSignature } from './signature'
+
+export interface SdJwtOptions {
+  /** The key or certificates of the issuer */
+  key?: string
+  /** The nonce the verifier sent, which the Key Binding JWT has to hold */
+  nonce?: string
+  /** The audience the Key Binding JWT has to be for, the client_id of the verifier */
+  aud?: string
+}
 
 /** Codes of the findings of an SD-JWT inspection */
 export const SD_JWT_CODES = {
@@ -41,25 +52,20 @@ export const SD_JWT_CODES = {
   MISSING_KB_CLAIM: 'missing_kb_claim',
   /** `sd_hash` of the Key Binding JWT is not the hash of the presented SD-JWT (RFC 9901 Section 4.3) */
   SD_HASH_MISMATCH: 'sd_hash_mismatch',
+  /** `nonce` of the Key Binding JWT is not the one the verifier sent */
+  KB_NONCE_MISMATCH: 'kb_nonce_mismatch',
+  /** `aud` of the Key Binding JWT is not the verifier */
+  KB_AUD_MISMATCH: 'kb_aud_mismatch',
 } as const
 
 type SdJwtCode = (typeof SD_JWT_CODES)[keyof typeof SD_JWT_CODES]
 
 const C = SD_JWT_CODES
-const JWS = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/
 // Claims an SD-JWT VC must not disclose selectively, as `@sd-jwt/sd-jwt-vc` enforces when issuing
 const PROTECTED_CLAIMS = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'status']
 const SKEW_SECONDS = 30
 
 const hasherSync = (data: string, alg: string) => hasher(data, alg)
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error))
-
-/** Whether the text is an SD-JWT in compact serialization */
-export const isSdJwt = (text: string) => JWS.test(text.split('~')[0]) && text.includes('~')
 
 /** Every digest referenced by `_sd` arrays and `{"...": digest}` array elements */
 function referencedDigests(value: unknown, digests = new Set<string>()): Set<string> {
@@ -84,10 +90,13 @@ function referencedDigests(value: unknown, digests = new Set<string>()): Set<str
 }
 
 /**
- * Decode an SD-JWT, or an SD-JWT VC, and check its disclosures, its claims and its Key
- * Binding JWT, without verifying any signature.
+ * Decode an SD-JWT, or an SD-JWT VC, check its disclosures, its claims and its Key Binding
+ * JWT, and verify its signatures.
  */
-export function inspectSdJwt(text: string): Inspection {
+export function inspectSdJwt(input: DocumentInput, options: SdJwtOptions = {}): Inspection {
+  const text = toText(input).replace(/\s+/g, '')
+  if (!text) throw new InspectionError('There is nothing to inspect')
+  if (!JWS.test(text.split('~')[0])) throw new InspectionError('An SD-JWT starts with a JWT, and this does not')
   const findings: Finding<SdJwtCode>[] = []
   const add = (
     severity: FindingSeverity,
@@ -248,6 +257,27 @@ export function inspectSdJwt(text: string): Inspection {
         )
       }
     }
+    const nonce = options.nonce?.trim()
+    if (nonce && keyBinding.payload.nonce !== undefined && keyBinding.payload.nonce !== nonce) {
+      add(
+        'error',
+        C.KB_NONCE_MISMATCH,
+        ['key_binding', 'payload', 'nonce'],
+        `nonce is not the one the verifier sent, ${nonce}`,
+        'RFC 9901 Section 7.3'
+      )
+    }
+    const aud = options.aud?.trim()
+    const audiences = Array.isArray(keyBinding.payload.aud) ? keyBinding.payload.aud : [keyBinding.payload.aud]
+    if (aud && keyBinding.payload.aud !== undefined && !audiences.includes(aud)) {
+      add(
+        'error',
+        C.KB_AUD_MISMATCH,
+        ['key_binding', 'payload', 'aud'],
+        `aud is not the verifier, ${aud}`,
+        'RFC 9901 Section 7.3'
+      )
+    }
     const sdHash = base64url.encode(hasher(text.slice(0, text.lastIndexOf('~') + 1), sdAlg))
     if (keyBinding.payload.sd_hash !== undefined && keyBinding.payload.sd_hash !== sdHash) {
       add(
@@ -286,6 +316,27 @@ export function inspectSdJwt(text: string): Inspection {
   ]
   if (isVc && typeof timeSource.vct === 'string') facts.unshift(['Type (vct)', timeSource.vct])
 
+  const signatures: SignatureCheck[] = [jwsSignatureCheck(parts[0], header, options.key, 'Issuer signature')]
+  if (keyBindingJwt && keyBinding) {
+    const { header: kbHeader } = keyBinding
+    const cnf = timeSource.cnf
+    signatures.push({
+      label: 'Key Binding JWT',
+      verify: async () => {
+        if (!isRecord(cnf) || !isRecord(cnf.jwk)) {
+          return { status: 'unverified', message: 'Not verified: the SD-JWT has no cnf with a jwk to verify it with' }
+        }
+        let keys: ReturnType<typeof parseKeys>
+        try {
+          keys = parseKeys(JSON.stringify(cnf.jwk))
+        } catch (error) {
+          return { status: 'invalid', message: `Invalid: the jwk of cnf cannot be read: ${errorMessage(error)}` }
+        }
+        return verifyJwsSignature(keyBindingJwt, kbHeader, { keys, source: 'the cnf key of the SD-JWT' })
+      },
+    })
+  }
+
   return {
     kind: 'sd-jwt',
     title: `${isVc ? 'SD-JWT VC' : 'SD-JWT'}${keyBindingJwt ? ' presentation' : ''}`,
@@ -295,11 +346,17 @@ export function inspectSdJwt(text: string): Inspection {
       ...(keyBindingJwt ? ['Key Binding JWT'] : []),
     ],
     notes: [
-      'No signature is verified',
+      ...(keyBindingJwt && !options.nonce?.trim()
+        ? ['The nonce of the Key Binding JWT is not compared: give it to do so']
+        : []),
+      ...(keyBindingJwt && !options.aud?.trim()
+        ? ['The aud of the Key Binding JWT is not compared: give it to do so']
+        : []),
       ...(isVc ? ['The type metadata of the vct is not fetched', 'The status is not looked up'] : []),
     ],
     value,
     findings,
     facts,
+    signatures,
   }
 }
