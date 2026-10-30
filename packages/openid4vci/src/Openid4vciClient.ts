@@ -3,6 +3,7 @@ import {
   type CallbackContext,
   type CreateAuthorizationRequestUrlOptions,
   createPkce,
+  extractDpopNonceFromHeaders,
   getAuthorizationServerMetadataFromList,
   Oauth2Client,
   Oauth2ClientAuthorizationChallengeError,
@@ -353,11 +354,18 @@ export class Openid4vciClient {
             `Expected 'auth_session' to be defined with authorization challenge response error '${error.errorResponse.error}' and 'presentation' parameter`
           )
         }
+        let dpop = options.dpop
+        const dpopNonce = extractDpopNonceFromHeaders(error.response.headers)
+        if (dpop && dpopNonce) {
+          dpop = { ...dpop, nonce: dpopNonce }
+        }
+
         return {
           authorizationFlow: AuthorizationFlow.PresentationDuringIssuance,
           openid4vpRequestUrl: error.errorResponse.presentation,
           authSession: error.errorResponse.auth_session,
           authorizationServer: authorizationServerMetadata.issuer,
+          dpop,
         }
       }
 
