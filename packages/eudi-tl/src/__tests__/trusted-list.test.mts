@@ -32,6 +32,8 @@ describe('parseTrustedList', () => {
 
     expect(tl.tslType).toBe(TSLType.EUgeneric)
     expect(tl.schemeOperatorName).toBe('Test Scheme Operator') // 'en' entry preferred
+    // the list's own territory, not the one of a pointer
+    expect(tl.schemeTerritory).toBe('ES')
     expect(tl.sequenceNumber).toBe(42)
     expect(tl.listIssueDateTime).toBe('2025-01-15T00:00:00Z')
     expect(tl.nextUpdate).toBe('2025-07-15T00:00:00Z')
