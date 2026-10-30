@@ -5,17 +5,19 @@ describe('Parse Authorization Request Params', () => {
   test('parse authorization request uri and transforms string JSON fields to JSON', () => {
     expect(
       parseOpenid4vpAuthorizationRequest({
-        authorizationRequest: `openid4vp://?client_id=test&presentation_definition=${encodeURIComponent(JSON.stringify({ id: 'something' }))}&dcql_query=${encodeURIComponent(JSON.stringify({ id: 'something' }))}&client_metadata=${encodeURIComponent(JSON.stringify({ my: 'metadata' }))}&transaction_data=${encodeURIComponent(JSON.stringify(['something']))}&verifier_attestations=${encodeURIComponent(JSON.stringify([{ format: 'custom', data: 'none', credential_ids: ['my-id'] }]))}&verifier_info=${encodeURIComponent(JSON.stringify([{ format: 'custom', data: 'none', credential_ids: ['my-id'] }]))}`,
+        authorizationRequest: `openid4vp://?response_type=vp_token&client_id=test&nonce=nonce&presentation_definition=${encodeURIComponent(JSON.stringify({ id: 'something' }))}&dcql_query=${encodeURIComponent(JSON.stringify({ id: 'something' }))}&client_metadata=${encodeURIComponent(JSON.stringify({ my: 'metadata' }))}&transaction_data=${encodeURIComponent(JSON.stringify(['c29tZXRoaW5n']))}&verifier_attestations=${encodeURIComponent(JSON.stringify([{ format: 'custom', data: 'none', credential_ids: ['my-id'] }]))}&verifier_info=${encodeURIComponent(JSON.stringify([{ format: 'custom', data: 'none', credential_ids: ['my-id'] }]))}`,
       })
     ).toEqual({
       type: 'openid4vp',
       provided: 'uri',
       params: {
+        response_type: 'vp_token',
         client_id: 'test',
+        nonce: 'nonce',
         presentation_definition: { id: 'something' },
         client_metadata: { my: 'metadata' },
         dcql_query: { id: 'something' },
-        transaction_data: ['something'],
+        transaction_data: ['c29tZXRoaW5n'],
         verifier_attestations: [
           {
             format: 'custom',
