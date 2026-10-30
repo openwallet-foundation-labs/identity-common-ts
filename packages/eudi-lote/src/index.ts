@@ -21,6 +21,7 @@ export {
 } from './profiles'
 // Schemas
 export {
+  hasDigitalIdentity,
   JWKPublicKeySchema,
   ListAndSchemeInformationSchema,
   LocalizedStringSchema,
@@ -30,6 +31,7 @@ export {
   LoTESchema,
   OtherLoTEPointerSchema,
   PkiObjectSchema,
+  PolicyOrLegalNoticeListSchema,
   PolicyOrLegalNoticeSchema,
   PostalAddressSchema,
   SchemeOperatorAddressSchema,

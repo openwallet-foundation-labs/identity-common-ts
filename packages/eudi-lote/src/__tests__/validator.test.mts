@@ -1,6 +1,7 @@
 import { decodeJwt } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import { assertValidLoTE, validateLoTE } from '../index'
+import { LOTE_TYPES } from '../profiles'
 import type { LoTEDocument } from '../types'
 import { LoTEProfile, validateLoTEProfile } from '../validator'
 import {
@@ -361,8 +362,8 @@ describe('LoTE Validator', () => {
 
       const result = validateLoTE(lote)
 
-      expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.message.includes('digital identity type'))).toBe(true)
+      // The TS 119 602 JSON schema allows an empty ServiceDigitalIdentity; the EU profiles do not
+      expect(result).toEqual({ valid: true, errors: [] })
     })
   })
 
@@ -533,6 +534,145 @@ describe('LoTE Validator', () => {
       })
 
       expect(result.valid).toBe(false)
+      expect(result.errors.map((e) => e.path)).toContain(
+        'LoTE.ListAndSchemeInformation.PolicyOrLegalNotice.0.LoTELegalNotice'
+      )
+    })
+
+    const withPolicyOrLegalNotice = (items: unknown[]) => {
+      const lote = createMinimalValidLoTE()
+      return {
+        LoTE: {
+          ...lote.LoTE,
+          ListAndSchemeInformation: { ...lote.LoTE.ListAndSchemeInformation, PolicyOrLegalNotice: items },
+        },
+      }
+    }
+    const policy = { LoTEPolicy: { lang: 'en', uriValue: 'https://example.com/policy' } }
+
+    it('should accept an empty string legal notice, as the JSON schema does', () => {
+      expect(validateLoTE(withPolicyOrLegalNotice([{ LoTELegalNotice: '' }]))).toEqual({ valid: true, errors: [] })
+    })
+
+    it('should reject a PolicyOrLegalNotice item with neither LoTEPolicy nor LoTELegalNotice', () => {
+      const result = validateLoTE(withPolicyOrLegalNotice([{}]))
+
+      expect(result.valid).toBe(false)
+      expect(result.errors.map((e) => e.path)).toEqual(['LoTE.ListAndSchemeInformation.PolicyOrLegalNotice.0'])
+    })
+
+    it('should reject a PolicyOrLegalNotice whose every item has both LoTEPolicy and LoTELegalNotice', () => {
+      const result = validateLoTE(withPolicyOrLegalNotice([{ ...policy, LoTELegalNotice: 'Notice' }]))
+
+      expect(result.valid).toBe(false)
+      expect(result.errors.map((e) => e.path)).toEqual(['LoTE.ListAndSchemeInformation.PolicyOrLegalNotice'])
+    })
+
+    it('should accept an item with both keys when another item has only one, as the oneOf does', () => {
+      expect(validateLoTE(withPolicyOrLegalNotice([policy, { ...policy, LoTELegalNotice: 'Notice' }]))).toEqual({
+        valid: true,
+        errors: [],
+      })
+    })
+
+    it('should reject an empty PolicyOrLegalNotice', () => {
+      const result = validateLoTE(withPolicyOrLegalNotice([]))
+
+      expect(result.errors.map((e) => e.path)).toEqual(['LoTE.ListAndSchemeInformation.PolicyOrLegalNotice'])
+    })
+
+    it('should reject policies and legal notices mixed in one PolicyOrLegalNotice', () => {
+      const result = validateLoTE(withPolicyOrLegalNotice([policy, { LoTELegalNotice: 'Notice' }]))
+
+      expect(result.valid).toBe(false)
+      expect(result.errors.map((e) => e.path)).toEqual(['LoTE.ListAndSchemeInformation.PolicyOrLegalNotice.1'])
+    })
+
+    it('should accept date-times with an offset (RFC 3339)', () => {
+      const lote = createMinimalValidLoTE()
+      lote.LoTE.ListAndSchemeInformation.ListIssueDateTime = '2026-10-23T10:47:49+02:00'
+      lote.LoTE.ListAndSchemeInformation.NextUpdate = '2027-04-23T10:47:49-05:30'
+
+      expect(validateLoTE(lote)).toEqual({ valid: true, errors: [] })
+    })
+
+    it('should accept lowercase t and z and a leap second at 23:59:60 UTC (RFC 3339)', () => {
+      const lote = createMinimalValidLoTE()
+      lote.LoTE.ListAndSchemeInformation.ListIssueDateTime = '2016-12-31t23:59:60z'
+      lote.LoTE.ListAndSchemeInformation.NextUpdate = '2017-01-01T00:59:60+01:00'
+
+      expect(validateLoTE(lote)).toEqual({ valid: true, errors: [] })
+    })
+
+    it('should reject a leap second outside 23:59 UTC and an impossible date', () => {
+      const lote = createMinimalValidLoTE()
+      lote.LoTE.ListAndSchemeInformation.ListIssueDateTime = '2016-12-31T22:59:60Z'
+      lote.LoTE.ListAndSchemeInformation.NextUpdate = '2026-02-29T00:00:00Z'
+
+      expect(validateLoTE(lote).errors.map((e) => e.path)).toEqual([
+        'LoTE.ListAndSchemeInformation.ListIssueDateTime',
+        'LoTE.ListAndSchemeInformation.NextUpdate',
+      ])
+    })
+
+    it('should accept what the JSON schema leaves open: any certificate encoding and specRef, empty strings, a long country', () => {
+      const lote = withEntity({
+        TrustedEntityInformation: {
+          TEName: [{ lang: '', value: '' }],
+          TEAddress: {
+            TEPostalAddress: [{ lang: 'en', StreetAddress: '1 St', Country: 'Germany' }],
+            TEElectronicAddress: [{ lang: 'en', uriValue: 'mailto:test@example.com' }],
+          },
+        },
+        TrustedEntityServices: [
+          {
+            ServiceInformation: {
+              ServiceName: [{ lang: 'en', value: 'Service' }],
+              ServiceDigitalIdentity: {
+                X509Certificates: [{ encoding: 'https://example.com/der', specRef: 'X.509', val: '' }],
+              },
+            },
+          },
+        ],
+      })
+      lote.LoTE.ListAndSchemeInformation = {
+        ...lote.LoTE.ListAndSchemeInformation,
+        PointersToOtherLoTE: [
+          {
+            LoTELocation: 'https://example.com/lote.json',
+            ServiceDigitalIdentities: [{}],
+            LoTEQualifiers: [
+              { LoTEType: 'https://example.com/type', SchemeOperatorName: [{ lang: 'en', value: 'Op' }], MimeType: '' },
+            ],
+          },
+        ],
+      }
+
+      expect(validateLoTE(lote)).toEqual({ valid: true, errors: [] })
+    })
+
+    it('should still reject a certificate encoding that is not a URI', () => {
+      const lote = withEntity({
+        TrustedEntityInformation: {
+          TEName: [{ lang: 'en', value: 'Entity' }],
+          TEAddress: {
+            TEPostalAddress: [fullAddress],
+            TEElectronicAddress: [{ lang: 'en', uriValue: 'mailto:a@example.com' }],
+          },
+        },
+        TrustedEntityServices: [
+          {
+            ServiceInformation: {
+              ServiceName: [{ lang: 'en', value: 'Service' }],
+              ServiceDigitalIdentity: { X509Certificates: [{ encoding: 'not a uri', val: 'AA==' }] },
+            },
+          },
+        ],
+      })
+
+      expect(validateLoTE(lote).errors.map((e) => e.path)).toEqual([
+        'LoTE.TrustedEntitiesList.0.TrustedEntityServices.0.ServiceInformation.ServiceDigitalIdentity.X509Certificates.0.encoding',
+      ])
     })
   })
 
@@ -593,6 +733,104 @@ describe('LoTE Validator', () => {
       expect(lote.LoTE.ListAndSchemeInformation.PolicyOrLegalNotice).toEqual([{ LoTELegalNotice: 'Legal notice' }])
       expect(validateLoTE(lote)).toEqual({ valid: true, errors: [] })
       expect(validateLoTEProfile(lote, LoTEProfile.EUWRPRCProvidersList)).toEqual({ valid: true, errors: [] })
+    })
+
+    /** The EC WRPAC list, turned into a list of another EU profile by its URIs */
+    const asProfile = (kind: 'EAA' | 'PubEAA') => {
+      const { payload } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
+      const json = JSON.stringify(payload)
+        .replace(/LoTEType\/EUWRPACProvidersList/g, `LoTEType/EU${kind}ProvidersList`)
+        .replace(/WRPACProvidersList\//g, `${kind}ProvidersList/`)
+        .replace(/ListOfTrustedEntities\/WRPACProvider\//g, `ListOfTrustedEntities/${kind}Provider/`)
+        .replace(/SvcType\/WRPAC\//g, `SvcType/${kind}/`)
+      const lote = JSON.parse(json) as LoTEDocument
+      if (kind === 'PubEAA') lote.LoTE.ListAndSchemeInformation.HistoricalInformationPeriod = 65535
+      return lote
+    }
+
+    it('should validate a list against the EUEAAProvidersList profile', () => {
+      const lote = asProfile('EAA')
+
+      expect(lote.LoTE.ListAndSchemeInformation.LoTEType).toBe(LOTE_TYPES.EUEAAProvidersList)
+      expect(validateLoTEProfile(lote, LoTEProfile.EUEAAProvidersList)).toEqual({ valid: true, errors: [] })
+    })
+
+    it('should validate a list against the EUPubEAAProvidersList profile', () => {
+      const lote = asProfile('PubEAA')
+
+      expect(lote.LoTE.ListAndSchemeInformation.LoTEType).toBe(LOTE_TYPES.EUPubEAAProvidersList)
+      expect(validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList)).toEqual({ valid: true, errors: [] })
+    })
+
+    it('should keep requiring a 2-letter country and a digital identity in the EU profiles', () => {
+      const { payload: lote } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
+      const entity = lote.LoTE.TrustedEntitiesList?.[0]
+      const address = entity?.TrustedEntityInformation.TEAddress.TEPostalAddress[0]
+      const firstService = entity?.TrustedEntityServices[0]
+      if (!address || !firstService) throw new Error('The WRPAC fixture has no entity with an address and a service')
+      address.Country = 'Germany'
+      firstService.ServiceInformation.ServiceDigitalIdentity = {}
+
+      expect(validateLoTE(lote)).toEqual({ valid: true, errors: [] })
+      const result = validateLoTEProfile(lote, LoTEProfile.EUWRPACProvidersList)
+      expect(result.valid).toBe(false)
+      expect(result.errors.map((e) => e.path)).toEqual([
+        'LoTEType',
+        'LoTE.TrustedEntitiesList.0.TrustedEntityInformation.TEAddress.TEPostalAddress.0.Country',
+        'LoTE.TrustedEntitiesList.0.TrustedEntityServices.0.ServiceInformation.ServiceDigitalIdentity',
+      ])
+    })
+
+    it('should keep the rules the base schema used to apply in the EU profiles', () => {
+      const { payload: lote } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
+      const info = lote.LoTE.ListAndSchemeInformation
+      const entity = lote.LoTE.TrustedEntitiesList?.[0]
+      const firstService = entity?.TrustedEntityServices[0]
+      if (!entity || !firstService) throw new Error('The WRPAC fixture has no entity with a service')
+      info.SchemeOperatorName = [{ lang: '', value: '' }]
+      info.SchemeOperatorAddress = {
+        SchemeOperatorPostalAddress: [{ lang: 'en', StreetAddress: '1 Rue', Country: 'Belgium' }],
+        SchemeOperatorElectronicAddress: [{ lang: 'en', uriValue: 'mailto:op@example.com' }],
+      }
+      info.PointersToOtherLoTE = [
+        {
+          LoTELocation: 'https://example.com/other.json',
+          ServiceDigitalIdentities: [{}],
+          LoTEQualifiers: [
+            { LoTEType: 'https://example.com/type', SchemeOperatorName: [{ lang: 'en', value: 'Op' }], MimeType: '' },
+          ],
+        },
+      ]
+      firstService.ServiceInformation.ServiceDigitalIdentity = {
+        X509Certificates: [{ encoding: 'https://example.com/der', specRef: 'X.509', val: '' }],
+        PublicKeyValues: [{ kty: 'oct' }],
+      }
+      firstService.ServiceHistory = [
+        {
+          ServiceName: [{ lang: 'en', value: 'Old' }],
+          ServiceDigitalIdentity: {},
+          ServiceStatus: 'https://example.com/status',
+          StatusStartingTime: '2026-01-01T00:00:00Z',
+        },
+      ]
+
+      expect(validateLoTE(lote)).toEqual({ valid: true, errors: [] })
+      const paths = validateLoTEProfile(lote, LoTEProfile.EUWRPACProvidersList).errors.map((e) => e.path)
+      const service = 'LoTE.TrustedEntitiesList.0.TrustedEntityServices.0'
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          'LoTE.ListAndSchemeInformation.SchemeOperatorName.0.lang',
+          'LoTE.ListAndSchemeInformation.SchemeOperatorName.0.value',
+          'LoTE.ListAndSchemeInformation.SchemeOperatorAddress.SchemeOperatorPostalAddress.0.Country',
+          'LoTE.ListAndSchemeInformation.PointersToOtherLoTE.0.ServiceDigitalIdentities.0',
+          'LoTE.ListAndSchemeInformation.PointersToOtherLoTE.0.LoTEQualifiers.0.MimeType',
+          `${service}.ServiceInformation.ServiceDigitalIdentity.X509Certificates.0.val`,
+          `${service}.ServiceInformation.ServiceDigitalIdentity.X509Certificates.0.encoding`,
+          `${service}.ServiceInformation.ServiceDigitalIdentity.X509Certificates.0.specRef`,
+          `${service}.ServiceInformation.ServiceDigitalIdentity.PublicKeyValues.0.kty`,
+          `${service}.ServiceHistory.0.ServiceDigitalIdentity`,
+        ])
+      )
     })
 
     it('short-circuit errors when validating against wrong profile', () => {
