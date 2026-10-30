@@ -7,6 +7,7 @@ export const jarmResponseMode = [
   'form_post.jwt',
   'direct_post.jwt',
   'dc_api.jwt',
+  'w3c_dc_api.jwt',
 ] as const
 export const zJarmResponseMode = z.enum(jarmResponseMode)
 
