@@ -88,6 +88,31 @@ h3 {
   color: var(--text-muted);
 }
 
+.privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ok);
+  border-radius: var(--radius);
+  background: var(--ok-bg);
+  font-size: 14px;
+}
+
+.privacy svg {
+  flex: none;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.privacy p {
+  margin: 0;
+}
+
 .formats {
   display: flex;
   flex-wrap: wrap;

@@ -13,11 +13,12 @@ this repository:
 | SD-JWT and SD-JWT VC | RFC 9901, draft-ietf-oauth-sd-jwt-vc | compact, with or without Key Binding JWT |
 | mdoc | ISO/IEC 18013-5 | IssuerSigned or DeviceResponse, CBOR as bytes, hex or base64url |
 
-Documents can be pasted, dropped as a file or fetched from a URL. Everything runs in the browser. The findings come
-from the validators of the packages, each with a path into the parsed document, so they are shown at the element they
-concern. For a status list, it also counts the statuses and looks up the status at an index. For an SD-JWT, it
-resolves the claims and shows the claim each disclosure discloses. For an mdoc, it shows the Mobile Security Object and
-every element, and compares the digest of each element with the one in the MSO.
+Documents can be pasted, dropped as a file or fetched from a URL. Everything runs in the browser: nothing that is
+pasted, dropped or checked is sent to a server, and once loaded the page only makes a request to fetch a URL. The
+findings come from the validators of the packages, each with a path into the parsed document, so they are shown at the
+element they concern. For a status list, it also counts the statuses and looks up the status at an index. For an SD-JWT,
+it resolves the claims and shows the claim each disclosure discloses. For an mdoc, it shows the Mobile Security Object
+and every element, and compares the digest of each element with the one in the MSO.
 
 The checks of trusted lists, LoTEs, certificates and status lists come from the validators of the packages. Those of
 SD-JWTs and mdocs are in the inspector (`src/sd-jwt.ts`, `src/mdoc.ts`), built on the decoding of `@sd-jwt/core` and
