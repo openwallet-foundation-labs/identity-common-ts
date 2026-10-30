@@ -350,6 +350,13 @@ export class Jwt<
     if (options?.allowedIssuerAlgorithms && !options.allowedIssuerAlgorithms.includes(alg)) {
       throw new SDJWTException(`Verify Error: Disallowed alg ${alg}`, { code: 'INVALID_JWT_SIGNATURE' })
     }
+    // RFC 7515 Section 4.1.11: a JWS with a critical extension the recipient does not understand is invalid,
+    // and no extension Header Parameter is understood here
+    if (this.header && 'crit' in this.header) {
+      throw new SDJWTException('Verify Error: unsupported critical header parameters', {
+        code: 'INVALID_JWT_SIGNATURE',
+      })
+    }
 
     if (!options?.skipJwtClaimValidation) {
       validateJwtPayload(this.payload, options)

@@ -18,6 +18,8 @@ import {
   getSDAlgAndPayload,
   Jwt,
   type SafeVerifyResult,
+  SD_DIGEST,
+  SD_LIST_KEY,
   SDJWTException,
   SDJwt,
   SDJwtInstance,
@@ -52,6 +54,16 @@ import type { VerificationResult } from './verification-result'
 // SRI hash algorithms, ordered from weakest to strongest
 const SRI_ALGORITHMS = ['sha256', 'sha384', 'sha512']
 
+// Claims that SD-JWT VC forbids to be selectively disclosed
+const PROTECTED_CLAIMS = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'vct#integrity', 'status']
+
+// Whether a value has selectively disclosable parts: an `_sd` digest list or an array element digest
+const hasSelectivelyDisclosableParts = (value: unknown): boolean => {
+  if (Array.isArray(value)) return value.some(hasSelectivelyDisclosableParts)
+  if (typeof value !== 'object' || value === null) return false
+  return SD_DIGEST in value || SD_LIST_KEY in value || Object.values(value).some(hasSelectivelyDisclosableParts)
+}
+
 export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, T> {
   /**
    * The type of the SD-JWT-VC set in the header.typ field.
@@ -73,11 +85,59 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
    */
   protected validateDisclosureFrame(disclosureFrame?: DisclosureFrame<SdJwtVcPayload>): void {
     if (disclosureFrame?._sd && Array.isArray(disclosureFrame._sd) && disclosureFrame._sd.length > 0) {
-      const reservedNames = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'vct#integrity', 'status']
-      const reservedNamesInDisclosureFrame = disclosureFrame._sd.filter((key) => reservedNames.includes(String(key)))
+      const reservedNamesInDisclosureFrame = disclosureFrame._sd.filter((key) => PROTECTED_CLAIMS.includes(String(key)))
       if (reservedNamesInDisclosureFrame.length > 0) {
         throw new SDJWTException('Cannot disclose protected field')
       }
+    }
+    // Nor can their sub-claims, such as the status_list of status (SD-JWT VC draft 19, Section 2.2.2.3)
+    const frame = disclosureFrame as Record<string, unknown> | undefined
+    if (PROTECTED_CLAIMS.some((name) => frame?.[name] !== undefined)) {
+      throw new SDJWTException('Cannot disclose protected field')
+    }
+  }
+
+  /**
+   * Validates the SD-JWT-VC like `SDJwtInstance.validate`, and rejects it when a protected claim was selectively
+   * disclosed or has selectively disclosable parts.
+   */
+  async validate(encodedSDJwt: string, options?: T & VerifierOptions) {
+    const result = await super.validate(encodedSDJwt, options)
+    this.validateProtectedClaims(result.payload, await this.issuerSignedPayload(encodedSDJwt))
+    return result
+  }
+
+  /**
+   * The issuer-signed payload of the SD-JWT-VC, before any Disclosure is applied.
+   */
+  private async issuerSignedPayload(encodedSDJwt: string): Promise<SdJwtVcPayload> {
+    const { payload } = await SDJwt.extractJwt<Record<string, unknown>, SdJwtVcPayload>(encodedSDJwt)
+    if (!payload) {
+      throw new SDJWTException('Invalid SD JWT', { code: 'INVALID_SD_JWT' })
+    }
+    return payload
+  }
+
+  /**
+   * Throws when a protected claim was selectively disclosed (it is a top-level claim that the issuer-signed payload
+   * does not contain itself) or has selectively disclosable parts in the issuer-signed payload.
+   */
+  private validateProtectedClaims(claims: Record<string, unknown>, signedPayload: Record<string, unknown>) {
+    const disclosed = PROTECTED_CLAIMS.filter((name) => {
+      const claimInSignedPayload = name in signedPayload
+      return name in claims && !claimInSignedPayload
+    })
+    if (disclosed.length > 0) {
+      throw new SDJWTException(`Protected claims must not be selectively disclosed: ${disclosed.join(', ')}`, {
+        code: 'INVALID_SD_JWT',
+      })
+    }
+    const partlyDisclosable = PROTECTED_CLAIMS.filter((name) => hasSelectivelyDisclosableParts(signedPayload[name]))
+    if (partlyDisclosable.length > 0) {
+      throw new SDJWTException(
+        `Protected claims must not have selectively disclosable parts: ${partlyDisclosable.join(', ')}`,
+        { code: 'INVALID_SD_JWT' }
+      )
     }
   }
 
@@ -186,6 +246,15 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
         header: baseResult.data.header,
         kb: baseResult.data.kb as VerificationResult['kb'],
       }
+      const signedPayload = await this.issuerSignedPayload(encodedSDJwt)
+      try {
+        this.validateProtectedClaims(result.payload, signedPayload)
+      } catch (e) {
+        const error = ensureError(e)
+        addError('INVALID_SD_JWT', error.message, error)
+        // The status and type metadata checks below then see only the issuer-signed claims
+        result = { ...result, payload: signedPayload }
+      }
     } else {
       // Try to extract payload even if verification failed for status/vct checks
       try {
@@ -199,6 +268,15 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
         }
       } catch {
         // Cannot extract payload, skip additional checks
+      }
+      // Only the issuer-signed claims are decoded here, so this finds protected claims with selectively disclosable parts
+      if (result) {
+        try {
+          this.validateProtectedClaims(result.payload, result.payload)
+        } catch (e) {
+          const error = ensureError(e)
+          addError('INVALID_SD_JWT', error.message, error)
+        }
       }
     }
 

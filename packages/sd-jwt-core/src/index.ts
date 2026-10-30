@@ -798,6 +798,10 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
         if (options?.allowedIssuerAlgorithms && !options.allowedIssuerAlgorithms.includes(header.alg)) {
           throw new SDJWTException(`Verify Error: Disallowed alg ${header.alg}`)
         }
+        // RFC 7515 Section 4.1.11, as in Jwt.verify
+        if ('crit' in header) {
+          throw new SDJWTException('Verify Error: unsupported critical header parameters')
+        }
         return { verified, header }
       })
     )

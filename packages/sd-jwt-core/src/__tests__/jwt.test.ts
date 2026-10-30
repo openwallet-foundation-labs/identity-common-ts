@@ -90,6 +90,27 @@ describe('JWT', () => {
     }
   })
 
+  test('verify rejects critical header parameters', async () => {
+    const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
+    const testSigner: Signer = async (data: string) => {
+      const sig = Crypto.sign(null, Buffer.from(data), privateKey)
+      return Buffer.from(sig).toString('base64url')
+    }
+    const testVerifier: Verifier = async (data: string, sig: string) => {
+      return Crypto.verify(null, Buffer.from(data), publicKey, Buffer.from(sig, 'base64url'))
+    }
+
+    const jwt = new Jwt({
+      header: { alg: 'EdDSA', crit: ['urn:example:ext'], 'urn:example:ext': true },
+      payload: { foo: 'bar' },
+    })
+    const newJwt = Jwt.fromEncode(await jwt.sign(testSigner))
+    await expect(newJwt.verify(testVerifier)).rejects.toMatchObject({
+      code: 'INVALID_JWT_SIGNATURE',
+      message: 'Verify Error: unsupported critical header parameters',
+    })
+  })
+
   test('encode', async () => {
     const { privateKey } = Crypto.generateKeyPairSync('ed25519')
     const testSigner: Signer = async (data: string) => {

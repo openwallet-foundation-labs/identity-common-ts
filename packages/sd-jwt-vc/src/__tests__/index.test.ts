@@ -11,6 +11,7 @@ import {
   type JwtPayload,
   JwtTimeClaimException,
   SDJWTException,
+  SDJwtInstance,
   type Signer,
   type Verifier,
 } from '@sd-jwt/core'
@@ -96,6 +97,127 @@ describe('App', () => {
     const payload: SdJwtVcPayload = { iat, iss, vct, 'vct#integrity': 'sha256-example' }
     const disclosureFrame = { _sd: ['vct#integrity'] } as unknown as DisclosureFrame<SdJwtVcPayload>
     await expect(sdjwt.issue(payload, disclosureFrame)).rejects.toThrowError('Cannot disclose protected field')
+  })
+
+  test.each([
+    ['iss', iss],
+    ['nbf', iat],
+    ['exp', iat + 3600],
+    ['cnf', { jwk: { kty: 'OKP', crv: 'Ed25519', x: 'x' } }],
+    ['vct', vct],
+    ['vct#integrity', 'sha256-example'],
+  ])('rejects a credential in which %s was selectively disclosed', async (claim, value) => {
+    const { signer, verifier } = createSignerVerifier()
+    const config = {
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256' as const,
+      saltGenerator: generateSalt,
+    }
+    // A plain SD-JWT issuer does not apply the SD-JWT VC rule, so it can make a protected claim disclosable
+    const issuer = new SDJwtInstance<SdJwtVcPayload>(config)
+    const sdjwt = new SDJwtVcInstance(config)
+    const payload: SdJwtVcPayload = { iat, iss, vct, [claim]: value, nested: { [claim]: value } }
+
+    // The same claim inside a disclosable object is not protected
+    const control = await issuer.issue(payload, {
+      nested: { _sd: [claim] },
+    } as unknown as DisclosureFrame<SdJwtVcPayload>)
+    await expect(sdjwt.verify(control)).resolves.toHaveProperty('payload')
+    await expect(sdjwt.safeVerify(control)).resolves.toMatchObject({ success: true })
+
+    const credential = await issuer.issue(payload, { _sd: [claim] } as unknown as DisclosureFrame<SdJwtVcPayload>)
+    await expect(sdjwt.verify(credential)).rejects.toMatchObject({
+      code: 'INVALID_SD_JWT',
+      message: `Protected claims must not be selectively disclosed: ${claim}`,
+    })
+    const result = await sdjwt.safeVerify(credential)
+    expect(result.success).toBe(false)
+    expect(result.errors?.map((e) => e.code)).toEqual(['INVALID_SD_JWT'])
+  })
+
+  test('rejects a credential in which status was selectively disclosed', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    const statusListFetcher = vi.fn(async () => statusListJWT)
+    const config = {
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256' as const,
+      saltGenerator: generateSalt,
+      statusListFetcher,
+    }
+    const issuer = new SDJwtInstance<SdJwtVcPayload>(config)
+    const sdjwt = new SDJwtVcInstance(config)
+    const status = { status_list: { idx: 0, uri: 'https://example.com/status-list' } }
+    const payload: SdJwtVcPayload = { iat, iss, vct, status }
+    const credential = await issuer.issue(payload, { _sd: ['status'] } as unknown as DisclosureFrame<SdJwtVcPayload>)
+
+    await expect(sdjwt.verify(credential)).rejects.toMatchObject({
+      code: 'INVALID_SD_JWT',
+      message: 'Protected claims must not be selectively disclosed: status',
+    })
+    const result = await sdjwt.safeVerify(credential)
+    expect(result.success).toBe(false)
+    expect(result.errors?.map((e) => e.code)).toEqual(['INVALID_SD_JWT'])
+    expect(statusListFetcher).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    ['status', { status: { _sd: ['status_list'] } }],
+    ['cnf', { cnf: { _sd: ['jwk'] } }],
+    ['cnf', { cnf: { keys: { _sd: [0] } } }],
+  ])('rejects a credential in which a part of %s is selectively disclosable', async (claim, frame) => {
+    const { signer, verifier } = createSignerVerifier()
+    const statusListFetcher = vi.fn(async () => statusListJWT)
+    const config = {
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256' as const,
+      saltGenerator: generateSalt,
+      statusListFetcher,
+    }
+    const issuer = new SDJwtInstance<SdJwtVcPayload>(config)
+    const sdjwt = new SDJwtVcInstance(config)
+    const jwk = { kty: 'OKP', crv: 'Ed25519', x: 'x' }
+    const payload: SdJwtVcPayload = {
+      iat,
+      iss,
+      vct,
+      status: { status_list: { idx: 0, uri: 'https://example.com/status-list' } },
+      cnf: { jwk, keys: [jwk, jwk] },
+    }
+    const disclosureFrame = frame as unknown as DisclosureFrame<SdJwtVcPayload>
+
+    await expect(sdjwt.issue(payload, disclosureFrame)).rejects.toThrowError('Cannot disclose protected field')
+
+    // Refused whether the holder reveals the part or withholds it
+    const credential = await issuer.issue(payload, disclosureFrame)
+    for (const presentation of [credential, await issuer.present(credential, {})]) {
+      await expect(sdjwt.verify(presentation)).rejects.toMatchObject({
+        code: 'INVALID_SD_JWT',
+        message: `Protected claims must not have selectively disclosable parts: ${claim}`,
+      })
+      const result = await sdjwt.safeVerify(presentation)
+      expect(result.success).toBe(false)
+      expect(result.errors?.map((e) => e.code)).toContain('INVALID_SD_JWT')
+    }
+
+    // Also reported when the signature does not verify, from the issuer-signed claims alone
+    const rejecting = new SDJwtVcInstance({ ...config, verifier: async () => false })
+    const failed = await rejecting.safeVerify(credential)
+    expect(failed.errors?.map((e) => e.message)).toContain(
+      `Protected claims must not have selectively disclosable parts: ${claim}`
+    )
+    // The same claim without selectively disclosable parts is not reported
+    const control = await rejecting.safeVerify(await issuer.issue(payload, {}))
+    expect(control.success).toBe(false)
+    expect(control.errors?.map((e) => e.code)).not.toContain('INVALID_SD_JWT')
   })
 })
 
