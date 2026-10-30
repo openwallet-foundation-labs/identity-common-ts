@@ -90,9 +90,9 @@ export const RenderingSchema = z
      */
     svg_template: z.array(SvgTemplateRenderingSchema).optional(),
   })
-  .transform(({ svg_template, svg_templates, ...rest }) => ({
+  .transform(({ svg_template, svg_templates = svg_template, ...rest }) => ({
     ...rest,
-    svg_templates: svg_templates ?? svg_template,
+    ...(svg_templates && { svg_templates }),
   }))
 
 export type Rendering = z.infer<typeof RenderingSchema>
