@@ -33,7 +33,8 @@ describe('LoTE Creation', () => {
     expect(lote.LoTE.ListAndSchemeInformation.SchemeOperatorName).toEqual([{ lang: 'en', value: 'Test Operator' }])
     expect(lote.LoTE.ListAndSchemeInformation.LoTEVersionIdentifier).toBe(1)
     expect(lote.LoTE.ListAndSchemeInformation.LoTESequenceNumber).toBe(1)
-    expect(lote.LoTE.TrustedEntitiesList).toEqual([])
+    // No entities: no TrustedEntitiesList key (the JSON schema has minItems 1)
+    expect('TrustedEntitiesList' in lote.LoTE).toBe(false)
   })
 
   it('should create a LoTE document with full scheme info', () => {

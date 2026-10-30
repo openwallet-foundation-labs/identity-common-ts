@@ -76,27 +76,33 @@ export function createLoTE(
   const sixMonthsLater = new Date(now)
   sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6)
 
+  const info: ListAndSchemeInformation = {
+    LoTEVersionIdentifier: schemeInfo.LoTEVersionIdentifier ?? 1,
+    LoTESequenceNumber: schemeInfo.LoTESequenceNumber ?? 1,
+    LoTEType: schemeInfo.LoTEType,
+    SchemeOperatorName: schemeInfo.SchemeOperatorName,
+    SchemeOperatorAddress: schemeInfo.SchemeOperatorAddress,
+    SchemeName: schemeInfo.SchemeName,
+    SchemeInformationURI: schemeInfo.SchemeInformationURI,
+    StatusDeterminationApproach: schemeInfo.StatusDeterminationApproach,
+    SchemeTypeCommunityRules: schemeInfo.SchemeTypeCommunityRules,
+    SchemeTerritory: schemeInfo.SchemeTerritory,
+    PolicyOrLegalNotice: schemeInfo.PolicyOrLegalNotice,
+    HistoricalInformationPeriod: schemeInfo.HistoricalInformationPeriod,
+    PointersToOtherLoTE: schemeInfo.PointersToOtherLoTE,
+    ListIssueDateTime: schemeInfo.ListIssueDateTime ?? now.toISOString(),
+    NextUpdate: schemeInfo.NextUpdate ?? sixMonthsLater.toISOString(),
+    DistributionPoints: schemeInfo.DistributionPoints,
+    SchemeExtensions: schemeInfo.SchemeExtensions,
+  }
+
   const lote: LoTE = {
-    ListAndSchemeInformation: {
-      LoTEVersionIdentifier: schemeInfo.LoTEVersionIdentifier ?? 1,
-      LoTESequenceNumber: schemeInfo.LoTESequenceNumber ?? 1,
-      LoTEType: schemeInfo.LoTEType,
-      SchemeOperatorName: schemeInfo.SchemeOperatorName,
-      SchemeOperatorAddress: schemeInfo.SchemeOperatorAddress,
-      SchemeName: schemeInfo.SchemeName,
-      SchemeInformationURI: schemeInfo.SchemeInformationURI,
-      StatusDeterminationApproach: schemeInfo.StatusDeterminationApproach,
-      SchemeTypeCommunityRules: schemeInfo.SchemeTypeCommunityRules,
-      SchemeTerritory: schemeInfo.SchemeTerritory,
-      PolicyOrLegalNotice: schemeInfo.PolicyOrLegalNotice,
-      HistoricalInformationPeriod: schemeInfo.HistoricalInformationPeriod,
-      PointersToOtherLoTE: schemeInfo.PointersToOtherLoTE,
-      ListIssueDateTime: schemeInfo.ListIssueDateTime ?? now.toISOString(),
-      NextUpdate: schemeInfo.NextUpdate ?? sixMonthsLater.toISOString(),
-      DistributionPoints: schemeInfo.DistributionPoints,
-      SchemeExtensions: schemeInfo.SchemeExtensions,
-    },
-    TrustedEntitiesList: entities,
+    // Fields not given are left out rather than written as undefined
+    ListAndSchemeInformation: Object.fromEntries(
+      Object.entries(info).filter(([, value]) => value !== undefined)
+    ) as ListAndSchemeInformation,
+    // No entities: the key is left out, as the EC lists do (the JSON schema has minItems 1)
+    ...(entities.length > 0 ? { TrustedEntitiesList: entities } : {}),
   }
 
   return { LoTE: lote }
@@ -185,12 +191,12 @@ export function addTrustedEntity(lote: LoTEDocument, entity: TrustedEntity): LoT
  * Remove a trusted entity from a LoTE document by name
  */
 export function removeTrustedEntity(lote: LoTEDocument, entityName: string): LoTEDocument {
-  return {
-    LoTE: {
-      ...lote.LoTE,
-      TrustedEntitiesList: lote.LoTE.TrustedEntitiesList?.filter(
-        (e) => !e.TrustedEntityInformation.TEName.some((n) => n.value === entityName)
-      ),
-    },
-  }
+  const list = lote.LoTE.TrustedEntitiesList
+  const remaining = list?.filter((e) => !e.TrustedEntityInformation.TEName.some((n) => n.value === entityName))
+  // Nothing removed: the document as it was, key and order included
+  if (!list || !remaining || remaining.length === list.length) return { LoTE: { ...lote.LoTE } }
+  if (remaining.length > 0) return { LoTE: { ...lote.LoTE, TrustedEntitiesList: remaining } }
+  // No entity left: the key goes, as in createLoTE (the JSON schema has minItems 1)
+  const { TrustedEntitiesList: _removed, ...rest } = lote.LoTE
+  return { LoTE: rest }
 }

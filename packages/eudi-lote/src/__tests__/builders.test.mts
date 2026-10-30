@@ -88,6 +88,22 @@ describe('ServiceBuilder', () => {
     expect(svc.ServiceInformation.ServiceSupplyPoints?.[0].uriValue).toBe('https://issuer.example.com')
   })
 
+  it('should add a service endpoint without a ServiceType', () => {
+    const svc = service()
+      .name('Test Service')
+      .addPublicKey({ kty: 'EC' })
+      .addEndpoint('https://issuer.example.com')
+      .addEndpoint(undefined, 'https://verifier.example.com')
+      .addEndpoint('https://example.org/type/issuer', 'https://typed.example.com')
+      .build()
+
+    expect(svc.ServiceInformation.ServiceSupplyPoints).toStrictEqual([
+      { uriValue: 'https://issuer.example.com' },
+      { uriValue: 'https://verifier.example.com' },
+      { ServiceType: 'https://example.org/type/issuer', uriValue: 'https://typed.example.com' },
+    ])
+  })
+
   it('should add service definition URIs', () => {
     const svc = service()
       .name('Test Service')

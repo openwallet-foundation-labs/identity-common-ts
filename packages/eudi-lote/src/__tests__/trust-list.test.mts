@@ -33,7 +33,8 @@ describe('LoTE Creation', () => {
     expect(lote.LoTE.ListAndSchemeInformation.SchemeOperatorName).toEqual([{ lang: 'en', value: 'Test Operator' }])
     expect(lote.LoTE.ListAndSchemeInformation.LoTEVersionIdentifier).toBe(1)
     expect(lote.LoTE.ListAndSchemeInformation.LoTESequenceNumber).toBe(1)
-    expect(lote.LoTE.TrustedEntitiesList).toEqual([])
+    // No entities: no TrustedEntitiesList key (the JSON schema has minItems 1)
+    expect('TrustedEntitiesList' in lote.LoTE).toBe(false)
   })
 
   it('should create a LoTE document with full scheme info', () => {
@@ -203,5 +204,43 @@ describe('LoTE Entity Management', () => {
     lote = removeTrustedEntity(lote, 'Non-existent')
 
     expect(lote.LoTE.TrustedEntitiesList).toHaveLength(originalLength)
+  })
+
+  it('should leave TrustedEntitiesList out when the last entity is removed', () => {
+    let lote = createLoTE({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] })
+    lote = addTrustedEntity(lote, createTestEntity('Entity A'))
+
+    lote = removeTrustedEntity(lote, 'Entity A')
+
+    expect('TrustedEntitiesList' in lote.LoTE).toBe(false)
+  })
+
+  it('should not add a TrustedEntitiesList key to a list without one', () => {
+    const lote = createLoTE({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] })
+
+    expect(removeTrustedEntity(lote, 'Entity A')).toStrictEqual(lote)
+  })
+
+  it('should leave a list untouched, key order included, when no entity has that name', () => {
+    const lote = {
+      LoTE: {
+        TrustedEntitiesList: [] as TrustedEntity[],
+        ...createLoTE({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] }).LoTE,
+      },
+    }
+
+    const result = removeTrustedEntity(lote, 'Entity A')
+
+    expect(result).toStrictEqual(lote)
+    expect(Object.keys(result.LoTE)).toEqual(Object.keys(lote.LoTE))
+  })
+
+  it('should write no undefined field in createLoTE', () => {
+    const lote = createLoTE({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] })
+
+    expect(Object.values(lote.LoTE.ListAndSchemeInformation)).not.toContain(undefined)
+    expect(Object.keys(lote.LoTE.ListAndSchemeInformation).sort()).toEqual(
+      ['ListIssueDateTime', 'LoTESequenceNumber', 'LoTEVersionIdentifier', 'NextUpdate', 'SchemeOperatorName'].sort()
+    )
   })
 })
