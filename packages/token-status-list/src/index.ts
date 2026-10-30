@@ -15,6 +15,7 @@ export type {
 } from './cbor/status-list-info'
 export { StatusListInfo } from './cbor/status-list-info'
 export { fetchStatusList } from './fetch-status-list'
+export type { EncryptBlock } from './ff1'
 export type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
 export { JWT_STATUS_LIST_TYPE, JWTClaimNames } from './jwt-types'
 export { StatusList } from './status-list'
@@ -25,6 +26,12 @@ export type {
   StatusListIndexAllocatorState,
 } from './status-list-index'
 export { createStatusListIndexAllocator, StatusListIndexAllocator } from './status-list-index'
+export type {
+  FeistelStatusListIndexAllocatorContext,
+  FeistelStatusListIndexAllocatorOptions,
+  FeistelStatusListIndexAllocatorState,
+} from './status-list-index-feistel'
+export { createFeistelStatusListIndexAllocator, FeistelStatusListIndexAllocator } from './status-list-index-feistel'
 export type { VerifyStatusListJwtClaimsOptions } from './status-list-jwt'
 export {
   createHeaderAndPayload,
