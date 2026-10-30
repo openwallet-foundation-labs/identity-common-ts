@@ -166,6 +166,14 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
 
   const version = options.version ?? 101
 
+  // The origin prefixes are reserved for the wallet and MUST NOT be accepted in a request
+  if (options.clientId?.startsWith('origin:') || options.clientId?.startsWith('web-origin:')) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequest,
+      error_description: `Failed to parse client identifier. The client id prefix in client_id '${options.clientId}' is reserved and not allowed in a request.`,
+    })
+  }
+
   // Handle DC API
   if (isOpenid4vpResponseModeDcApi(options.responseMode)) {
     if (!options.clientId) {
@@ -309,9 +317,12 @@ export async function validateOpenid4vpClientId(
     supportedSchemes: parserConfig?.supportedSchemes || Object.values(zClientIdPrefix.options),
   }
 
+  // The wallet MUST ignore the client_id of an unsigned DC API request, the client is identified by the origin
+  const ignoreClientId = !jar && isOpenid4vpAuthorizationRequestDcApi(authorizationRequestPayload)
+
   const { clientIdIdentifier, clientIdPrefix, effectiveClientId, original } = getOpenid4vpClientId({
-    clientId: authorizationRequestPayload.client_id,
-    legacyClientIdScheme: authorizationRequestPayload.client_id_scheme,
+    clientId: ignoreClientId ? undefined : authorizationRequestPayload.client_id,
+    legacyClientIdScheme: ignoreClientId ? undefined : authorizationRequestPayload.client_id_scheme,
     responseMode: authorizationRequestPayload.response_mode,
     origin,
   })
