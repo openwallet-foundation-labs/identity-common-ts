@@ -55,6 +55,9 @@ export {
 export {
   assertValidTrustedList,
   type ProfileRule,
+  TRUSTED_LIST_VALIDATION_CODES,
+  type TrustedListFinding,
+  type TrustedListValidationCode,
   type ValidationError,
   type ValidationResult,
   validateTrustedList,

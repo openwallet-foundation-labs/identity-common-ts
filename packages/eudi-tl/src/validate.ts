@@ -1,6 +1,27 @@
+import { type Finding, hasErrorFindings, schemaIssueToFinding } from '@owf/identity-common'
 import type { z } from 'zod'
 import { TrustedListParseException } from './trusted-list-exception'
 import { type TrustedList, TrustedListSchema } from './types'
+
+/**
+ * Codes for the profile checks, beyond schema parsing, whose issues carry the zod issue
+ * code instead.
+ */
+export const TRUSTED_LIST_VALIDATION_CODES = {
+  /** `TSLType` differs from the one of the profile */
+  UNEXPECTED_TSL_TYPE: 'unexpected_tsl_type',
+  /** A service type identifier the profile does not permit */
+  UNEXPECTED_SERVICE_TYPE: 'unexpected_service_type',
+  /** A service status the profile does not permit */
+  UNEXPECTED_SERVICE_STATUS: 'unexpected_service_status',
+} as const
+
+/** A profile validation code emitted by this validator */
+export type TrustedListValidationCode =
+  (typeof TRUSTED_LIST_VALIDATION_CODES)[keyof typeof TRUSTED_LIST_VALIDATION_CODES]
+
+/** A finding of a trusted list validation, with a zod issue code for schema issues */
+export type TrustedListFinding = Finding<TrustedListValidationCode | (string & {})>
 
 /** A single validation problem, mirroring `@owf/eudi-lote`'s ValidationError. */
 export interface ValidationError {
@@ -12,13 +33,20 @@ export interface ValidationError {
 export interface ValidationResult {
   valid: boolean
   errors: ValidationError[]
+  /** The errors as findings, with a code and with array indices as numbers in the path */
+  findings: TrustedListFinding[]
 }
 
-function fromZodError(error: z.ZodError): ValidationError[] {
-  return error.issues.map((issue) => ({
-    path: issue.path.map((p) => String(p)).join('.'),
-    message: issue.message,
-  }))
+function toResult(findings: TrustedListFinding[]): ValidationResult {
+  return {
+    valid: !hasErrorFindings(findings),
+    errors: findings.map((finding) => ({ path: finding.path.join('.'), message: finding.message })),
+    findings,
+  }
+}
+
+function fromZodError(error: z.ZodError): TrustedListFinding[] {
+  return error.issues.map((issue) => schemaIssueToFinding(issue))
 }
 
 /**
@@ -29,7 +57,7 @@ function fromZodError(error: z.ZodError): ValidationError[] {
  */
 export function validateTrustedList(value: unknown): ValidationResult {
   const result = TrustedListSchema.safeParse(value)
-  return result.success ? { valid: true, errors: [] } : { valid: false, errors: fromZodError(result.error) }
+  return toResult(result.success ? [] : fromZodError(result.error))
 }
 
 /**
@@ -40,7 +68,7 @@ export function assertValidTrustedList(value: unknown): TrustedList {
   const result = TrustedListSchema.safeParse(value)
   if (!result.success) {
     const details = fromZodError(result.error)
-      .map((e) => `${e.path}: ${e.message}`)
+      .map((e) => `${e.path.join('.')}: ${e.message}`)
       .join('; ')
     throw new TrustedListParseException(`Invalid trusted list: ${details}`)
   }
@@ -72,32 +100,38 @@ export interface ProfileRule {
  */
 export const stripScheme = (uri: string | undefined): string => (uri ?? '').replace(/^https?:\/\//, '')
 
-function profileErrors(trustedList: TrustedList, rule: ProfileRule): ValidationError[] {
+function profileErrors(trustedList: TrustedList, rule: ProfileRule): TrustedListFinding[] {
   const label = rule.name ?? 'profile'
-  const errors: ValidationError[] = []
+  const errors: TrustedListFinding[] = []
+  const add = (code: TrustedListValidationCode, path: (string | number)[], message: string) =>
+    errors.push({ severity: 'error', code, path, message: `[${label}] ${message}` })
 
   if (stripScheme(trustedList.tslType) !== stripScheme(rule.tslType)) {
-    errors.push({
-      path: 'tslType',
-      message: `[${label}] expected TSLType ${rule.tslType}, got ${trustedList.tslType ?? 'none'}`,
-    })
+    add(
+      TRUSTED_LIST_VALIDATION_CODES.UNEXPECTED_TSL_TYPE,
+      ['tslType'],
+      `expected TSLType ${rule.tslType}, got ${trustedList.tslType ?? 'none'}`
+    )
   }
 
   const allowedTypes = new Set(rule.serviceTypes.map(stripScheme))
   const allowedStatuses = new Set(rule.serviceStatuses.map(stripScheme))
   trustedList.providers.forEach((provider, pi) => {
     provider.services.forEach((service, si) => {
+      const servicePath = ['providers', pi, 'services', si]
       if (!allowedTypes.has(stripScheme(service.serviceTypeIdentifier))) {
-        errors.push({
-          path: `providers.${pi}.services.${si}.serviceTypeIdentifier`,
-          message: `[${label}] unexpected service type ${service.serviceTypeIdentifier}`,
-        })
+        add(
+          TRUSTED_LIST_VALIDATION_CODES.UNEXPECTED_SERVICE_TYPE,
+          [...servicePath, 'serviceTypeIdentifier'],
+          `unexpected service type ${service.serviceTypeIdentifier}`
+        )
       }
       if (!allowedStatuses.has(stripScheme(service.serviceStatus))) {
-        errors.push({
-          path: `providers.${pi}.services.${si}.serviceStatus`,
-          message: `[${label}] unexpected service status ${service.serviceStatus}`,
-        })
+        add(
+          TRUSTED_LIST_VALIDATION_CODES.UNEXPECTED_SERVICE_STATUS,
+          [...servicePath, 'serviceStatus'],
+          `unexpected service status ${service.serviceStatus}`
+        )
       }
     })
   })
@@ -117,8 +151,5 @@ export function validateTrustedListProfile(value: unknown, rule: ProfileRule | P
   const trustedList = value as TrustedList
   const rules = Array.isArray(rule) ? rule : [rule]
   const perRule = rules.map((r) => profileErrors(trustedList, r))
-  if (perRule.some((errors) => errors.length === 0)) {
-    return { valid: true, errors: [] }
-  }
-  return { valid: false, errors: perRule.flat() }
+  return toResult(perRule.some((errors) => errors.length === 0) ? [] : perRule.flat())
 }

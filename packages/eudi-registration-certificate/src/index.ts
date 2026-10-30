@@ -71,7 +71,7 @@ export type {
   WRPRCPayload,
 } from './types'
 // Validators
-export type { ValidationError, ValidationResult, WRPRCValidationCode } from './validator'
+export type { ValidationError, ValidationResult, WRPRCFinding, WRPRCValidationCode } from './validator'
 export {
   assertValidWRPRC,
   assertValidWRPRCPayload,

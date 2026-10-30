@@ -88,7 +88,7 @@ describe('createAccessCertificate', () => {
     expect(cert.crlDistributionPoints).toEqual(['https://ca.example.com/crl'])
     expect(cert.ocspUrls).toEqual(['https://ocsp.example.com'])
 
-    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [] })
+    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [], findings: [] })
     expect(await verifyCertificateSignature(cert, CA_CERTIFICATE_PEM, webCryptoVerifier)).toBe(true)
   })
 
@@ -138,7 +138,7 @@ describe('createAccessCertificate', () => {
     expect(ac.certificate.subject.rfc4514).toBe(
       'CN=Erika Mustermann,SERIALNUMBER=IDCDE-T22000129,SN=Mustermann,GN=Erika,C=DE'
     )
-    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [] })
+    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [], findings: [] })
   })
 
   it('supports signers that return DER encoded ECDSA signatures', async () => {
