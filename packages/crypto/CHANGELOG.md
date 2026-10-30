@@ -1,5 +1,12 @@
 # @owf/crypto
 
+## 0.6.2
+
+### Patch Changes
+
+- 13a53dc: Add `getAesBlockEncrypter`, which encrypts single 16-byte blocks with AES using Web Crypto. Pass it as `encryptBlock` to `FeistelStatusListIndexAllocator` from `@owf/token-status-list`.
+- @owf/identity-common@0.6.2
+
 ## 0.6.1
 
 ### Patch Changes

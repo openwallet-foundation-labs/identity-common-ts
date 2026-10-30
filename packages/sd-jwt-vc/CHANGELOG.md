@@ -1,5 +1,18 @@
 # @sd-jwt/sd-jwt-vc
 
+## 0.24.1
+
+### Patch Changes
+
+- eb3fef1: `svg_templates` in the type metadata rendering is now optional in the `TypeMetadataFormat` type. Parsing type metadata without `svg_templates` or `svg_template` no longer adds an `svg_templates: undefined` key.
+- 260114a: Sub-claims of a protected claim can no longer be selectively disclosed, as SD-JWT VC requires. `issue` rejects a disclosure frame for any sub-claim of `iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity` or `status` (for example the `status_list` of `status`), and verification rejects an SD-JWT VC whose issuer-signed protected claims have a selectively disclosable sub-claim, whether the holder reveals it or not.
+- 260114a: Verification now rejects an issuer-signed JWT or Key Binding JWT whose header has `crit`, as RFC 7515 requires for extensions the verifier does not understand, and an SD-JWT VC in which a protected claim (`iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity` or `status`) arrived in a Disclosure.
+- Updated dependencies [260114a]
+- Updated dependencies [13a53dc]
+  - @sd-jwt/core@0.24.1
+  - @owf/token-status-list@0.6.2
+  - @owf/identity-common@0.6.2
+
 ## 0.24.0
 
 ### Minor Changes

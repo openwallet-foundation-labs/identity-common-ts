@@ -1,5 +1,17 @@
 # @openid4vc/openid4vci
 
+## 0.9.1
+
+### Patch Changes
+
+- 33576aa: Preserve authorization-server DPoP nonces across authorization challenge, presentation-during-issuance, and PAR flows.
+- b74d901: Add `Openid4vciIssuer.parseNotificationRequest` to validate a Notification Request at the issuer's notification endpoint. An invalid request throws an `Oauth2ServerErrorResponseError` with the new `Oauth2ErrorCodes.InvalidNotificationRequest`. `Oauth2ErrorCodes.InvalidNotificationId` is added for unknown notification ids.
+- Updated dependencies [33576aa]
+- Updated dependencies [b74d901]
+  - @openid4vc/oauth2@0.9.1
+  - @owf/identity-common@0.6.2
+  - @openid4vc/utils@0.9.1
+
 ## 0.9.0
 
 ### Minor Changes

@@ -1,5 +1,13 @@
 # @openid4vc/oauth2
 
+## 0.9.1
+
+### Patch Changes
+
+- 33576aa: Export `RetrieveAccessTokenReturn` so consumers can name the return type of access token retrieval methods.
+- b74d901: Add `Openid4vciIssuer.parseNotificationRequest` to validate a Notification Request at the issuer's notification endpoint. An invalid request throws an `Oauth2ServerErrorResponseError` with the new `Oauth2ErrorCodes.InvalidNotificationRequest`. `Oauth2ErrorCodes.InvalidNotificationId` is added for unknown notification ids.
+- @openid4vc/utils@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes

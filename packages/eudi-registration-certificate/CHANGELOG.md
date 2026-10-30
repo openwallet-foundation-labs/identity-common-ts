@@ -1,5 +1,14 @@
 # @owf/eudi-registration-certificate
 
+## 0.5.4
+
+### Patch Changes
+
+- Updated dependencies [13a53dc]
+  - @owf/crypto@0.6.2
+  - @owf/identity-common@0.6.2
+  - @owf/eudi-jades@0.5.4
+
 ## 0.5.3
 
 ### Patch Changes
