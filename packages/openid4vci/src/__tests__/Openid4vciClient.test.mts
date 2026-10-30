@@ -716,6 +716,125 @@ describe('Openid4vciClient', () => {
     expect(credentialResponse.credentialResponse).toStrictEqual(presentationDuringIssuance.credentialResponse)
   })
 
+  test('returns the DPoP nonce from an authorization challenge that requires presentation', async () => {
+    const dpopNonce = 'authorization-challenge-nonce'
+    const { d, ...dpopPublicJwk } = presentationDuringIssuance.holderPrivateKeyJwk
+    const dpop = {
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: dpopPublicJwk,
+      },
+    } as const
+
+    server.resetHandlers(
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`,
+        () => HttpResponse.json(presentationDuringIssuance.credentialIssuerMetadata)
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-configuration`,
+        () => HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/oauth-authorization-server`,
+        () => HttpResponse.json(presentationDuringIssuance.authorizationServerMetadata)
+      ),
+      http.post(
+        presentationDuringIssuance.authorizationServerMetadata.authorization_challenge_endpoint,
+        ({ request }) => {
+          expect(request.headers.get('DPoP')).toEqual(expect.any(String))
+          return HttpResponse.json(presentationDuringIssuance.authorizationChallengeErrorResponse, {
+            status: 400,
+            headers: { 'DPoP-Nonce': dpopNonce },
+          })
+        }
+      )
+    )
+
+    const client = new Openid4vciClient({
+      callbacks: {
+        ...callbacks,
+        fetch,
+        signJwt: getSignJwtCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
+      },
+    })
+    const credentialOffer = await client.resolveCredentialOffer(presentationDuringIssuance.credentialOffer)
+    const issuerMetadata = await client.resolveIssuerMetadata(credentialOffer.credential_issuer)
+
+    const authorization = await client.initiateAuthorization({
+      clientId: 'some-random-client-id',
+      issuerMetadata,
+      redirectUri: 'https://example.com/redirect',
+      credentialOffer,
+      dpop,
+    })
+
+    expect(authorization.authorizationFlow).toBe(AuthorizationFlow.PresentationDuringIssuance)
+    expect(authorization.dpop).toEqual({ ...dpop, nonce: dpopNonce })
+  })
+
+  test('preserve DPoP nonce when authorization challenge returns redirect_to_web and the regular request uses PAR', async () => {
+    const dpopNonce = 'authorization-challenge-nonce'
+    const { d, ...dpopPublicJwk } = presentationDuringIssuance.holderPrivateKeyJwk
+    const dpop = {
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: dpopPublicJwk,
+      },
+    } as const
+
+    server.resetHandlers(
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`,
+        () => HttpResponse.json(presentationDuringIssuance.credentialIssuerMetadata)
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-configuration`,
+        () => HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/oauth-authorization-server`,
+        () => HttpResponse.json(presentationDuringIssuance.authorizationServerMetadata)
+      ),
+      http.post(presentationDuringIssuance.authorizationServerMetadata.authorization_challenge_endpoint, () =>
+        HttpResponse.json({ error: 'redirect_to_web' }, { status: 400, headers: { 'DPoP-Nonce': dpopNonce } })
+      ),
+      http.post(
+        presentationDuringIssuance.authorizationServerMetadata.pushed_authorization_request_endpoint,
+        async ({ request }) => {
+          expect(decodeJwt({ jwt: request.headers.get('DPoP') as string }).payload.nonce).toBe(dpopNonce)
+          return HttpResponse.json({
+            request_uri: 'urn:ietf:params:oauth:request_uri:request',
+            expires_in: 60,
+          })
+        }
+      )
+    )
+
+    const client = new Openid4vciClient({
+      callbacks: {
+        ...callbacks,
+        fetch,
+        signJwt: getSignJwtCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
+      },
+    })
+    const credentialOffer = await client.resolveCredentialOffer(presentationDuringIssuance.credentialOffer)
+    const issuerMetadata = await client.resolveIssuerMetadata(credentialOffer.credential_issuer)
+
+    const authorization = await client.initiateAuthorization({
+      clientId: 'some-random-client-id',
+      issuerMetadata,
+      redirectUri: 'https://example.com/redirect',
+      credentialOffer,
+      dpop,
+    })
+
+    expect(authorization.authorizationFlow).toBe(AuthorizationFlow.Oauth2Redirect)
+    expect(authorization.dpop).toEqual({ ...dpop, nonce: dpopNonce })
+  })
+
   test.each([
     ['missing jwks', { enc_values_supported: ['A128GCM'], encryption_required: false }],
     ['empty keys', { jwks: { keys: [] }, enc_values_supported: ['A128GCM'], encryption_required: false }],
