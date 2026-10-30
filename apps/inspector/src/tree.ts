@@ -74,7 +74,19 @@ function formatLeaf(value: unknown): { text: string; kind: string } {
 }
 
 // Properties that name an object well enough to find it in a collapsed list
-const PREVIEW_KEYS = ['name', 'serviceName', 'TEName', 'ServiceName', 'commonName', 'sub', 'oid', 'type', 'uri']
+const PREVIEW_KEYS = [
+  'elementIdentifier',
+  'docType',
+  'name',
+  'serviceName',
+  'TEName',
+  'ServiceName',
+  'commonName',
+  'sub',
+  'oid',
+  'type',
+  'uri',
+]
 
 function preview(value: Record<string, unknown> | unknown[]): string {
   if (Array.isArray(value)) return `[${value.length}]`

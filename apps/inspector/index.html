@@ -23,6 +23,8 @@
         <li><strong>Registration certificate</strong> ETSI TS 119 475, JWS</li>
         <li><strong>Access certificate</strong> ETSI TS 119 411-8, PEM, base64 or DER</li>
         <li><strong>Token Status List</strong> draft-ietf-oauth-status-list, JWT</li>
+        <li><strong>SD-JWT VC</strong> RFC 9901, with or without Key Binding</li>
+        <li><strong>mdoc</strong> ISO/IEC 18013-5 IssuerSigned or DeviceResponse, CBOR</li>
       </ul>
     </header>
 
@@ -47,7 +49,7 @@
         <textarea
           id="source"
           spellcheck="false"
-          placeholder="Paste XML, JSON, a JWS or a PEM certificate, or drop a file here"
+          placeholder="Paste XML, JSON, a JWT or SD-JWT, CBOR as hex or base64url, or a PEM certificate, or drop a file here"
         ></textarea>
         <div class="actions">
           <button type="button" id="inspect" class="primary">Inspect</button>

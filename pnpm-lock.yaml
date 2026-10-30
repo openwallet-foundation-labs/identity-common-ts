@@ -135,6 +135,12 @@ importers:
 
   apps/inspector:
     dependencies:
+      '@owf/cose':
+        specifier: workspace:*
+        version: link:../../packages/cose
+      '@owf/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@owf/eudi-access-certificate':
         specifier: workspace:*
         version: link:../../packages/eudi-access-certificate
@@ -150,9 +156,18 @@ importers:
       '@owf/identity-common':
         specifier: workspace:*
         version: link:../../packages/identity-common
+      '@owf/mdoc':
+        specifier: workspace:*
+        version: link:../../packages/mdoc
       '@owf/token-status-list':
         specifier: workspace:*
         version: link:../../packages/token-status-list
+      '@owf/x509':
+        specifier: workspace:*
+        version: link:../../packages/x509
+      '@sd-jwt/core':
+        specifier: workspace:*
+        version: link:../../packages/sd-jwt-core
     devDependencies:
       vite:
         specifier: 8.3.4

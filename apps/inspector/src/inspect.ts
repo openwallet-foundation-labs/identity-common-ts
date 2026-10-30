@@ -10,44 +10,19 @@ import {
   verifyEuLotlSignature,
   verifyTrustedListSignature,
 } from '@owf/eudi-tl'
-import { decodeJwt, type Finding } from '@owf/identity-common'
+import { base64, base64url, decodeJwt, type Finding, hex } from '@owf/identity-common'
 import { validateStatusListJwt } from '@owf/token-status-list'
 
-export type DocumentKind =
-  | 'trusted-list'
-  | 'lote'
-  | 'registration-certificate'
-  | 'access-certificate'
-  | 'status-list'
-  | 'over-asking'
+import { type Inspection, InspectionError } from './inspection'
+import { inspectMdoc, isCborMap } from './mdoc'
+import { inspectSdJwt, isSdJwt } from './sd-jwt'
 
-export interface Inspection {
-  kind: DocumentKind
-  /** What the input was recognised as */
-  title: string
-  /** The checks that ran */
-  checks: string[]
-  /** What was not checked */
-  notes: string[]
-  /** The parsed document, which the paths of the findings point into */
-  value: unknown
-  findings: Finding[]
-  /** Further facts about the document, as label and value */
-  facts?: [string, string][]
-  /** Look something up in the document, e.g. the status at an index of a status list */
-  lookup?: { label: string; placeholder: string; find: (input: string) => string }
-  /**
-   * Verify the signature, separately as it is asynchronous. Resolves with a description of
-   * what was established, rejects when the signature is missing or invalid.
-   */
-  verifySignature?: () => Promise<string>
-}
-
-/** The input could not be recognised or parsed */
-export class InspectionError extends Error {}
+export { type DocumentKind, type Inspection, InspectionError } from './inspection'
 
 const JWS = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/
-const BASE64 = /^[A-Za-z0-9+/=\s]+$/
+const HEX = /^(?:[0-9a-fA-F]{2})+$/
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/
+const BASE64URL = /^[A-Za-z0-9_-]+$/
 
 /**
  * Recognise the format of the input, parse it and check it against its specification.
@@ -55,20 +30,42 @@ const BASE64 = /^[A-Za-z0-9+/=\s]+$/
  * @throws InspectionError when the input is not one of the supported formats or does not parse
  */
 export function inspect(input: string | Uint8Array): Inspection {
-  // DER encoding starts with a SEQUENCE, which no supported text format does
-  if (typeof input !== 'string' && input[0] === 0x30) return inspectAccessCertificate(input)
+  if (typeof input !== 'string' && isBinary(input)) return inspectBinary(input)
 
   const text = (typeof input === 'string' ? input : new TextDecoder().decode(input)).replace(/^﻿/, '').trim()
   if (!text) throw new InspectionError('There is nothing to inspect')
   if (text.startsWith('<')) return inspectTrustedList(text)
   if (text.includes('-----BEGIN CERTIFICATE-----')) return inspectAccessCertificate(text)
   if (text.startsWith('{')) return inspectJson(text)
+  if (isSdJwt(text)) return inspectSdJwt(text)
   if (JWS.test(text)) return inspectJws(text)
-  if (BASE64.test(text)) return inspectAccessCertificate(text.replace(/\s+/g, ''))
+
+  // A certificate or an mdoc as text
+  const compact = text.replace(/\s+/g, '')
+  const unpadded = compact.replace(/=+$/, '')
+  const decode = (decoder: () => Uint8Array) => {
+    try {
+      return decoder()
+    } catch (error) {
+      throw new InspectionError(`The input cannot be decoded: ${errorMessage(error)}`)
+    }
+  }
+  if (HEX.test(compact)) return inspectBinary(decode(() => hex.decode(compact)))
+  if (BASE64URL.test(unpadded)) return inspectBinary(decode(() => base64url.decode(unpadded)))
+  if (BASE64.test(compact)) return inspectBinary(decode(() => base64.decode(compact)))
 
   throw new InspectionError(
-    'Unrecognised input. Expected an XML trusted list, a LoTE as JSON or JWS, a registration certificate as JWS, or an access certificate as PEM, base64 or DER.'
+    'Unrecognised input. Expected a trusted list (XML), a LoTE (JSON or JWS), a registration certificate or status list (JWT), an SD-JWT, an mdoc (CBOR as hex or base64url) or a certificate (PEM, base64 or DER).'
   )
+}
+
+// DER starts with a SEQUENCE and an mdoc with a CBOR map, which no supported text format does
+const isBinary = (bytes: Uint8Array) => bytes[0] === 0x30 || isCborMap(bytes)
+
+function inspectBinary(bytes: Uint8Array): Inspection {
+  if (bytes[0] === 0x30) return inspectAccessCertificate(bytes)
+  if (isCborMap(bytes)) return inspectMdoc(bytes)
+  throw new InspectionError('The decoded bytes are neither a DER certificate nor the CBOR of an mdoc')
 }
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error))
@@ -148,6 +145,7 @@ function inspectJws(jws: string): Inspection {
   const { header, payload } = decoded
   const typ = typeof header.typ === 'string' ? header.typ.toLowerCase().replace(/^application\//, '') : undefined
   if (typ === 'rc-wrp+jwt') return inspectRegistrationCertificate(header, payload)
+  if (typ === 'dc+sd-jwt' || typ === 'vc+sd-jwt') return inspectSdJwt(jws)
   if (typ === 'statuslist+jwt' || 'status_list' in payload) return inspectStatusList(header, payload)
   if ('LoTE' in payload) return inspectLoTE(payload, header)
   throw new InspectionError(
