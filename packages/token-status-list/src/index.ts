@@ -41,5 +41,12 @@ export {
   verifyStatusListJwtClaims,
   verifyStatusListJwtHeader,
 } from './status-list-jwt'
+export type {
+  StatusListFinding,
+  StatusListJwtValidationResult,
+  StatusListValidationCode,
+  ValidateStatusListJwtOptions,
+} from './status-list-jwt-validation'
+export { STATUS_LIST_VALIDATION_CODES, validateStatusListJwt } from './status-list-jwt-validation'
 export type { BitsPerStatus, StatusListEntry } from './types'
 export { MediaTypes, StatusType } from './types'
