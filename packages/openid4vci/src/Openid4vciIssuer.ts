@@ -61,6 +61,11 @@ import {
 } from './metadata/credential-issuer/z-credential-issuer-metadata'
 import type { IssuerMetadataResult } from './metadata/fetch-issuer-metadata'
 import { type CreateNonceResponseOptions, createNonceResponse } from './nonce/nonce-request'
+import {
+  type ParseNotificationRequestOptions,
+  type ParseNotificationRequestReturn,
+  parseNotificationRequest,
+} from './notification/parse-notification-request'
 
 export interface Openid4vciIssuerOptions {
   /**
@@ -269,6 +274,15 @@ export class Openid4vciIssuer {
       issuerMetadata: options.issuerMetadata,
       callbacks: this.options.callbacks,
     })
+  }
+
+  /**
+   * Parses and validates a Notification Request. Verifying the access token and checking
+   * the `notification_id` is up to the caller.
+   * @throws Oauth2ServerErrorResponseError - with `invalid_notification_request` if the request is invalid
+   */
+  public parseNotificationRequest(options: ParseNotificationRequestOptions): ParseNotificationRequestReturn {
+    return parseNotificationRequest(options)
   }
 
   /**

@@ -114,6 +114,40 @@ describe('Openid4vciIssuer', () => {
     )
   })
 
+  test('parseNotificationRequest returns the validated notification request', () => {
+    expect(
+      issuer.parseNotificationRequest({
+        notificationRequest: {
+          notification_id: '3b926f09-d603-4e8b-a75d-eaa8965f0fe3',
+          event: 'credential_accepted',
+          event_description: 'Credential stored',
+        },
+      })
+    ).toEqual({
+      notificationRequest: {
+        notification_id: '3b926f09-d603-4e8b-a75d-eaa8965f0fe3',
+        event: 'credential_accepted',
+        event_description: 'Credential stored',
+      },
+    })
+  })
+
+  test('parseNotificationRequest throws invalid_notification_request for an invalid request', () => {
+    expect(() =>
+      issuer.parseNotificationRequest({
+        notificationRequest: {
+          notification_id: '3b926f09-d603-4e8b-a75d-eaa8965f0fe3',
+          event: 'credential_unknown',
+        },
+      })
+    ).toThrow(
+      expect.objectContaining({
+        status: 400,
+        errorResponse: expect.objectContaining({ error: 'invalid_notification_request' }),
+      })
+    )
+  })
+
   test('create issuer metadata, create a credential offer, parse a credential request with jwt proof, create a credential response', async () => {
     const credentialOffer = await issuer.createCredentialOffer({
       credentialConfigurationIds: ['pidSdJwt'],

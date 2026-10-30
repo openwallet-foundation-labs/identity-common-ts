@@ -120,7 +120,15 @@ export { type IssuerInfo, type IssuerInfoEntry, zIssuerInfo } from './metadata/c
 export type { IssuerMetadataResult } from './metadata/fetch-issuer-metadata'
 export type { NonceResponse } from './nonce/z-nonce'
 export type { SendNotificationResponseNotOk, SendNotificationResponseOk } from './notification/notification'
-export type { NotificationErrorResponse, NotificationEvent } from './notification/z-notification'
+export type {
+  ParseNotificationRequestOptions,
+  ParseNotificationRequestReturn,
+} from './notification/parse-notification-request'
+export type {
+  NotificationErrorResponse,
+  NotificationEvent,
+  NotificationRequest,
+} from './notification/z-notification'
 
 export { AuthorizationFlow, Openid4vciClient, type Openid4vciClientOptions } from './Openid4vciClient'
 export { Openid4vciIssuer, type Openid4vciIssuerOptions } from './Openid4vciIssuer'
