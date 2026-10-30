@@ -33,6 +33,9 @@ export {
   PSP_SUB_ENTITLEMENTS,
   WRP_ENTITLEMENTS,
 } from './entitlements'
+// Over-asking
+export type { OverAskingCode, OverAskingFinding, OverAskingResult, RegisteredCredential } from './over-asking'
+export { checkOverAsking, OVER_ASKING_CODES } from './over-asking'
 // Schemas
 export {
   ClaimSchema,
