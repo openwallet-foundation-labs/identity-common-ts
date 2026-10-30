@@ -1,5 +1,6 @@
 packages:
   - packages/**
+  - apps/*
 
 catalog:
   '@noble/curves': ^2.4.0
