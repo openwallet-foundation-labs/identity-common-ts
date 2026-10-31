@@ -22,6 +22,7 @@ jobs:
       pull-requests: write
     outputs:
       published: ${{ steps.changesets.outputs.published }}
+      eudi_package_version: ${{ steps.get_version.outputs.eudi_package_version }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,6 +63,7 @@ jobs:
           echo "mdoc_package_version=$(node -p "require('./packages/mdoc/package.json').version")" >> $GITHUB_OUTPUT
           echo "dcql_package_version=$(node -p "require('./packages/dcql/package.json').version")" >> $GITHUB_OUTPUT
           echo "openid4vc_package_version=$(node -p "require('./packages/oauth2/package.json').version")" >> $GITHUB_OUTPUT
+          echo "eudi_package_version=$(node -p "require('./packages/eudi-inspector/package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Create Github Release
         if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
@@ -96,6 +98,25 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: openid4vc-v${{ steps.get_version.outputs.openid4vc_package_version }}
+
+      # @owf/eudi-* packages are versioned separately from the other @owf/* packages, so they get their own tag prefix.
+      # The release carries the executable of the eudi-inspect command line tool, see the inspector-binary job.
+      - name: Create EUDI Github Release
+        if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: eudi-v${{ steps.get_version.outputs.eudi_package_version }}
+
+  inspector-binary:
+    name: Inspector executable
+    needs: release-stable
+    # The same condition as the EUDI release the executable is attached to
+    if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
+    permissions:
+      contents: write # Attach the executable to the EUDI release
+    uses: ./.github/workflows/inspector-binary.yml
+    with:
+      release-tag: eudi-v${{ needs.release-stable.outputs.eudi_package_version }}
 
   release-unstable:
     runs-on: ubuntu-24.04
