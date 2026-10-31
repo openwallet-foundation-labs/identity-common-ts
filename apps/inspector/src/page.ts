@@ -1,10 +1,17 @@
 import './style.css'
+import {
+  type DocumentFormat,
+  type DocumentInput,
+  detect,
+  fromFragment,
+  type Inspection,
+  InspectionError,
+  MAX_LINK_LENGTH,
+  type SharedValue,
+  toFragment,
+} from '@owf/eudi-inspector'
 import { base64url } from '@owf/identity-common'
-import { type DocumentFormat, detect } from './detect'
-import { type DocumentInput, errorMessage } from './input'
-import { type Inspection, InspectionError } from './inspection'
 import { renderInspection, showError } from './render'
-import { fromFragment, MAX_LINK_LENGTH, type SharedValue, toFragment } from './share'
 import { pageOf } from './site'
 import { el } from './tree'
 
@@ -52,6 +59,8 @@ const MAX_SHOWN = 1_000_000
 const HANDOFF_KEY = 'inspector:handoff'
 
 const root = document.body.dataset.root ?? './'
+
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** The URL of a page of the inspector, or of the page that recognises any document */
 export const pageUrl = (id?: string) => new URL(id ? `${root}${id}/` : root, location.href).href

@@ -1,9 +1,9 @@
 import { base64url, hex } from '@owf/identity-common'
 import { cborEncode, IssuerSigned } from '@owf/mdoc'
 import { describe, expect, it } from 'vitest'
-import { issuerSignedBytes } from '../../../../packages/mdoc/src/__tests__/examples/bdr/issuerSigned'
-import { deviceResponse } from '../../../../packages/mdoc/src/__tests__/examples/france/deviceResponse'
-import { InspectionError, inspect } from '../inspect'
+import { issuerSignedBytes } from '../../../mdoc/src/__tests__/examples/bdr/issuerSigned'
+import { deviceResponse } from '../../../mdoc/src/__tests__/examples/france/deviceResponse'
+import { InspectionError, inspect } from '../index'
 import { MDOC_CODES as CODES } from '../mdoc'
 import { anchorOf } from '../paths'
 

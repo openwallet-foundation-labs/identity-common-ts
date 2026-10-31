@@ -1,7 +1,7 @@
+import { EU_LOTL_URL, inspectTrustedList } from '@owf/eudi-inspector'
 import type { TrustedList } from '@owf/eudi-tl'
 import { startPage } from '../page'
 import { el } from '../tree'
-import { EU_LOTL_URL, inspectTrustedList } from '../trusted-list'
 
 let lotl: Promise<string> | undefined
 

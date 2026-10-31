@@ -2,7 +2,7 @@
   "name": "identity-inspector",
   "private": true,
   "type": "module",
-  "description": "Browser tool to parse and check EUDI trusted lists, LoTEs, registration certificates and access certificates",
+  "description": "Browser pages to parse and check EUDI documents, built on @owf/eudi-inspector",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "vite",
@@ -10,17 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@owf/cose": "workspace:*",
-    "@owf/crypto": "workspace:*",
-    "@owf/eudi-access-certificate": "workspace:*",
-    "@owf/eudi-lote": "workspace:*",
-    "@owf/eudi-registration-certificate": "workspace:*",
+    "@owf/eudi-inspector": "workspace:*",
     "@owf/eudi-tl": "workspace:*",
-    "@owf/identity-common": "workspace:*",
-    "@owf/mdoc": "workspace:*",
-    "@owf/token-status-list": "workspace:*",
-    "@owf/x509": "workspace:*",
-    "@sd-jwt/core": "workspace:*"
+    "@owf/identity-common": "workspace:*"
   },
   "devDependencies": {
     "vite": "8.3.4"

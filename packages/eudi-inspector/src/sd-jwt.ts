@@ -322,7 +322,7 @@ export function inspectSdJwt(input: DocumentInput, options: SdJwtOptions = {}): 
     const cnf = timeSource.cnf
     signatures.push({
       label: 'Key Binding JWT',
-      verify: async () => {
+      verify: async (crypto) => {
         if (!isRecord(cnf) || !isRecord(cnf.jwk)) {
           return { status: 'unverified', message: 'Not verified: the SD-JWT has no cnf with a jwk to verify it with' }
         }
@@ -332,7 +332,7 @@ export function inspectSdJwt(input: DocumentInput, options: SdJwtOptions = {}): 
         } catch (error) {
           return { status: 'invalid', message: `Invalid: the jwk of cnf cannot be read: ${errorMessage(error)}` }
         }
-        return verifyJwsSignature(keyBindingJwt, kbHeader, { keys, source: 'the cnf key of the SD-JWT' })
+        return verifyJwsSignature(keyBindingJwt, kbHeader, crypto, { keys, source: 'the cnf key of the SD-JWT' })
       },
     })
   }

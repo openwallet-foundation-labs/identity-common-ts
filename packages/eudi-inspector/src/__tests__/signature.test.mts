@@ -1,6 +1,6 @@
 import { base64 } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
-import { OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM } from '../../../../packages/eudi-access-certificate/src/__tests__/fixtures.mjs'
+import { OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM } from '../../../eudi-access-certificate/src/__tests__/fixtures.mjs'
 import { InspectionError } from '../inspection'
 import { parseKeys, verifyJwsSignature } from '../signature'
 import { CA_CERTIFICATE_PEM, generateKey, issueCertificate, signJwt } from './keys.mjs'
@@ -15,15 +15,19 @@ describe('signature verification', () => {
     const jws = await signJwt({ typ: 'JWT', kid: 'k1' }, { sub: 'x' }, signer.privateKey)
     const header = decodeHeader(jws)
 
-    await expect(verifyJwsSignature(jws, header, given(JSON.stringify(signer.publicJwk)))).resolves.toMatchObject({
+    await expect(
+      verifyJwsSignature(jws, header, crypto, given(JSON.stringify(signer.publicJwk)))
+    ).resolves.toMatchObject({
       status: 'valid',
     })
     const set = JSON.stringify({ keys: [other.publicJwk, { ...signer.publicJwk, kid: 'k1' }] })
-    await expect(verifyJwsSignature(jws, header, given(set))).resolves.toEqual({
+    await expect(verifyJwsSignature(jws, header, crypto, given(set))).resolves.toEqual({
       status: 'valid',
       message: 'Valid, signed with the key you gave (JWK k1).',
     })
-    await expect(verifyJwsSignature(jws, header, given(JSON.stringify(other.publicJwk)))).resolves.toMatchObject({
+    await expect(
+      verifyJwsSignature(jws, header, crypto, given(JSON.stringify(other.publicJwk)))
+    ).resolves.toMatchObject({
       status: 'invalid',
     })
   })
@@ -31,11 +35,11 @@ describe('signature verification', () => {
   it('says which key is missing when there is neither a given key nor an x5c', async () => {
     const { privateKey } = await generateKey()
     const jws = await signJwt({ kid: 'issuer-key-1' }, {}, privateKey)
-    await expect(verifyJwsSignature(jws, decodeHeader(jws))).resolves.toEqual({
+    await expect(verifyJwsSignature(jws, decodeHeader(jws), crypto)).resolves.toEqual({
       status: 'unverified',
       message: 'Not verified: the header has no x5c, so give the key with the kid issuer-key-1 of the signer.',
     })
-    await expect(verifyJwsSignature(jws, { alg: 'none' })).resolves.toMatchObject({ status: 'invalid' })
+    await expect(verifyJwsSignature(jws, { alg: 'none' }, crypto)).resolves.toMatchObject({ status: 'invalid' })
   })
 
   it('verifies with the x5c of the header, and its chain with a certificate of a trust anchor', async () => {
@@ -44,17 +48,19 @@ describe('signature verification', () => {
     const jws = await signJwt({ x5c: [base64.encode(certificate.der)] }, { sub: 'x' }, signer.privateKey)
     const header = decodeHeader(jws)
 
-    const integrity = await verifyJwsSignature(jws, header)
+    const integrity = await verifyJwsSignature(jws, header, crypto)
     expect(integrity.status).toBe('valid')
     expect(integrity.message).toContain('This proves integrity only')
 
-    await expect(verifyJwsSignature(jws, header, given(CA_CERTIFICATE_PEM))).resolves.toEqual({
+    await expect(verifyJwsSignature(jws, header, crypto, given(CA_CERTIFICATE_PEM))).resolves.toEqual({
       status: 'valid',
       message:
         'Valid, signed with the x5c certificate Example Issuer, and its chain leads to the certificate you gave, Example WRP Access CA.',
     })
     // A certificate that did not issue it
-    await expect(verifyJwsSignature(jws, header, given(OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM))).resolves.toMatchObject({
+    await expect(
+      verifyJwsSignature(jws, header, crypto, given(OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM))
+    ).resolves.toMatchObject({
       status: 'invalid',
       message: expect.stringContaining('does not lead to'),
     })
@@ -62,7 +68,7 @@ describe('signature verification', () => {
     // Signed with another key than the one of the x5c certificate
     const other = await generateKey()
     const forged = await signJwt({ x5c: [base64.encode(certificate.der)] }, { sub: 'x' }, other.privateKey)
-    await expect(verifyJwsSignature(forged, decodeHeader(forged))).resolves.toMatchObject({ status: 'invalid' })
+    await expect(verifyJwsSignature(forged, decodeHeader(forged), crypto)).resolves.toMatchObject({ status: 'invalid' })
   })
 
   it('reads keys as JWK, JWK Set, PEM and base64, and rejects anything else', async () => {

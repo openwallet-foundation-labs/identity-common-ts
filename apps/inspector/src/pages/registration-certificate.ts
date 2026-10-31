@@ -1,5 +1,5 @@
+import { inspectRegistrationCertificate } from '@owf/eudi-inspector'
 import { startPage } from '../page'
-import { inspectRegistrationCertificate } from '../registration-certificate'
 
 startPage({
   format: 'registration-certificate',

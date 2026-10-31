@@ -7,8 +7,8 @@ import {
 } from '@owf/eudi-registration-certificate'
 import { base64urlEncode } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
-import { OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM } from '../../../../packages/eudi-access-certificate/src/__tests__/fixtures.mjs'
-import { InspectionError } from '../inspect'
+import { OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM } from '../../../eudi-access-certificate/src/__tests__/fixtures.mjs'
+import { InspectionError } from '../index'
 import { checkRequest, parseRequest } from '../over-asking'
 
 const PID_VCT = 'urn:eudi:pid:1'

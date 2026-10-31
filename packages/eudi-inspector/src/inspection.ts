@@ -20,7 +20,8 @@ export interface SignatureResult {
 export interface SignatureCheck {
   /** What is signed, e.g. "Signature" or "Key Binding JWT" */
   label: string
-  verify: () => Promise<SignatureResult>
+  /** Verify the signature with a Web Crypto implementation, e.g. `globalThis.crypto` */
+  verify: (crypto: Crypto) => Promise<SignatureResult>
 }
 
 export interface Inspection {

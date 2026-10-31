@@ -2,7 +2,7 @@ import { hasher } from '@owf/crypto'
 import { base64url, base64urlEncode } from '@owf/identity-common'
 import { Disclosure } from '@sd-jwt/core'
 import { describe, expect, it } from 'vitest'
-import { type Inspection, inspect } from '../inspect'
+import { type Inspection, inspect } from '../index'
 import { SD_JWT_CODES as CODES, inspectSdJwt } from '../sd-jwt'
 import { generateKey, signJwt } from './keys.mjs'
 
@@ -154,7 +154,7 @@ describe('SD-JWT verification', () => {
   }
 
   const verifyAll = (inspection: Inspection) =>
-    Promise.all((inspection.signatures ?? []).map(async ({ label, verify }) => ({ label, ...(await verify()) })))
+    Promise.all((inspection.signatures ?? []).map(async ({ label, verify }) => ({ label, ...(await verify(crypto)) })))
 
   it('verifies the issuer signature with the given key, and the Key Binding JWT with the key in cnf', async () => {
     const { text, issuer } = await presentation()

@@ -4,10 +4,7 @@
 import { digest } from '@owf/crypto'
 import { base64url, base64urlEncode } from '@owf/identity-common'
 import { createCertificate } from '@owf/x509'
-import {
-  CA_CERTIFICATE_PEM,
-  CA_PRIVATE_JWK,
-} from '../../../../packages/eudi-access-certificate/src/__tests__/fixtures.mjs'
+import { CA_CERTIFICATE_PEM, CA_PRIVATE_JWK } from '../../../eudi-access-certificate/src/__tests__/fixtures.mjs'
 
 export { CA_CERTIFICATE_PEM }
 

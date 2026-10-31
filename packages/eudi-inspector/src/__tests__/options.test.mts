@@ -5,13 +5,13 @@ import { describe, expect, it } from 'vitest'
 import {
   CA_CERTIFICATE_PEM,
   OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM,
-} from '../../../../packages/eudi-access-certificate/src/__tests__/fixtures.mjs'
+} from '../../../eudi-access-certificate/src/__tests__/fixtures.mjs'
 import {
   NATIONAL_POINTER_CERT_BASE64,
   SIGNED_TSL_XML,
   SIGNER_CERT_BASE64,
   UNSIGNED_TSL_XML,
-} from '../../../../packages/eudi-tl/src/__tests__/fixtures.mjs'
+} from '../../../eudi-tl/src/__tests__/fixtures.mjs'
 import { inspectAccessCertificate } from '../access-certificate'
 import { detect } from '../detect'
 import { inspectRegistrationCertificate } from '../registration-certificate'
@@ -21,8 +21,8 @@ import { inspectTrustedList } from '../trusted-list'
 const fakeJws = (header: Record<string, unknown>, payload: unknown) =>
   `${base64urlEncode(JSON.stringify(header))}.${base64urlEncode(JSON.stringify(payload))}.c2ln`
 
-const verify = (inspection: { signatures?: { verify: () => Promise<unknown> }[] }) =>
-  inspection.signatures?.[0].verify()
+const verify = (inspection: { signatures?: { verify: (crypto: Crypto) => Promise<unknown> }[] }) =>
+  inspection.signatures?.[0].verify(crypto)
 
 describe('options of the format pages', () => {
   it('checks the signer of a trusted list against the certificates you give', async () => {

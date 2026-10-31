@@ -1,5 +1,5 @@
+import { anchorOf, formatPath, type Path, pathKey } from '@owf/eudi-inspector'
 import type { Finding } from '@owf/identity-common'
-import { anchorOf, formatPath, type Path, pathKey } from './paths'
 
 /** A finding together with where it is shown in the document */
 export interface PlacedFinding extends Finding {

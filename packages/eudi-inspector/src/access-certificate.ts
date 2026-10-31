@@ -31,7 +31,7 @@ export function inspectAccessCertificate(input: DocumentInput, options: AccessCe
   }
   const { certificate } = accessCertificate
 
-  const verify = async (): Promise<SignatureResult> => {
+  const verify = async (crypto: Crypto): Promise<SignatureResult> => {
     const validity = outsideValidity(certificate)
     if (!options.issuer?.trim()) {
       return {
@@ -46,7 +46,7 @@ export function inspectAccessCertificate(input: DocumentInput, options: AccessCe
       return { status: 'unverified', message: `Not verified: ${errorMessage(error)}` }
     }
     for (const { certificate: issuer } of issuers) {
-      if (issuer && (await verifyCertificateSignature(certificate, issuer, certificateVerifier))) {
+      if (issuer && (await verifyCertificateSignature(certificate, issuer, certificateVerifier(crypto)))) {
         return validity
           ? { status: 'invalid', message: `Signed by ${certificateName(issuer)}, but ${validity}.` }
           : { status: 'valid', message: `Valid, signed by the CA certificate you gave, ${certificateName(issuer)}.` }

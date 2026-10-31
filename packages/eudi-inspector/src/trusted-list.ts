@@ -1,6 +1,7 @@
 import {
   getPointerSigningCertificates,
   parseTrustedList,
+  setTrustedListCrypto,
   type TrustedList,
   TrustedListProfiles,
   TSLType,
@@ -144,10 +145,13 @@ export function inspectTrustedList(input: DocumentInput, options: TrustedListOpt
     signatures: [
       {
         label: 'Signature',
-        verify: () =>
-          verifySigner(xml, trustedList, options).catch(
+        verify: (crypto) => {
+          // @owf/eudi-tl verifies XML signatures with one engine for the whole process
+          setTrustedListCrypto(crypto)
+          return verifySigner(xml, trustedList, options).catch(
             (error): SignatureResult => ({ status: 'invalid', message: `Invalid: ${errorMessage(error)}` })
-          ),
+          )
+        },
       },
     ],
   }

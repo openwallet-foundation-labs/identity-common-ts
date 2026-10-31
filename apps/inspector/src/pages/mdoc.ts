@@ -1,4 +1,4 @@
-import { inspectMdoc } from '../mdoc'
+import { inspectMdoc } from '@owf/eudi-inspector'
 import { startPage } from '../page'
 
 startPage({

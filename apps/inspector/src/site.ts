@@ -1,4 +1,4 @@
-import type { DocumentKind } from './inspection'
+import type { DocumentKind } from '@owf/eudi-inspector'
 
 /** A page of the inspector, served at `<id>/` */
 export interface Page {

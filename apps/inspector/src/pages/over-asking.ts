@@ -1,4 +1,4 @@
-import { checkRequest } from '../over-asking'
+import { checkRequest } from '@owf/eudi-inspector'
 import { startPage } from '../page'
 
 startPage({

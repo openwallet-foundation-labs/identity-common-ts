@@ -1,5 +1,5 @@
+import { inspectSdJwt } from '@owf/eudi-inspector'
 import { startPage } from '../page'
-import { inspectSdJwt } from '../sd-jwt'
 
 startPage({
   format: 'sd-jwt',

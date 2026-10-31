@@ -1,4 +1,4 @@
-import { inspectAccessCertificate } from '../access-certificate'
+import { inspectAccessCertificate } from '@owf/eudi-inspector'
 import { startPage } from '../page'
 
 startPage({

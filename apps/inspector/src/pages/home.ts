@@ -1,6 +1,4 @@
-import { type DocumentFormat, detect } from '../detect'
-import type { DocumentInput } from '../input'
-import type { Inspection } from '../inspection'
+import { type DocumentFormat, type DocumentInput, detect, type Inspection } from '@owf/eudi-inspector'
 import { startPage } from '../page'
 import { pageOf } from '../site'
 
@@ -11,14 +9,14 @@ type Inspector = (input: DocumentInput) => Inspection
 
 // The parsers of a format load when a document of it is inspected
 const INSPECTORS: Record<DocumentFormat, () => Promise<Inspector>> = {
-  'trusted-list': () => import('../trusted-list').then((module) => module.inspectTrustedList),
-  lote: () => import('../lote').then((module) => module.inspectLoTE),
+  'trusted-list': () => import('../formats/trusted-list').then((module) => module.inspectDocument),
+  lote: () => import('../formats/lote').then((module) => module.inspectDocument),
   'registration-certificate': () =>
-    import('../registration-certificate').then((module) => module.inspectRegistrationCertificate),
-  'access-certificate': () => import('../access-certificate').then((module) => module.inspectAccessCertificate),
-  'status-list': () => import('../status-list').then((module) => module.inspectStatusList),
-  'sd-jwt': () => import('../sd-jwt').then((module) => module.inspectSdJwt),
-  mdoc: () => import('../mdoc').then((module) => module.inspectMdoc),
+    import('../formats/registration-certificate').then((module) => module.inspectDocument),
+  'access-certificate': () => import('../formats/access-certificate').then((module) => module.inspectDocument),
+  'status-list': () => import('../formats/status-list').then((module) => module.inspectDocument),
+  'sd-jwt': () => import('../formats/sd-jwt').then((module) => module.inspectDocument),
+  mdoc: () => import('../formats/mdoc').then((module) => module.inspectDocument),
 }
 
 startPage({

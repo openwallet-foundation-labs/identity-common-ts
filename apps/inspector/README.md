@@ -1,7 +1,9 @@
 # EUDI Inspector
 
-A browser tool that parses a document and checks each element against its specification, built on the packages of
-this repository. Each format has its own page, with the inputs its further checks need:
+A browser tool that parses a document and checks each element against its specification. The parsing and the checks
+are those of [`@owf/eudi-inspector`](../../packages/eudi-inspector), which also has them as the command line tool
+`eudi-inspect`; these pages add the input forms and the document tree. Each format has its own page, with the inputs its
+further checks need:
 
 | Page | Specification | Input | Further inputs |
 | --- | --- | --- | --- |
@@ -25,12 +27,12 @@ each disclosure discloses. For an mdoc, it shows the Mobile Security Object and 
 of each element with the one in the MSO.
 
 The checks of trusted lists, LoTEs, certificates and status lists come from the validators of the packages. Those of
-SD-JWTs and mdocs are in the inspector (`src/sd-jwt.ts`, `src/mdoc.ts`), built on the decoding of `@sd-jwt/core` and
-`@owf/mdoc`, as these packages verify with keys and report the first failure.
+SD-JWTs and mdocs are in `@owf/eudi-inspector`, built on the decoding of `@sd-jwt/core` and `@owf/mdoc`, as these
+packages verify with keys and report the first failure.
 
 ## Signatures
 
-Signatures are verified with the Web Crypto API of the browser (`src/signature.ts`):
+Signatures are verified with the Web Crypto API of the browser, which the pages pass to `@owf/eudi-inspector`:
 
 - A JWS is verified with the key you give, as JWK, JWK Set or certificates, or else with the `x5c` of its header. When
   you give a certificate and the header has an `x5c`, the chain of the `x5c` has to lead to it, so it acts as the trust
@@ -71,7 +73,8 @@ pnpm --filter identity-inspector dev
 
 The packages are used from their sources, so changes to them show up without a build. Each page is an `index.html` in
 the folder of its name; `layout.ts` adds the header, navigation, result area and footer they share when they are built,
-and `src/site.ts` lists the pages.
+and `src/site.ts` lists the pages. The start page loads the parsers of a format through its module in `src/formats/`,
+so each format is a chunk of its own.
 
 ## Deployment
 

@@ -1,5 +1,5 @@
+import { inspectStatusList } from '@owf/eudi-inspector'
 import { startPage } from '../page'
-import { inspectStatusList } from '../status-list'
 
 startPage({
   format: 'status-list',

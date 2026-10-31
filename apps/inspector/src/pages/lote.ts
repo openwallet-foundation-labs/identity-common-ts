@@ -1,4 +1,4 @@
-import { inspectLoTE } from '../lote'
+import { inspectLoTE } from '@owf/eudi-inspector'
 import { startPage } from '../page'
 
 startPage({

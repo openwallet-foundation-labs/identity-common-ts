@@ -1,5 +1,4 @@
-import type { Inspection, SignatureResult } from './inspection'
-import { formatPath } from './paths'
+import { formatPath, type Inspection, type SignatureResult } from '@owf/eudi-inspector'
 import { DocumentTree, el, findingElement, placeFindings } from './tree'
 
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -66,7 +65,7 @@ export function renderInspection(inspection: Inspection, options: RenderOptions)
   for (const [term, detail] of inspection.facts ?? []) fact(term, detail)
   for (const signature of inspection.signatures ?? []) {
     const detail = fact(signature.label, el('span', 'pending', 'Verifying…'))
-    signature.verify().then(
+    signature.verify(globalThis.crypto).then(
       ({ status, message }) => {
         if (current === rendered) detail.replaceChildren(el('span', SIGNATURE_CLASSES[status], message))
       },

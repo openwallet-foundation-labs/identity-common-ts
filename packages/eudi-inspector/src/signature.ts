@@ -3,7 +3,8 @@ import { type Certificate, parseCertificate, type SignatureVerifier, verifyCerti
 import { decodeBinaryText, errorMessage, isRecord } from './input'
 import { InspectionError, type SignatureCheck, type SignatureResult } from './inspection'
 
-// The inspector runs in the browser, so it verifies with the Web Crypto API of the browser
+// Signatures are verified with a Web Crypto implementation the caller passes, e.g.
+// `globalThis.crypto` of a browser or of Node.js
 
 /** A public key to verify with */
 export interface VerificationKey {
@@ -35,6 +36,7 @@ function webCryptoAlgorithm(alg: string): WebCryptoAlgorithm | undefined {
 const CURVES: Record<string, string> = { ES256: 'P-256', ES384: 'P-384', ES512: 'P-521' }
 
 async function importKey(
+  crypto: Crypto,
   key: VerificationKey,
   alg: string,
   algorithm: WebCryptoAlgorithm
@@ -59,6 +61,7 @@ async function importKey(
 }
 
 async function verifyWith(
+  crypto: Crypto,
   key: VerificationKey,
   alg: string,
   data: Uint8Array,
@@ -66,7 +69,7 @@ async function verifyWith(
 ): Promise<boolean> {
   const algorithm = webCryptoAlgorithm(alg)
   if (!algorithm) throw new InspectionError(`The algorithm ${alg} is not supported`)
-  const cryptoKey = await importKey(key, alg, algorithm)
+  const cryptoKey = await importKey(crypto, key, alg, algorithm)
   if (!cryptoKey) return false
   const params =
     algorithm.sign === 'RSA-PSS'
@@ -151,15 +154,18 @@ export function x5cCertificates(header: Record<string, unknown>): Certificate[] 
 }
 
 /** Verify certificate signatures, for {@link verifyCertificateSignature} of @owf/x509 */
-export const certificateVerifier: SignatureVerifier = ({ data, signatureP1363, signatureAlgorithmName, publicKey }) =>
-  signatureAlgorithmName
-    ? verifyWith(
-        { description: 'issuer', key: publicKey.jwk ?? publicKey.spki },
-        signatureAlgorithmName,
-        data,
-        signatureP1363
-      ).catch(() => false)
-    : false
+export const certificateVerifier =
+  (crypto: Crypto): SignatureVerifier =>
+  ({ data, signatureP1363, signatureAlgorithmName, publicKey }) =>
+    signatureAlgorithmName
+      ? verifyWith(
+          crypto,
+          { description: 'issuer', key: publicKey.jwk ?? publicKey.spki },
+          signatureAlgorithmName,
+          data,
+          signatureP1363
+        ).catch(() => false)
+      : false
 
 const date = (value: Date) => value.toISOString().slice(0, 10)
 
@@ -174,7 +180,12 @@ export function outsideValidity(certificate: Certificate, now = new Date()): str
  * Check that a chain of certificates, leaf first, leads to one of the anchors: each
  * certificate is signed by the next, and the last is an anchor or signed by one.
  */
-export async function verifyChain(chain: Certificate[], anchors: Certificate[]): Promise<SignatureResult> {
+export async function verifyChain(
+  chain: Certificate[],
+  anchors: Certificate[],
+  crypto: Crypto
+): Promise<SignatureResult> {
+  const verifier = certificateVerifier(crypto)
   for (let index = 0; index < chain.length; index++) {
     const anchor = anchors.find((candidate) => compareBytes(candidate.der, chain[index].der))
     if (anchor)
@@ -182,13 +193,13 @@ export async function verifyChain(chain: Certificate[], anchors: Certificate[]):
 
     const issuer = chain[index + 1]
     if (issuer) {
-      if (!(await verifyCertificateSignature(chain[index], issuer, certificateVerifier))) {
+      if (!(await verifyCertificateSignature(chain[index], issuer, verifier))) {
         return { status: 'invalid', message: `x5c[${index}] is not signed by x5c[${index + 1}]` }
       }
       continue
     }
     for (const candidate of anchors) {
-      if (await verifyCertificateSignature(chain[index], candidate, certificateVerifier)) {
+      if (await verifyCertificateSignature(chain[index], candidate, verifier)) {
         return {
           status: 'valid',
           message: `its chain leads to the certificate you gave, ${certificateName(candidate)}`,
@@ -200,14 +211,18 @@ export async function verifyChain(chain: Certificate[], anchors: Certificate[]):
 }
 
 /** The key that signed the compact JWS, if one of the keys did */
-export async function findSigningKey(jws: string, keys: VerificationKey[]): Promise<VerificationKey | undefined> {
+export async function findSigningKey(
+  jws: string,
+  keys: VerificationKey[],
+  crypto: Crypto
+): Promise<VerificationKey | undefined> {
   const [encodedHeader, encodedPayload, encodedSignature] = jws.split('.')
   const header: unknown = JSON.parse(new TextDecoder().decode(base64url.decode(encodedHeader)))
   const alg = isRecord(header) && typeof header.alg === 'string' ? header.alg : 'none'
   const data = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
   const signature = base64url.decode(encodedSignature)
   for (const key of keys) {
-    if (await verifyWith(key, alg, data, signature)) return key
+    if (await verifyWith(crypto, key, alg, data, signature)) return key
   }
   return undefined
 }
@@ -227,6 +242,7 @@ export interface GivenKeys {
 export async function verifyJwsSignature(
   jws: string,
   header: Record<string, unknown>,
+  crypto: Crypto,
   given?: GivenKeys
 ): Promise<SignatureResult> {
   if (typeof header.alg !== 'string' || header.alg === 'none') {
@@ -242,20 +258,20 @@ export async function verifyJwsSignature(
     const withValidity = (message: string) => (validity ? `${message} Note: ${validity}.` : message)
 
     if (given && given.keys.length > 0) {
-      const signer = await findSigningKey(jws, given.keys)
+      const signer = await findSigningKey(jws, given.keys, crypto)
       if (signer) return { status: 'valid', message: `Valid, signed with ${given.source} (${signer.description}).` }
 
       const anchors = given.keys.flatMap((key) => (key.certificate ? [key.certificate] : []))
       if (chain.length === 0 || anchors.length === 0) {
         return { status: 'invalid', message: `Invalid: not signed with ${given.source}.` }
       }
-      if (!(await findSigningKey(jws, [certificateKey(chain[0])]))) {
+      if (!(await findSigningKey(jws, [certificateKey(chain[0])], crypto))) {
         return {
           status: 'invalid',
           message: `Invalid: signed neither with ${given.source} nor with the x5c certificate.`,
         }
       }
-      const path = await verifyChain(chain, anchors)
+      const path = await verifyChain(chain, anchors, crypto)
       const leaf = certificateName(chain[0])
       return path.status === 'valid'
         ? {
@@ -267,7 +283,7 @@ export async function verifyJwsSignature(
 
     if (chain.length > 0) {
       const leaf = certificateName(chain[0])
-      return (await findSigningKey(jws, [certificateKey(chain[0])]))
+      return (await findSigningKey(jws, [certificateKey(chain[0])], crypto))
         ? {
             status: 'valid',
             message: withValidity(
@@ -278,7 +294,7 @@ export async function verifyJwsSignature(
     }
 
     if (isRecord(header.jwk)) {
-      return (await findSigningKey(jws, [jwkKey(header.jwk)]))
+      return (await findSigningKey(jws, [jwkKey(header.jwk)], crypto))
         ? { status: 'valid', message: 'Valid, signed with the jwk of the header. This proves integrity only.' }
         : { status: 'invalid', message: 'Invalid: not signed with the jwk of the header.' }
     }
@@ -312,10 +328,10 @@ export function jwsSignatureCheck(
 ): SignatureCheck {
   return {
     label,
-    verify: async () => {
+    verify: async (crypto) => {
       const given = givenKeys(keyText)
       if (typeof given === 'string') return { status: 'unverified', message: given }
-      return verifyJwsSignature(jws, header, given)
+      return verifyJwsSignature(jws, header, crypto, given)
     },
   }
 }

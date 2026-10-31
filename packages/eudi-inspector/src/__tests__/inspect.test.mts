@@ -6,10 +6,10 @@ import { describe, expect, it } from 'vitest'
 import {
   CA_CERTIFICATE_PEM,
   OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM,
-} from '../../../../packages/eudi-access-certificate/src/__tests__/fixtures.mjs'
-import { WRPACProvidersJWT } from '../../../../packages/eudi-lote/src/__tests__/fixtures.mjs'
-import { SIGNED_TSL_XML, UNSIGNED_TSL_XML } from '../../../../packages/eudi-tl/src/__tests__/fixtures.mjs'
-import { InspectionError, inspect } from '../inspect'
+} from '../../../eudi-access-certificate/src/__tests__/fixtures.mjs'
+import { WRPACProvidersJWT } from '../../../eudi-lote/src/__tests__/fixtures.mjs'
+import { SIGNED_TSL_XML, UNSIGNED_TSL_XML } from '../../../eudi-tl/src/__tests__/fixtures.mjs'
+import { InspectionError, inspect } from '../index'
 import { anchorOf, formatPath } from '../paths'
 
 const pemToDer = (pem: string) => base64.decode(pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, ''))
@@ -22,7 +22,7 @@ describe('inspect', () => {
     const inspection = inspect(SIGNED_TSL_XML)
     expect(inspection.kind).toBe('trusted-list')
     expect(inspection.checks[0]).toBe('ETSI TS 119 612 structure')
-    await expect(inspection.signatures?.[0].verify()).resolves.toMatchObject({
+    await expect(inspection.signatures?.[0].verify(crypto)).resolves.toMatchObject({
       status: 'valid',
       message: expect.stringContaining('This proves integrity only'),
     })
@@ -31,7 +31,7 @@ describe('inspect', () => {
   it('rejects the signature of an unsigned trusted list', async () => {
     const inspection = inspect(UNSIGNED_TSL_XML)
     expect(inspection.kind).toBe('trusted-list')
-    await expect(inspection.signatures?.[0].verify()).resolves.toMatchObject({ status: 'invalid' })
+    await expect(inspection.signatures?.[0].verify(crypto)).resolves.toMatchObject({ status: 'invalid' })
   })
 
   it('recognises an access certificate as PEM, base64 and DER', () => {
