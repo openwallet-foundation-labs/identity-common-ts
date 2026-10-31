@@ -94,8 +94,9 @@ so each format is a chunk of its own.
 
 ## Deployment
 
-`.github/workflows/pages.yml` builds the inspector and publishes it with the SD-JWT site under `/inspector/` on every
-push to `main` that touches it or the packages it bundles. The build uses a relative base, so it works under any path.
+`.github/workflows/pages.yml` builds the inspector and publishes it as the GitHub Pages site of the repository,
+<https://openwallet-foundation-labs.github.io/identity-common-ts/>, on every push to `main` that touches it or the
+packages it bundles. The build uses a relative base, so it works under any path.
 
 ## Limitations
 

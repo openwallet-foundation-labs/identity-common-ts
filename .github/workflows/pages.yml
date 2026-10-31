@@ -1,20 +1,13 @@
-name: Deploy GitHub Pages
+name: Deploy the inspector to GitHub Pages
 
 on:
   push:
     branches:
       - main
     paths:
-      - docs/sd-jwt/**
-      - packages/sd-jwt-vc/docs/**
-      # The inspector and the packages it bundles
       - apps/inspector/**
-      - packages/identity-common/src/**
-      - packages/crypto/src/**
-      - packages/x509/src/**
-      - packages/eudi-*/src/**
-      - packages/token-status-list/src/**
-      - packages/cose/src/**
+      # The packages the inspector bundles
+      - packages/*/src/**
       - pnpm-lock.yaml
       - .github/workflows/pages.yml
   workflow_dispatch:
@@ -53,21 +46,13 @@ jobs:
       - name: Build inspector
         run: pnpm --filter identity-inspector build
 
-      # Keep the guides available under their previous sdjwt.js.org/0.x/ URLs
-      - name: Assemble site
-        run: |
-          mkdir -p _site/0.x _site/inspector
-          cp -r docs/sd-jwt/. _site/
-          cp packages/sd-jwt-vc/docs/*.md _site/0.x/
-          cp -r apps/inspector/dist/. _site/inspector/
-
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: _site
+          path: apps/inspector/dist
 
       - name: Deploy to GitHub Pages
         id: deployment

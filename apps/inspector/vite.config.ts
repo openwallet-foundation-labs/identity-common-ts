@@ -4,7 +4,7 @@ import { layout } from './layout'
 import { PAGES } from './src/site'
 
 export default defineConfig({
-  // A relative base, so the build works under any path, e.g. /inspector/ on GitHub Pages
+  // A relative base, so the build works under any path, e.g. /identity-common-ts/ on GitHub Pages
   base: './',
   appType: 'mpa',
   plugins: [layout()],

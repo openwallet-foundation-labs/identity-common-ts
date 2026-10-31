@@ -27,7 +27,7 @@ export interface CliEnvironment {
 export const EXIT = { OK: 0, FAILED: 1, UNREADABLE: 2 } as const
 
 /** Where the web pages of the inspector are published */
-export const WEB_URL = 'https://sdjwt.js.org/inspector/'
+export const WEB_URL = 'https://openwallet-foundation-labs.github.io/identity-common-ts/'
 
 const FORMATS = Object.keys(INSPECTORS) as DocumentFormat[]
 

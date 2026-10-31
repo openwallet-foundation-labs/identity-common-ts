@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/openwallet-foundation-labs/identity-common-ts/blob/main/LICENSE)
 
 Parse EUDI documents and check each element against its specification, as a library and as the command line tool
-`eudi-inspect`. It is what the [EUDI Inspector](https://sdjwt.js.org/inspector/) web pages run on.
+`eudi-inspect`. It is what the [EUDI Inspector](https://openwallet-foundation-labs.github.io/identity-common-ts/) web pages run on.
 
 | Format | Specification | Input |
 | --- | --- | --- |
