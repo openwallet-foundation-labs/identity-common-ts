@@ -254,7 +254,9 @@ Removes an entity by name.
 
 #### `validateLoTE(lote): ValidationResult`
 
-Validates a LoTE document against ETSI TS 119 602 schema. Returns validation result with error details.
+Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns validation result with error details.
+
+The rules of the EU lists (2-letter country codes, non-empty names, at least one digital identity, X.509 certificate encoding, and so on) are not part of the JSON schema: `validateLoTEProfile` applies them. The known differences from the JSON schema are listed in [`src/__tests__/schema-drift.test.mts`](./src/__tests__/schema-drift.test.mts).
 
 #### `assertValidLoTE(lote): asserts lote is LoTEDocument`
 
@@ -281,7 +283,7 @@ Methods:
 - `.infoUri(uri, lang?)` - Information URI
 - `.addExtension(extension)` - Add an extension
 - `.addService(service)` - Add a service
-- `.build()` - Build the entity
+- `.build()` - Build the entity, checked against the JSON schema rules (use `validateLoTEProfile` on the list for the EU rules)
 
 #### `service(): ServiceBuilder`
 
@@ -298,10 +300,10 @@ Methods:
 - `.addX509SKI(base64SKI)` - Add X.509 Subject Key Identifier
 - `.addPublicKey(jwk)` - Add JWK public key
 - `.addOtherId(identifier)` - Add custom identifier
-- `.addEndpoint(type, uri)` - Add service endpoint
+- `.addEndpoint(uri)` or `.addEndpoint(type, uri)` - Add service endpoint, with an optional `ServiceType`
 - `.addExtension(extension)` - Add service extension
 - `.addHistoryEntry(entry)` - Add service history entry
-- `.build()` - Build the service
+- `.build()` - Build the service, checked against the JSON schema rules
 
 ## Types
 

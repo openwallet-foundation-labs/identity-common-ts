@@ -6,10 +6,108 @@
  */
 
 import type z from 'zod'
-import { LoTEDocumentSchema } from './schemas'
-import type { LoTEDocument } from './types'
+import { hasDigitalIdentity, LoTEDocumentSchema } from './schemas'
+import type { LoTEDocument, PostalAddress, ServiceDigitalIdentity } from './types'
 
 const SIX_MONTHS_IN_MS = 6 * 31 * 24 * 60 * 60 * 1000
+
+/*
+ * What the profiles require beyond the TS 119 602 JSON schema, which the base schema
+ * follows. These were base-schema rules before it followed the JSON schema; the EU lists
+ * keep them.
+ */
+
+/** A postal address names its country by a 2-letter code. */
+function checkCountries(
+  addresses: PostalAddress[] | undefined,
+  path: (string | number)[],
+  ctx: z.RefinementCtx<LoTEDocument>
+) {
+  addresses?.forEach((address, index) => {
+    if (address.Country.length !== 2) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Country must be a 2-letter country code',
+        path: [...path, index.toString(), 'Country'],
+      })
+    }
+  })
+}
+
+const X509_ENCODING = 'urn:ietf:params:tls-cert-type:x509'
+const X509_SPEC_REF = 'RFC5280'
+
+/**
+ * A service digital identity carries at least one identity; a certificate has a value
+ * and, when it names them, the X.509 encoding and RFC 5280; a public key is not a
+ * symmetric (`oct`) key.
+ */
+function checkDigitalIdentity(
+  identity: ServiceDigitalIdentity,
+  path: (string | number)[],
+  ctx: z.RefinementCtx<LoTEDocument>
+) {
+  if (!hasDigitalIdentity(identity)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'At least one digital identity type must be provided',
+      path,
+    })
+  }
+  identity.X509Certificates?.forEach((certificate, index) => {
+    const certificatePath = [...path, 'X509Certificates', index.toString()]
+    if (certificate.val === '') {
+      ctx.addIssue({ code: 'custom', message: 'A certificate must have a value', path: [...certificatePath, 'val'] })
+    }
+    if (certificate.encoding !== undefined && certificate.encoding !== X509_ENCODING) {
+      ctx.addIssue({
+        code: 'invalid_value',
+        values: [X509_ENCODING],
+        message: `A certificate's encoding must be ${X509_ENCODING}`,
+        path: [...certificatePath, 'encoding'],
+      })
+    }
+    if (certificate.specRef !== undefined && certificate.specRef !== X509_SPEC_REF) {
+      ctx.addIssue({
+        code: 'invalid_value',
+        values: [X509_SPEC_REF],
+        message: `A certificate's specRef must be ${X509_SPEC_REF}`,
+        path: [...certificatePath, 'specRef'],
+      })
+    }
+  })
+  identity.PublicKeyValues?.forEach((key, index) => {
+    if (key.kty === 'oct') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A public key cannot be a symmetric (oct) key',
+        path: [...path, 'PublicKeyValues', index.toString(), 'kty'],
+      })
+    }
+  })
+}
+
+/** Every localized string or URI has a language, and a localized string a value. */
+function checkLocalizedValues(node: unknown, path: (string | number)[], ctx: z.RefinementCtx<LoTEDocument>) {
+  if (Array.isArray(node)) {
+    node.forEach((item, index) => {
+      checkLocalizedValues(item, [...path, index.toString()], ctx)
+    })
+    return
+  }
+  if (node === null || typeof node !== 'object') return
+  const record = node as Record<string, unknown>
+  if (typeof record.lang === 'string') {
+    if (record.lang === '') ctx.addIssue({ code: 'custom', message: 'lang must not be empty', path: [...path, 'lang'] })
+    if (record.value === '') {
+      ctx.addIssue({ code: 'custom', message: 'value must not be empty', path: [...path, 'value'] })
+    }
+  }
+  for (const [key, value] of Object.entries(record)) {
+    // Extensions are free-form: nothing in them is a localized value of this schema
+    if (!key.endsWith('Extensions')) checkLocalizedValues(value, [...path, key], ctx)
+  }
+}
 
 export const LOTE_TYPES = {
   EUPIDProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUPIDProvidersList',
@@ -121,6 +219,28 @@ const listAndSchemeInformationRefinement =
       })
     }
 
+    checkLocalizedValues(info, path, ctx)
+    checkCountries(
+      info.SchemeOperatorAddress?.SchemeOperatorPostalAddress,
+      [...path, 'SchemeOperatorAddress', 'SchemeOperatorPostalAddress'],
+      ctx
+    )
+    info.PointersToOtherLoTE?.forEach((pointer, pointerIndex) => {
+      const pointerPath = [...path, 'PointersToOtherLoTE', pointerIndex.toString()]
+      pointer.ServiceDigitalIdentities.forEach((identity, identityIndex) => {
+        checkDigitalIdentity(identity, [...pointerPath, 'ServiceDigitalIdentities', identityIndex.toString()], ctx)
+      })
+      pointer.LoTEQualifiers.forEach((qualifier, qualifierIndex) => {
+        if (qualifier.MimeType === '') {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'MimeType must not be empty',
+            path: [...pointerPath, 'LoTEQualifiers', qualifierIndex.toString(), 'MimeType'],
+          })
+        }
+      })
+    })
+
     const listIssueDateTime = new Date(info.ListIssueDateTime).getTime()
     const nextUpdate = new Date(info.NextUpdate).getTime()
 
@@ -141,8 +261,15 @@ type TrustedEntitiesListRefinementOptions = {
 const trustedEntitiesListRefinement =
   ({ allowedServiceTypeIdentifiers, informationUriPrefix }: TrustedEntitiesListRefinementOptions) =>
   ({ LoTE }: LoTEDocument, ctx: z.RefinementCtx<LoTEDocument>) => {
-    LoTE.TrustedEntitiesList.forEach((entity, index) => {
+    LoTE.TrustedEntitiesList?.forEach((entity, index) => {
       const trustedEntityPath = ['LoTE', 'TrustedEntitiesList', index.toString()]
+
+      checkLocalizedValues(entity, trustedEntityPath, ctx)
+      checkCountries(
+        entity.TrustedEntityInformation.TEAddress.TEPostalAddress,
+        [...trustedEntityPath, 'TrustedEntityInformation', 'TEAddress', 'TEPostalAddress'],
+        ctx
+      )
 
       if (informationUriPrefix) {
         const uri = entity.TrustedEntityInformation.TEInformationURI?.find(({ uriValue }) =>
@@ -169,6 +296,19 @@ const trustedEntitiesListRefinement =
 
       entity.TrustedEntityServices.forEach((service, serviceIndex) => {
         const entityServicePath = [...trustedEntityPath, 'TrustedEntityServices', serviceIndex.toString()]
+
+        checkDigitalIdentity(
+          service.ServiceInformation.ServiceDigitalIdentity,
+          [...entityServicePath, 'ServiceInformation', 'ServiceDigitalIdentity'],
+          ctx
+        )
+        service.ServiceHistory?.forEach((instance, historyIndex) => {
+          checkDigitalIdentity(
+            instance.ServiceDigitalIdentity,
+            [...entityServicePath, 'ServiceHistory', historyIndex.toString(), 'ServiceDigitalIdentity'],
+            ctx
+          )
+        })
 
         if (typeof service.ServiceInformation.ServiceStatus !== 'undefined') {
           ctx.addIssue({
@@ -287,7 +427,7 @@ export const EUEAAProvidersListSchema = LoTEDocumentSchema.superRefine(
   listAndSchemeInformationRefinement({
     loTEType: LOTE_TYPES.EUEAAProvidersList,
     loTEVersionIdentifier: 1,
-    statusDeterminationApproach: 'http://uri.etsi.org/19602/EAAProvidersList/StatusDetn/EU"',
+    statusDeterminationApproach: 'http://uri.etsi.org/19602/EAAProvidersList/StatusDetn/EU',
     schemeTerritory: 'EU',
     schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/EAAProvidersList/schemerules/EU',
     requireNoPointersToOtherLoTE: true,
@@ -307,7 +447,7 @@ export const EUPubEAAProvidersListSchema = LoTEDocumentSchema.superRefine(
   listAndSchemeInformationRefinement({
     loTEType: LOTE_TYPES.EUPubEAAProvidersList,
     loTEVersionIdentifier: 1,
-    statusDeterminationApproach: 'http://uri.etsi.org/19602/PubEAAProvidersList/StatusDetn/EU"',
+    statusDeterminationApproach: 'http://uri.etsi.org/19602/PubEAAProvidersList/StatusDetn/EU',
     schemeTerritory: 'EU',
     schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/PubEAAProvidersList/schemerules/EU',
     requireNoPointersToOtherLoTE: true,
