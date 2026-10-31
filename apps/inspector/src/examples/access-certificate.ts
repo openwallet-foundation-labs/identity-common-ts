@@ -1,0 +1,38 @@
+// Made by scripts/generate-examples.mjs, run `pnpm --filter identity-inspector examples` to make it again
+import type { Example } from '../example'
+
+export const examples: Example[] = [
+  {
+    id: 'access-certificate',
+    title: 'Access certificate',
+    description:
+      'An access certificate of a relying party, verified with the certificate of the test CA that issued it.',
+    values: {
+      doc: '-----BEGIN CERTIFICATE-----\nMIIDpjCCA0ygAwIBAgIEC63A3jAKBggqhkjOPQQDAjBrMQswCQYDVQQGEwJERTEj\nMCEGA1UECgwaRXhhbXBsZSBBY2Nlc3MgQ0EgUHJvdmlkZXIxFzAVBgNVBGEMDk5U\nUkRFLUhSQjEyMzQ1MR4wHAYDVQQDDBVFeGFtcGxlIFdSUCBBY2Nlc3MgQ0EwHhcN\nMjYwOTI4MTk1OTA2WhcNMzYwOTI1MTk1OTA2WjB5MQswCQYDVQQGEwJERTEjMCEG\nA1UECgwaRXhhbXBsZSBSZWx5aW5nIFBhcnR5IEdtYkgxFDASBgNVBAsMC09ubGlu\nZSBTaG9wMRgwFgYDVQRhDA9WQVRERS0xMjM0NTY3ODkxFTATBgNVBAMMDEV4YW1w\nbGUgU2hvcDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABHMcGZ3HO/exk+1jjOll\nVt1KKAGwP5BcBs+KYVDjvw/awTaQAQhU5fi13yMznVkbuI7+5c16r+w0LI7t1FYg\nMsqjggHOMIIByjAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDAdBgNVHQ4E\nFgQUbZvDzbe2oVZqqcG3xfbbu0GAk78wHwYDVR0jBBgwFoAUdd0cs56P7zfHv4eI\nvh+sGm/XPfkwPgYDVR0gBDcwNTAzBgcEAIvsRgEEMCgwJgYIKwYBBQUHAgEWGmh0\ndHBzOi8vY2EuZXhhbXBsZS5jb20vY3BzMG0GA1UdEQRmMGSCEHNob3AuZXhhbXBs\nZS5jb22GIGh0dHBzOi8vc2hvcC5leGFtcGxlLmNvbS9zdXBwb3J0gRhzdXBwb3J0\nQHNob3AuZXhhbXBsZS5jb22gFAYDVQQUoA0TCys0OTMwMTIzNDU2MCsGA1UdHwQk\nMCIwIKAeoByGGmh0dHBzOi8vY2EuZXhhbXBsZS5jb20vY3JsMF8GCCsGAQUFBwEB\nBFMwUTAkBggrBgEFBQcwAYYYaHR0cHM6Ly9vY3NwLmV4YW1wbGUuY29tMCkGCCsG\nAQUFBzAChh1odHRwczovL2NhLmV4YW1wbGUuY29tL2NhLmNydDAtBggrBgEFBQcB\nAwQhMB8wCAYGBACORgEBMBMGBgQAjkYBBjAJBgcEAI5GAQYCMAoGCCqGSM49BAMC\nA0gAMEUCIQCTOehzjd269zf3H1jEUgZdrM0cML+6H5d+3lsZf+OzOQIgNsvEnenR\ni4IvgvE6YqyuxczNUeACbq4MVpqDYf3oCPg=\n-----END CERTIFICATE-----\n',
+      issuer:
+        '-----BEGIN CERTIFICATE-----\nMIICCTCCAbCgAwIBAgIBATAKBggqhkjOPQQDAjBrMQswCQYDVQQGEwJERTEjMCEG\nA1UECgwaRXhhbXBsZSBBY2Nlc3MgQ0EgUHJvdmlkZXIxFzAVBgNVBGEMDk5UUkRF\nLUhSQjEyMzQ1MR4wHAYDVQQDDBVFeGFtcGxlIFdSUCBBY2Nlc3MgQ0EwHhcNMjYw\nOTI4MTk1OTA2WhcNMzYwOTI1MTk1OTA2WjBrMQswCQYDVQQGEwJERTEjMCEGA1UE\nCgwaRXhhbXBsZSBBY2Nlc3MgQ0EgUHJvdmlkZXIxFzAVBgNVBGEMDk5UUkRFLUhS\nQjEyMzQ1MR4wHAYDVQQDDBVFeGFtcGxlIFdSUCBBY2Nlc3MgQ0EwWTATBgcqhkjO\nPQIBBggqhkjOPQMBBwNCAARg0c8sALBbzE/SFVqttq8OdUmAewJixq8yhU8EXhbb\n9sxiRnhAQg5ymI7lvJAFxx15QMhFCCIPhfS2LpY39Ihxo0UwQzASBgNVHRMBAf8E\nCDAGAQH/AgEAMA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUdd0cs56P7zfHv4eI\nvh+sGm/XPfkwCgYIKoZIzj0EAwIDRwAwRAIgYkMrTbHkFQVYaIpdmbn+Gw5KjFH8\n7Nd8vbZoZNwMFiYCIBS/aia34bqtP/3GeUgtuDoE7qHHRo8Wr/Woma9EBFB1\n-----END CERTIFICATE-----\n',
+    },
+    expect: {
+      findings: [],
+      signatures: ['valid'],
+    },
+  },
+  {
+    id: 'ca-certificate',
+    title: 'A CA certificate',
+    description: 'The certificate of the CA, checked as if it were an access certificate.',
+    values: {
+      doc: '-----BEGIN CERTIFICATE-----\nMIICCTCCAbCgAwIBAgIBATAKBggqhkjOPQQDAjBrMQswCQYDVQQGEwJERTEjMCEG\nA1UECgwaRXhhbXBsZSBBY2Nlc3MgQ0EgUHJvdmlkZXIxFzAVBgNVBGEMDk5UUkRF\nLUhSQjEyMzQ1MR4wHAYDVQQDDBVFeGFtcGxlIFdSUCBBY2Nlc3MgQ0EwHhcNMjYw\nOTI4MTk1OTA2WhcNMzYwOTI1MTk1OTA2WjBrMQswCQYDVQQGEwJERTEjMCEGA1UE\nCgwaRXhhbXBsZSBBY2Nlc3MgQ0EgUHJvdmlkZXIxFzAVBgNVBGEMDk5UUkRFLUhS\nQjEyMzQ1MR4wHAYDVQQDDBVFeGFtcGxlIFdSUCBBY2Nlc3MgQ0EwWTATBgcqhkjO\nPQIBBggqhkjOPQMBBwNCAARg0c8sALBbzE/SFVqttq8OdUmAewJixq8yhU8EXhbb\n9sxiRnhAQg5ymI7lvJAFxx15QMhFCCIPhfS2LpY39Ihxo0UwQzASBgNVHRMBAf8E\nCDAGAQH/AgEAMA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUdd0cs56P7zfHv4eI\nvh+sGm/XPfkwCgYIKoZIzj0EAwIDRwAwRAIgYkMrTbHkFQVYaIpdmbn+Gw5KjFH8\n7Nd8vbZoZNwMFiYCIBS/aia34bqtP/3GeUgtuDoE7qHHRo8Wr/Woma9EBFB1\n-----END CERTIFICATE-----\n',
+    },
+    expect: {
+      findings: [
+        'CA_CERTIFICATE',
+        'MISSING_CONTACT',
+        'MISSING_CPS_URI',
+        'MISSING_DIGITAL_SIGNATURE_KEY_USAGE',
+        'MISSING_POLICY',
+      ],
+      signatures: ['unverified'],
+    },
+  },
+]

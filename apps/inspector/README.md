@@ -43,6 +43,22 @@ Signatures are verified with the Web Crypto API of the browser, which the pages 
   which the page then fetches from `ec.europa.eu`.
 - An access certificate is verified with the certificate of its CA.
 
+## Examples
+
+Each page offers examples that show what it checks: documents that pass, and documents with a planted problem, each
+with a description of what it shows. The start page offers a few of them. An example opens as `#example=<id>`, e.g.
+`sd-jwt/#example=other-verifier`, so it can be linked to.
+
+`scripts/examples.ts` makes them into `src/examples/`. The signed examples are made with throwaway keys and certificates
+of the test CA of `@owf/eudi-access-certificate`, valid until 2036, and the keys are not kept. To make them again:
+
+```bash
+pnpm --filter identity-inspector examples
+```
+
+`src/__tests__/examples.test.mts` runs every example as its page does and checks the findings and signature results it
+was made to show, so an example that expires or changes fails the tests.
+
 ## Sharing a result
 
 "Copy link to this result" puts the input of the page into the fragment of the URL, after the `#`, which browsers do not

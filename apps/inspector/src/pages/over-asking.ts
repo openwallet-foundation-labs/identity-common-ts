@@ -1,6 +1,5 @@
-import { checkRequest } from '@owf/eudi-inspector'
+import { examples } from '../examples/over-asking'
+import { checkRequestPage } from '../inspectors'
 import { startPage } from '../page'
 
-startPage({
-  inspect: ({ fields }) => checkRequest(fields.request ?? '', fields.registration ?? ''),
-})
+startPage({ inspect: checkRequestPage, examples })

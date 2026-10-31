@@ -1,7 +1,5 @@
-import { inspectSdJwt } from '@owf/eudi-inspector'
+import { examples } from '../examples/sd-jwt'
+import { inspectSdJwtPage } from '../inspectors'
 import { startPage } from '../page'
 
-startPage({
-  format: 'sd-jwt',
-  inspect: ({ document, fields }) => inspectSdJwt(document, { key: fields.key, nonce: fields.nonce, aud: fields.aud }),
-})
+startPage({ format: 'sd-jwt', inspect: inspectSdJwtPage, examples })

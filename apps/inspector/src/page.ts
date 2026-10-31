@@ -11,16 +11,11 @@ import {
   toFragment,
 } from '@owf/eudi-inspector'
 import { base64url } from '@owf/identity-common'
+import type { Example } from './example'
+import type { PageInput } from './inspectors'
 import { renderInspection, showError } from './render'
 import { pageOf } from './site'
 import { el } from './tree'
-
-export interface PageInput {
-  /** The document, empty on a page without a document field */
-  document: DocumentInput
-  /** The values of the other fields of the form by name, "1" for a checked checkbox */
-  fields: Record<string, string>
-}
 
 /** Lets a page link to the page of another format, carrying the document over */
 export interface PageContext {
@@ -35,6 +30,39 @@ export interface PageDefinition {
   extra?: (inspection: Inspection, context: PageContext) => HTMLElement | undefined
   /** Elements to add to the summary */
   actions?: (inspection: Inspection, context: PageContext) => HTMLElement[]
+  /** Examples to load, as `#example=<id>` */
+  examples?: Example[]
+}
+
+/** A link to an example, of this page or another */
+export interface ExampleLink {
+  title: string
+  description?: string
+  href: string
+  /** Open it on this page, instead of following the link */
+  open?: () => void
+}
+
+/** Show links to examples at the top of the input panel */
+export function showExamples(label: string, links: ExampleLink[]): void {
+  const panel = document.getElementById('input-panel')
+  if (!panel || links.length === 0) return
+  const row = el('nav', 'examples')
+  row.setAttribute('aria-label', label)
+  row.append(el('span', 'examples-label', label))
+  for (const { title, description, href, open } of links) {
+    const link = el('a', 'example', title)
+    link.href = href
+    if (description) link.title = description
+    if (open) {
+      link.addEventListener('click', (event) => {
+        event.preventDefault()
+        open()
+      })
+    }
+    row.append(link)
+  }
+  panel.prepend(row)
 }
 
 /** A document that was not pasted: fetched, dropped, chosen or carried over from another page */
@@ -118,6 +146,8 @@ export function startPage(definition: PageDefinition): void {
   let loaded: Loaded | undefined
   let runs = 0
   let pendingLookup: string | undefined
+  // The example shown, until the input changes
+  let example: Example | undefined
 
   const fields = () => [...form.elements].filter(isField).filter((field) => field.name && field !== docField)
   const compressed = new Set([...form.querySelectorAll('textarea')].map((textarea) => textarea.name))
@@ -212,11 +242,17 @@ export function startPage(definition: PageDefinition): void {
     }
   }
 
-  /** Inspect what the form holds. `fromLink` keeps the link the page was opened with in the address bar. */
-  async function run(fromLink = false): Promise<void> {
+  /**
+   * Inspect what the form holds. `fromLink` keeps the link the page was opened with in the
+   * address bar, and `linkOrigin` names where the fields of a page without a document came from.
+   */
+  async function run(fromLink = false, linkOrigin = 'Shared link'): Promise<void> {
     const run = ++runs
     const { document: input, origin } = current()
-    if (!fromLink && location.hash) history.replaceState(null, '', location.pathname + location.search)
+    if (!fromLink) {
+      example = undefined
+      if (location.hash) history.replaceState(null, '', location.pathname + location.search)
+    }
     let inspection: Inspection
     try {
       inspection = await definition.inspect({
@@ -230,7 +266,8 @@ export function startPage(definition: PageDefinition): void {
     if (run !== runs) return
     renderInspection(inspection, {
       // A page without a document field has only the fields, which the link filled in
-      origin: fromLink && !docField ? 'Shared link' : origin,
+      origin: fromLink && !docField ? linkOrigin : origin,
+      description: example?.description,
       lookup: pendingLookup,
       extra: definition.extra?.(inspection, context),
       actions: [...(definition.actions?.(inspection, context) ?? []), shareButton()],
@@ -302,7 +339,17 @@ export function startPage(definition: PageDefinition): void {
     }
     if (!location.hash) return
 
-    const values = await fromFragment(location.hash, compressed)
+    const linked = await fromFragment(location.hash, compressed)
+    const exampleId = linked.get('example')
+    example = exampleId === undefined ? undefined : definition.examples?.find((entry) => entry.id === exampleId)
+    if (exampleId !== undefined && !example) {
+      showError(`This page has no example ${exampleId}.`)
+      return
+    }
+    // An example is a link with its values
+    const values = example ? new Map(Object.entries(example.values)) : linked
+    const origin = example ? `Example: ${example.title}` : 'Shared link'
+
     for (const field of fields()) {
       const value = values.get(field.name) ?? ''
       if (field instanceof HTMLInputElement && field.type === 'checkbox') field.checked = value === '1'
@@ -311,13 +358,13 @@ export function startPage(definition: PageDefinition): void {
     pendingLookup = values.get('lookup')
     const url = values.get('url')
     const doc = values.get('doc')
-    if (url && urlInput) {
-      urlInput.value = url
+    if (urlInput) urlInput.value = url ?? ''
+    if (url) {
       await fetchDocument(url, true)
     } else if (doc !== undefined && docField) {
-      await load(doc, 'Shared link', undefined, true)
+      await load(doc, origin, undefined, true)
     } else if (!docField && values.size > 0) {
-      await run(true)
+      await run(true, origin)
     }
   }
 
@@ -368,6 +415,23 @@ export function startPage(definition: PageDefinition): void {
     })
   }
 
-  window.addEventListener('hashchange', () => void restore())
+  showExamples(
+    'Examples',
+    (definition.examples ?? []).map((entry) => {
+      const href = `#${new URLSearchParams({ example: entry.id })}`
+      return {
+        title: entry.title,
+        description: entry.description,
+        href,
+        open: () => {
+          history.pushState(null, '', href)
+          void restore()
+        },
+      }
+    })
+  )
+
+  // Following a link within the page, or going back and forth, changes the fragment
+  window.addEventListener('popstate', () => void restore())
   void restore()
 }

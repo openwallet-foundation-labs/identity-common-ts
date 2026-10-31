@@ -1,5 +1,6 @@
 import { type DocumentFormat, type DocumentInput, detect, type Inspection } from '@owf/eudi-inspector'
-import { startPage } from '../page'
+import { featured } from '../examples/featured'
+import { pageUrl, showExamples, startPage } from '../page'
 import { pageOf } from '../site'
 
 // The over-asking check used to be a tab of this page
@@ -27,3 +28,11 @@ startPage({
     return [linkTo(inspection.kind, `Open in the ${page.title} for more checks`)]
   },
 })
+
+showExamples(
+  'Try an example',
+  featured.map(({ page, id, title }) => ({
+    title: `${title} (${pageOf(page)?.name ?? page})`,
+    href: `${pageUrl(page)}#${new URLSearchParams({ example: id })}`,
+  }))
+)

@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "examples": "node scripts/generate-examples.mjs"
   },
   "dependencies": {
     "@owf/eudi-inspector": "workspace:*",
@@ -15,6 +16,12 @@
     "@owf/identity-common": "workspace:*"
   },
   "devDependencies": {
+    "@owf/crypto": "workspace:*",
+    "@owf/eudi-registration-certificate": "workspace:*",
+    "@owf/mdoc": "workspace:*",
+    "@owf/token-status-list": "workspace:*",
+    "@owf/x509": "workspace:*",
+    "@sd-jwt/core": "workspace:*",
     "vite": "8.3.4"
   }
 }

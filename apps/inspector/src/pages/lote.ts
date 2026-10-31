@@ -1,7 +1,5 @@
-import { inspectLoTE } from '@owf/eudi-inspector'
+import { examples } from '../examples/lote'
+import { inspectLoTEPage } from '../inspectors'
 import { startPage } from '../page'
 
-startPage({
-  format: 'lote',
-  inspect: ({ document, fields }) => inspectLoTE(document, { key: fields.key }),
-})
+startPage({ format: 'lote', inspect: inspectLoTEPage, examples })

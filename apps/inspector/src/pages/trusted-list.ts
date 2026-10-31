@@ -1,22 +1,8 @@
-import { EU_LOTL_URL, inspectTrustedList } from '@owf/eudi-inspector'
 import type { TrustedList } from '@owf/eudi-tl'
+import { examples } from '../examples/trusted-list'
+import { inspectTrustedListPage } from '../inspectors'
 import { startPage } from '../page'
 import { el } from '../tree'
-
-let lotl: Promise<string> | undefined
-
-/** The EU LOTL, fetched once */
-function fetchLotl(): Promise<string> {
-  lotl ??= fetch(EU_LOTL_URL, { credentials: 'omit' }).then(async (response) => {
-    if (!response.ok) throw new Error(`${EU_LOTL_URL} answered ${response.status}`)
-    return response.text()
-  })
-  // Try again next time
-  lotl.catch(() => {
-    lotl = undefined
-  })
-  return lotl
-}
 
 /** The lists a list points to, each with a link to inspect it with its signer checked against the LOTL */
 function pointers(trustedList: TrustedList): HTMLElement | undefined {
@@ -57,7 +43,7 @@ function pointers(trustedList: TrustedList): HTMLElement | undefined {
 
 startPage({
   format: 'trusted-list',
-  inspect: ({ document, fields }) =>
-    inspectTrustedList(document, { signers: fields.signers, loadLotl: fields.lotl ? fetchLotl : undefined }),
+  inspect: inspectTrustedListPage,
   extra: (inspection) => pointers(inspection.value as TrustedList),
+  examples,
 })

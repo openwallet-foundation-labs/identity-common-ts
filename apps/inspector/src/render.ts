@@ -6,6 +6,8 @@ const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) 
 export interface RenderOptions {
   /** Where the document came from */
   origin: string
+  /** What the example shows, when it is one */
+  description?: string
   /** Elements to add at the end of the summary, e.g. a button to copy a link */
   actions?: HTMLElement[]
   /** Content between the summary and the findings */
@@ -82,7 +84,12 @@ export function renderInspection(inspection: Inspection, options: RenderOptions)
   }
 
   const summary = byId('summary')
-  summary.replaceChildren(el('h2', undefined, inspection.title), verdict, facts)
+  summary.replaceChildren(
+    el('h2', undefined, inspection.title),
+    ...(options.description ? [el('p', 'example-note', options.description)] : []),
+    verdict,
+    facts
+  )
   if (inspection.lookup) summary.append(lookupForm(inspection.lookup, options.lookup))
   if (options.actions?.length) {
     const actions = el('div', 'summary-actions')
