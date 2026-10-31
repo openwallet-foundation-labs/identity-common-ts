@@ -1,5 +1,12 @@
 # @openid4vc/oauth2
 
+## 0.9.2
+
+### Patch Changes
+
+- 410d45a: `zJarAuthorizationRequest` now requires `request` or `request_uri`. Before, it matched any object. An unsigned request that failed the regular schema was accepted without validation in `resolveOpenid4vpAuthorizationRequest`, `parseOpenid4vpAuthorizationRequest`, `parsePushedAuthorizationRequest` and `parseInteractiveAuthorizationRequest`. For OpenID4VP, this skipped the https check on `response_uri`, so a wallet could send the presentation over plain http.
+- @openid4vc/utils@0.9.2
+
 ## 0.9.1
 
 ### Patch Changes

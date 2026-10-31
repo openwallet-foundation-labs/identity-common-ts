@@ -1,5 +1,14 @@
 # @openid4vc/openid4vci
 
+## 0.9.2
+
+### Patch Changes
+
+- Updated dependencies [410d45a]
+  - @openid4vc/oauth2@0.9.2
+  - @owf/identity-common@0.6.3
+  - @openid4vc/utils@0.9.2
+
 ## 0.9.1
 
 ### Patch Changes

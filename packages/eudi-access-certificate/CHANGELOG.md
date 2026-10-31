@@ -1,5 +1,12 @@
 # @owf/eudi-access-certificate
 
+## 0.5.5
+
+### Patch Changes
+
+- @owf/identity-common@0.6.3
+  - @owf/x509@0.6.3
+
 ## 0.5.4
 
 ### Patch Changes
