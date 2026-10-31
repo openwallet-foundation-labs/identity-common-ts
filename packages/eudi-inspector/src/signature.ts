@@ -103,6 +103,22 @@ function jwkKey(value: unknown): VerificationKey {
 }
 
 /**
+ * The PEM blocks of the text. Each part after a BEGIN line is searched for its END line, as a
+ * regular expression over the whole text could take long on many BEGIN lines without an END.
+ */
+function pemBlocks(text: string): { label: string; body: string }[] {
+  const blocks: { label: string; body: string }[] = []
+  for (const part of text.split('-----BEGIN ').slice(1)) {
+    const labelEnd = part.indexOf('-----')
+    const label = part.slice(0, labelEnd)
+    if (labelEnd < 0 || !/^[A-Z ]+$/.test(label)) continue
+    const end = part.indexOf(`-----END ${label}-----`, labelEnd + 5)
+    if (end >= 0) blocks.push({ label, body: part.slice(labelEnd + 5, end) })
+  }
+  return blocks
+}
+
+/**
  * Read the keys of a JWK, a JWK Set, PEM certificates or public keys, or a certificate as
  * base64 or hex.
  *
@@ -123,7 +139,7 @@ export function parseKeys(text: string): VerificationKey[] {
 
   if (trimmed.includes('-----BEGIN')) {
     const keys: VerificationKey[] = []
-    for (const [, label, body] of trimmed.matchAll(/-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/g)) {
+    for (const { label, body } of pemBlocks(trimmed)) {
       const der = base64.decode(body.replace(/\s+/g, ''))
       if (label === 'CERTIFICATE') keys.push(certificateKey(parseCertificateOrThrow(der)))
       else if (label === 'PUBLIC KEY') keys.push({ description: 'public key', key: der })

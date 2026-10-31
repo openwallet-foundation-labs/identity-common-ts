@@ -24,7 +24,10 @@ export const toText = (input: DocumentInput) =>
 /** Bytes given as hex, base64url or base64 text, or `undefined` when the text is none of them */
 export function decodeBinaryText(text: string): Uint8Array | undefined {
   const compact = text.replace(/\s+/g, '')
-  const unpadded = compact.replace(/=+$/, '')
+  // Without a regular expression, which could take long on a long run of = that does not end the text
+  let end = compact.length
+  while (end > 0 && compact[end - 1] === '=') end--
+  const unpadded = compact.slice(0, end)
   const decode = (decoder: () => Uint8Array) => {
     try {
       return decoder()

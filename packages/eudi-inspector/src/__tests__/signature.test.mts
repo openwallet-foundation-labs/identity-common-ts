@@ -79,5 +79,7 @@ describe('signature verification', () => {
     expect(parseKeys(der)[0].description).toBe('certificate Example WRP Access CA')
     expect(() => parseKeys('{"foo": 1}')).toThrow(InspectionError)
     expect(() => parseKeys('not a key!')).toThrow(InspectionError)
+    // Many BEGIN lines without an END, which took a regular expression quadratic time
+    expect(() => parseKeys('-----BEGIN  -----a'.repeat(50_000))).toThrow('no complete certificate or public key')
   })
 })

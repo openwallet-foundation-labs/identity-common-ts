@@ -107,5 +107,7 @@ describe('options of the format pages', () => {
     expect(detect(SIGNED_TSL_XML)).toBe('trusted-list')
     expect(detect(new TextEncoder().encode(OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM))).toBe('access-certificate')
     expect(detect(fakeJws({ typ: 'statuslist+jwt' }, {}))).toBe('status-list')
+    // A long run of = that does not end the text, which took a regular expression quadratic time
+    expect(() => detect(`a${'='.repeat(100_000)}!`)).toThrow('Unrecognised input')
   })
 })
