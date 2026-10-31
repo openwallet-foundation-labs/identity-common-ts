@@ -44,6 +44,8 @@ export interface AccessCertificateValidationResult {
   valid: boolean
   errors: AccessCertificateIssue[]
   warnings: AccessCertificateIssue[]
+  /** The errors and warnings together, in the order they were found */
+  findings: AccessCertificateIssue[]
 }
 
 const C = ACCESS_CERTIFICATE_VALIDATION_CODES
@@ -64,30 +66,52 @@ export function validateAccessCertificate(
   const add = (
     severity: AccessCertificateValidationSeverity,
     code: AccessCertificateValidationCode,
+    path: (string | number)[],
     message: string,
     requirement?: string
-  ) => issues.push({ severity, code, message, requirement })
+  ) => issues.push({ severity, code, path, message, ...(requirement ? { requirement } : {}) })
 
   // X.509 basics
   if (certificate.version !== 3) {
-    add('error', C.UNSUPPORTED_VERSION, `Expected an X.509 v3 certificate, got v${certificate.version}`)
+    add(
+      'error',
+      C.UNSUPPORTED_VERSION,
+      ['certificate', 'version'],
+      `Expected an X.509 v3 certificate, got v${certificate.version}`
+    )
   }
   if (options.now !== false) {
     const now = options.now ?? new Date()
     if (now < certificate.notBefore) {
-      add('error', C.NOT_YET_VALID, `Certificate is not valid before ${certificate.notBefore.toISOString()}`)
+      add(
+        'error',
+        C.NOT_YET_VALID,
+        ['certificate', 'notBefore'],
+        `Certificate is not valid before ${certificate.notBefore.toISOString()}`
+      )
     }
     if (now > certificate.notAfter) {
-      add('error', C.EXPIRED, `Certificate expired at ${certificate.notAfter.toISOString()}`)
+      add(
+        'error',
+        C.EXPIRED,
+        ['certificate', 'notAfter'],
+        `Certificate expired at ${certificate.notAfter.toISOString()}`
+      )
     }
   }
   if (certificate.basicConstraints?.cA) {
-    add('error', C.CA_CERTIFICATE, 'An access certificate must be an end-entity certificate (cA is true)')
+    add(
+      'error',
+      C.CA_CERTIFICATE,
+      ['certificate', 'basicConstraints', 'cA'],
+      'An access certificate must be an end-entity certificate (cA is true)'
+    )
   }
   if (certificate.keyUsage && !certificate.keyUsage.includes('digitalSignature')) {
     add(
       'warning',
       C.MISSING_DIGITAL_SIGNATURE_KEY_USAGE,
+      ['certificate', 'keyUsage'],
       'Key usage does not include digitalSignature, which is needed to authenticate the wallet-relying party'
     )
   }
@@ -99,6 +123,7 @@ export function validateAccessCertificate(
     add(
       'error',
       C.MISSING_POLICY,
+      ['certificate', 'policies'],
       'Certificate does not contain an ETSI TS 119 411-8 certificate policy identifier',
       'GEN-6.6.1-03'
     )
@@ -110,6 +135,7 @@ export function validateAccessCertificate(
     add(
       'error',
       C.CONFLICTING_POLICIES,
+      ['policies'],
       `Certificate policies for both natural and legal persons are present: ${accessCertificate.policies.join(', ')}`,
       'GEN-6.6.1-03'
     )
@@ -117,7 +143,13 @@ export function validateAccessCertificate(
 
   // GEN-6.6.1-06: CPS URI
   if (!certificate.policies.some((p) => p.cpsUris.length > 0)) {
-    add('error', C.MISSING_CPS_URI, 'Certificate policies do not contain a cpsURI qualifier', 'GEN-6.6.1-06')
+    add(
+      'error',
+      C.MISSING_CPS_URI,
+      ['certificate', 'policies'],
+      'Certificate policies do not contain a cpsURI qualifier',
+      'GEN-6.6.1-06'
+    )
   }
 
   // GEN-6.6.1-07: contact information in the SAN
@@ -126,6 +158,7 @@ export function validateAccessCertificate(
     add(
       'error',
       C.MISSING_CONTACT,
+      ['certificate', 'subjectAlternativeNames'],
       'Subject alternative name must contain a website (URI), phone number (otherName telephoneNumber) or email address (rfc822Name)',
       'GEN-6.6.1-07'
     )
@@ -134,21 +167,35 @@ export function validateAccessCertificate(
   // Subject naming
   const subject = certificate.subject
   const subjectType = options.subjectType ?? accessCertificate.subjectType
-  if (!subject.commonName) add('error', C.MISSING_COMMON_NAME, 'Subject commonName is missing')
-  if (!subject.countryName) add('error', C.MISSING_COUNTRY_NAME, 'Subject countryName is missing')
+  if (!subject.commonName)
+    add('error', C.MISSING_COMMON_NAME, ['certificate', 'subject', 'commonName'], 'Subject commonName is missing')
+  if (!subject.countryName)
+    add('error', C.MISSING_COUNTRY_NAME, ['certificate', 'subject', 'countryName'], 'Subject countryName is missing')
 
   if (subjectType === 'legal') {
     if (!subject.organizationName) {
-      add('error', C.MISSING_ORGANIZATION_NAME, 'Subject organizationName is missing (ETSI EN 319 412-3)')
+      add(
+        'error',
+        C.MISSING_ORGANIZATION_NAME,
+        ['certificate', 'subject', 'organizationName'],
+        'Subject organizationName is missing (ETSI EN 319 412-3)'
+      )
     }
     if (!subject.organizationIdentifier) {
-      add('error', C.MISSING_ORGANIZATION_IDENTIFIER, 'Subject organizationIdentifier is missing', 'GEN-6.6.1-05')
+      add(
+        'error',
+        C.MISSING_ORGANIZATION_IDENTIFIER,
+        ['certificate', 'subject', 'organizationIdentifier'],
+        'Subject organizationIdentifier is missing',
+        'GEN-6.6.1-05'
+      )
     } else {
       const identifier = parseSemanticIdentifier(subject.organizationIdentifier)
       if (!identifier) {
         add(
           'error',
           C.INVALID_ORGANIZATION_IDENTIFIER,
+          ['certificate', 'subject', 'organizationIdentifier'],
           `organizationIdentifier "${subject.organizationIdentifier}" is not encoded as specified in ETSI EN 319 412-1 clause 5.1.4`,
           'GEN-6.6.1-05'
         )
@@ -156,6 +203,7 @@ export function validateAccessCertificate(
         add(
           'error',
           C.INVALID_GREECE_COUNTRY_CODE,
+          ['certificate', 'subject', 'organizationIdentifier'],
           'organizationIdentifier must use the country code "EL" for Greece',
           'GEN-6.6.1-05'
         )
@@ -166,6 +214,7 @@ export function validateAccessCertificate(
       add(
         'error',
         C.MISSING_NATURAL_PERSON_NAME,
+        ['certificate', 'subject'],
         'Subject must contain givenName and/or surname, or a pseudonym (ETSI EN 319 412-2)'
       )
     }
@@ -173,17 +222,24 @@ export function validateAccessCertificate(
       add(
         'warning',
         C.MISSING_SERIAL_NUMBER,
+        ['certificate', 'subject', 'serialNumber'],
         'Subject serialNumber is missing; the wallet-relying party has no semantic identifier'
       )
     } else if (!parseSemanticIdentifier(subject.serialNumber)) {
       add(
         'warning',
         C.INVALID_SERIAL_NUMBER,
+        ['certificate', 'subject', 'serialNumber'],
         `serialNumber "${subject.serialNumber}" is not a semantic identifier as specified in ETSI EN 319 412-1 clause 5.1.3`
       )
     }
   } else {
-    add('error', C.UNKNOWN_SUBJECT_TYPE, 'Unable to determine whether the subject is a natural or a legal person')
+    add(
+      'error',
+      C.UNKNOWN_SUBJECT_TYPE,
+      ['subjectType'],
+      'Unable to determine whether the subject is a natural or a legal person'
+    )
   }
 
   // GEN-6.6.1-02: qualified certificates follow ETSI EN 319 412-5
@@ -192,6 +248,7 @@ export function validateAccessCertificate(
       add(
         'error',
         C.MISSING_QC_COMPLIANCE,
+        ['certificate', 'qcStatements', 'qcCompliance'],
         'Qualified access certificates must contain the QcCompliance statement (ETSI EN 319 412-5)',
         'GEN-6.6.1-02'
       )
@@ -202,6 +259,7 @@ export function validateAccessCertificate(
       add(
         'warning',
         C.QC_TYPE_MISMATCH,
+        ['certificate', 'qcStatements', 'qcTypes'],
         `Expected QcType ${expectedType} for a ${subjectType} person, found ${qcTypes.length ? qcTypes.join(', ') : 'none'}`,
         'GEN-6.6.1-02'
       )
@@ -209,7 +267,12 @@ export function validateAccessCertificate(
   }
 
   const errors = issues.filter((i) => i.severity === 'error')
-  return { valid: errors.length === 0, errors, warnings: issues.filter((i) => i.severity === 'warning') }
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings: issues.filter((i) => i.severity === 'warning'),
+    findings: issues,
+  }
 }
 
 /**

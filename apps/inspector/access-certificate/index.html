@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- inspector:head -->
+  </head>
+  <body>
+    <!-- inspector:header -->
+
+    <main>
+      <section class="panel input" id="input-panel">
+        <!-- inspector:fetch -->
+        <form id="input-form">
+          <!-- inspector:document -->
+          <fieldset class="options">
+            <legend>Issuer</legend>
+            <div class="field">
+              <label class="field-label" for="issuer">CA certificate <span class="optional">optional</span></label>
+              <p class="help" id="issuer-help">The certificate of the CA that issued it, as PEM, to verify its signature.</p>
+              <textarea id="issuer" name="issuer" class="short" spellcheck="false" aria-describedby="issuer-help" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+            </div>
+          </fieldset>
+          <!-- inspector:actions -->
+        </form>
+      </section>
+
+      <!-- inspector:result -->
+    </main>
+
+    <!-- inspector:footer -->
+    <script type="module" src="/src/pages/access-certificate.ts"></script>
+  </body>
+</html>

@@ -25,6 +25,13 @@ function firstDescendant(el: Element, name: string, ns = TSL_NS): Element | unde
   return descendants(el, name, ns)[0]
 }
 
+/** The first direct child element with the name, so a nested element of the same name is not taken */
+function child(el: Element, name: string, ns = TSL_NS): Element | undefined {
+  return Array.from(el.childNodes).find(
+    (n): n is Element => (n as Element).namespaceURI === ns && (n as Element).localName === name
+  )
+}
+
 function textOf(el: Element | undefined): string | undefined {
   const t = el?.textContent?.trim()
   return t ? t : undefined
@@ -192,6 +199,8 @@ export function parseTrustedList(xml: string, options: ParseTrustedListOptions =
   return assertValidTrustedList({
     tslType: textOf(schemeInfo && firstDescendant(schemeInfo, 'TSLType')),
     schemeOperatorName: localizedName(schemeInfo && firstDescendant(schemeInfo, 'SchemeOperatorName')),
+    // A pointer to another list has a SchemeTerritory as well, so only a direct child is the list's own
+    schemeTerritory: textOf(schemeInfo && child(schemeInfo, 'SchemeTerritory')),
     sequenceNumber: sequenceText ? Number(sequenceText) : undefined,
     listIssueDateTime: textOf(schemeInfo && firstDescendant(schemeInfo, 'ListIssueDateTime')),
     nextUpdate: textOf(nextUpdate && firstDescendant(nextUpdate, 'dateTime')),

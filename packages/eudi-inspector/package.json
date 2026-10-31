@@ -1,0 +1,64 @@
+{
+  "name": "@owf/eudi-inspector",
+  "version": "0.5.1",
+  "description": "Parse EUDI trusted lists, LoTEs, registration and access certificates, status lists, SD-JWTs and mdocs, and check each element against its specification, as a library and a command line tool",
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "license": "Apache-2.0",
+  "exports": "./src/index.ts",
+  "bin": {
+    "eudi-inspect": "./bin/eudi-inspect.mjs"
+  },
+  "sideEffects": false,
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/eudi-inspector",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/eudi-inspector"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.mjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "keywords": [
+    "eudi",
+    "wallet",
+    "inspector",
+    "validation",
+    "trusted-list",
+    "registration-certificate",
+    "access-certificate",
+    "status-list",
+    "sd-jwt",
+    "mdoc",
+    "cli"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "build:binary": "tsdown --config tsdown.binary.config.mts"
+  },
+  "dependencies": {
+    "@owf/cose": "workspace:^",
+    "@owf/crypto": "workspace:^",
+    "@owf/eudi-access-certificate": "workspace:^",
+    "@owf/eudi-lote": "workspace:^",
+    "@owf/eudi-registration-certificate": "workspace:^",
+    "@owf/eudi-tl": "workspace:^",
+    "@owf/identity-common": "workspace:^",
+    "@owf/mdoc": "workspace:^",
+    "@owf/token-status-list": "workspace:^",
+    "@owf/x509": "workspace:^",
+    "@sd-jwt/core": "workspace:^"
+  }
+}

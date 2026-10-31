@@ -13,6 +13,7 @@ import {
   parseWRPRCPayload,
   signWRPRC,
   toWRPRCDialect,
+  validateWRPRC,
   validateWRPRCJWTHeader,
   validateWRPRCPayload,
   WRP_ENTITLEMENTS,
@@ -270,5 +271,44 @@ describe('Annex C example', () => {
 
     expect(WRPRCPayloadSchema.safeParse(annexC).success).toBe(true)
     expect(validateWRPRCPayload(annexC, annexC.intermediary.sub).valid).toBe(true)
+  })
+})
+
+describe('findings', () => {
+  it('reports errors and warnings as findings with severity and requirement', () => {
+    const payload = base()
+      .expiresAt(1_700_000_000 + 400 * 24 * 3600)
+      .build()
+    const result = validateWRPRCPayload(payload, payload.sub)
+
+    expect(result.findings).toContainEqual({
+      severity: 'error',
+      code: WRPRC_VALIDATION_CODES.EXP_TOO_LATE,
+      path: ['exp'],
+      message: 'exp must be at most 12 months after iat (GEN-5.2.4-08)',
+      requirement: 'GEN-5.2.4-08',
+    })
+    expect(result.errors).toEqual(
+      result.findings
+        .filter((f) => f.severity === 'error')
+        .map(({ path, message, code }) => ({ path: path.map(String), message, code }))
+    )
+    expect(result.warnings).toEqual(
+      result.findings
+        .filter((f) => f.severity === 'warning')
+        .map(({ path, message, code }) => ({ path: path.map(String), message, code }))
+    )
+  })
+
+  it('prefixes header and payload findings and keeps array indices as numbers', () => {
+    const payload = { ...base().build(), entitlements: [42] }
+    const result = validateWRPRC({ alg: 'ES256' }, payload, 'LEINL-529900T8BM49AURSDO55')
+
+    expect(result.valid).toBe(false)
+    expect(result.findings.some((f) => f.path[0] === 'header')).toBe(true)
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({ severity: 'error', path: ['payload', 'entitlements', 0] })
+    )
+    expect(result.errors).toContainEqual(expect.objectContaining({ path: ['payload', 'entitlements', '0'] }))
   })
 })

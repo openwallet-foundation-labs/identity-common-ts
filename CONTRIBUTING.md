@@ -68,7 +68,7 @@ identity-common-ts/
 │   ├── openid4vc*/              # OpenID4VCI, OpenID4VP and shared utilities (@openid4vc/*)
 │   └── eudi-*/                  # EUDI-specific packages (planned)
 ├── examples/                    # Runnable examples, grouped by topic (e.g. examples/sd-jwt)
-├── docs/sd-jwt/                 # sdjwt.js.org landing page (deployed to GitHub Pages)
+├── apps/inspector/              # EUDI Inspector web pages (deployed to GitHub Pages)
 ├── tests/                       # Integration tests
 ├── .changeset/                  # Changeset configuration for versioning
 └── .github/                     # GitHub Actions workflows

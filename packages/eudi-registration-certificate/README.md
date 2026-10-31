@@ -235,6 +235,28 @@ if (result.warnings.length > 0) {
 
 `accessCertificateSub` is required for payload validation, parsing, signing, and decoding. It is compared with `intermediary.sub` when the WRPRC has an intermediary, and with `sub` otherwise.
 
+The result also lists the errors and warnings as `findings`, each with a `severity`, a `code`, a `path` into the payload and, where a check has one, the ETSI TS 119 475 `requirement`.
+
+### Checking a Request for Over-Asking
+
+`checkOverAsking` compares the DCQL query of an OpenID4VP request with the `credentials` of the WRPRC, and reports every credential and claim the request asks for beyond the registration:
+
+```typescript
+import { checkOverAsking } from '@owf/eudi-registration-certificate'
+
+const result = checkOverAsking(authorizationRequest.dcql_query, wrprcPayload.credentials)
+
+for (const finding of result.findings) {
+  // e.g. credentials.0.claims.1: Credential query pid asks for the claim ["birthdate"], which is not registered
+  console.log(`${finding.path.join('.')}: ${finding.message}`)
+}
+```
+
+- A requested credential needs a registered one of the same `format` whose `meta` it stays within: every requested `vct_values` or `type_values` entry is registered, and `doctype_value` is the same.
+- A requested claim needs a registered claim with the same path or a parent path, as registering `address` covers `address.locality`. `null` in a registered path covers every array element. A registered claim with `values` only allows requests for some of these values.
+- A credential query without `claims` asks for no selectively disclosable claims, so only its credential is checked.
+- A registered credential without claims gives a warning for each credential query with claims, as the registration does not say which claims are allowed.
+
 ### Entitlement Constants
 
 The package exports all entitlement URIs from ETSI TS 119 475 Annex A:

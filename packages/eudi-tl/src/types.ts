@@ -80,6 +80,8 @@ export const TrustedListSchema = z.object({
   tslType: z.string().optional(),
   /** `SchemeOperatorName` (English name when available). */
   schemeOperatorName: z.string().optional(),
+  /** `SchemeTerritory`, the country code of the list (e.g. `ES`), or `EU` for the LOTL. */
+  schemeTerritory: z.string().optional(),
   /** `TSLSequenceNumber`. */
   sequenceNumber: z.number().optional(),
   /** `ListIssueDateTime` (ISO 8601). */

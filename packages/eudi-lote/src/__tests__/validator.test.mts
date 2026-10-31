@@ -1,6 +1,6 @@
 import { decodeJwt } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
-import { assertValidLoTE, validateLoTE } from '../index'
+import { assertValidLoTE, LOTE_VALIDATION_CODES, validateLoTE } from '../index'
 import type { LoTEDocument } from '../types'
 import { LoTEProfile, validateLoTEProfile } from '../validator'
 import { EUPIDProvidersJWT, WalletProvidersJWT, WRPACProvidersJWT } from './fixtures.mjs'
@@ -489,6 +489,14 @@ describe('LoTE Validator', () => {
           path: 'LoTE.ListAndSchemeInformation.LoTEType',
         },
       ])
+      expect(result.findings).toEqual(
+        [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUWalletProvidersList].map((profile) => ({
+          severity: 'error',
+          code: LOTE_VALIDATION_CODES.UNEXPECTED_LOTE_TYPE,
+          path: ['LoTE', 'ListAndSchemeInformation', 'LoTEType'],
+          message: `Profile ${profile}: LoTEType must be http://uri.etsi.org/19602/LoTEType/${profile}`,
+        }))
+      )
     })
 
     it('only includes errors for matched LoTEProfile', () => {
@@ -518,6 +526,29 @@ describe('LoTE Validator', () => {
           path: 'LoTE.ListAndSchemeInformation.StatusDeterminationApproach',
         },
       ])
+      // findings carry no document level summary, only the issues of the matched profile
+      expect(result.findings).toHaveLength(2)
+      for (const finding of result.findings) {
+        expect(finding).toMatchObject({
+          severity: 'error',
+          code: expect.any(String),
+          path: ['LoTE', 'ListAndSchemeInformation', 'StatusDeterminationApproach'],
+        })
+      }
+    })
+
+    it('reports schema issues as findings with numeric array indices', () => {
+      const lote = createMinimalValidLoTE()
+      lote.LoTE.TrustedEntitiesList = [{} as never]
+
+      const result = validateLoTE(lote)
+
+      expect(result.valid).toBe(false)
+      expect(result.findings.length).toBeGreaterThan(0)
+      for (const finding of result.findings) {
+        expect(finding.path.slice(0, 3)).toEqual(['LoTE', 'TrustedEntitiesList', 0])
+      }
+      expect(result.errors.map((e) => e.path)).toEqual(result.findings.map((f) => f.path.join('.')))
     })
   })
 })

@@ -71,7 +71,7 @@ describe('validateAccessCertificate', () => {
   const ac = parseAccessCertificate(OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM)
 
   it('accepts a conforming certificate', () => {
-    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [] })
+    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [], findings: [] })
   })
 
   it('checks the validity period', () => {
@@ -93,6 +93,19 @@ describe('validateAccessCertificate', () => {
     ])
     expect(result.errors.find((e) => e.code === CODES.MISSING_CONTACT)?.requirement).toBe('GEN-6.6.1-07')
     expect(result.warnings.map((e) => e.code)).toEqual([CODES.MISSING_DIGITAL_SIGNATURE_KEY_USAGE])
+  })
+
+  it('reports each issue as a finding pointing at the checked certificate field', () => {
+    const result = validateAccessCertificate(parseAccessCertificate(CA_CERTIFICATE_PEM), { now: NOW })
+    expect(result.findings.map(({ severity, code, path }) => ({ severity, code, path }))).toEqual([
+      { severity: 'error', code: CODES.CA_CERTIFICATE, path: ['certificate', 'basicConstraints', 'cA'] },
+      { severity: 'warning', code: CODES.MISSING_DIGITAL_SIGNATURE_KEY_USAGE, path: ['certificate', 'keyUsage'] },
+      { severity: 'error', code: CODES.MISSING_POLICY, path: ['certificate', 'policies'] },
+      { severity: 'error', code: CODES.MISSING_CPS_URI, path: ['certificate', 'policies'] },
+      { severity: 'error', code: CODES.MISSING_CONTACT, path: ['certificate', 'subjectAlternativeNames'] },
+    ])
+    expect(result.findings).toEqual(expect.arrayContaining([...result.errors, ...result.warnings]))
+    expect(result.findings).toHaveLength(result.errors.length + result.warnings.length)
   })
 
   it('accepts TSP allocated policy OIDs when configured', () => {
@@ -130,7 +143,12 @@ describe('validateAccessCertificate', () => {
     expect(result.errors.map((e) => e.code)).toEqual([CODES.MISSING_NATURAL_PERSON_NAME])
     expect(result.warnings.map((e) => e.code)).toEqual([CODES.MISSING_SERIAL_NUMBER])
     const named = withSubject(natural, { givenName: 'Erika', serialNumber: 'PNODE-1234' })
-    expect(validateAccessCertificate(named, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [] })
+    expect(validateAccessCertificate(named, { now: NOW })).toEqual({
+      valid: true,
+      errors: [],
+      warnings: [],
+      findings: [],
+    })
   })
 
   it('checks QC statements of qualified certificates', () => {

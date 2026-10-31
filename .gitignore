@@ -9,3 +9,6 @@ dist-fuzz
 packages/*/src/**/*.d.ts
 packages/*/src/**/*.d.mts
 packages/*/src/**/*.d.cts
+
+# Single executables of the command line tool
+dist-binary

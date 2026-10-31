@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- inspector:head -->
+  </head>
+  <body>
+    <!-- inspector:header -->
+
+    <main>
+      <section class="panel input" id="input-panel">
+        <!-- inspector:fetch -->
+        <form id="input-form">
+          <!-- inspector:document -->
+          <fieldset class="options">
+            <legend>Reference and signature</legend>
+            <div class="field">
+              <label class="field-label" for="uri">uri of the reference <span class="optional">optional</span></label>
+              <p class="help" id="uri-help">The uri in the status claim of a token, which sub of the status list has to equal.</p>
+              <input type="url" id="uri" name="uri" spellcheck="false" aria-describedby="uri-help" placeholder="https://…" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="key">Signer key <span class="optional">optional</span></label>
+              <p class="help" id="key-help">A JWK, a JWK Set, or certificates as PEM. Without it, the signature is verified with the x5c of the header; give the certificate of a trust anchor to check the x5c chain as well.</p>
+              <textarea id="key" name="key" class="short" spellcheck="false" aria-describedby="key-help" placeholder="{&quot;kty&quot;: …} or -----BEGIN CERTIFICATE-----"></textarea>
+            </div>
+          </fieldset>
+          <!-- inspector:actions -->
+        </form>
+      </section>
+
+      <!-- inspector:result -->
+    </main>
+
+    <!-- inspector:footer -->
+    <script type="module" src="/src/pages/status-list.ts"></script>
+  </body>
+</html>

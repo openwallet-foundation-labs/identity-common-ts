@@ -1,0 +1,27 @@
+{
+  "name": "identity-inspector",
+  "private": true,
+  "type": "module",
+  "description": "Browser pages to parse and check EUDI documents, built on @owf/eudi-inspector",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "examples": "node scripts/generate-examples.mjs"
+  },
+  "dependencies": {
+    "@owf/eudi-inspector": "workspace:*",
+    "@owf/eudi-tl": "workspace:*",
+    "@owf/identity-common": "workspace:*"
+  },
+  "devDependencies": {
+    "@owf/crypto": "workspace:*",
+    "@owf/eudi-registration-certificate": "workspace:*",
+    "@owf/mdoc": "workspace:*",
+    "@owf/token-status-list": "workspace:*",
+    "@owf/x509": "workspace:*",
+    "@sd-jwt/core": "workspace:*",
+    "vite": "8.3.5"
+  }
+}

@@ -1,13 +1,15 @@
-name: Deploy SD-JWT Docs
+name: Deploy the inspector to GitHub Pages
 
 on:
   push:
     branches:
       - main
     paths:
-      - docs/sd-jwt/**
-      - packages/sd-jwt-vc/docs/**
-      - .github/workflows/sd-jwt-docs.yml
+      - apps/inspector/**
+      # The packages the inspector bundles
+      - packages/*/src/**
+      - pnpm-lock.yaml
+      - .github/workflows/pages.yml
   workflow_dispatch:
 
 permissions:
@@ -31,12 +33,18 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Keep the guides available under their previous sdjwt.js.org/0.x/ URLs
-      - name: Assemble site
-        run: |
-          mkdir -p _site/0.x
-          cp -r docs/sd-jwt/. _site/
-          cp packages/sd-jwt-vc/docs/*.md _site/0.x/
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - name: Setup NodeJS
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build inspector
+        run: pnpm --filter identity-inspector build
 
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
@@ -44,7 +52,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: _site
+          path: apps/inspector/dist
 
       - name: Deploy to GitHub Pages
         id: deployment
