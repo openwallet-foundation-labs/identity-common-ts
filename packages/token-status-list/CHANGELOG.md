@@ -1,5 +1,13 @@
 # @owf/token-status-list
 
+## 0.6.3
+
+### Patch Changes
+
+- Updated dependencies [057107b]
+  - @owf/cose@0.6.3
+  - @owf/identity-common@0.6.3
+
 ## 0.6.2
 
 ### Patch Changes

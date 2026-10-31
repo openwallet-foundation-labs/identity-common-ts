@@ -1,5 +1,12 @@
 # @owf/cose
 
+## 0.6.3
+
+### Patch Changes
+
+- 057107b: Use the registered JWK `crv` names `P-384` and `P-521`. `fromJwk` now accepts these values, and `.jwk` emits them instead of `p-384` and `p-521`.
+- @owf/identity-common@0.6.3
+
 ## 0.6.2
 
 ### Patch Changes

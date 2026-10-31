@@ -1,6 +1,6 @@
 {
   "name": "@owf/x509",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Environment agnostic X.509 certificate and CRL parsing, creation and verification with pluggable crypto",
   "files": [
     "dist"

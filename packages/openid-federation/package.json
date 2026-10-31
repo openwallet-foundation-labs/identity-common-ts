@@ -1,6 +1,6 @@
 {
   "name": "@owf/openid-federation",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "OpenID Federation 1.0: create, fetch and validate entity statements, and resolve trust chains with metadata policies",
   "files": [
     "dist"

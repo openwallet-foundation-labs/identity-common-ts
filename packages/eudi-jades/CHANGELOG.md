@@ -1,5 +1,12 @@
 # @owf/eudi-jades
 
+## 0.5.5
+
+### Patch Changes
+
+- @owf/crypto@0.6.3
+  - @owf/identity-common@0.6.3
+
 ## 0.5.4
 
 ### Patch Changes
