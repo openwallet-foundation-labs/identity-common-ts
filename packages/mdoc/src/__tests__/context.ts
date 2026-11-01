@@ -16,7 +16,7 @@ const p256HpkeSuite = new CipherSuite(KEM_DHKEM_P256_HKDF_SHA256, KDF_HKDF_SHA25
 
 export const mdocContext: MdocContext = {
   // Resolve the global fetch on every call, so it can be intercepted by msw after this module is loaded
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => fetch(input, init),
   crypto: {
     digest: async ({ digestAlgorithm, bytes }) => {
       // Need to cast as Uint8Array<ArrayBuffer> since newer TypeScript versions made Uint8Array generic

@@ -8,6 +8,7 @@ Cryptographic utilities using the Web Crypto API and `@noble/hashes`. Platform-a
 - **Hashing** via Web Crypto `subtle.digest` and `@noble/hashes` (SHA-256/384/512)
 - **ECDSA key generation** (ES256, ES384, ES512)
 - **Signing and verification** via Web Crypto `subtle`
+- **AES block encryption** via Web Crypto `subtle`, for FF1 in `@owf/token-status-list`
 
 ## Installation
 
@@ -18,7 +19,7 @@ npm install @owf/crypto
 ## Usage
 
 ```typescript
-import { generateSalt, digest, getHasher, ES256, sha256, hasher } from '@owf/crypto'
+import { generateSalt, digest, getHasher, ES256, sha256, hasher, getAesBlockEncrypter } from '@owf/crypto'
 
 // Generate a random hex salt
 const salt = generateSalt(16)
@@ -38,4 +39,8 @@ const signer = await ES256.getSigner(privateKey)
 const verifier = await ES256.getVerifier(publicKey)
 const signature = await signer('data to sign')
 const isValid = await verifier('data to sign', signature)
+
+// Encrypt single 16-byte blocks with AES (AES-ECB without padding)
+const encryptBlock = await getAesBlockEncrypter(aesKey) // raw key bytes, or an AES-CBC CryptoKey with the encrypt usage
+const ciphertext = await encryptBlock(block)
 ```

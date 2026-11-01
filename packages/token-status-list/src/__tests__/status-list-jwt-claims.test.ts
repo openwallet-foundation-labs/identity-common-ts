@@ -2,7 +2,8 @@ import { base64url, stringToBytes } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import { JWT_STATUS_LIST_TYPE } from '../jwt-types'
 import { StatusList } from '../status-list'
-import { verifyStatus, verifyStatusListJwtClaims } from '../status-list-jwt'
+import { SLException, StatusListEntryNotValidException } from '../status-list-exception'
+import { verifyStatus, verifyStatusListJwtClaims, verifyStatusListJwtHeader } from '../status-list-jwt'
 import { StatusType } from '../types'
 
 const uri = 'https://example.com/statuslists/1'
@@ -27,11 +28,11 @@ const statusListToken = (
   return `${encode({ alg: 'ES256', typ: JWT_STATUS_LIST_TYPE, ...header })}.${encode({
     sub: uri,
     iat: seconds(Date.now() - 60_000),
-    ...claims,
     status_list: {
       bits: statusList.getBitsPerStatus(),
       lst: base64url.encode(statusList.compressStatusListToBytes()),
     },
+    ...claims,
   })}.`
 }
 
@@ -84,6 +85,49 @@ describe('verifyStatus (JWT)', () => {
     expect(() => verifyStatus({ uri, idx: 3, token: statusListToken({}, [3]) })).toThrow(
       "Status for id '3' is not Valid"
     )
+  })
+
+  it('reports a status that is not Valid with its index and status', () => {
+    const verification = () => verifyStatus({ uri, idx: 3, token: statusListToken({}, [3]) })
+
+    expect(verification).toThrow(StatusListEntryNotValidException)
+    expect(verification).toThrow(SLException)
+    expect(verification).toThrow(expect.objectContaining({ idx: 3, status: StatusType.Invalid }))
+  })
+
+  it('returns the header it verified, with its alg', () => {
+    const header = { alg: 'ES256', typ: JWT_STATUS_LIST_TYPE, kid: 'key-1' }
+
+    const verified = verifyStatusListJwtHeader(header)
+
+    expect(verified).toBe(header)
+    expect(verified.alg.toUpperCase()).toStrictEqual('ES256')
+  })
+
+  it('rejects a token without an alg header', () => {
+    expect(() => verifyStatus({ uri, idx: 0, token: statusListToken({}, [], { alg: undefined }) })).toThrow(
+      'The status list token has no alg header, which is required'
+    )
+  })
+
+  it.each([
+    { name: 'no status_list', claims: { status_list: undefined } },
+    {
+      name: 'an lst that is not deflate',
+      claims: { status_list: { bits: 1, lst: base64url.encode(new Uint8Array([1, 2, 3])) } },
+    },
+  ])('rejects a token with $name as an SLException', ({ claims }) => {
+    const verification = () => verifyStatus({ uri, idx: 0, token: statusListToken(claims) })
+
+    expect(verification).toThrow(SLException)
+    expect(verification).toThrow('The status list token has no valid status_list claim')
+    expect(verification).not.toThrow(StatusListEntryNotValidException)
+  })
+
+  it('verifies the header and the claims before reading the status list', () => {
+    const token = statusListToken({ sub: 'https://example.com/other', status_list: undefined })
+
+    expect(() => verifyStatus({ uri, idx: 0, token })).toThrow('must be equal to the uri')
   })
 
   it('applies the clock skew to the expiration', () => {

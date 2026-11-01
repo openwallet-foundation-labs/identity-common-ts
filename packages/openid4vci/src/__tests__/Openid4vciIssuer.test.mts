@@ -1,8 +1,8 @@
 import { preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
-import { addSecondsToDate } from '@openid4vc/utils'
+import { addSecondsToDate, ContentType } from '@openid4vc/utils'
 import { describe, expect, test } from 'vitest'
 import { callbacks, getSignJwtCallback } from '../../../oauth2/src/__tests__/util.mjs'
-import { parseCredentialRequest } from '../credential-request/parse-credential-request.js'
+import { parseCredentialRequestPayload } from '../credential-request/parse-credential-request-payload.js'
 import { createCredentialRequestJwtProof } from '../formats/proof-type/jwt/jwt-proof-type.js'
 import { createKeyAttestationJwt } from '../key-attestation/key-attestation.js'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata.js'
@@ -96,19 +96,54 @@ const issuerMetadata = {
 } as const satisfies IssuerMetadataResult
 
 describe('Openid4vciIssuer', () => {
-  test('parseCredentialRequest keeps unknown_credential_configuration for an unknown credential_configuration_id', () => {
-    expect(() =>
+  test('parseCredentialRequestPayload keeps unknown_credential_configuration for an unknown credential_configuration_id', async () => {
+    await expect(
       issuer.parseCredentialRequest({
         issuerMetadata: { ...issuerMetadata, originalDraftVersion: Openid4vciVersion.Draft15 },
         credentialRequest: {
           credential_configuration_id: 'not-offered',
           proof: { proof_type: 'jwt', jwt: 'ey.ey.S' },
         },
+        contentType: ContentType.Json,
+      })
+    ).rejects.toMatchObject(
+      expect.objectContaining({
+        status: 400,
+        errorResponse: expect.objectContaining({ error: 'unknown_credential_configuration' }),
+      })
+    )
+  })
+
+  test('parseNotificationRequest returns the validated notification request', () => {
+    expect(
+      issuer.parseNotificationRequest({
+        notificationRequest: {
+          notification_id: '3b926f09-d603-4e8b-a75d-eaa8965f0fe3',
+          event: 'credential_accepted',
+          event_description: 'Credential stored',
+        },
+      })
+    ).toEqual({
+      notificationRequest: {
+        notification_id: '3b926f09-d603-4e8b-a75d-eaa8965f0fe3',
+        event: 'credential_accepted',
+        event_description: 'Credential stored',
+      },
+    })
+  })
+
+  test('parseNotificationRequest throws invalid_notification_request for an invalid request', () => {
+    expect(() =>
+      issuer.parseNotificationRequest({
+        notificationRequest: {
+          notification_id: '3b926f09-d603-4e8b-a75d-eaa8965f0fe3',
+          event: 'credential_unknown',
+        },
       })
     ).toThrow(
       expect.objectContaining({
         status: 400,
-        errorResponse: expect.objectContaining({ error: 'unknown_credential_configuration' }),
+        errorResponse: expect.objectContaining({ error: 'invalid_notification_request' }),
       })
     )
   })
@@ -177,7 +212,7 @@ describe('Openid4vciIssuer', () => {
       nonce: 'some-nonce',
     })
 
-    const parsedCredentialRequest = parseCredentialRequest({
+    const parsedCredentialRequest = parseCredentialRequestPayload({
       issuerMetadata: {
         authorizationServers: [],
         credentialIssuer: credentialIssuerMetadata,

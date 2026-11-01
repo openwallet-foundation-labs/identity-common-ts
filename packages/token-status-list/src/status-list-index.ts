@@ -33,6 +33,7 @@ export interface StatusListIndexAllocatorContext {
   hasher: Hasher
 }
 
+/** Deterministic random numbers from the seed: the same seed always gives the same sequence. */
 class SeededRandom {
   private readonly seed: Uint8Array
   private readonly hasher: Hasher
@@ -45,6 +46,10 @@ class SeededRandom {
     this.hasher = hasher
   }
 
+  /**
+   * Returns an integer in [0, maxExclusive). Values from the top of the uint32 range that would make
+   * `value % maxExclusive` favour low numbers are skipped, so every result is equally likely.
+   */
   async nextInt(maxExclusive: number): Promise<number> {
     const limit = UINT32_RANGE - (UINT32_RANGE % maxExclusive)
     let value: number

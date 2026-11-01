@@ -1,4 +1,5 @@
 export type { Signer } from '@owf/identity-common'
+export { getAesBlockEncrypter } from './aes'
 export {
   digest,
   ES256,

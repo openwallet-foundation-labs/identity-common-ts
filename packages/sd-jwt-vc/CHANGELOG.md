@@ -1,5 +1,34 @@
 # @sd-jwt/sd-jwt-vc
 
+## 0.24.1
+
+### Patch Changes
+
+- eb3fef1: `svg_templates` in the type metadata rendering is now optional in the `TypeMetadataFormat` type. Parsing type metadata without `svg_templates` or `svg_template` no longer adds an `svg_templates: undefined` key.
+- 260114a: Sub-claims of a protected claim can no longer be selectively disclosed, as SD-JWT VC requires. `issue` rejects a disclosure frame for any sub-claim of `iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity` or `status` (for example the `status_list` of `status`), and verification rejects an SD-JWT VC whose issuer-signed protected claims have a selectively disclosable sub-claim, whether the holder reveals it or not.
+- 260114a: Verification now rejects an issuer-signed JWT or Key Binding JWT whose header has `crit`, as RFC 7515 requires for extensions the verifier does not understand, and an SD-JWT VC in which a protected claim (`iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity` or `status`) arrived in a Disclosure.
+- Updated dependencies [260114a]
+- Updated dependencies [13a53dc]
+  - @sd-jwt/core@0.24.1
+  - @owf/token-status-list@0.6.2
+  - @owf/identity-common@0.6.2
+
+## 0.24.0
+
+### Minor Changes
+
+- 1031dd7: Add `verifyTypeMetadata` to check the claims of an SD-JWT VC against its type metadata: extra claims, missing or undisclosed mandatory claims, and `sd` violations. `verify` and `safeVerify` add the result as `typeMetadataVerification` when `loadTypeMetadataFormat` is enabled.
+
+### Patch Changes
+
+- 0957fb1: Fix the mandatory claim checks of `verifyTypeMetadata`: claim names such as `constructor` are no longer found on `Object.prototype`, a mandatory claim under a `null` path is undisclosed when every element is withheld and missing when the value is not an array, and the vct of type metadata passed by the caller is compared before its `extends` chain is resolved.
+- 70f7b34: `vct#integrity` can no longer be made selectively disclosable, as required by SD-JWT VC.
+- Updated dependencies [bf9b7c8]
+- Updated dependencies [bf9b7c8]
+  - @owf/identity-common@0.6.1
+  - @owf/token-status-list@0.6.1
+  - @sd-jwt/core@0.24.0
+
 ## 0.23.2
 
 ### Patch Changes

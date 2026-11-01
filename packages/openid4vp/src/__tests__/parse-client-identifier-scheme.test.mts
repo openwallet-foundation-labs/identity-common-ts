@@ -5,6 +5,7 @@ import {
   getOpenid4vpClientId,
   validateOpenid4vpClientId,
 } from '../client-identifier-prefix/parse-client-identifier-prefix.js'
+import { resolveOpenid4vpAuthorizationRequest } from '../index.js'
 
 const callbacks = {
   getX509CertificateMetadata: () => ({ sanDnsNames: ['example.com'], sanUriNames: ['https://example.com'] }),
@@ -453,6 +454,58 @@ describe('Correctly parses the client identifier', () => {
       })
 
       setGlobalConfig({ allowInsecureUrls: beforeValue })
+    })
+
+    test.each(['origin:https://example.com', 'web-origin:https://example.com'])(
+      "rejects reserved client id '%s' in a request",
+      (clientId) => {
+        for (const responseMode of ['dc_api', 'direct_post']) {
+          expect(() => getOpenid4vpClientId({ responseMode, clientId, origin: 'https://example.com' })).toThrow(
+            `Failed to parse client identifier. The client id prefix in client_id '${clientId}' is reserved and not allowed in a request.`
+          )
+        }
+      }
+    )
+  })
+
+  describe('unsigned DC API request', () => {
+    const origin = 'https://attacker.example'
+    const dcApiRequest = {
+      response_type: 'vp_token',
+      response_mode: 'dc_api',
+      nonce: 'nonce',
+      dcql_query: { credentials: [{ id: 'pid', format: 'dc+sd-jwt', meta: { vct_values: ['pid'] } }] },
+    } as const
+
+    test.each(['web-origin:https://verifier.example', 'origin:https://verifier.example', 'verifier.example'])(
+      "ignores client_id '%s' and identifies the client by the origin",
+      async (clientId) => {
+        const resolved = await resolveOpenid4vpAuthorizationRequest({
+          authorizationRequestPayload: { ...dcApiRequest, client_id: clientId },
+          responseMode: { type: 'dc_api', expectedOrigin: origin },
+          callbacks: { ...callbacks, verifyJwt: () => Promise.reject(), decryptJwe: () => Promise.reject() },
+        })
+
+        expect(resolved.authorizationRequestPayload).not.toHaveProperty('client_id')
+        expect(resolved.client).toEqual({
+          prefix: 'origin',
+          identifier: origin,
+          effective: `origin:${origin}`,
+          original: { clientId: undefined },
+          clientMetadata: undefined,
+        })
+      }
+    )
+
+    test('validateOpenid4vpClientId ignores client_id without a signed request', async () => {
+      const client = await validateOpenid4vpClientId({
+        authorizationRequestPayload: { ...dcApiRequest, client_id: 'x509_san_dns:example.com' },
+        origin,
+        callbacks,
+        version: 100,
+      })
+
+      expect(client).toMatchObject({ prefix: 'origin', identifier: origin, effective: `origin:${origin}` })
     })
   })
 })

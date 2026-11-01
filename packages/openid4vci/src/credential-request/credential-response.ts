@@ -1,7 +1,7 @@
 import type { CallbackContext, JweEncryptor } from '@openid4vc/oauth2'
 import { parseWithErrorHandling } from '@openid4vc/utils'
 import { Openid4vciError } from '../error/Openid4vciError'
-import type { ParseCredentialRequestReturn } from './parse-credential-request'
+import type { ParseCredentialRequestReturn } from './parse-credential-request-payload'
 import type { CredentialResponseEncryption } from './z-credential-request-common'
 import {
   type CredentialResponse,

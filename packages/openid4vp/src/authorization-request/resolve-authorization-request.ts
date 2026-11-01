@@ -87,6 +87,10 @@ export async function resolveOpenid4vpAuthorizationRequest(
       jar.authorizationRequestPayload,
       'Invalid authorization request. Could not parse jar request payload as openid4vp auth request.'
     )
+  } else if (isOpenid4vpAuthorizationRequestDcApi(parsed)) {
+    // The wallet MUST ignore the client_id of an unsigned DC API request
+    const { client_id: _clientId, ...payloadWithoutClientId } = parsed
+    authorizationRequestPayload = payloadWithoutClientId
   } else {
     authorizationRequestPayload = parsed
   }

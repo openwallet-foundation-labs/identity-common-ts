@@ -48,13 +48,7 @@ export function verifyCredentialResponseEncryption(
     )
   }
 
-  // Without `zip_values_supported` the issuer does not support compression
-  const zip = credentialResponseEncryption.zip
-  if (zip !== undefined && !supported.zip_values_supported?.includes(zip)) {
-    throw invalidEncryptionParameters(
-      supported.zip_values_supported
-        ? `Credential response encryption 'zip' must be one of ${supported.zip_values_supported.map((value) => `'${value}'`).join(', ')}`
-        : `The credential issuer does not support compression of the credential response ('zip')`
-    )
+  if (credentialResponseEncryption.zip !== undefined) {
+    throw invalidEncryptionParameters('Compressed credential responses are not supported')
   }
 }

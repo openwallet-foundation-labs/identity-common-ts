@@ -103,8 +103,11 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
    * about, so the content type negotiation for it lives here.
    */
   public static async fetch(uri: string, ctx: Pick<MdocContext, 'fetch'>): Promise<IdentifierListCwt> {
-    const fetcher = ctx.fetch ?? fetch
-    const response = await fetcher(uri, { headers: { Accept: MediaTypes.IdentifierListCwt } })
+    const response = await ctx.fetch(
+      uri,
+      { headers: { Accept: MediaTypes.IdentifierListCwt } },
+      { type: 'identifierList' }
+    )
 
     if (!response.ok) {
       throw new InvalidRevocationListError(`Identifier list fetch at ${uri} failed with status '${response.status}'`)

@@ -1,6 +1,8 @@
 import {
   fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray,
   jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray,
+  zAlgValueNotNone,
+  zJwk,
 } from '@openid4vc/oauth2'
 import { type InferOutputUnion, type Simplify, zDataUrl, zHttpsUrl } from '@openid4vc/utils'
 import z from 'zod'
@@ -138,6 +140,12 @@ const zCredentialIssuerMetadataDisplayEntry = z
   .loose()
 export type CredentialIssuerMetadataDisplayEntry = z.infer<typeof zCredentialIssuerMetadataDisplayEntry>
 
+export const zCredentialRequestEncryptionJwk = zJwk.extend({
+  kid: z.string().min(1),
+  alg: zAlgValueNotNone.min(1),
+})
+export type CredentialRequestEncryptionJwk = z.infer<typeof zCredentialRequestEncryptionJwk>
+
 export type CredentialIssuerMetadata = z.infer<typeof zCredentialIssuerMetadataDraft14Draft15V1>
 export const zCredentialIssuerMetadataDraft14Draft15V1 = z
   .object({
@@ -154,6 +162,32 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
         alg_values_supported: z.array(z.string()),
         enc_values_supported: z.array(z.string()),
         zip_values_supported: z.array(z.string()).optional(),
+        encryption_required: z.boolean(),
+      })
+      .loose()
+      .optional(),
+    credential_request_encryption: z
+      .object({
+        jwks: z
+          .object({
+            keys: z.array(zCredentialRequestEncryptionJwk).min(1),
+          })
+          .loose()
+          .superRefine(({ keys }, ctx) => {
+            const keyIds = new Set<string>()
+            for (const [index, key] of keys.entries()) {
+              if (keyIds.has(key.kid)) {
+                ctx.addIssue({
+                  code: 'custom',
+                  message: `Duplicate JWK kid '${key.kid}'`,
+                  path: ['keys', index, 'kid'],
+                })
+              }
+              keyIds.add(key.kid)
+            }
+          }),
+        enc_values_supported: z.array(z.string()).min(1),
+        zip_values_supported: z.array(z.string()).min(1).optional(),
         encryption_required: z.boolean(),
       })
       .loose()
@@ -379,6 +413,7 @@ const zCredentialConfigurationSupportedV1ToDraft11 = zCredentialConfigurationSup
 export const zCredentialIssuerMetadataDraft11ToV1 = z
   .object({
     authorization_server: z.string().optional(),
+    credential_request_encryption: z.never().optional(),
     credentials_supported: z.array(
       z
         .object({
@@ -467,14 +502,16 @@ export const zCredentialIssuerMetadataWithDraftVersion = z.union([
     })
 
     // we assume V1 is used when we detect V1
-    const isV1 = credentialConfigurations.some(
-      (configuration) =>
-        // Added in draft 16, but since there's no other breaking changes
-        configuration.credential_metadata ||
-        // Was changed to COSE algorithms in Draft 16 (which we detect as v1)
-        (configuration.format === 'mso_mdoc' &&
-          configuration.credential_signing_alg_values_supported?.some((supported) => typeof supported === 'number'))
-    )
+    const isV1 =
+      credentialIssuerMetadata.credential_request_encryption !== undefined ||
+      credentialConfigurations.some(
+        (configuration) =>
+          // Added in draft 16, but since there's no other breaking changes
+          configuration.credential_metadata ||
+          // Was changed to COSE algorithms in Draft 16 (which we detect as v1)
+          (configuration.format === 'mso_mdoc' &&
+            configuration.credential_signing_alg_values_supported?.some((supported) => typeof supported === 'number'))
+      )
 
     return {
       credentialIssuerMetadata,

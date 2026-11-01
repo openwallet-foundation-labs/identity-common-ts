@@ -43,3 +43,19 @@ export const isMediaType = (
   const expectedMediaTypes = typeof expected === 'string' ? [expected] : expected
   return expectedMediaTypes.some((expectedMediaType) => extractMediaType(expectedMediaType) === mediaType)
 }
+
+/**
+ * Create an `Accept` header value that asks for `mediaTypes` in order of preference. The order of
+ * the values alone expresses no preference ({@link https://www.rfc-editor.org/rfc/rfc9110.html#section-12.5.1 | RFC 9110}),
+ * so every media type after the first gets a lower quality value, down to `q=0.1`, which keeps all
+ * of them acceptable. Duplicates are dropped.
+ *
+ * @example
+ * ```ts
+ * createAcceptHeader(['application/jwt', 'application/json']) // 'application/jwt, application/json;q=0.9'
+ * ```
+ */
+export const createAcceptHeader = (mediaTypes: ReadonlyArray<string>): string =>
+  Array.from(new Set(mediaTypes))
+    .map((mediaType, index) => (index === 0 ? mediaType : `${mediaType};q=${Math.max(0.1, 1 - index / 10).toFixed(1)}`))
+    .join(', ')

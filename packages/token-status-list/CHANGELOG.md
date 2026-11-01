@@ -1,5 +1,22 @@
 # @owf/token-status-list
 
+## 0.6.2
+
+### Patch Changes
+
+- 13a53dc: Add `FeistelStatusListIndexAllocator` for status lists of 1,000,000 indices or more. It assigns each index by encrypting the position with FF1 (NIST SP 800-38G) under an AES key that stays in a caller-provided `encryptBlock` callback. With a unique `tweak` per list, such as its URI, one key can serve several lists. Creating or resuming one takes under 1 µs, against about 250 ms for `StatusListIndexAllocator` with 1,000,000 indices, and `next()` is asynchronous.
+- @owf/cose@0.6.2
+  - @owf/identity-common@0.6.2
+
+## 0.6.1
+
+### Patch Changes
+
+- bf9b7c8: `fetchStatusList` asks for its `acceptedFormats` in order of preference. `verifyStatusListJwtHeader` now requires an `alg` header and returns the header it verified, typed with `alg` and `typ`. `verifyStatus` checks the header and claims before it reads the status list, reports an unreadable list as an `SLException`, and a status that is not Valid as the new `StatusListEntryNotValidException`, an `SLException` with `idx` and `status`.
+- Updated dependencies [bf9b7c8]
+  - @owf/identity-common@0.6.1
+  - @owf/cose@0.6.1
+
 ## 0.6.0
 
 ### Patch Changes
