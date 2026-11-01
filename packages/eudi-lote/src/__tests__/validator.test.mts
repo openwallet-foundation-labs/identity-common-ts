@@ -833,6 +833,21 @@ describe('LoTE Validator', () => {
       )
     })
 
+    it('should keep NextUpdate within 6 months of ListIssueDateTime with an offset, lowercase or leap second', () => {
+      const errorPaths = (ListIssueDateTime: string, NextUpdate: string) => {
+        const { payload: lote } = decodeJwt<any, LoTEDocument>(EUPIDProvidersJWT)
+        Object.assign(lote.LoTE.ListAndSchemeInformation, { ListIssueDateTime, NextUpdate })
+        return validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList).errors.map((e) => e.path)
+      }
+      const tooLate = ['LoTEType', 'LoTE.ListAndSchemeInformation.NextUpdate']
+
+      expect(errorPaths('2026-04-30T11:08:12Z', '2030-06-30T23:59:59Z')).toEqual(tooLate)
+      expect(errorPaths('2026-04-30T11:08:12Z', '2030-06-30T23:59:60Z')).toEqual(tooLate)
+      expect(errorPaths('2026-04-30t11:08:12z', '2030-07-01T01:59:60+02:00')).toEqual(tooLate)
+      expect(errorPaths('2026-04-30T11:08:12Z', '2026-10-30t11:08:12z')).toEqual([])
+      expect(errorPaths('2016-12-31T23:59:60Z', '2017-06-30T00:59:60+01:00')).toEqual([])
+    })
+
     it('short-circuit errors when validating against wrong profile', () => {
       const { payload: lote } = decodeJwt(WRPACProvidersJWT)
       const result = validateLoTEProfile(lote, [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUWalletProvidersList])

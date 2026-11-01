@@ -126,6 +126,24 @@ export function isRfc3339DateTime(value: string): boolean {
   return true
 }
 
+/**
+ * The time of an RFC 3339 date-time in milliseconds since the epoch, NaN if it is not one.
+ * Read from its fields, as `Date.parse` gives NaN for a leap second and need not accept a
+ * lowercase `t` or `z`; a leap second counts as the first second of the next minute.
+ */
+export function rfc3339DateTimeToMs(value: string): number {
+  const match = isRfc3339DateTime(value) ? RFC3339_DATE_TIME.exec(value) : null
+  if (!match) return Number.NaN
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number)
+  const offsetMinutes =
+    match[8] === undefined ? 0 : (match[8] === '-' ? -1 : 1) * (Number(match[9]) * 60 + Number(match[10]))
+  const date = new Date(0)
+  // setUTCFullYear keeps years 0 to 99, which Date.UTC maps to 1900 to 1999; fields past their range carry over
+  date.setUTCFullYear(year, month - 1, day)
+  date.setUTCHours(hour, minute - offsetMinutes, second, Number(`0${match[7] ?? ''}`) * 1000)
+  return date.getTime()
+}
+
 const DateTimeSchema = z.string().refine(isRfc3339DateTime, { message: 'Invalid RFC 3339 date-time' })
 
 // ============================================================================

@@ -6,7 +6,7 @@
  */
 
 import type z from 'zod'
-import { hasDigitalIdentity, LoTEDocumentSchema } from './schemas'
+import { hasDigitalIdentity, LoTEDocumentSchema, rfc3339DateTimeToMs } from './schemas'
 import type { LoTEDocument, PostalAddress, ServiceDigitalIdentity } from './types'
 
 const SIX_MONTHS_IN_MS = 6 * 31 * 24 * 60 * 60 * 1000
@@ -241,8 +241,9 @@ const listAndSchemeInformationRefinement =
       })
     })
 
-    const listIssueDateTime = new Date(info.ListIssueDateTime).getTime()
-    const nextUpdate = new Date(info.NextUpdate).getTime()
+    // Not new Date(): its NaN for a leap second would let any NextUpdate through
+    const listIssueDateTime = rfc3339DateTimeToMs(info.ListIssueDateTime)
+    const nextUpdate = rfc3339DateTimeToMs(info.NextUpdate)
 
     if (nextUpdate - listIssueDateTime > SIX_MONTHS_IN_MS) {
       ctx.addIssue({

@@ -20,7 +20,7 @@ Still checked by the EU profiles in `validateLoTEProfile`, on the scheme informa
 
 Known differences from the JSON schema, kept on purpose: `validateLoTE` still accepts an empty `TrustedEntitiesList`, an entity without `TEInformationURI`, a localized `LoTELegalNotice`, empty optional arrays, an `OKP` key, a non-integer `HistoricalInformationPeriod`, a `ServiceType` that is not a URI and unknown properties. It rejects a few values the schema's formats let through: a URI that the WHATWG URL parser refuses (a port above 65535, for example), a date-time with a space instead of `T` or an offset without a colon, and integers above 2^53 - 1.
 
-Fixed: the EUEAAProvidersList and EUPubEAAProvidersList profiles rejected every list, because their expected `StatusDeterminationApproach` ended in a stray `"`.
+Fixed: the EUEAAProvidersList and EUPubEAAProvidersList profiles rejected every list, because their expected `StatusDeterminationApproach` ended in a stray `"`. The profiles read `ListIssueDateTime` and `NextUpdate` from their RFC 3339 fields for the 6-month rule, so a leap second, which `new Date()` turns into NaN, no longer lets any `NextUpdate` through.
 
 Other changes:
 
