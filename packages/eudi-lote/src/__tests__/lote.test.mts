@@ -33,7 +33,8 @@ describe('LoTE Creation', () => {
     expect(lote.LoTE.ListAndSchemeInformation.SchemeOperatorName).toEqual([{ lang: 'en', value: 'Test Operator' }])
     expect(lote.LoTE.ListAndSchemeInformation.LoTEVersionIdentifier).toBe(1)
     expect(lote.LoTE.ListAndSchemeInformation.LoTESequenceNumber).toBe(1)
-    expect(lote.LoTE.TrustedEntitiesList).toEqual([])
+    // No entities: no TrustedEntitiesList key (the JSON schema has minItems 1)
+    expect('TrustedEntitiesList' in lote.LoTE).toBe(false)
   })
 
   it('should create a LoTE document with full scheme info', () => {
@@ -99,7 +100,7 @@ describe('LoTE Creation', () => {
     const lote = createLoTE(minimalSchemeInfo, [entity])
 
     expect(lote.LoTE.TrustedEntitiesList).toHaveLength(1)
-    expect(lote.LoTE.TrustedEntitiesList[0].TrustedEntityInformation.TEName[0].value).toBe('Test Entity')
+    expect(lote.LoTE.TrustedEntitiesList?.[0].TrustedEntityInformation.TEName[0].value).toBe('Test Entity')
   })
 })
 
@@ -217,7 +218,7 @@ describe('LoTE Entity Management', () => {
     lote = addTrustedEntity(lote, entity)
 
     expect(lote.LoTE.TrustedEntitiesList).toHaveLength(1)
-    expect(lote.LoTE.TrustedEntitiesList[0].TrustedEntityInformation.TEName[0].value).toBe('New Entity')
+    expect(lote.LoTE.TrustedEntitiesList?.[0].TrustedEntityInformation.TEName[0].value).toBe('New Entity')
   })
 
   it('should add multiple entities', () => {
@@ -245,8 +246,26 @@ describe('LoTE Entity Management', () => {
 
     expect(lote.LoTE.TrustedEntitiesList).toHaveLength(2)
     expect(
-      lote.LoTE.TrustedEntitiesList.find((e) => e.TrustedEntityInformation.TEName[0].value === 'Entity B')
+      lote.LoTE.TrustedEntitiesList?.find((e) => e.TrustedEntityInformation.TEName[0].value === 'Entity B')
     ).toBeUndefined()
+  })
+
+  it('should add a trusted entity to a list without TrustedEntitiesList', () => {
+    const { LoTE } = createLoTE({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] })
+    const { TrustedEntitiesList: _, ...withoutEntities } = LoTE
+
+    const lote = addTrustedEntity({ LoTE: withoutEntities }, createTestEntity('New Entity'))
+
+    expect(lote.LoTE.TrustedEntitiesList).toHaveLength(1)
+  })
+
+  it('should leave a list without TrustedEntitiesList as is when removing an entity', () => {
+    const { LoTE } = createLoTE({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] })
+    const { TrustedEntitiesList: _, ...withoutEntities } = LoTE
+
+    const lote = removeTrustedEntity({ LoTE: withoutEntities }, 'Entity A')
+
+    expect(lote.LoTE.TrustedEntitiesList).toBeUndefined()
   })
 
   it('should not modify list when removing non-existent entity', () => {
@@ -255,7 +274,7 @@ describe('LoTE Entity Management', () => {
     })
 
     lote = addTrustedEntity(lote, createTestEntity('Entity A'))
-    const originalLength = lote.LoTE.TrustedEntitiesList.length
+    const originalLength = lote.LoTE.TrustedEntitiesList?.length ?? 0
 
     lote = removeTrustedEntity(lote, 'Non-existent')
 

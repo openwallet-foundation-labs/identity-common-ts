@@ -1,7 +1,8 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
   "files": {
-    "maxSize": 10000000
+    "maxSize": 10000000,
+    "includes": ["**", "!packages/eudi-lote/src/__tests__/etsi-ts-119-602"]
   },
   "formatter": {
     "lineWidth": 120,
