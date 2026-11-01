@@ -26,6 +26,14 @@ CI installs with `--frozen-lockfile`, so commit `pnpm-lock.yaml` with every depe
 - zod schemas are named `zFoo`.
 - Thrown errors are a package exception class that extends `IdentityException`.
 
+## Writing code
+
+- Make the smallest change that solves the whole task, including the callers and tests it affects.
+- Reuse before you write: what the package has, then `@owf/identity-common`, the platform, and a dependency the package already uses. Don't add a dependency for a few lines.
+- No abstractions, options or configuration nobody asked for. Follow the structure and naming of the surrounding code.
+- Comment only what the code can't show: why it does something, or the requirement of the specification it implements. Don't comment self-explanatory code. Exported functions and types get JSDoc.
+- Shorter code must not drop a check: keep the validation of untrusted input and the error handling.
+
 ## Security
 
 These packages parse and verify credentials, so every input is untrusted.
@@ -47,11 +55,12 @@ These packages parse and verify credentials, so every input is untrusted.
 - Every change to a published package needs a changeset.
 - All packages except `dcql` are below 1.0: a feature or breaking change is `minor`, a fix is `patch`. Don't use `major` for them.
 - Packages are bumped in fixed groups (`.changeset/config.json`), so one changeset bumps the whole group.
-- Write for the user of the package. Name the exported functions and say how their behaviour changes. For a fix, say what was wrong ("Before, …"). Put breaking changes in a `**Breaking:**` paragraph that says how to migrate.
+- Keep changesets short and write them for the user of the package: name the exported functions and say what changes for them, or for a fix, what was wrong. A breaking change adds a `**Breaking:**` paragraph on how to migrate.
 
 ## Commits and pull requests
 
 - Conventional Commits with the package directory as scope, e.g. `fix(oauth2): …` or `feat(eudi-tl): …`, and `feat!:` for breaking changes.
 - Write the body as prose: what changes for a user of the package, and why.
 - Sign off every commit (`git commit -s`).
+- Don't add AI attribution, such as a `Co-Authored-By` trailer for an AI or a "Generated with" line, to commits or pull requests. The contributor is responsible for the change, however it was written.
 - Update the package README when its public API changes.
