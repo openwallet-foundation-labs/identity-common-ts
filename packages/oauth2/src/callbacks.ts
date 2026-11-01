@@ -62,6 +62,12 @@ export interface DecryptJweCallbackOptions {
   jwk?: Jwk
 }
 
+/**
+ * Return `{ decrypted: false }` for expected decryption failures, including invalid
+ * ciphertext, authentication tags, or key mismatches. Throw only for unexpected
+ * internal failures, such as an unavailable key store.
+ * On success, return the JWK of the key actually used to decrypt.
+ */
 export type DecryptJweCallback = (
   jwe: string,
   options?: DecryptJweCallbackOptions

@@ -46,6 +46,11 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
       throw new SDJWTException(`Verify Error: Disallowed Key Binding alg ${this.header.alg}`)
     }
 
+    // RFC 7515 Section 4.1.11, checked here so the failure names the Key Binding JWT
+    if ('crit' in this.header) {
+      throw new SDJWTException('Verify Error: unsupported critical header parameters in Key Binding JWT')
+    }
+
     if (this.payload.nonce !== values.nonce) {
       throw new SDJWTException('Verify Error: Invalid Nonce')
     }

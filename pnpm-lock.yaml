@@ -311,6 +311,9 @@ importers:
 
   packages/openid4vc-utils:
     dependencies:
+      '@owf/identity-common':
+        specifier: workspace:^
+        version: link:../identity-common
       buffer:
         specifier: ^6.0.3
         version: 6.0.3
@@ -329,6 +332,9 @@ importers:
       '@openid4vc/utils':
         specifier: workspace:^
         version: link:../openid4vc-utils
+      '@owf/identity-common':
+        specifier: workspace:^
+        version: link:../identity-common
       zod:
         specifier: 'catalog:'
         version: 4.6.7

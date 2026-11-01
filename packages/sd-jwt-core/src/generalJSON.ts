@@ -69,6 +69,10 @@ export class GeneralJSON {
     if (!json.signatures[0]) {
       throw new SDJWTException('Invalid JSON')
     }
+    // RFC 7515 Section 4.1.11: crit MUST be integrity protected
+    if (json.signatures.some((s) => s.header && 'crit' in s.header)) {
+      throw new SDJWTException('crit MUST only appear in the protected header')
+    }
     for (let index = 1; index < json.signatures.length; index++) {
       const header = json.signatures[index].header
       if (header && ('disclosures' in header || 'kb_jwt' in header)) {

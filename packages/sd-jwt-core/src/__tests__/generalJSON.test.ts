@@ -72,6 +72,21 @@ describe('GeneralJSON', () => {
     expect(result.toEncoded(0)).toEqual(compact)
   })
 
+  test('fromSerialized rejects crit in an unprotected header', () => {
+    const serialize = (header: Record<string, unknown>) => ({
+      payload: 'eyJpZCI6IjEyMzQifQ',
+      signatures: [
+        { protected: 'eyJ0eXAiOiJzZCtqd3QiLCJhbGciOiJFUzI1NiJ9', signature: 'c2lnLTE', header: { disclosures: [] } },
+        { protected: 'eyJ0eXAiOiJzZCtqd3QiLCJhbGciOiJFUzI1NiJ9', signature: 'c2lnLTI', header },
+      ],
+    })
+
+    expect(GeneralJSON.fromSerialized(serialize({ kid: 'key-2' }))).toBeDefined()
+    expect(() => GeneralJSON.fromSerialized(serialize({ kid: 'key-2', crit: ['kid'] }))).toThrowError(
+      'crit MUST only appear in the protected header'
+    )
+  })
+
   test('fromSerialized without disclosures, KB JWT', () => {
     const generalJSON = {
       payload:

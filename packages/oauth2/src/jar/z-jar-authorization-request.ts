@@ -10,6 +10,10 @@ export const zJarAuthorizationRequest = z
     client_id: z.optional(z.string()),
   })
   .loose()
+  // Without this, any object matches and a non-JAR request that fails its own schema passes as JAR in a union
+  .refine((request) => request.request !== undefined || request.request_uri !== undefined, {
+    message: 'request or request_uri must be present',
+  })
 export type JarAuthorizationRequest = z.infer<typeof zJarAuthorizationRequest>
 
 export function validateJarRequestParams(options: {

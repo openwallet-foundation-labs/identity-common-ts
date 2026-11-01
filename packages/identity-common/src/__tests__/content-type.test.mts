@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractMediaType, isMediaType } from '../../src'
+import { createAcceptHeader, extractMediaType, isMediaType } from '../../src'
 
 describe('content type', () => {
   describe('extractMediaType', () => {
@@ -51,6 +51,34 @@ describe('content type', () => {
       expect(isMediaType(null, 'application/statuslist+jwt')).toBe(false)
       expect(isMediaType('', 'application/statuslist+jwt')).toBe(false)
       expect(isMediaType('application/statuslist+jwt', [])).toBe(false)
+    })
+  })
+
+  describe('createAcceptHeader', () => {
+    it('should ask for a single media type without a quality value', () => {
+      expect(createAcceptHeader(['application/json'])).toStrictEqual('application/json')
+    })
+
+    it('should give every media type after the first a lower quality value', () => {
+      expect(createAcceptHeader(['application/jwt', 'application/jwk-set+json', 'application/json'])).toStrictEqual(
+        'application/jwt, application/jwk-set+json;q=0.9, application/json;q=0.8'
+      )
+    })
+
+    it('should never go below q=0.1, which keeps every media type acceptable', () => {
+      const mediaTypes = Array.from({ length: 12 }, (_, index) => `application/type-${index}`)
+
+      expect(createAcceptHeader(mediaTypes).split(', ').slice(-3)).toStrictEqual([
+        'application/type-9;q=0.1',
+        'application/type-10;q=0.1',
+        'application/type-11;q=0.1',
+      ])
+    })
+
+    it('should drop duplicates', () => {
+      expect(createAcceptHeader(['application/cwt', 'application/cwt', 'application/jwt'])).toStrictEqual(
+        'application/cwt, application/jwt;q=0.9'
+      )
     })
   })
 })

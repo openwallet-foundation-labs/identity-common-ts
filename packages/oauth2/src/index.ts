@@ -7,6 +7,7 @@ export {
   setGlobalConfig,
 } from '@openid4vc/utils'
 export type {
+  RetrieveAccessTokenReturn,
   RetrieveAuthorizationCodeAccessTokenOptions,
   RetrieveClientCredentialsAccessTokenOptions,
   RetrievePreAuthorizedCodeAccessTokenOptions,

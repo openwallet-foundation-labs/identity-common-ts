@@ -1,5 +1,23 @@
 # @openid4vc/oauth2
 
+## 0.9.1
+
+### Patch Changes
+
+- 33576aa: Export `RetrieveAccessTokenReturn` so consumers can name the return type of access token retrieval methods.
+- b74d901: Add `Openid4vciIssuer.parseNotificationRequest` to validate a Notification Request at the issuer's notification endpoint. An invalid request throws an `Oauth2ServerErrorResponseError` with the new `Oauth2ErrorCodes.InvalidNotificationRequest`. `Oauth2ErrorCodes.InvalidNotificationId` is added for unknown notification ids.
+- @openid4vc/utils@0.9.1
+
+## 0.9.0
+
+### Patch Changes
+
+- fa1ce42: `verifyResourceRequest` now rejects an opaque access token when token introspection reports it as inactive. Before, a response with `active: false` was accepted, so revoked, expired or unknown tokens passed verification.
+- 34bd5c9: Requests made with `createZodFetcher` now send the expected content types as the `Accept` header, unless the request already sets one. The first content type is preferred, and later ones get decreasing `q` values. Before, the expected content types were only checked against the response `Content-Type`.
+- Updated dependencies [bf9b7c8]
+- Updated dependencies [34bd5c9]
+  - @openid4vc/utils@0.9.0
+
 ## 0.8.2
 
 ### Patch Changes

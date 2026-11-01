@@ -1,4 +1,4 @@
-import { isMediaType } from '@owf/identity-common'
+import { createAcceptHeader, isMediaType } from '@owf/identity-common'
 import { SLException } from './status-list-exception'
 import { MediaTypes } from './types'
 
@@ -9,9 +9,7 @@ export const fetchStatusList = async ({
 }: {
   uri: string
   /**
-   *
-   * If none is supplied either can be returned
-   *
+   * The formats to ask for, in order of preference. If none is supplied either can be returned.
    */
   acceptedFormats?: Array<'cwt' | 'jwt'>
   customFetcher?: typeof fetch
@@ -21,13 +19,13 @@ export const fetchStatusList = async ({
       throw new SLException(`At least one accepted format (cwt, jwt) needs to be provided`)
     }
 
-    const acceptHeaders = acceptedFormats.map((format) =>
-      format === 'jwt' ? MediaTypes.StatusListJwt : MediaTypes.StatusListCwt
+    const acceptHeader = createAcceptHeader(
+      acceptedFormats.map((format) => (format === 'jwt' ? MediaTypes.StatusListJwt : MediaTypes.StatusListCwt))
     )
 
     const response = await customFetcher(uri, {
       headers: {
-        Accept: acceptHeaders.join(','),
+        Accept: acceptHeader,
       },
     })
 

@@ -88,6 +88,18 @@ describe('cose key', () => {
     expect(coseKey.d).toBeDefined()
   })
 
+  test('uses registered jwk crv names', () => {
+    const coordinate = base64url.encode(new Uint8Array(48).fill(1))
+
+    expect(CoseKey.fromJwk({ kty: 'EC', crv: 'P-384', x: coordinate, y: coordinate }).curve).toStrictEqual(
+      Curve['P-384']
+    )
+    expect(CoseKey.fromJwk({ kty: 'EC', crv: 'P-521', x: coordinate, y: coordinate }).curve).toStrictEqual(
+      Curve['P-521']
+    )
+    expect(CoseKey.create({ keyType: KeyType.Ec, curve: Curve['P-384'] }).jwk.crv).toStrictEqual('P-384')
+  })
+
   test('create jwk from cose key', () => {
     const jwk = {
       kty: 'EC',

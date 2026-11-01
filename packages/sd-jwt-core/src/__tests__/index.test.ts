@@ -4,7 +4,8 @@ import { exportJWK, importJWK, type JWK } from 'jose'
 import { describe, expect, test } from 'vitest'
 import { SDJwtGeneralJSONInstance, SDJwtInstance, type SdJwtPayload } from '../index'
 import type { VerifierOptions } from '../jwt'
-import type { JwtPayload, KbVerifier, Signer, Verifier } from '../types'
+import { KBJwt } from '../kbjwt'
+import { type JwtPayload, KB_JWT_TYP, type KbVerifier, type Signer, type Verifier } from '../types'
 import { Disclosure } from '../utils'
 
 // Extract the major version as a number
@@ -1268,5 +1269,80 @@ describe('index', () => {
         sdjwt.verify(presentation, { ...options, allowedKeyBindingAlgorithms: ['ES256'] })
       ).resolves.toHaveProperty('kb')
     })
+  })
+})
+
+describe('critical header parameters (RFC 7515 Section 4.1.11)', () => {
+  const crit = { crit: ['urn:example:ext'], 'urn:example:ext': true }
+
+  test('verify and safeVerify reject an issuer-signed JWT with crit', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      saltGenerator: generateSalt,
+    })
+    const payload = { foo: 'bar', iat: Math.floor(Date.now() / 1000) }
+
+    const control = await sdjwt.issue(payload, { _sd: ['foo'] })
+    await expect(sdjwt.verify(control)).resolves.toHaveProperty('payload')
+
+    const credential = await sdjwt.issue(payload, { _sd: ['foo'] }, { header: crit })
+    await expect(sdjwt.verify(credential)).rejects.toMatchObject({
+      code: 'INVALID_JWT_SIGNATURE',
+      message: 'Verify Error: unsupported critical header parameters',
+    })
+    const result = await sdjwt.safeVerify(credential)
+    expect(result.success).toBe(false)
+    expect(result.errors?.map((e) => e.code)).toEqual(['INVALID_JWT_SIGNATURE'])
+  })
+
+  test('verify and safeVerify reject a Key Binding JWT with crit', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    const holder = createSignerVerifier()
+    const kbVerifier: KbVerifier = (data, sig) => holder.verifier(data, sig)
+    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      saltGenerator: generateSalt,
+      kbVerifier,
+    })
+    const now = Math.floor(Date.now() / 1000)
+    const credential = await sdjwt.issue({ foo: 'bar', iat: now }, { _sd: ['foo'] })
+    const sdHash = Buffer.from(await digest(credential, 'sha-256')).toString('base64url')
+    const present = async (header: Record<string, unknown>) => {
+      const kbJwt = new KBJwt({
+        header: { typ: KB_JWT_TYP, alg: 'EdDSA', ...header },
+        payload: { iat: now, aud: 'aud', nonce: 'nonce', sd_hash: sdHash },
+      })
+      return `${credential}${await kbJwt.sign(holder.signer)}`
+    }
+
+    await expect(sdjwt.verify(await present({}), { keyBindingNonce: 'nonce' })).resolves.toHaveProperty('kb')
+
+    const presentation = await present(crit)
+    await expect(sdjwt.verify(presentation, { keyBindingNonce: 'nonce' })).rejects.toThrowError(
+      'Verify Error: unsupported critical header parameters in Key Binding JWT'
+    )
+    const result = await sdjwt.safeVerify(presentation, { keyBindingNonce: 'nonce' })
+    expect(result.success).toBe(false)
+    expect(result.errors?.map((e) => e.code)).toEqual(['KEY_BINDING_SIGNATURE_INVALID'])
+  })
+
+  test('General JSON verify rejects a signature whose protected header has crit', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    const sdjwt = new SDJwtGeneralJSONInstance<SdJwtPayload>({ verifier, hasher: digest, saltGenerator: generateSalt })
+    const payload = { foo: 'bar', iat: Math.floor(Date.now() / 1000) }
+    const issue = (header?: Record<string, unknown>) =>
+      sdjwt.issue(payload, { _sd: ['foo'] }, { sigs: [{ signer, alg: 'EdDSA', kid: 'key-1', header }] })
+
+    await expect(sdjwt.verify(await issue())).resolves.toHaveProperty('payload')
+    await expect(sdjwt.verify(await issue(crit))).rejects.toThrowError(
+      'Verify Error: unsupported critical header parameters'
+    )
   })
 })

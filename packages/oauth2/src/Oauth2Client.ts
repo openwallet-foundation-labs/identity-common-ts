@@ -106,6 +106,7 @@ export class Oauth2Client {
         })
       : undefined
 
+    let dpop = options.dpop
     if (options.authorizationServerMetadata.authorization_challenge_endpoint) {
       try {
         await this.sendAuthorizationChallengeRequest({
@@ -115,7 +116,7 @@ export class Oauth2Client {
           redirectUri: options.redirectUri,
           scope: options.scope,
           resource: options.resource,
-          dpop: options.dpop,
+          dpop,
           state: options.state,
         })
       } catch (error) {
@@ -126,6 +127,11 @@ export class Oauth2Client {
 
         if (!isRecoverableError) throw error
 
+        const dpopNonce = extractDpopNonceFromHeaders(error.response.headers)
+        if (dpop && dpopNonce) {
+          dpop = { ...dpop, nonce: dpopNonce }
+        }
+
         // If a request_uri was returned we can treat the response as if PAR was used
         if (error.errorResponse.request_uri) {
           const authorizationRequestUrl = `${options.authorizationServerMetadata.authorization_endpoint}?${objectToQueryParams(
@@ -135,14 +141,8 @@ export class Oauth2Client {
             }
           ).toString()}`
 
-          const dpopNonce = extractDpopNonceFromHeaders(error.response.headers)
           return {
-            dpop: options.dpop
-              ? {
-                  ...options.dpop,
-                  nonce: dpopNonce ?? undefined,
-                }
-              : undefined,
+            dpop,
             authorizationRequestUrl,
             pkce,
           }
@@ -158,7 +158,7 @@ export class Oauth2Client {
       scope: options.scope,
       pkceCodeVerifier: pkce?.codeVerifier,
       resource: options.resource,
-      dpop: options.dpop,
+      dpop,
       state: options.state,
     })
   }

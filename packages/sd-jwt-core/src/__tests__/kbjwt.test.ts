@@ -175,6 +175,34 @@ describe('KB JWT', () => {
     }
   })
 
+  test('verify rejects critical header parameters', async () => {
+    const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
+    const testSigner: Signer = async (data: string) => {
+      const sig = Crypto.sign(null, Buffer.from(data), privateKey)
+      return Buffer.from(sig).toString('base64url')
+    }
+    const testVerifier: KbVerifier = async (data: string, sig: string) => {
+      return Crypto.verify(null, Buffer.from(data), publicKey, Buffer.from(sig, 'base64url'))
+    }
+    const payload = { iat: 1, aud: 'aud', nonce: 'nonce', sd_hash: 'hash' }
+
+    for (const [header, accepted] of [
+      [{ typ: KB_JWT_TYP, alg: 'EdDSA' }, true],
+      [{ typ: KB_JWT_TYP, alg: 'EdDSA', crit: ['urn:example:ext'], 'urn:example:ext': true }, false],
+    ] as const) {
+      const kbJwt = new KBJwt({ header, payload })
+      const decoded = KBJwt.fromKBEncode(await kbJwt.sign(testSigner))
+      const verification = decoded.verifyKB({ verifier: testVerifier, payload: {}, nonce: 'nonce' })
+      if (accepted) {
+        await expect(verification).resolves.toHaveProperty('payload')
+      } else {
+        await expect(verification).rejects.toThrowError(
+          'Verify Error: unsupported critical header parameters in Key Binding JWT'
+        )
+      }
+    }
+  })
+
   test('verify failed with verifier return false', async () => {
     const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
     const testSigner: Signer = async (data: string) => {

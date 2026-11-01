@@ -37,6 +37,8 @@ export enum Oauth2ErrorCodes {
   UnknownCredentialConfiguration = 'unknown_credential_configuration',
   UnknownCredentialIdentifier = 'unknown_credential_identifier',
   InvalidTransactionId = 'invalid_transaction_id',
+  InvalidNotificationId = 'invalid_notification_id',
+  InvalidNotificationRequest = 'invalid_notification_request',
   // Removed from Draft 16+
   UnsupportedCredentialType = 'unsupported_credential_type',
   UnsupportedCredentialFormat = 'unsupported_credential_format',
