@@ -197,14 +197,15 @@ import {
   assertValidLoTE,
 } from '@owf/eudi-lote';
 
-// Get validation result with error details
+// Get the validation result with all issues
 const result = validateLoTE(lote);
-if (!result.valid) {
-  console.log('Validation errors:', result.errors);
+for (const issue of result.issues) {
+  // e.g. error invalid_format LoTE.ListAndSchemeInformation.DistributionPoints.0: Invalid URL
+  console.log(issue.severity, issue.code, `${issue.path.join('.')}: ${issue.message}`);
 }
 
 // Or throw on invalid
-assertValidLoTE(lote); // throws ValidationError if invalid
+assertValidLoTE(lote); // throws LoTEException if invalid
 ```
 
 ### Updating a LoTE Document
@@ -254,15 +255,15 @@ Removes an entity by name.
 
 #### `validateLoTE(lote): ValidationResult`
 
-Validates a LoTE document against ETSI TS 119 602 schema. Returns validation result with error details.
+Validates a LoTE document against ETSI TS 119 602 schema. Returns `{ valid, issues }`, where each issue has a `severity`, a `code`, a `path` into the document and a `message`. Schema issues carry the zod issue code.
 
 #### `assertValidLoTE(lote): asserts lote is LoTEDocument`
 
-Type assertion that throws `ValidationError` if the LoTE document is invalid.
+Type assertion that throws `LoTEException` if the LoTE document is invalid.
 
 #### `validateLoTEProfile(lote, profile: LoTEProfile | LoTEProfile[]): ValidationResult`
 
-Validates a LoTE document against a known LoTE Profile, such as EU PID Providers List, mDL Providers List, etc. Returns validation result with error details.
+Validates a LoTE document against a known LoTE Profile, such as EU PID Providers List, mDL Providers List, etc. Returns `{ valid, issues }` like `validateLoTE`. A document whose `LoTEType` matches none of the profiles gets an `unexpected_lote_type` issue for each profile.
 
 ### Builders
 
@@ -313,7 +314,7 @@ See [src/types.ts](./src/types.ts) for complete type definitions including:
 - `ServiceDigitalIdentity` - Digital identity for a service
 - `ServiceHistory` / `ServiceHistoryInstance` - Historical service states
 - `PointersToOtherLoTE` / `OtherLoTEPointer` - Cross-list references
-- `ValidationResult` / `ValidationError` - Validation types
+- `ValidationResult` / `LoTEValidationIssue` - Validation types
 
 All document types are derived from Zod schemas. You can import and use the schemas
 directly for custom validation or to build upon:

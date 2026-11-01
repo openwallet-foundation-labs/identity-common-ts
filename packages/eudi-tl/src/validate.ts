@@ -1,4 +1,10 @@
-import { type Finding, hasErrorFindings, schemaIssueToFinding } from '@owf/identity-common'
+import {
+  type ValidationResult as CommonValidationResult,
+  type SchemaIssueCode,
+  schemaIssueToValidationIssue,
+  toValidationResult,
+  type ValidationIssueOf,
+} from '@owf/identity-common'
 import type { z } from 'zod'
 import { TrustedListParseException } from './trusted-list-exception'
 import { type TrustedList, TrustedListSchema } from './types'
@@ -20,33 +26,14 @@ export const TRUSTED_LIST_VALIDATION_CODES = {
 export type TrustedListValidationCode =
   (typeof TRUSTED_LIST_VALIDATION_CODES)[keyof typeof TRUSTED_LIST_VALIDATION_CODES]
 
-/** A finding of a trusted list validation, with a zod issue code for schema issues */
-export type TrustedListFinding = Finding<TrustedListValidationCode | (string & {})>
+/** An issue of a trusted list validation, with a zod issue code for schema issues */
+export type TrustedListValidationIssue = ValidationIssueOf<TrustedListValidationCode | SchemaIssueCode>
 
-/** A single validation problem, mirroring `@owf/eudi-lote`'s ValidationError. */
-export interface ValidationError {
-  path: string
-  message: string
-}
+/** Result of a validation, the same as `@owf/eudi-lote`'s ValidationResult */
+export type ValidationResult = CommonValidationResult<TrustedListValidationIssue>
 
-/** Result of a validation, mirroring `@owf/eudi-lote`'s ValidationResult. */
-export interface ValidationResult {
-  valid: boolean
-  errors: ValidationError[]
-  /** The errors as findings, with a code and with array indices as numbers in the path */
-  findings: TrustedListFinding[]
-}
-
-function toResult(findings: TrustedListFinding[]): ValidationResult {
-  return {
-    valid: !hasErrorFindings(findings),
-    errors: findings.map((finding) => ({ path: finding.path.join('.'), message: finding.message })),
-    findings,
-  }
-}
-
-function fromZodError(error: z.ZodError): TrustedListFinding[] {
-  return error.issues.map((issue) => schemaIssueToFinding(issue))
+function fromZodError(error: z.ZodError): TrustedListValidationIssue[] {
+  return error.issues.map((issue) => schemaIssueToValidationIssue(issue) as TrustedListValidationIssue)
 }
 
 /**
@@ -57,7 +44,7 @@ function fromZodError(error: z.ZodError): TrustedListFinding[] {
  */
 export function validateTrustedList(value: unknown): ValidationResult {
   const result = TrustedListSchema.safeParse(value)
-  return toResult(result.success ? [] : fromZodError(result.error))
+  return toValidationResult(result.success ? [] : fromZodError(result.error))
 }
 
 /**
@@ -100,9 +87,9 @@ export interface ProfileRule {
  */
 export const stripScheme = (uri: string | undefined): string => (uri ?? '').replace(/^https?:\/\//, '')
 
-function profileErrors(trustedList: TrustedList, rule: ProfileRule): TrustedListFinding[] {
+function profileErrors(trustedList: TrustedList, rule: ProfileRule): TrustedListValidationIssue[] {
   const label = rule.name ?? 'profile'
-  const errors: TrustedListFinding[] = []
+  const errors: TrustedListValidationIssue[] = []
   const add = (code: TrustedListValidationCode, path: (string | number)[], message: string) =>
     errors.push({ severity: 'error', code, path, message: `[${label}] ${message}` })
 
@@ -151,5 +138,5 @@ export function validateTrustedListProfile(value: unknown, rule: ProfileRule | P
   const trustedList = value as TrustedList
   const rules = Array.isArray(rule) ? rule : [rule]
   const perRule = rules.map((r) => profileErrors(trustedList, r))
-  return toResult(perRule.some((errors) => errors.length === 0) ? [] : perRule.flat())
+  return toValidationResult(perRule.some((errors) => errors.length === 0) ? [] : perRule.flat())
 }

@@ -7,6 +7,7 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
+import { VALIDATION_CODES, type ValidationIssueContexts, type ValidationIssueParams } from '@owf/identity-common'
 import { z } from 'zod'
 
 // ============================================================================
@@ -214,6 +215,23 @@ export const WRPRC_JWS_ALGORITHMS = [
   'EdDSA',
 ] as const
 
+/** The `typ` of a WRPRC as JWT (clause 5.2.2, Table 5) */
+const WRPRC_JWT_TYP = 'rc-wrp+jwt'
+
+/** `typ`, with an `invalid_typ` issue that carries the expected and the actual value */
+const WRPRCJWTTypSchema = z.custom<typeof WRPRC_JWT_TYP>().superRefine((typ, ctx) => {
+  if (typ === WRPRC_JWT_TYP) return
+  const params: ValidationIssueParams<'invalid_typ', ValidationIssueContexts['invalid_typ']> = {
+    code: VALIDATION_CODES.INVALID_TYP,
+    context: { expected: [WRPRC_JWT_TYP], actual: typ },
+  }
+  ctx.addIssue({
+    code: 'custom',
+    message: typ === undefined ? `typ is missing, it must be ${WRPRC_JWT_TYP}` : `typ must be ${WRPRC_JWT_TYP}`,
+    params,
+  })
+})
+
 /**
  * JWT Header schema according to ETSI TS 119 475 clause 5.2.2 (Table 5).
  *
@@ -223,7 +241,7 @@ export const WRPRC_JWS_ALGORITHMS = [
  */
 export const WRPRCJWTHeaderSchema = z.object({
   /** Type of the Web Token - must be "rc-wrp+jwt" for JWT */
-  typ: z.literal('rc-wrp+jwt'),
+  typ: WRPRCJWTTypSchema,
   /** Algorithm used to sign the JWT */
   alg: z.enum(WRPRC_JWS_ALGORITHMS),
   /** Certificate chain to verify the JWT */

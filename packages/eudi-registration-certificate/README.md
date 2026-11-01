@@ -221,21 +221,21 @@ import { validateWRPRCPayload } from '@owf/eudi-registration-certificate'
 
 const result = validateWRPRCPayload(payload, accessCertificateSub)
 
-if (result.valid) {
-  console.log('WRPRC is valid')
-} else {
-  console.log('Errors:', result.errors)
-}
+console.log(result.valid ? 'WRPRC is valid' : 'WRPRC is invalid')
 
-// Warnings are returned even for valid payloads
-if (result.warnings.length > 0) {
-  console.log('Warnings:', result.warnings)
+// Errors and warnings in one list; warnings are returned even for valid payloads
+for (const issue of result.issues) {
+  // e.g. error exp_too_late exp: exp must be at most 12 months after iat (GEN-5.2.4-08)
+  console.log(issue.severity, issue.code, `${issue.path.join('.')}: ${issue.message}`)
 }
 ```
 
 `accessCertificateSub` is required for payload validation, parsing, signing, and decoding. It is compared with `intermediary.sub` when the WRPRC has an intermediary, and with `sub` otherwise.
 
-The result also lists the errors and warnings as `findings`, each with a `severity`, a `code`, a `path` into the payload and, where a check has one, the ETSI TS 119 475 `requirement`.
+Each issue has a `severity`, a `code` from `WRPRC_VALIDATION_CODES` or, for schema issues, the zod issue code, a `path` into the payload and, where a check has one, the ETSI TS 119 475 `requirement`. Checks that recur in other specifications use the codes of `VALIDATION_CODES` from `@owf/identity-common` and carry a typed `context`:
+
+- `invalid_typ`, when the JWT header `typ` is not `rc-wrp+jwt`, with `expected` and `actual`;
+- `expires_before_issued`, when `exp` is at or before `iat`, with `issuedAt` and `expiresAt`.
 
 ### Checking a Request for Over-Asking
 
@@ -246,9 +246,10 @@ import { checkOverAsking } from '@owf/eudi-registration-certificate'
 
 const result = checkOverAsking(authorizationRequest.dcql_query, wrprcPayload.credentials)
 
-for (const finding of result.findings) {
-  // e.g. credentials.0.claims.1: Credential query pid asks for the claim ["birthdate"], which is not registered
-  console.log(`${finding.path.join('.')}: ${finding.message}`)
+// The same { valid, issues } as validateWRPRCPayload: valid is false when any issue is an error
+for (const issue of result.issues) {
+  // e.g. error credentials.0.claims.1: Credential query pid asks for the claim ["birthdate"], which is not registered
+  console.log(issue.severity, `${issue.path.join('.')}: ${issue.message}`)
 }
 ```
 

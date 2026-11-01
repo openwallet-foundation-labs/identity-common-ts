@@ -53,7 +53,7 @@ describe('validateTrustedListProfile', () => {
       rule
     )
     expect(result.valid).toBe(false)
-    expect(result.errors.some((e) => e.path === 'tslType')).toBe(true)
+    expect(result.issues.some((issue) => issue.path.join('.') === 'tslType')).toBe(true)
   })
 
   it('rejects an unexpected service type / status', () => {
@@ -62,15 +62,15 @@ describe('validateTrustedListProfile', () => {
       rule
     )
     expect(result.valid).toBe(false)
-    expect(result.errors.length).toBeGreaterThan(0)
+    expect(result.issues.length).toBeGreaterThan(0)
   })
 
-  it('reports each profile error as a finding pointing at the service', () => {
+  it('reports each profile error as an issue pointing at the service', () => {
     const result = validateTrustedListProfile(
       list(rule.tslType, 'https://example.org/service-type/other', 'https://example.org/service-status/withdrawn'),
       rule
     )
-    expect(result.findings).toEqual([
+    expect(result.issues).toEqual([
       {
         severity: 'error',
         code: TRUSTED_LIST_VALIDATION_CODES.UNEXPECTED_SERVICE_TYPE,
@@ -84,19 +84,15 @@ describe('validateTrustedListProfile', () => {
         message: '[example] unexpected service status https://example.org/service-status/withdrawn',
       },
     ])
-    expect(result.errors.map((e) => e.path)).toEqual([
-      'providers.0.services.0.serviceTypeIdentifier',
-      'providers.0.services.0.serviceStatus',
-    ])
   })
 
-  it('reports schema issues as findings with the zod issue code', () => {
+  it('reports schema issues with the zod issue code', () => {
     const result = validateTrustedListProfile({ tslType: rule.tslType, providers: [{ services: [{}] }] }, rule)
     expect(result.valid).toBe(false)
-    expect(result.findings.length).toBeGreaterThan(0)
-    for (const finding of result.findings) {
-      expect(finding).toMatchObject({ severity: 'error', code: expect.any(String) })
-      expect(finding.path.slice(0, 4)).toEqual(['providers', 0, 'services', 0])
+    expect(result.issues.length).toBeGreaterThan(0)
+    for (const issue of result.issues) {
+      expect(issue).toMatchObject({ severity: 'error', code: expect.any(String) })
+      expect(issue.path.slice(0, 4)).toEqual(['providers', 0, 'services', 0])
     }
   })
 

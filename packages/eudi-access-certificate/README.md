@@ -56,7 +56,8 @@ const result = validateWRPRC(header, payload, getAccessCertificateSubjectIdentif
 ## Validation
 
 `validateAccessCertificate` checks the certificate profile of TS 119 411-8 clause 6.6.1 and the profiles it
-references (ETSI EN 319 412-1/-2/-3/-5):
+references (ETSI EN 319 412-1/-2/-3/-5). The table names the keys of `ACCESS_CERTIFICATE_VALIDATION_CODES`; their
+values are the codes in lower case, such as `missing_policy`:
 
 | Code | Severity | Requirement |
 |------|----------|-------------|
@@ -75,14 +76,23 @@ references (ETSI EN 319 412-1/-2/-3/-5):
 ```typescript
 import { parseAndValidateAccessCertificate, validateAccessCertificate } from '@owf/eudi-access-certificate'
 
-const { valid, errors, warnings } = validateAccessCertificate(ac, {
+const { valid, issues } = validateAccessCertificate(ac, {
   now: new Date(),                     // or false to skip the validity period check
   acceptedPolicyOids: ['1.2.3.4.5'],   // TSP allocated policy OIDs (GEN-6.6.1-03)
 })
 
+for (const issue of issues) {
+  // e.g. error missing_contact certificate.subjectAlternativeNames (GEN-6.6.1-07)
+  console.log(issue.severity, issue.code, issue.path.join('.'), issue.requirement ?? '')
+}
+
 // Or throw an AccessCertificateException on errors
 const checked = parseAndValidateAccessCertificate(pem)
 ```
+
+`valid` is `false` when any issue is an error. Each issue has a `path` into the `AccessCertificate`. `expired` and
+`not_yet_valid` are the common codes of `VALIDATION_CODES` from `@owf/identity-common`, and carry the date as
+`context`: `expiredAt` (the `notAfter`) or `validFrom` (the `notBefore`).
 
 ## Signature and revocation checks
 

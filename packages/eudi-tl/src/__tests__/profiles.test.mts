@@ -24,7 +24,7 @@ describe('TrustedListProfiles.euLotl', () => {
   it('rejects a generic national list (wrong TSLType)', () => {
     const result = validateTrustedListProfile({ tslType: TSLType.EUgeneric, providers: [] }, TrustedListProfiles.euLotl)
     expect(result.valid).toBe(false)
-    expect(result.errors.some((e) => e.path === 'tslType')).toBe(true)
+    expect(result.issues.some((issue) => issue.path.join('.') === 'tslType')).toBe(true)
   })
 })
 

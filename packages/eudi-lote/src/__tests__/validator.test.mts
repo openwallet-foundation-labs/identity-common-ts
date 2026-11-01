@@ -25,14 +25,14 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(true)
-      expect(result.errors).toHaveLength(0)
+      expect(result.issues).toHaveLength(0)
     })
 
     it('should reject null', () => {
       const result = validateLoTE(null)
 
       expect(result.valid).toBe(false)
-      expect(result.errors[0].message).toContain('expected object')
+      expect(result.issues[0].message).toContain('expected object')
     })
 
     it('should reject undefined', () => {
@@ -51,14 +51,14 @@ describe('LoTE Validator', () => {
       const result = validateLoTE({})
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path === 'LoTE')).toBe(true)
+      expect(result.issues.some((issue) => issue.path.join('.') === 'LoTE')).toBe(true)
     })
 
     it('should require ListAndSchemeInformation', () => {
       const result = validateLoTE({ LoTE: {} })
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path === 'LoTE.ListAndSchemeInformation')).toBe(true)
+      expect(result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation')).toBe(true)
     })
   })
 
@@ -71,7 +71,9 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path === 'LoTE.ListAndSchemeInformation.LoTEVersionIdentifier')).toBe(true)
+      expect(
+        result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.LoTEVersionIdentifier')
+      ).toBe(true)
     })
 
     it('should require LoTESequenceNumber', () => {
@@ -82,7 +84,9 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path === 'LoTE.ListAndSchemeInformation.LoTESequenceNumber')).toBe(true)
+      expect(
+        result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.LoTESequenceNumber')
+      ).toBe(true)
     })
 
     it('should require SchemeOperatorName', () => {
@@ -93,7 +97,9 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path === 'LoTE.ListAndSchemeInformation.SchemeOperatorName')).toBe(true)
+      expect(
+        result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.SchemeOperatorName')
+      ).toBe(true)
     })
 
     it('should require non-empty SchemeOperatorName array', () => {
@@ -112,7 +118,9 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path === 'LoTE.ListAndSchemeInformation.ListIssueDateTime')).toBe(true)
+      expect(
+        result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.ListIssueDateTime')
+      ).toBe(true)
     })
 
     it('should require valid NextUpdate', () => {
@@ -122,7 +130,9 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path === 'LoTE.ListAndSchemeInformation.NextUpdate')).toBe(true)
+      expect(result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.NextUpdate')).toBe(
+        true
+      )
     })
 
     it('should validate optional URI fields', () => {
@@ -133,8 +143,12 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path === 'LoTE.ListAndSchemeInformation.LoTEType')).toBe(true)
-      expect(result.errors.some((e) => e.path === 'LoTE.ListAndSchemeInformation.DistributionPoints.0')).toBe(true)
+      expect(result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.LoTEType')).toBe(
+        true
+      )
+      expect(
+        result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.DistributionPoints.0')
+      ).toBe(true)
     })
 
     it('should validate SchemeTerritory is 2-character code', () => {
@@ -144,7 +158,9 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path === 'LoTE.ListAndSchemeInformation.SchemeTerritory')).toBe(true)
+      expect(
+        result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.SchemeTerritory')
+      ).toBe(true)
     })
 
     it('should accept valid 2-character SchemeTerritory', () => {
@@ -281,9 +297,9 @@ describe('LoTE Validator', () => {
 
       expect(result.valid).toBe(false)
       expect(
-        result.errors.some(
-          (e) =>
-            e.path ===
+        result.issues.some(
+          (issue) =>
+            issue.path.join('.') ===
             'LoTE.TrustedEntitiesList.0.TrustedEntityServices.0.ServiceInformation.ServiceSupplyPoints.0.uriValue'
         )
       ).toBe(true)
@@ -307,7 +323,7 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.path.includes('TrustedEntityServices'))).toBe(true)
+      expect(result.issues.some((issue) => issue.path.includes('TrustedEntityServices'))).toBe(true)
     })
 
     it('should require service name', () => {
@@ -356,7 +372,7 @@ describe('LoTE Validator', () => {
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.message.includes('digital identity type'))).toBe(true)
+      expect(result.issues.some((issue) => issue.message.includes('digital identity type'))).toBe(true)
     })
   })
 
@@ -474,22 +490,7 @@ describe('LoTE Validator', () => {
       const result = validateLoTEProfile(lote, [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUWalletProvidersList])
 
       expect(result.valid).toBe(false)
-      expect(result.errors).toEqual([
-        {
-          message: 'Document does not match any of the specified profiles: EUPIDProvidersList, EUWalletProvidersList',
-          path: 'LoTEType',
-        },
-        {
-          message: 'Profile EUPIDProvidersList: LoTEType must be http://uri.etsi.org/19602/LoTEType/EUPIDProvidersList',
-          path: 'LoTE.ListAndSchemeInformation.LoTEType',
-        },
-        {
-          message:
-            'Profile EUWalletProvidersList: LoTEType must be http://uri.etsi.org/19602/LoTEType/EUWalletProvidersList',
-          path: 'LoTE.ListAndSchemeInformation.LoTEType',
-        },
-      ])
-      expect(result.findings).toEqual(
+      expect(result.issues).toEqual(
         [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUWalletProvidersList].map((profile) => ({
           severity: 'error',
           code: LOTE_VALIDATION_CODES.UNEXPECTED_LOTE_TYPE,
@@ -511,44 +512,33 @@ describe('LoTE Validator', () => {
       ])
 
       expect(result.valid).toBe(false)
-      expect(result.errors).toEqual([
+      expect(result.issues).toEqual([
         {
-          message: 'Document does not match profile EUWRPACProvidersList',
-          path: 'LoTEType',
-        },
-        {
+          severity: 'error',
+          code: 'invalid_format',
+          path: ['LoTE', 'ListAndSchemeInformation', 'StatusDeterminationApproach'],
           message: 'Profile EUWRPACProvidersList: Invalid URL',
-          path: 'LoTE.ListAndSchemeInformation.StatusDeterminationApproach',
         },
         {
-          message:
-            'Profile EUWRPACProvidersList: StatusDeterminationApproach must be http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
-          path: 'LoTE.ListAndSchemeInformation.StatusDeterminationApproach',
-        },
-      ])
-      // findings carry no document level summary, only the issues of the matched profile
-      expect(result.findings).toHaveLength(2)
-      for (const finding of result.findings) {
-        expect(finding).toMatchObject({
           severity: 'error',
           code: expect.any(String),
           path: ['LoTE', 'ListAndSchemeInformation', 'StatusDeterminationApproach'],
-        })
-      }
+          message:
+            'Profile EUWRPACProvidersList: StatusDeterminationApproach must be http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
+        },
+      ])
     })
-
-    it('reports schema issues as findings with numeric array indices', () => {
+    it('reports schema issues with numeric array indices', () => {
       const lote = createMinimalValidLoTE()
       lote.LoTE.TrustedEntitiesList = [{} as never]
 
       const result = validateLoTE(lote)
 
       expect(result.valid).toBe(false)
-      expect(result.findings.length).toBeGreaterThan(0)
-      for (const finding of result.findings) {
-        expect(finding.path.slice(0, 3)).toEqual(['LoTE', 'TrustedEntitiesList', 0])
+      expect(result.issues.length).toBeGreaterThan(0)
+      for (const issue of result.issues) {
+        expect(issue.path.slice(0, 3)).toEqual(['LoTE', 'TrustedEntitiesList', 0])
       }
-      expect(result.errors.map((e) => e.path)).toEqual(result.findings.map((f) => f.path.join('.')))
     })
   })
 })

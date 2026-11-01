@@ -92,7 +92,7 @@ export type {
   X509CertificateRef,
 } from './types'
 // Validator
-export type { LoTEFinding, LoTEValidationCode, ValidationError, ValidationResult } from './validator'
+export type { LoTEValidationCode, LoTEValidationIssue, ValidationResult } from './validator'
 export {
   assertValidLoTE,
   LOTE_VALIDATION_CODES,

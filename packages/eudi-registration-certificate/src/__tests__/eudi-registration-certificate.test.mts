@@ -177,13 +177,13 @@ describe('Validators', () => {
     it('should validate valid payload', () => {
       const result = validateWRPRCPayload(validLegalPersonPayload, validLegalPersonPayload.sub)
       expect(result.valid).toBe(true)
-      expect(result.errors).toHaveLength(0)
+      expect(result.issues.filter((issue) => issue.severity === 'error')).toHaveLength(0)
     })
 
     it('should return errors for invalid payload', () => {
       const result = validateWRPRCPayload({}, 'LEIXG-529900T8BM49AURSDO55')
       expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
+      expect(result.issues.some((issue) => issue.severity === 'error')).toBe(true)
     })
 
     it('should warn about unknown entitlements', () => {
@@ -192,7 +192,9 @@ describe('Validators', () => {
         entitlements: ['https://custom.example.com/entitlement'],
       }
       const result = validateWRPRCPayload(payload, payload.sub)
-      expect(result.warnings.some((w) => w.code === 'unknown_entitlement')).toBe(true)
+      expect(result.issues.some((issue) => issue.severity === 'warning' && issue.code === 'unknown_entitlement')).toBe(
+        true
+      )
     })
 
     it('should error when PSP sub-entitlement without Service_Provider', () => {
@@ -202,7 +204,9 @@ describe('Validators', () => {
       }
       const result = validateWRPRCPayload(payload, payload.sub)
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.code === 'missing_base_entitlement')).toBe(true)
+      expect(
+        result.issues.some((issue) => issue.severity === 'error' && issue.code === 'missing_base_entitlement')
+      ).toBe(true)
     })
 
     it('should allow PSP sub-entitlement with Service_Provider', () => {
@@ -211,7 +215,9 @@ describe('Validators', () => {
         entitlements: [WRP_ENTITLEMENTS.SERVICE_PROVIDER, PSP_SUB_ENTITLEMENTS.PAYMENT_INITIATION],
       }
       const result = validateWRPRCPayload(payload, payload.sub)
-      expect(result.errors.some((e) => e.code === 'missing_base_entitlement')).toBe(false)
+      expect(
+        result.issues.some((issue) => issue.severity === 'error' && issue.code === 'missing_base_entitlement')
+      ).toBe(false)
     })
   })
 

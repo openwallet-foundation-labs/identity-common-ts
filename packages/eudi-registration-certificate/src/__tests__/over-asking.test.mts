@@ -22,7 +22,7 @@ const sdJwtQuery = (claims: unknown[], meta: Record<string, unknown> = { vct_val
 })
 
 const codesAndPaths = (result: ReturnType<typeof checkOverAsking>) =>
-  result.findings.map(({ severity, code, path }) => ({ severity, code, path }))
+  result.issues.map(({ severity, code, path }) => ({ severity, code, path }))
 
 describe('checkOverAsking', () => {
   it('accepts registered claims and members of registered objects', () => {
@@ -30,13 +30,13 @@ describe('checkOverAsking', () => {
       sdJwtQuery([{ path: ['given_name'] }, { path: ['address', 'locality'] }, { path: ['nationalities', 0] }]),
       registered
     )
-    expect(result).toEqual({ valid: true, findings: [] })
+    expect(result).toEqual({ valid: true, issues: [] })
   })
 
   it('reports a claim that is not registered, at the claims query', () => {
     const result = checkOverAsking(sdJwtQuery([{ path: ['given_name'] }, { path: ['birthdate'] }]), registered)
     expect(result.valid).toBe(false)
-    expect(result.findings).toEqual([
+    expect(result.issues).toEqual([
       {
         severity: 'error',
         code: CODES.CLAIM_NOT_REGISTERED,
@@ -83,7 +83,7 @@ describe('checkOverAsking', () => {
   it('checks only the credential of a query without claims', () => {
     expect(
       checkOverAsking({ credentials: [{ format: 'dc+sd-jwt', meta: { vct_values: [PID_VCT] } }] }, registered)
-    ).toEqual({ valid: true, findings: [] })
+    ).toEqual({ valid: true, issues: [] })
   })
 
   it('reads mdoc claims in either form, and a parsed DcqlQuery', () => {

@@ -1,3 +1,10 @@
+import {
+  toValidationResult,
+  VALIDATION_CODES,
+  type ValidationIssueOf,
+  type ValidationResult,
+  validationErrors,
+} from '@owf/identity-common'
 import type { CertificateInput } from '@owf/x509'
 import { AccessCertificateException } from './access-certificate-exception'
 import { ACCESS_CERTIFICATE_POLICY_INFO } from './constants'
@@ -5,48 +12,44 @@ import { parseAccessCertificate } from './profile'
 import { parseSemanticIdentifier } from './semantic-identifier'
 import type {
   AccessCertificate,
-  AccessCertificateValidationIssue,
   AccessCertificateValidationOptions,
   AccessCertificateValidationSeverity,
 } from './types'
 
 export const ACCESS_CERTIFICATE_VALIDATION_CODES = {
-  UNSUPPORTED_VERSION: 'UNSUPPORTED_VERSION',
-  NOT_YET_VALID: 'NOT_YET_VALID',
-  EXPIRED: 'EXPIRED',
-  CA_CERTIFICATE: 'CA_CERTIFICATE',
-  MISSING_DIGITAL_SIGNATURE_KEY_USAGE: 'MISSING_DIGITAL_SIGNATURE_KEY_USAGE',
-  MISSING_POLICY: 'MISSING_POLICY',
-  CONFLICTING_POLICIES: 'CONFLICTING_POLICIES',
-  MISSING_CPS_URI: 'MISSING_CPS_URI',
-  MISSING_CONTACT: 'MISSING_CONTACT',
-  UNKNOWN_SUBJECT_TYPE: 'UNKNOWN_SUBJECT_TYPE',
-  MISSING_COMMON_NAME: 'MISSING_COMMON_NAME',
-  MISSING_COUNTRY_NAME: 'MISSING_COUNTRY_NAME',
-  MISSING_ORGANIZATION_NAME: 'MISSING_ORGANIZATION_NAME',
-  MISSING_ORGANIZATION_IDENTIFIER: 'MISSING_ORGANIZATION_IDENTIFIER',
-  INVALID_ORGANIZATION_IDENTIFIER: 'INVALID_ORGANIZATION_IDENTIFIER',
-  INVALID_GREECE_COUNTRY_CODE: 'INVALID_GREECE_COUNTRY_CODE',
-  MISSING_NATURAL_PERSON_NAME: 'MISSING_NATURAL_PERSON_NAME',
-  MISSING_SERIAL_NUMBER: 'MISSING_SERIAL_NUMBER',
-  INVALID_SERIAL_NUMBER: 'INVALID_SERIAL_NUMBER',
-  MISSING_QC_COMPLIANCE: 'MISSING_QC_COMPLIANCE',
-  QC_TYPE_MISMATCH: 'QC_TYPE_MISMATCH',
+  UNSUPPORTED_VERSION: 'unsupported_version',
+  /** With `validFrom`, the `notBefore` of the certificate, as context */
+  NOT_YET_VALID: VALIDATION_CODES.NOT_YET_VALID,
+  /** With `expiredAt`, the `notAfter` of the certificate, as context */
+  EXPIRED: VALIDATION_CODES.EXPIRED,
+  CA_CERTIFICATE: 'ca_certificate',
+  MISSING_DIGITAL_SIGNATURE_KEY_USAGE: 'missing_digital_signature_key_usage',
+  MISSING_POLICY: 'missing_policy',
+  CONFLICTING_POLICIES: 'conflicting_policies',
+  MISSING_CPS_URI: 'missing_cps_uri',
+  MISSING_CONTACT: 'missing_contact',
+  UNKNOWN_SUBJECT_TYPE: 'unknown_subject_type',
+  MISSING_COMMON_NAME: 'missing_common_name',
+  MISSING_COUNTRY_NAME: 'missing_country_name',
+  MISSING_ORGANIZATION_NAME: 'missing_organization_name',
+  MISSING_ORGANIZATION_IDENTIFIER: 'missing_organization_identifier',
+  INVALID_ORGANIZATION_IDENTIFIER: 'invalid_organization_identifier',
+  INVALID_GREECE_COUNTRY_CODE: 'invalid_greece_country_code',
+  MISSING_NATURAL_PERSON_NAME: 'missing_natural_person_name',
+  MISSING_SERIAL_NUMBER: 'missing_serial_number',
+  INVALID_SERIAL_NUMBER: 'invalid_serial_number',
+  MISSING_QC_COMPLIANCE: 'missing_qc_compliance',
+  QC_TYPE_MISMATCH: 'qc_type_mismatch',
 } as const
 
 export type AccessCertificateValidationCode =
   (typeof ACCESS_CERTIFICATE_VALIDATION_CODES)[keyof typeof ACCESS_CERTIFICATE_VALIDATION_CODES]
 
-export type AccessCertificateIssue = AccessCertificateValidationIssue<AccessCertificateValidationCode>
+/** An issue of {@link validateAccessCertificate}, with the context of its code for the common ones */
+export type AccessCertificateIssue = ValidationIssueOf<AccessCertificateValidationCode>
 
-export interface AccessCertificateValidationResult {
-  /** `true` when there are no errors; warnings do not affect validity */
-  valid: boolean
-  errors: AccessCertificateIssue[]
-  warnings: AccessCertificateIssue[]
-  /** The errors and warnings together, in the order they were found */
-  findings: AccessCertificateIssue[]
-}
+/** `valid` when none of the issues is an error; warnings do not affect validity */
+export type AccessCertificateValidationResult = ValidationResult<AccessCertificateIssue>
 
 const C = ACCESS_CERTIFICATE_VALIDATION_CODES
 
@@ -65,7 +68,7 @@ export function validateAccessCertificate(
   const issues: AccessCertificateIssue[] = []
   const add = (
     severity: AccessCertificateValidationSeverity,
-    code: AccessCertificateValidationCode,
+    code: Exclude<AccessCertificateValidationCode, typeof C.NOT_YET_VALID | typeof C.EXPIRED>,
     path: (string | number)[],
     message: string,
     requirement?: string
@@ -83,20 +86,22 @@ export function validateAccessCertificate(
   if (options.now !== false) {
     const now = options.now ?? new Date()
     if (now < certificate.notBefore) {
-      add(
-        'error',
-        C.NOT_YET_VALID,
-        ['certificate', 'notBefore'],
-        `Certificate is not valid before ${certificate.notBefore.toISOString()}`
-      )
+      issues.push({
+        severity: 'error',
+        code: C.NOT_YET_VALID,
+        path: ['certificate', 'notBefore'],
+        message: `Certificate is not valid before ${certificate.notBefore.toISOString()}`,
+        context: { validFrom: certificate.notBefore },
+      })
     }
     if (now > certificate.notAfter) {
-      add(
-        'error',
-        C.EXPIRED,
-        ['certificate', 'notAfter'],
-        `Certificate expired at ${certificate.notAfter.toISOString()}`
-      )
+      issues.push({
+        severity: 'error',
+        code: C.EXPIRED,
+        path: ['certificate', 'notAfter'],
+        message: `Certificate expired at ${certificate.notAfter.toISOString()}`,
+        context: { expiredAt: certificate.notAfter },
+      })
     }
   }
   if (certificate.basicConstraints?.cA) {
@@ -266,13 +271,7 @@ export function validateAccessCertificate(
     }
   }
 
-  const errors = issues.filter((i) => i.severity === 'error')
-  return {
-    valid: errors.length === 0,
-    errors,
-    warnings: issues.filter((i) => i.severity === 'warning'),
-    findings: issues,
-  }
+  return toValidationResult(issues)
 }
 
 /**
@@ -298,9 +297,10 @@ export function assertValidAccessCertificate(
 ): void {
   const result = validateAccessCertificate(accessCertificate, options)
   if (!result.valid) {
+    const errors = validationErrors(result)
     throw new AccessCertificateException(
-      `Invalid access certificate: ${result.errors.map((e) => e.message).join('; ')}`,
-      result.errors
+      `Invalid access certificate: ${errors.map((issue) => issue.message).join('; ')}`,
+      errors
     )
   }
 }

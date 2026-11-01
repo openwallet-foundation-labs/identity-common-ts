@@ -4,7 +4,14 @@
  * Runtime validation for ETSI TS 119 602 LoTE documents using Zod schemas.
  */
 
-import { type Finding, hasErrorFindings, schemaIssueToFinding } from '@owf/identity-common'
+import {
+  type ValidationResult as CommonValidationResult,
+  type SchemaIssueCode,
+  schemaIssueToValidationIssue,
+  toValidationResult,
+  type ValidationIssueOf,
+  validationErrors,
+} from '@owf/identity-common'
 import type z from 'zod'
 import { LoTEException } from './lote-exception'
 import {
@@ -32,58 +39,32 @@ export const LOTE_VALIDATION_CODES = {
 /** A profile validation code emitted by this validator */
 export type LoTEValidationCode = (typeof LOTE_VALIDATION_CODES)[keyof typeof LOTE_VALIDATION_CODES]
 
-/** A finding of a LoTE validation, with a zod issue code for schema issues */
-export type LoTEFinding = Finding<LoTEValidationCode | (string & {})>
+/** An issue of a LoTE validation, with a zod issue code for schema issues */
+export type LoTEValidationIssue = ValidationIssueOf<LoTEValidationCode | SchemaIssueCode>
 
-/**
- * Validation error detail
- */
-export interface ValidationError {
-  /** Path to the invalid field */
-  path: string
-  /** Error message */
-  message: string
-}
+/** Validation result, with all issues of the document */
+export type ValidationResult = CommonValidationResult<LoTEValidationIssue>
 
-/**
- * Validation result
- */
-export interface ValidationResult {
-  /** Whether the LoTE document is valid */
-  valid: boolean
-  /** List of validation errors (if invalid) */
-  errors: ValidationError[]
-  /**
-   * The problems as findings, with a code and with array indices as numbers in the path.
-   * Unlike `errors`, they carry no summary entry for the document as a whole.
-   */
-  findings: LoTEFinding[]
-}
-
-const toValidationError = (finding: LoTEFinding): ValidationError => ({
-  path: finding.path.join('.'),
-  message: finding.message,
-})
+const fromZodIssue = (issue: z.ZodError['issues'][number]): LoTEValidationIssue =>
+  schemaIssueToValidationIssue(issue) as LoTEValidationIssue
 
 /**
  * Validate a LoTE document against ETSI TS 119 602 schema
  *
  * @param loteDocument - The LoTE document to validate
- * @returns Validation result with errors if invalid
+ * @returns Validation result with the issues of the document
  *
  * @example
  * ```typescript
  * const result = validateLoTE(myLoTE);
  * if (!result.valid) {
- *   console.error('Validation errors:', result.errors);
+ *   console.error('Validation issues:', result.issues);
  * }
  * ```
  */
 export function validateLoTE(loteDocument: unknown): ValidationResult {
   const result = LoTEDocumentSchema.safeParse(loteDocument)
-  const findings = result.success ? [] : result.error.issues.map((issue) => schemaIssueToFinding(issue))
-
-  return { valid: !hasErrorFindings(findings), errors: findings.map(toValidationError), findings }
+  return toValidationResult(result.success ? [] : result.error.issues.map(fromZodIssue))
 }
 
 /**
@@ -95,7 +76,9 @@ export function validateLoTE(loteDocument: unknown): ValidationResult {
 export function assertValidLoTE(loteDocument: unknown): asserts loteDocument is LoTEDocument {
   const result = validateLoTE(loteDocument)
   if (!result.valid) {
-    const errorMessages = result.errors.map((e) => `${e.path}: ${e.message}`).join('\n')
+    const errorMessages = validationErrors(result)
+      .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+      .join('\n')
     throw new LoTEException(`Invalid LoTE document:\n${errorMessages}`)
   }
 }
@@ -145,7 +128,7 @@ function getDocumentLoTEType(loteDocument: unknown): string | undefined {
  *
  * @param loteDocument - The LoTE document to validate
  * @param profile - The profile(s) to validate against
- * @returns Validation result with errors if invalid
+ * @returns Validation result with the issues of the document
  */
 export function validateLoTEProfile(loteDocument: unknown, profile: LoTEProfile | LoTEProfile[]): ValidationResult {
   const profiles = Array.isArray(profile) ? profile : [profile]
@@ -157,40 +140,25 @@ export function validateLoTEProfile(loteDocument: unknown, profile: LoTEProfile 
   if (matchedProfile) {
     const result = profileConfig[matchedProfile].schema.safeParse(loteDocument)
 
-    if (result.success) {
-      return { valid: true, errors: [], findings: [] }
-    }
-
-    const findings = result.error.issues.map((issue) => ({
-      ...schemaIssueToFinding(issue),
-      message: `Profile ${matchedProfile}: ${issue.message}`,
-    }))
-    return {
-      valid: false,
-      errors: [
-        { path: 'LoTEType', message: `Document does not match profile ${matchedProfile}` },
-        ...findings.map(toValidationError),
-      ],
-      findings,
-    }
+    return toValidationResult(
+      result.success
+        ? []
+        : result.error.issues.map((issue) => ({
+            ...fromZodIssue(issue),
+            message: `Profile ${matchedProfile}: ${issue.message}`,
+          }))
+    )
   }
 
   // No requested profile matches the document's LoTEType.
-  const findings: LoTEFinding[] = profiles.map((p) => ({
-    severity: 'error',
-    code: LOTE_VALIDATION_CODES.UNEXPECTED_LOTE_TYPE,
-    path: ['LoTE', 'ListAndSchemeInformation', 'LoTEType'],
-    message: `Profile ${p}: LoTEType must be ${profileConfig[p].loTEType}`,
-  }))
-  return {
-    valid: false,
-    errors: [
-      {
-        path: 'LoTEType',
-        message: `Document does not match any of the specified profiles: ${profiles.join(', ')}`,
-      },
-      ...findings.map(toValidationError),
-    ],
-    findings,
-  }
+  return toValidationResult(
+    profiles.map(
+      (p): LoTEValidationIssue => ({
+        severity: 'error',
+        code: LOTE_VALIDATION_CODES.UNEXPECTED_LOTE_TYPE,
+        path: ['LoTE', 'ListAndSchemeInformation', 'LoTEType'],
+        message: `Profile ${p}: LoTEType must be ${profileConfig[p].loTEType}`,
+      })
+    )
+  )
 }

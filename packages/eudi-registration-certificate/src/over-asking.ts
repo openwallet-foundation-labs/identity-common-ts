@@ -6,9 +6,9 @@
  * 119 475 Table 9), which follow the shape of a DCQL Credential Query.
  */
 
-import { type Finding, hasErrorFindings } from '@owf/identity-common'
+import { toValidationResult, type ValidationIssue, type ValidationResult } from '@owf/identity-common'
 
-/** Codes of the findings of {@link checkOverAsking} */
+/** Codes of the issues of {@link checkOverAsking} */
 export const OVER_ASKING_CODES = {
   /** The query is not a DCQL query with a `credentials` array */
   INVALID_QUERY: 'invalid_query',
@@ -24,14 +24,11 @@ export const OVER_ASKING_CODES = {
 
 export type OverAskingCode = (typeof OVER_ASKING_CODES)[keyof typeof OVER_ASKING_CODES]
 
-export type OverAskingFinding = Finding<OverAskingCode>
+/** An issue of {@link checkOverAsking}, with a path into the DCQL query, e.g. `['credentials', 0, 'claims', 2]` */
+export type OverAskingIssue = ValidationIssue<OverAskingCode>
 
-export interface OverAskingResult {
-  /** `true` when the request asks for nothing beyond the registration */
-  valid: boolean
-  /** Findings with paths into the DCQL query, e.g. `['credentials', 0, 'claims', 2]` */
-  findings: OverAskingFinding[]
-}
+/** `valid` when the request asks for nothing beyond the registration */
+export type OverAskingResult = ValidationResult<OverAskingIssue>
 
 type ClaimPath = (string | number | null)[]
 type ClaimValue = string | number | boolean
@@ -127,11 +124,11 @@ export function checkOverAsking(
   query: unknown,
   registeredCredentials: readonly RegisteredCredential[] = []
 ): OverAskingResult {
-  const findings: OverAskingFinding[] = []
-  const result = (): OverAskingResult => ({ valid: !hasErrorFindings(findings), findings })
+  const issues: OverAskingIssue[] = []
+  const result = (): OverAskingResult => toValidationResult(issues)
 
   if (!isRecord(query) || !Array.isArray(query.credentials)) {
-    findings.push({
+    issues.push({
       severity: 'error',
       code: OVER_ASKING_CODES.INVALID_QUERY,
       path: ['credentials'],
@@ -143,7 +140,7 @@ export function checkOverAsking(
   query.credentials.forEach((credential: unknown, credentialIndex: number) => {
     const credentialPath = ['credentials', credentialIndex]
     if (!isRecord(credential) || typeof credential.format !== 'string') {
-      findings.push({
+      issues.push({
         severity: 'error',
         code: OVER_ASKING_CODES.INVALID_QUERY,
         path: credentialPath,
@@ -156,7 +153,7 @@ export function checkOverAsking(
     const sameFormat = registeredCredentials.filter((registered) => registered.format === credential.format)
     const matching = sameFormat.filter((registered) => metaCovered(credential.meta ?? {}, registered.meta))
     if (matching.length === 0) {
-      findings.push({
+      issues.push({
         severity: 'error',
         code: OVER_ASKING_CODES.CREDENTIAL_NOT_REGISTERED,
         path: sameFormat.length === 0 ? [...credentialPath, 'format'] : [...credentialPath, 'meta'],
@@ -172,7 +169,7 @@ export function checkOverAsking(
 
     const registeredClaims = matching.flatMap((registered) => registered.claim ?? registered.claims ?? [])
     if (matching.some((registered) => !(registered.claim ?? registered.claims))) {
-      findings.push({
+      issues.push({
         severity: 'warning',
         code: OVER_ASKING_CODES.CLAIMS_NOT_LISTED,
         path: [...credentialPath, 'claims'],
@@ -183,12 +180,12 @@ export function checkOverAsking(
 
     credential.claims.forEach((claim: unknown, claimIndex: number) => {
       const path = isRecord(claim) ? claimPath(claim as RequestedClaim) : undefined
-      const findingPath = [...credentialPath, 'claims', claimIndex]
+      const queryPath = [...credentialPath, 'claims', claimIndex]
       if (!path) {
-        findings.push({
+        issues.push({
           severity: 'error',
           code: OVER_ASKING_CODES.INVALID_QUERY,
-          path: findingPath,
+          path: queryPath,
           message: 'A claims query must have a path, or a namespace and a claim_name',
         })
         return
@@ -196,10 +193,10 @@ export function checkOverAsking(
 
       const covering = registeredClaims.filter((registered) => pathCovered(path, registered.path))
       if (covering.length === 0) {
-        findings.push({
+        issues.push({
           severity: 'error',
           code: OVER_ASKING_CODES.CLAIM_NOT_REGISTERED,
-          path: findingPath,
+          path: queryPath,
           message: `${label} asks for the claim ${JSON.stringify(path)}, which is not registered`,
         })
         return
@@ -212,10 +209,10 @@ export function checkOverAsking(
       )
       if (!allowed) {
         const registeredValues = covering.flatMap((registered) => registered.values ?? [])
-        findings.push({
+        issues.push({
           severity: 'error',
           code: OVER_ASKING_CODES.CLAIM_VALUES_NOT_REGISTERED,
-          path: [...findingPath, 'values'],
+          path: [...queryPath, 'values'],
           message: `${label} asks for the claim ${JSON.stringify(path)} with ${
             requestedValues ? `the values ${JSON.stringify(requestedValues)}` : 'any value'
           }, but only ${JSON.stringify(registeredValues)} are registered`,

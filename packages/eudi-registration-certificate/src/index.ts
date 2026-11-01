@@ -34,7 +34,7 @@ export {
   WRP_ENTITLEMENTS,
 } from './entitlements'
 // Over-asking
-export type { OverAskingCode, OverAskingFinding, OverAskingResult, RegisteredCredential } from './over-asking'
+export type { OverAskingCode, OverAskingIssue, OverAskingResult, RegisteredCredential } from './over-asking'
 export { checkOverAsking, OVER_ASKING_CODES } from './over-asking'
 // Schemas
 export {
@@ -74,7 +74,7 @@ export type {
   WRPRCPayload,
 } from './types'
 // Validators
-export type { ValidationError, ValidationResult, WRPRCFinding, WRPRCValidationCode } from './validator'
+export type { ValidationResult, WRPRCValidationCode, WRPRCValidationIssue } from './validator'
 export {
   assertValidWRPRC,
   assertValidWRPRCPayload,
