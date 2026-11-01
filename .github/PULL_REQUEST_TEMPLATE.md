@@ -20,7 +20,18 @@ Fixes #
 ## Packages Affected
 
 - [ ] `@owf/identity-common`
+- [ ] `@owf/crypto`
+- [ ] `@owf/cose`
+- [ ] `@owf/x509`
+- [ ] `@owf/token-status-list`
 - [ ] `@owf/openid-federation`
+- [ ] `@owf/eudi-access-certificate`
+- [ ] `@owf/eudi-attestation-schema`
+- [ ] `@owf/eudi-jades`
+- [ ] `@owf/eudi-lote`
+- [ ] `@owf/eudi-registration-certificate`
+- [ ] `@owf/eudi-sca`
+- [ ] `@owf/eudi-tl`
 - [ ] `@sd-jwt/core`
 - [ ] `@sd-jwt/sd-jwt-vc`
 - [ ] `@owf/mdoc`
