@@ -209,11 +209,16 @@ export class ServiceBuilder {
   }
 
   /**
-   * Add a service endpoint
+   * Add a service endpoint (service supply point): `addEndpoint(uri)` for a bare
+   * `{ uriValue }`, as the EC PID and wallet lists use, or `addEndpoint(type, uri)`.
    */
-  addEndpoint(type: string, uri: string): this {
+  addEndpoint(uri: string): this
+  addEndpoint(type: string | undefined, uri: string): this
+  addEndpoint(...args: [string] | [string | undefined, string]): this {
+    // On the number of arguments, so a JavaScript call addEndpoint(type, undefined) keeps its type
+    const [type, uriValue] = args.length === 1 ? [undefined, args[0]] : args
     this.info.ServiceSupplyPoints = this.info.ServiceSupplyPoints ?? []
-    this.info.ServiceSupplyPoints.push({ ServiceType: type, uriValue: uri })
+    this.info.ServiceSupplyPoints.push(type === undefined ? { uriValue } : { ServiceType: type, uriValue })
     return this
   }
 
