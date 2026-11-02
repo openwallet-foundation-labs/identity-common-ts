@@ -1311,4 +1311,63 @@ describe('dcql-query', () => {
       })
     )
   })
+
+  it('reports duplicate claim ids, and claims without id when there are claim sets', (_t) => {
+    const parse = () =>
+      DcqlQuery.parse({
+        credentials: [
+          {
+            id: 'pid',
+            format: 'dc+sd-jwt',
+            claims: [
+              { id: 'name', path: ['given_name'] },
+              { id: 'name', path: ['family_name'] },
+              { path: ['birthdate'] },
+            ],
+            claim_sets: [['name']],
+          },
+        ],
+      })
+
+    expect(parse).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'duplicate_claim_id',
+            path: ['credentials', 0, 'claims', 1, 'id'],
+            message: "The claim id 'name' is present more than once in claims",
+          },
+          {
+            severity: 'error',
+            code: 'missing',
+            path: ['credentials', 0, 'claims', 2, 'id'],
+            message: 'A claim needs an id when the credential query has claim_sets',
+          },
+        ],
+      })
+    )
+
+    // Without claim sets, a claim id is optional
+    expect(() =>
+      DcqlQuery.parse({ credentials: [{ id: 'pid', format: 'dc+sd-jwt', claims: [{ path: ['birthdate'] }] }] })
+    ).not.toThrow()
+  })
+
+  it('rejects an empty vct_values, which OpenID4VP 1.0 Appendix B.3.5 does not allow', (_t) => {
+    expect(() =>
+      DcqlQuery.parse({ credentials: [{ id: 'pid', format: 'dc+sd-jwt', meta: { vct_values: [] as never } }] })
+    ).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'empty_array',
+            path: ['credentials', 0, 'meta', 'vct_values'],
+            message: 'Array must be non-empty and have length of at least 1',
+          },
+        ],
+      })
+    )
+  })
 })

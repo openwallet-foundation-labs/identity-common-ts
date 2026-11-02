@@ -53,6 +53,8 @@ export const DCQL_VALIDATION_CODES = {
   DUPLICATE_CREDENTIAL_QUERY_ID: 'duplicate_credential_query_id',
   /** A credential set option refers to a credential query `id` that is not in `credentials` (OpenID4VP 1.0 Section 6.2) */
   UNKNOWN_CREDENTIAL_QUERY_ID: 'unknown_credential_query_id',
+  /** A claim `id` is present more than once in the `claims` of a credential query (OpenID4VP 1.0 Section 6.3) */
+  DUPLICATE_CLAIM_ID: 'duplicate_claim_id',
   /** A claim set refers to a claim `id` that is not in the `claims` of the credential query (OpenID4VP 1.0 Section 6.1) */
   UNKNOWN_CLAIM_ID: 'unknown_claim_id',
   /** An array that must not be empty is, e.g. `claims` */

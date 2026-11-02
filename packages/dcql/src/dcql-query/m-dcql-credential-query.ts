@@ -16,12 +16,32 @@ const claimsDescription = 'OPTIONAL. A non-empty array of objects as that specif
 const metaDescription =
   'OPTIONAL. An object defining additional properties requested by the Verifier that apply to the metadata and validity data of the Credential.'
 
-// OpenID4VP 1.0 Section 6.1: claim_sets contain identifiers for elements in claims
-function checkClaimSetIds(
-  credentialQuery: { claims?: { id?: string }[]; claim_sets?: string[][] },
-  ctx: z.RefinementCtx
-) {
-  const claimIds = new Set(credentialQuery.claims?.map((claim) => claim.id))
+function checkClaimIds(credentialQuery: { claims?: { id?: string }[]; claim_sets?: string[][] }, ctx: z.RefinementCtx) {
+  // OpenID4VP 1.0 Section 6.3: the id is REQUIRED if claim_sets is present, and the same id MUST NOT be present
+  // more than once within the claims array
+  const claimIds = new Set<string>()
+  credentialQuery.claims?.forEach(({ id }, index) => {
+    if (id === undefined) {
+      if (credentialQuery.claim_sets) {
+        addDcqlIssue(ctx, {
+          code: 'missing',
+          path: ['claims', index, 'id'],
+          message: 'A claim needs an id when the credential query has claim_sets',
+        })
+      }
+      return
+    }
+    if (claimIds.has(id)) {
+      addDcqlIssue(ctx, {
+        code: DCQL_VALIDATION_CODES.DUPLICATE_CLAIM_ID,
+        path: ['claims', index, 'id'],
+        message: `The claim id '${id}' is present more than once in claims`,
+      })
+    }
+    claimIds.add(id)
+  })
+
+  // OpenID4VP 1.0 Section 6.1: claim_sets contain identifiers for elements in claims
   credentialQuery.claim_sets?.forEach((claimSet, claimSetIndex) => {
     claimSet.forEach((claimId, index) => {
       if (claimIds.has(claimId)) return
@@ -88,11 +108,11 @@ export namespace DcqlCredentialQuery {
     claims: zNonEmptyArray(DcqlClaimsQuery.zW3cSdJwtVc).optional().describe(claimsDescription),
     meta: z
       .object({
-        vct_values: z
-          .array(z.string())
+        // OpenID4VP 1.0 Appendix B.3.5 requires a non-empty array, the drafts did not say
+        vct_values: zNonEmptyArray(z.string())
           .optional()
           .describe(
-            'OPTIONAL. An array of strings that specifies allowed values for the type of the requested Verifiable Credential.'
+            'OPTIONAL. A non-empty array of strings that specifies allowed values for the type of the requested Verifiable Credential.'
           ),
       })
       .optional()
@@ -134,7 +154,7 @@ export namespace DcqlCredentialQuery {
       ],
       { error: `Expected format to be one of 'mso_mdoc', 'dc+sd-jwt', 'vc+sd-jwt', 'jwt_vc_json' or 'ldp_vc'` }
     )
-    .superRefine(checkClaimSetIds)
+    .superRefine(checkClaimIds)
   export type Input = z.input<typeof zModel>
   export type Output = z.output<typeof zModel>
 
