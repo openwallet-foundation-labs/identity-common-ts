@@ -13,17 +13,17 @@ catalogs:
       specifier: ^2.4.0
       version: 2.4.0
     '@peculiar/asn1-schema':
-      specifier: ^2.11.0
-      version: 2.11.0
+      specifier: ^2.11.1
+      version: 2.11.1
     '@peculiar/asn1-x509':
-      specifier: ^2.11.0
-      version: 2.11.0
+      specifier: ^2.11.1
+      version: 2.11.1
     '@peculiar/asn1-x509-qualified':
-      specifier: ^2.11.0
-      version: 2.11.0
+      specifier: ^2.11.1
+      version: 2.11.1
     '@peculiar/asn1-x509-qualified-etsi':
-      specifier: ^2.11.0
-      version: 2.11.0
+      specifier: ^2.11.1
+      version: 2.11.1
     cbor-x:
       specifier: ^1.6.8
       version: 1.6.8
@@ -261,10 +261,10 @@ importers:
         version: link:../identity-common
       '@peculiar/asn1-schema':
         specifier: 'catalog:'
-        version: 2.11.0
+        version: 2.11.1
       '@peculiar/asn1-x509':
         specifier: 'catalog:'
-        version: 2.11.0
+        version: 2.11.1
       '@xmldom/xmldom':
         specifier: ^0.9.12
         version: 0.9.12
@@ -404,16 +404,16 @@ importers:
         version: link:../identity-common
       '@peculiar/asn1-schema':
         specifier: 'catalog:'
-        version: 2.11.0
+        version: 2.11.1
       '@peculiar/asn1-x509':
         specifier: 'catalog:'
-        version: 2.11.0
+        version: 2.11.1
       '@peculiar/asn1-x509-qualified':
         specifier: 'catalog:'
-        version: 2.11.0
+        version: 2.11.1
       '@peculiar/asn1-x509-qualified-etsi':
         specifier: 'catalog:'
-        version: 2.11.0
+        version: 2.11.1
       asn1js:
         specifier: ^4.0.0
         version: 4.0.0
@@ -901,6 +901,10 @@ packages:
     resolution: {integrity: sha512-8xh4avo53/vXO6UEv9yaoJ83hY581geaLTygf61NPIXP5AeIZCPjJhpTaYU23IZkG+NpLN/C9FYzWp7hphIT9A==}
     engines: {node: '>=14'}
 
+  '@peculiar/asn1-schema@2.11.1':
+    resolution: {integrity: sha512-jaU9OaCcbZUdyXx9hMETZB9xoNmxTGjOGFqd3cOwKFkpKnyKd9WxF3uqj4PvX4cyOMP9bSdHg5YyML2qtx/d/g==}
+    engines: {node: '>=14'}
+
   '@peculiar/asn1-x509-attr@2.11.0':
     resolution: {integrity: sha512-Fgvnd9REmLxEj/4cbDP54dNUNUXkzUksXLqEHqs1mHBuSRjSTCUSPM/WQIZYSvrdG7ND9CX1AQtPoIBekhgQSA==}
     engines: {node: '>=14'}
@@ -909,16 +913,16 @@ packages:
     resolution: {integrity: sha512-K6EnquTX3xJ2G+uLPFH0jVkh7W8y6eTzoCxvSoXAj0sWS5uvVB2PEvpBPdzY4+ytaedUM3x9ZVgX0AZKb316ew==}
     engines: {node: '>=14'}
 
-  '@peculiar/asn1-x509-qualified-etsi@2.11.0':
-    resolution: {integrity: sha512-StoNM1dIqk/I2yQ1Onr28jcU0L7KDWdQV9X6Uo6uuy/I40oIGYC85wWfY8n7J+mJ9wwjnKJzA1O5YZF0ldN5Kg==}
+  '@peculiar/asn1-x509-qualified-etsi@2.11.1':
+    resolution: {integrity: sha512-s/MKDklY1EZL5TNVkIIWJ9OauJGGtTlrH+VhwUY5GT/L2IPih0ihtZ3nzUumm6bxagwq4HjM+MJQDWmg2uqxlQ==}
     engines: {node: '>=14'}
 
-  '@peculiar/asn1-x509-qualified@2.11.0':
-    resolution: {integrity: sha512-7L99BtTZe4STHx53xycm8uRJFb1FFD5ABIPsXNSM4ZWFP26cKM4GD/XYLWjyUkxj4i+W1oJecRSUrj6FqohTAw==}
+  '@peculiar/asn1-x509-qualified@2.11.1':
+    resolution: {integrity: sha512-8h/M3Gv75aKxMixxoeeS4j1YfEGqi7qzKD+nky0LzP1kXbYtD/JJWiH8zzO0pAnuMX0Fg/zaRonzTopS5nXJ9w==}
     engines: {node: '>=14'}
 
-  '@peculiar/asn1-x509@2.11.0':
-    resolution: {integrity: sha512-J1sHAwGNlk+8J+FeR1eLVc6Gq0T9f9ITc3HWyPYgJraoW6U8AJuQiWVJ3SCEpltfTdpOY7fHdHT5oKAsbK/jww==}
+  '@peculiar/asn1-x509@2.11.1':
+    resolution: {integrity: sha512-SXU4/X6B3FquqQAN6ARI0bFDUV7+L1WlvPEPMKzEMkstd2D7UyM0r93fv241+OjdhqAKYGx5MvV3gzZMAp0APA==}
     engines: {node: '>=14'}
 
   '@peculiar/utils@2.0.3':
@@ -1505,10 +1509,6 @@ packages:
   argparse@3.0.3:
     resolution: {integrity: sha512-Sn98ftV3KfsO8xfLPHG6oT8y+b0yvbrLgZjgPDXsharNY15tTAjqIsIju4S32nl6/iEUNNE4v+yL2Zhm8ooP3w==}
 
-  asn1js@3.0.10:
-    resolution: {integrity: sha512-S2s3aOytiKdFRdulw2qPE51MzjzVOisppcVv7jVFR+Kw0kxwvFrDcYA0h7Ndqbmj0HkMIXYWaoj7fli8kgx1eg==}
-    engines: {node: '>=12.0.0'}
-
   asn1js@3.1.0:
     resolution: {integrity: sha512-HWYi1THkOqguCiO+vwj09ZkQFD2kKEsejYHAYCtX0D80WVdoDnvRc9IukXX/jeb0T9NRWJnRtqwdbHltnFjwXA==}
     engines: {node: '>=12.0.0'}
@@ -2078,10 +2078,6 @@ packages:
 
   pvtsutils@1.3.6:
     resolution: {integrity: sha512-PLgQXQ6H2FWCaeRak8vvk1GW462lMxB5s3Jm673N82zI4vqtVUPuZdffdZbPDFRoU8kAhItWFtPCWiPpp4/EDg==}
-
-  pvutils@1.1.5:
-    resolution: {integrity: sha512-KTqnxsgGiQ6ZAzZCVlJH5eOjSnvlyEgx1m8bkRJfOhmGRqfo5KLvmAlACQkrjEtOQ4B7wF9TdSLIs9O90MX9xA==}
-    engines: {node: '>=16.0.0'}
 
   pvutils@1.2.0:
     resolution: {integrity: sha512-BbubeCEyTuQjVMakvJQ/Sxbc93F2pwmbsxONT/ZRrwU7Ua38d8unYTwXpTVLAKJ4BDuH9IGztCjQcd/N/39Dvg==}
@@ -2889,30 +2885,30 @@ snapshots:
   '@peculiar/asn1-asym-key@2.11.0':
     dependencies:
       '@peculiar/asn1-pkcs8': 2.11.0
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
   '@peculiar/asn1-cms@2.11.0':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       '@peculiar/asn1-x509-attr': 2.11.0
       asn1js: 3.1.0
       tslib: 2.8.1
 
   '@peculiar/asn1-csr@2.11.0':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
   '@peculiar/asn1-ecc@2.11.0':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
@@ -2921,14 +2917,14 @@ snapshots:
       '@peculiar/asn1-cms': 2.11.0
       '@peculiar/asn1-pkcs8': 2.11.0
       '@peculiar/asn1-rsa': 2.11.0
-      '@peculiar/asn1-schema': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
   '@peculiar/asn1-pkcs8@2.11.0':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
@@ -2937,58 +2933,64 @@ snapshots:
       '@peculiar/asn1-cms': 2.11.0
       '@peculiar/asn1-pfx': 2.11.0
       '@peculiar/asn1-pkcs8': 2.11.0
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       '@peculiar/asn1-x509-attr': 2.11.0
       asn1js: 3.1.0
       tslib: 2.8.1
 
   '@peculiar/asn1-rsa@2.11.0':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
   '@peculiar/asn1-schema@2.11.0':
     dependencies:
       '@peculiar/utils': 2.0.3
-      asn1js: 3.0.10
+      asn1js: 3.1.0
+      tslib: 2.8.1
+
+  '@peculiar/asn1-schema@2.11.1':
+    dependencies:
+      '@peculiar/utils': 2.0.3
+      asn1js: 3.1.0
       tslib: 2.8.1
 
   '@peculiar/asn1-x509-attr@2.11.0':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
   '@peculiar/asn1-x509-post-quantum@2.11.0':
     dependencies:
       '@peculiar/asn1-asym-key': 2.11.0
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
-  '@peculiar/asn1-x509-qualified-etsi@2.11.0':
+  '@peculiar/asn1-x509-qualified-etsi@2.11.1':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
-  '@peculiar/asn1-x509-qualified@2.11.0':
+  '@peculiar/asn1-x509-qualified@2.11.1':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-x509': 2.11.1
       asn1js: 3.1.0
       tslib: 2.8.1
 
-  '@peculiar/asn1-x509@2.11.0':
+  '@peculiar/asn1-x509@2.11.1':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.0
+      '@peculiar/asn1-schema': 2.11.1
       '@peculiar/utils': 2.0.3
-      asn1js: 3.0.10
+      asn1js: 3.1.0
       tslib: 2.8.1
 
   '@peculiar/utils@2.0.3':
@@ -3005,7 +3007,7 @@ snapshots:
       '@peculiar/asn1-pkcs9': 2.11.0
       '@peculiar/asn1-rsa': 2.11.0
       '@peculiar/asn1-schema': 2.11.0
-      '@peculiar/asn1-x509': 2.11.0
+      '@peculiar/asn1-x509': 2.11.1
       '@peculiar/asn1-x509-post-quantum': 2.11.0
       pvtsutils: 1.3.6
       tslib: 2.8.1
@@ -3331,12 +3333,6 @@ snapshots:
   argparse@2.0.1: {}
 
   argparse@3.0.3: {}
-
-  asn1js@3.0.10:
-    dependencies:
-      pvtsutils: 1.3.6
-      pvutils: 1.1.5
-      tslib: 2.8.1
 
   asn1js@3.1.0:
     dependencies:
@@ -3986,8 +3982,6 @@ snapshots:
   pvtsutils@1.3.6:
     dependencies:
       tslib: 2.8.1
-
-  pvutils@1.1.5: {}
 
   pvutils@1.2.0: {}
 
