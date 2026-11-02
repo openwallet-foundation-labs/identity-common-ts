@@ -10,6 +10,7 @@ export {
 // Exception
 export { LoTEException } from './lote-exception'
 // Profiles
+export type { LoTEProfileValidationOptions, LoTEValidationMode } from './profiles'
 export {
   EUEAAProvidersListSchema,
   EUPIDProvidersListSchema,
@@ -17,10 +18,13 @@ export {
   EUWalletProvidersListSchema,
   EUWRPACProvidersListSchema,
   EUWRPRCProvidersListSchema,
+  LOTE_TYPES,
   mDLProvidersListSchema,
 } from './profiles'
 // Schemas
 export {
+  CompatLoTEDocumentSchema,
+  CompatPolicyOrLegalNoticeListSchema,
   hasDigitalIdentity,
   JWKPublicKeySchema,
   ListAndSchemeInformationSchema,
@@ -55,6 +59,7 @@ export {
   updateLoTEVersion,
 } from './signer'
 export type {
+  CompatLoTEDocument,
   JWKPublicKey,
   ListAndSchemeInformation,
   // Localized values
@@ -94,5 +99,10 @@ export type {
   X509CertificateRef,
 } from './types'
 // Validator
-export type { ValidationError, ValidationResult } from './validator'
+export type {
+  LoTEProfileDocument,
+  LoTEProfileValidationResult,
+  ValidationError,
+  ValidationResult,
+} from './validator'
 export { assertValidLoTE, LoTEProfile, validateLoTE, validateLoTEProfile } from './validator'

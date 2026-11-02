@@ -10,6 +10,7 @@
 import type { Signer } from '@owf/crypto'
 import type { z } from 'zod'
 import type {
+  CompatLoTEDocumentSchema,
   JWKPublicKeySchema,
   ListAndSchemeInformationSchema,
   LocalizedStringSchema,
@@ -93,6 +94,8 @@ export type ListAndSchemeInformation = z.infer<typeof ListAndSchemeInformationSc
 
 export type LoTE = z.infer<typeof LoTESchema>
 export type LoTEDocument = z.infer<typeof LoTEDocumentSchema>
+/** A LoTE document that `validateLoTE` accepts in compat mode */
+export type CompatLoTEDocument = z.infer<typeof CompatLoTEDocumentSchema>
 
 // ============================================================================
 // Signed LoTE Types
