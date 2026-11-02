@@ -108,6 +108,7 @@ export type {
 } from './validator'
 export {
   assertValidLoTE,
+  getNotifiedTrustedEntities,
   LOTE_VALIDATION_CODES,
   LoTEProfile,
   validateLoTE,
