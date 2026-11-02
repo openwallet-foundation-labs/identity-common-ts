@@ -286,21 +286,32 @@ if (result.valid && result.loteType === LOTE_TYPES.EUPubEAAProvidersList) {
 
 Options:
 
-- `mode`: `strict` (default) validates the list exactly as the profile defines it. `compat` also accepts deviations of lists in use that don't change who is trusted. The table below lists them, together with `allowedTerritories`, which applies in either mode.
-- `allowedTerritories`: the accepted `SchemeTerritory` values, `['EU']` by default. Pass the territory of a national list of an EU type, such as `['DE']`.
+- `mode`: `strict` (default) validates the list exactly as the profile defines it. `compat` also accepts deviations of lists in use that don't change who is trusted. The table below lists them.
+- `allowedTerritories`: compat mode only. The accepted `SchemeTerritory` values, `['EU']` by default. Pass the territory of a national list of an EU type, such as `['DE']`. In strict mode the territory must be `EU` (TS 119 602 D to I), and passing `allowedTerritories` throws a `LoTEException`.
 
 | What | Profile(s) | Notes |
 | --- | --- | --- |
 | A `LoTELegalNotice` that is an array of localized URIs | All, and `validateLoTE` | The German EUDI Wallet sandbox lists |
 | A `PolicyOrLegalNotice` item with both `LoTEPolicy` and `LoTELegalNotice` | All, and `validateLoTE` | The German EUDI Wallet sandbox lists |
 | A `ServiceStatus` of `http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified`, with an optional `StatusStartingTime` | EU PID Providers List | No profile defines this status. The German PID Providers List sets it |
-| A `SchemeTerritory` other than `EU` | All | Only the values passed in `allowedTerritories`, such as `['DE']`. Works in strict mode too |
+| A `SchemeTerritory` other than `EU` | All | Only the values passed in `allowedTerritories`, such as `['DE']` |
 
-A Pub-EAA Providers List gives every service a `ServiceStatus` (TS 119 602 H), and a withdrawn provider stays listed with `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn`. The list is still valid: only trust services with `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified`.
+A Pub-EAA Providers List gives every service a `ServiceStatus` (TS 119 602 H), and a withdrawn provider stays listed with `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn`. The list is still valid: only trust services with `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified`. The valid result of a Pub-EAA Providers List has the trusted entities with only their notified services as `notifiedTrustedEntities`.
 
 ```typescript
 // The German EUDI Wallet PID Providers List
 validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList, { mode: 'compat', allowedTerritories: ['DE'] });
+```
+
+#### `getNotifiedTrustedEntities(lote): TrustedEntity[]`
+
+Returns the trusted entities of a list validated with `validateLoTEProfile`, with only their notified services. It leaves out withdrawn services, and entities with no notified service left. A service without a `ServiceStatus` is notified, as in the profiles that don't define one.
+
+```typescript
+const result = validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList);
+if (result.valid) {
+  const trustedEntities = getNotifiedTrustedEntities(result.lote);
+}
 ```
 
 ### Builders
