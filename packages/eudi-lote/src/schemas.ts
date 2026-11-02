@@ -291,3 +291,26 @@ export const LoTESchema = z.object({
 export const LoTEDocumentSchema = z.object({
   LoTE: LoTESchema,
 })
+
+/**
+ * The `PolicyOrLegalNotice` that lists in use publish: a `LoTELegalNotice` that is an array of
+ * localized URIs, and items that carry both keys (the German EUDI Wallet sandbox lists).
+ */
+export const CompatPolicyOrLegalNoticeListSchema = z
+  .array(
+    PolicyOrLegalNoticeSchema.extend({
+      LoTELegalNotice: z.union([z.string(), LocalizedStringSchema, z.array(LocalizedURISchema)]).optional(),
+    }).refine((item) => item.LoTEPolicy !== undefined || item.LoTELegalNotice !== undefined, {
+      message: 'An item needs LoTEPolicy or LoTELegalNotice',
+    })
+  )
+  .min(1)
+
+/** `LoTEDocumentSchema` with the `PolicyOrLegalNotice` of `CompatPolicyOrLegalNoticeListSchema` */
+export const CompatLoTEDocumentSchema = LoTEDocumentSchema.extend({
+  LoTE: LoTESchema.extend({
+    ListAndSchemeInformation: ListAndSchemeInformationSchema.extend({
+      PolicyOrLegalNotice: CompatPolicyOrLegalNoticeListSchema.optional(),
+    }),
+  }),
+})

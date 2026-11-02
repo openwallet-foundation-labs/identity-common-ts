@@ -56,17 +56,18 @@ This is a monorepo managed with [pnpm workspaces](https://pnpm.io/workspaces). T
 identity-common-ts/
 ├── packages/                    # All publishable packages
 │   ├── identity-common/         # Core identity utilities (base package)
+│   ├── crypto/                  # Crypto implementation based on Web Crypto (@owf/crypto)
 │   ├── jose/                    # JOSE/JWT implementation (planned)
-│   ├── cose/                    # COSE/CWT implementation (planned)
-│   ├── x509/                    # X.509 certificate utilities (planned)
-│   ├── token-status-list/       # JWT/CWT Token Status List (planned)
+│   ├── cose/                    # COSE/CWT implementation (@owf/cose)
+│   ├── x509/                    # X.509 certificate utilities (@owf/x509)
+│   ├── token-status-list/       # JWT/CWT Token Status List (@owf/token-status-list)
 │   ├── openid-federation/       # OpenID Federation 1.0 (@owf/openid-federation)
 │   ├── sd-jwt-*/                # SD-JWT and SD-JWT VC packages (@sd-jwt/*)
 │   ├── mdoc/                    # ISO/IEC 18013-5 mDOC and mDL (@owf/mdoc)
 │   ├── dcql/                    # Digital Credentials Query Language (dcql)
 │   ├── oauth2/                  # OAuth 2.0 (@openid4vc/oauth2)
 │   ├── openid4vc*/              # OpenID4VCI, OpenID4VP and shared utilities (@openid4vc/*)
-│   └── eudi-*/                  # EUDI-specific packages (planned)
+│   └── eudi-*/                  # EUDI-specific packages (@owf/eudi-*)
 ├── examples/                    # Runnable examples, grouped by topic (e.g. examples/sd-jwt)
 ├── docs/sd-jwt/                 # sdjwt.js.org landing page (deployed to GitHub Pages)
 ├── tests/                       # Integration tests
@@ -78,7 +79,7 @@ identity-common-ts/
 
 Packages are organized into six main categories:
 
-1. **Core Identity Utilities** (`@owf/identity-*`)
+1. **Core Identity Utilities** (`@owf/*`, e.g. `@owf/identity-common`, `@owf/crypto`, `@owf/x509`)
    - Generic, reusable utilities for any identity solution
    - Platform agnostic (Node.js, browsers, React Native)
    - Minimal dependencies
@@ -352,13 +353,13 @@ pnpm test
 pnpm test --watch
 
 # Run tests for a specific package
-pnpm test --filter @owf/my-package
+pnpm test packages/my-package
 ```
 
 ### Writing Tests
 
 - Place tests in `src/__tests__/` within each package
-- Use `.test.mts` extension for test files
+- Use the `.test.mts` extension in new packages. In an existing package, use the extension its tests already use (some use `.test.ts`)
 - Test public API behavior, not implementation details
 - Include edge cases and error conditions
 
@@ -394,7 +395,7 @@ Follow the prompts to:
 
 - Adding new features (minor)
 - Fixing bugs (patch)
-- Breaking changes (major)
+- Breaking changes (minor for packages below 1.0, which is all of them except `dcql`; major for `dcql`)
 - Documentation improvements that affect the published package (patch)
 
 **When NOT to create a changeset:**
