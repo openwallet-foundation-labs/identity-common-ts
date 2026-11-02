@@ -15,9 +15,21 @@ describe('a cose structure that does not match its schema', () => {
     expect(() => CwtPayload.decode(invalidClaims())).toThrow(ValidationError)
   })
 
-  it('is rejected with the issues worded by the shared error map, naming the claim', () => {
+  it('is rejected with the issues, each at the claim it is about', () => {
     expect(() => CwtPayload.decode(invalidClaims())).toThrow(
-      'Error decoding CwtPayload\n✖ Expected number, received string at "ExpirationTime (4)"'
+      expect.objectContaining({
+        message: 'Error decoding CwtPayload\n  - ExpirationTime (4): expected number, received string (invalid_type)',
+        issues: [
+          {
+            severity: 'error',
+            code: 'invalid_type',
+            path: [4],
+            pathLabels: ['ExpirationTime (4)'],
+            message: 'expected number, received string',
+            context: { expected: 'number' },
+          },
+        ],
+      })
     )
   })
 })
@@ -35,9 +47,9 @@ describe('a cose structure that cannot be encoded', () => {
     expect(() => unencodable().encode()).toThrow(ValidationError)
   })
 
-  it('is rejected with the issues worded by the shared error map, naming the claim', () => {
+  it('is rejected with the issues, each at the claim it is about', () => {
     expect(() => unencodable().encode()).toThrow(
-      'Error encoding CwtPayload\n✖ Expected number, received string at "ExpirationTime (4)"'
+      'Error encoding CwtPayload\n  - ExpirationTime (4): expected number, received string'
     )
   })
 })

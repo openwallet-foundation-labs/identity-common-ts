@@ -271,7 +271,7 @@ Removes an entity by name.
 
 #### `validateLote(lote, { mode? }): ValidationResult`
 
-Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns `{ valid, issues }`, where each issue has a `severity`, a `code`, a `path` into the document and a `message`. Schema issues have a code of `SCHEMA_VALIDATION_CODES` from `@owf/identity-common`, such as `missing` or `invalid_value`, and the profile checks one of `LOTE_VALIDATION_CODES`. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
+Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns `{ valid, issues }`, where each issue has a `severity`, a `code`, a `path` into the document and a `message`. Schema issues have a code of `SCHEMA_VALIDATION_CODES` from `@owf/identity-common`, such as `missing_value` or `invalid_value`, and the profile checks one of `LOTE_VALIDATION_CODES`. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
 
 When valid, the result has the document as `lote`: a `LoteDocument`, or a `CompatLoteDocument` in compat mode. A `CompatLoteDocument` is not a `LoteDocument`, as its `LoTELegalNotice` can be an array.
 

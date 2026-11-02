@@ -255,7 +255,7 @@ for (const issue of result.issues) {
 }
 ```
 
-- The query is parsed and validated with the [`dcql`](../dcql) library. A query it rejects gets its issues, at their location in the query and with a code of `DCQL_VALIDATION_CODES`, such as `duplicate_credential_query_id`, or a schema code, such as `missing`. A claims query without `path` (the `namespace` and `claim_name` form of earlier OpenID4VP drafts) gives an `invalid_query` issue.
+- The query is parsed and validated with the [`dcql`](../dcql) library. A query it rejects gets its issues, at their location in the query and with a code of `DCQL_VALIDATION_CODES`, such as `duplicate_credential_query_id`, or a schema code, such as `missing_value`. A claims query without `path` (the `namespace` and `claim_name` form of earlier OpenID4VP drafts) gives an `invalid_query` issue.
 - A requested credential needs a registered one of the same `format` whose `meta` it stays within: every requested `vct_values` or `type_values` entry is registered, and `doctype_value` is the same.
 - A requested claim needs a registered claim with the same path or a parent path, as registering `address` covers `address.locality`. `null` in a registered path covers every array element. A registered claim with `values` only allows requests for some of these values.
 - A credential query without `claims` asks for no selectively disclosable claims, so only its credential is checked.

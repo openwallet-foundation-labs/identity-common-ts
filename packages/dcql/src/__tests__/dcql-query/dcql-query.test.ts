@@ -1217,9 +1217,10 @@ describe('dcql-query', () => {
           },
           {
             severity: 'error',
-            code: 'missing',
+            code: 'missing_value',
             path: ['credentials', 1, 'id'],
-            message: 'Invalid input: expected string, received undefined',
+            message: 'expected string, received undefined',
+            context: { expected: 'string' },
           },
           {
             severity: 'error',
@@ -1233,7 +1234,7 @@ describe('dcql-query', () => {
             code: 'invalid_value',
             path: ['credentials', 2, 'format'],
             message: "Expected format to be one of 'mso_mdoc', 'dc+sd-jwt', 'vc+sd-jwt', 'jwt_vc_json' or 'ldp_vc'",
-            context: {},
+            context: { allowed: ['mso_mdoc', 'jwt_vc_json', 'ldp_vc', 'dc+sd-jwt', 'vc+sd-jwt'] },
           },
         ],
       })
@@ -1340,9 +1341,10 @@ describe('dcql-query', () => {
           },
           {
             severity: 'error',
-            code: 'missing',
+            code: 'missing_value',
             path: ['credentials', 0, 'claims', 2, 'id'],
             message: 'A claim needs an id when the credential query has claim_sets',
+            context: { expected: 'string' },
           },
         ],
       })
