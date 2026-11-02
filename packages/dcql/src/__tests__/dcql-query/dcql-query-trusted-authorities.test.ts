@@ -242,16 +242,41 @@ describe('dcql-query trusted authorities', () => {
                 {
                   success: false,
                   trusted_authority_index: 0,
-                  issues: {
-                    type: ["Expected trusted authority type to be 'aki' but received 'openid_federation'"],
-                    values: [
-                      "Expected one of the trusted authority values to be 's9tIpPmhxdiuNkHMEWNpYim8S8Y' | 'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA' but received 'https://federation.com'",
-                    ],
-                  },
-                  output: {
-                    type: 'openid_federation',
-                    values: ['https://federation.com'],
-                  },
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'trusted_authority_mismatch',
+                      path: ['type'],
+                      message: "Expected trusted authority type to be 'aki' but received 'openid_federation'",
+                      context: {
+                        actual: { type: 'openid_federation', values: ['https://federation.com'] },
+                        expected: {
+                          type: 'aki',
+                          values: [
+                            's9tIpPmhxdiuNkHMEWNpYim8S8Y',
+                            'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA',
+                          ],
+                        },
+                      },
+                    },
+                    {
+                      severity: 'error',
+                      code: 'trusted_authority_mismatch',
+                      path: ['values'],
+                      message:
+                        "Expected one of the trusted authority values to be 's9tIpPmhxdiuNkHMEWNpYim8S8Y' | 'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA' but received 'https://federation.com'",
+                      context: {
+                        actual: { type: 'openid_federation', values: ['https://federation.com'] },
+                        expected: {
+                          type: 'aki',
+                          values: [
+                            's9tIpPmhxdiuNkHMEWNpYim8S8Y',
+                            'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA',
+                          ],
+                        },
+                      },
+                    },
+                  ],
                 },
               ],
             },
@@ -303,16 +328,41 @@ describe('dcql-query trusted authorities', () => {
                 {
                   success: false,
                   trusted_authority_index: 0,
-                  issues: {
-                    type: ["Expected trusted authority type to be 'aki' but received 'openid_federation'"],
-                    values: [
-                      "Expected one of the trusted authority values to be 's9tIpPmhxdiuNkHMEWNpYim8S8Y' | 'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA' but received 'https://federation.com'",
-                    ],
-                  },
-                  output: {
-                    type: 'openid_federation',
-                    values: ['https://federation.com'],
-                  },
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'trusted_authority_mismatch',
+                      path: ['type'],
+                      message: "Expected trusted authority type to be 'aki' but received 'openid_federation'",
+                      context: {
+                        actual: { type: 'openid_federation', values: ['https://federation.com'] },
+                        expected: {
+                          type: 'aki',
+                          values: [
+                            's9tIpPmhxdiuNkHMEWNpYim8S8Y',
+                            'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA',
+                          ],
+                        },
+                      },
+                    },
+                    {
+                      severity: 'error',
+                      code: 'trusted_authority_mismatch',
+                      path: ['values'],
+                      message:
+                        "Expected one of the trusted authority values to be 's9tIpPmhxdiuNkHMEWNpYim8S8Y' | 'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA' but received 'https://federation.com'",
+                      context: {
+                        actual: { type: 'openid_federation', values: ['https://federation.com'] },
+                        expected: {
+                          type: 'aki',
+                          values: [
+                            's9tIpPmhxdiuNkHMEWNpYim8S8Y',
+                            'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA',
+                          ],
+                        },
+                      },
+                    },
+                  ],
                 },
               ],
             },
@@ -367,10 +417,25 @@ describe('dcql-query trusted authorities', () => {
                 {
                   success: false,
                   trusted_authority_index: 0,
-                  issues: {
-                    root: ["Expected trusted authority object with type 'aki' to be defined, but received undefined"],
-                  },
-                  output: undefined,
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'trusted_authority_mismatch',
+                      path: [],
+                      message:
+                        "Expected trusted authority object with type 'aki' to be defined, but received undefined",
+                      context: {
+                        actual: undefined,
+                        expected: {
+                          type: 'aki',
+                          values: [
+                            's9tIpPmhxdiuNkHMEWNpYim8S8Y',
+                            'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA',
+                          ],
+                        },
+                      },
+                    },
+                  ],
                 },
               ],
             },
@@ -422,10 +487,25 @@ describe('dcql-query trusted authorities', () => {
                 {
                   success: false,
                   trusted_authority_index: 0,
-                  issues: {
-                    root: ["Expected trusted authority object with type 'aki' to be defined, but received undefined"],
-                  },
-                  output: undefined,
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'trusted_authority_mismatch',
+                      path: [],
+                      message:
+                        "Expected trusted authority object with type 'aki' to be defined, but received undefined",
+                      context: {
+                        actual: undefined,
+                        expected: {
+                          type: 'aki',
+                          values: [
+                            's9tIpPmhxdiuNkHMEWNpYim8S8Y',
+                            'UVVJUkVELiBBIHN0cmluZyB1bmlxdWVseSBpZGVudGlmeWluZyB0aGUgdHlwZSA',
+                          ],
+                        },
+                      },
+                    },
+                  ],
                 },
               ],
             },

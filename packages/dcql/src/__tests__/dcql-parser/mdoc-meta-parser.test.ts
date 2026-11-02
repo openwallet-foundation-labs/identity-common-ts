@@ -1,4 +1,3 @@
-import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
 import { getMetaParser } from '../../dcql-parser/dcql-meta-query-result.js'
 import type { DcqlCredentialQuery } from '../../dcql-query/index.js'
@@ -31,7 +30,7 @@ const sdJwtCredentialExample = {
 describe('Mdoc Meta Parser', () => {
   it('meta with doctype', () => {
     const parser = getMetaParser(metaExample)
-    const res = v.parse(parser, credentialExample)
+    const res = parser.parse(credentialExample)
 
     expect(res).toEqual({
       cryptographic_holder_binding: true,
@@ -42,15 +41,15 @@ describe('Mdoc Meta Parser', () => {
 
   it('shows error for invalid format', () => {
     const parser = getMetaParser(metaExample)
-    const res = v.safeParse(parser, sdJwtCredentialExample)
+    const res = parser.safeParse(sdJwtCredentialExample)
 
-    expect(res.issues?.[0].message).toEqual("Expected credential format to be 'mso_mdoc' but received 'dc+sd-jwt'")
+    expect(res.error?.issues[0].message).toEqual("Expected credential format to be 'mso_mdoc' but received 'dc+sd-jwt'")
   })
 
   it('shows error for invalid doctype', () => {
     const parser = getMetaParser(metaExample)
-    const res = v.safeParse(parser, { ...credentialExample, doctype: 'something-else' })
+    const res = parser.safeParse({ ...credentialExample, doctype: 'something-else' })
 
-    expect(res.issues?.[0].message).toEqual("Expected doctype to be 'something' but received 'something-else'")
+    expect(res.error?.issues[0].message).toEqual("Expected doctype to be 'something' but received 'something-else'")
   })
 })

@@ -154,10 +154,20 @@ describe('DCQL presentation with claim sets', () => {
                   {
                     claim_set_index: 1,
                     success: false,
-                    issues: {
-                      given_name: ["Expected claim 'given_name' to be defined"],
-                      family_name: ["Expected claim 'family_name' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['given_name'],
+                        message: "Expected claim 'given_name' to be defined",
+                      },
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['family_name'],
+                        message: "Expected claim 'family_name' to be defined",
+                      },
+                    ],
                     failed_claim_indexes: [0, 1],
                     valid_claim_indexes: undefined,
                   },
@@ -189,21 +199,29 @@ describe('DCQL presentation with claim sets', () => {
                 failed_claims: [
                   {
                     success: false,
-                    issues: {
-                      given_name: ["Expected claim 'given_name' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['given_name'],
+                        message: "Expected claim 'given_name' to be defined",
+                      },
+                    ],
                     claim_index: 0,
                     claim_id: 'a',
-                    output: {},
                   },
                   {
                     success: false,
-                    issues: {
-                      family_name: ["Expected claim 'family_name' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['family_name'],
+                        message: "Expected claim 'family_name' to be defined",
+                      },
+                    ],
                     claim_index: 1,
                     claim_id: 'b',
-                    output: {},
                   },
                 ],
               },
@@ -284,9 +302,14 @@ describe('DCQL presentation with claim sets', () => {
                 failed_claim_sets: [
                   {
                     success: false,
-                    issues: {
-                      tax_id_code: ["Expected claim 'tax_id_code' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['tax_id_code'],
+                        message: "Expected claim 'tax_id_code' to be defined",
+                      },
+                    ],
                     claim_set_index: 0,
                     failed_claim_indexes: [2],
                     valid_claim_indexes: undefined,
@@ -332,12 +355,16 @@ describe('DCQL presentation with claim sets', () => {
                 failed_claims: [
                   {
                     success: false,
-                    issues: {
-                      tax_id_code: ["Expected claim 'tax_id_code' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['tax_id_code'],
+                        message: "Expected claim 'tax_id_code' to be defined",
+                      },
+                    ],
                     claim_index: 2,
                     claim_id: 'c',
-                    output: {},
                   },
                 ],
               },
@@ -430,9 +457,14 @@ describe('DCQL presentation with claim sets', () => {
                 failed_claim_sets: [
                   {
                     success: false,
-                    issues: {
-                      tax_id_code: ["Expected claim 'tax_id_code' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['tax_id_code'],
+                        message: "Expected claim 'tax_id_code' to be defined",
+                      },
+                    ],
                     claim_set_index: 0,
                     failed_claim_indexes: [2],
                     valid_claim_indexes: undefined,
@@ -478,12 +510,16 @@ describe('DCQL presentation with claim sets', () => {
                 failed_claims: [
                   {
                     success: false,
-                    issues: {
-                      tax_id_code: ["Expected claim 'tax_id_code' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['tax_id_code'],
+                        message: "Expected claim 'tax_id_code' to be defined",
+                      },
+                    ],
                     claim_index: 2,
                     claim_id: 'c',
-                    output: {},
                   },
                 ],
               },
@@ -586,9 +622,14 @@ describe('DCQL presentation with claim sets', () => {
                 failed_claim_sets: [
                   {
                     success: false,
-                    issues: {
-                      tax_id_code: ["Expected claim 'tax_id_code' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['tax_id_code'],
+                        message: "Expected claim 'tax_id_code' to be defined",
+                      },
+                    ],
                     claim_set_index: 0,
                     failed_claim_indexes: [2],
                     valid_claim_indexes: undefined,
@@ -634,12 +675,16 @@ describe('DCQL presentation with claim sets', () => {
                 failed_claims: [
                   {
                     success: false,
-                    issues: {
-                      tax_id_code: ["Expected claim 'tax_id_code' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['tax_id_code'],
+                        message: "Expected claim 'tax_id_code' to be defined",
+                      },
+                    ],
                     claim_index: 2,
                     claim_id: 'c',
-                    output: {},
                   },
                 ],
               },
@@ -754,9 +799,14 @@ describe('DCQL presentation with claim sets', () => {
                 failed_claim_sets: [
                   {
                     success: false,
-                    issues: {
-                      tax_id_code: ["Expected claim 'tax_id_code' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['tax_id_code'],
+                        message: "Expected claim 'tax_id_code' to be defined",
+                      },
+                    ],
                     claim_set_index: 0,
                     failed_claim_indexes: [2],
                     valid_claim_indexes: undefined,
@@ -802,12 +852,16 @@ describe('DCQL presentation with claim sets', () => {
                 failed_claims: [
                   {
                     success: false,
-                    issues: {
-                      tax_id_code: ["Expected claim 'tax_id_code' to be defined"],
-                    },
+                    issues: [
+                      {
+                        severity: 'error',
+                        code: 'claim_missing',
+                        path: ['tax_id_code'],
+                        message: "Expected claim 'tax_id_code' to be defined",
+                      },
+                    ],
                     claim_index: 2,
                     claim_id: 'c',
-                    output: {},
                   },
                 ],
               },
@@ -827,14 +881,15 @@ describe('DCQL presentation with claim sets', () => {
               },
               meta: {
                 success: false,
-                issues: {
-                  vct: ["Expected vct to be 'SomeRandomVct' but received 'PersonIdentificationData'"],
-                },
-                output: {
-                  cryptographic_holder_binding: true,
-                  credential_format: 'vc+sd-jwt',
-                  vct: 'PersonIdentificationData',
-                },
+                issues: [
+                  {
+                    severity: 'error',
+                    code: 'vct_mismatch',
+                    path: ['vct'],
+                    message: "Expected vct to be 'SomeRandomVct' but received 'PersonIdentificationData'",
+                    context: { actual: 'PersonIdentificationData', expected: ['SomeRandomVct'] },
+                  },
+                ],
               },
               claims: {
                 success: true,
@@ -923,16 +978,15 @@ describe('DCQL presentation with claim sets', () => {
     expect(
       presentationQueryResult.credential_matches['8c791a1f-12b4-41fe-a892-236c2887fa8e'].failed_credentials?.[0].meta
     ).toEqual({
-      issues: {
-        cryptographic_holder_binding: [
-          "Expected cryptographic_holder_binding to be true (because credential query '8c791a1f-12b4-41fe-a892-236c2887fa8e' requires cryptographic holder binding), but received false",
-        ],
-      },
-      output: {
-        credential_format: 'vc+sd-jwt',
-        cryptographic_holder_binding: false,
-        vct: 'PersonIdentificationData',
-      },
+      issues: [
+        {
+          severity: 'error',
+          code: 'cryptographic_holder_binding_required',
+          path: ['cryptographic_holder_binding'],
+          message:
+            "Expected cryptographic_holder_binding to be true (because credential query '8c791a1f-12b4-41fe-a892-236c2887fa8e' requires cryptographic holder binding), but received false",
+        },
+      ],
       success: false,
     })
   })

@@ -50,6 +50,7 @@
     "build": "tsdown src/index.ts --format esm --dts --sourcemap"
   },
   "dependencies": {
-    "valibot": "^1.4.2"
+    "@owf/identity-common": "workspace:^",
+    "zod": "catalog:"
   }
 }

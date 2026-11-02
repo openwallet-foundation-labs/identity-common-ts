@@ -6,12 +6,19 @@
  * 119 475 Table 9), which follow the shape of a DCQL Credential Query.
  */
 
-import { type ValidationIssueOf, ValidationIssues, type ValidationResult } from '@owf/identity-common'
-import { DcqlCredentialSetError, DcqlError, DcqlQuery } from 'dcql'
+import {
+  parseWithSchema,
+  type SchemaValidationCode,
+  toValidationResult,
+  type ValidationIssueOf,
+  ValidationIssues,
+  type ValidationResult,
+} from '@owf/identity-common'
+import { DCQL_VALIDATION_CODES, DcqlQuery, type DcqlValidationCode, type DcqlValidationContexts } from 'dcql'
 
 /** Codes of the issues of {@link checkOverAsking} */
 export const OVER_ASKING_CODES = {
-  /** The query is not a DCQL query, as the `dcql` library parses and validates it */
+  /** A claims query has the `namespace` and `claim_name` form of earlier drafts instead of a `path` */
   INVALID_QUERY: 'invalid_query',
   /** No registered credential has the requested format and covers the requested `meta` */
   CREDENTIAL_NOT_REGISTERED: 'credential_not_registered',
@@ -25,8 +32,14 @@ export const OVER_ASKING_CODES = {
 
 export type OverAskingCode = (typeof OVER_ASKING_CODES)[keyof typeof OVER_ASKING_CODES]
 
-/** An issue of {@link checkOverAsking}, with a path into the DCQL query, e.g. `['credentials', 0, 'claims', 2]` */
-export type OverAskingIssue = ValidationIssueOf<OverAskingCode>
+/**
+ * An issue of {@link checkOverAsking}, with a path into the DCQL query, e.g. `['credentials', 0, 'claims', 2]`.
+ * A query the `dcql` library rejects has its issues, with a code of `DCQL_VALIDATION_CODES` or a schema code.
+ */
+export type OverAskingIssue = ValidationIssueOf<
+  OverAskingCode | DcqlValidationCode | SchemaValidationCode,
+  DcqlValidationContexts
+>
 
 /** `valid` when the request asks for nothing beyond the registration */
 export type OverAskingResult = ValidationResult<OverAskingIssue>
@@ -40,36 +53,6 @@ export interface RegisteredCredential {
   meta: Record<string, unknown>
   claim?: { path: ClaimPath; values?: ClaimValue[] }[]
   claims?: { path: ClaimPath; values?: ClaimValue[] }[]
-}
-
-/** The issues of a valibot error, as thrown by `DcqlQuery.parse` */
-interface SchemaError {
-  issues: { message: string; path?: { key: unknown }[] }[]
-}
-
-const isSchemaError = (error: unknown): error is SchemaError =>
-  error instanceof Error && Array.isArray((error as Partial<SchemaError>).issues)
-
-/** Parse and validate the query with the DCQL library, adding an `invalid_query` issue for each problem */
-function parseDcqlQuery(query: unknown, issues: ValidationIssues<OverAskingCode>): DcqlQuery | undefined {
-  try {
-    const parsed = DcqlQuery.parse(query as DcqlQuery.Input)
-    DcqlQuery.validate(parsed)
-    return parsed
-  } catch (error) {
-    if (isSchemaError(error)) {
-      for (const issue of error.issues) {
-        const path = (issue.path ?? []).map(({ key }) => (typeof key === 'number' ? key : String(key)))
-        issues.add({ code: OVER_ASKING_CODES.INVALID_QUERY, path, message: issue.message })
-      }
-    } else if (error instanceof DcqlError) {
-      // DcqlQuery.validate does not say where the problem is, only in which member
-      const path = error instanceof DcqlCredentialSetError ? ['credential_sets'] : ['credentials']
-      issues.add({ code: OVER_ASKING_CODES.INVALID_QUERY, path, message: error.message })
-    } else {
-      throw error
-    }
-  }
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -131,7 +114,7 @@ const describeMeta = (meta: unknown) => (isRecord(meta) && Object.keys(meta).len
  *
  * A registered credential without claims is reported as a warning for each credential
  * query with claims, as the registration does not say which claims are allowed. A query
- * that the `dcql` library rejects only gets `invalid_query` issues.
+ * that the `dcql` library rejects only gets its issues, e.g. `duplicate_credential_query_id`.
  *
  * @param query The DCQL query of the request, e.g. its `dcql_query` parameter, which is parsed and validated with the `dcql` library
  * @param registeredCredentials The `credentials` of the WRPRC payload
@@ -140,12 +123,16 @@ export function checkOverAsking(
   query: unknown,
   registeredCredentials: readonly RegisteredCredential[] = []
 ): OverAskingResult {
+  const parsed = parseWithSchema<typeof DcqlQuery.zModel, DcqlValidationCode, DcqlValidationContexts>(
+    DcqlQuery.zModel,
+    query,
+    { codes: DCQL_VALIDATION_CODES }
+  )
+  if (!parsed.success) return toValidationResult<OverAskingIssue>(parsed.issues)
+
   const issues = new ValidationIssues<OverAskingCode>()
 
-  const parsed = parseDcqlQuery(query, issues)
-  if (!parsed) return issues.result()
-
-  parsed.credentials.forEach((credential, credentialIndex) => {
+  parsed.data.credentials.forEach((credential, credentialIndex) => {
     const credentialPath = ['credentials', credentialIndex]
     const label = `Credential query ${credential.id}`
     const sameFormat = registeredCredentials.filter((registered) => registered.format === credential.format)

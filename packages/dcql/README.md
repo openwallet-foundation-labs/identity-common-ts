@@ -72,9 +72,8 @@ const query = {
   ],
 } satisfies DcqlQuery.Input
 
-// Parse (structural) and validate (content) the query
+// Parse the query, which also checks that its ids are unique and its credential and claim sets refer to them
 const parsedQuery = DcqlQuery.parse(query)
-DcqlQuery.validate(parsedQuery)
 
 // Execute the query against credentials
 const queryResult = DcqlQuery.query(parsedQuery, credentials)
@@ -109,6 +108,18 @@ const credentialMatch = queryResult.credential_matches.credential_query_id
 console.log(credentialMatch.success) // True if the query is fulfillable
 ```
 
+## Issues
+
+`DcqlQuery.parse` throws a `DcqlParseError` when the input is not a DCQL query. Its `issues` are `ValidationIssue`s of `@owf/identity-common`, with the `path` into the query. The failed claims, claim sets, meta and trusted authorities of a result carry their `issues` the same way, with the `path` into the credential and a code of `DCQL_VALIDATION_CODES`, such as `claim_missing` or `doctype_mismatch`. A mismatch has the `expected` and the `actual` value as `context`.
+
+```ts
+try {
+  DcqlQuery.parse(input)
+} catch (error) {
+  if (error instanceof DcqlParseError) console.log(error.issues)
+}
+```
+
 ## Validating Presentations
 
 Validate presentation results against queries:
@@ -134,7 +145,8 @@ const presentationQueryResult = DcqlPresentationResult.fromDcqlPresentation(
 
 ## Dependencies
 
-- [valibot](https://www.npmjs.com/package/valibot)
+- [zod](https://www.npmjs.com/package/zod)
+- [@owf/identity-common](https://www.npmjs.com/package/@owf/identity-common)
 
 ## Platform Support
 
