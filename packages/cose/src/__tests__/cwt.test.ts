@@ -1,8 +1,8 @@
 import { hex } from '@owf/identity-common'
-import { Tag } from 'cbor-x'
 import { describe, expect, test } from 'vitest'
 import z from 'zod'
 import { CborDecodeError, cborEncode } from '../cbor'
+import { Tag } from '../cbor/cbor-x'
 import {
   type AnyCwt,
   type CoseHeadersFor,

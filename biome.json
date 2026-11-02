@@ -22,7 +22,13 @@
       "allowComments": true
     }
   },
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {
@@ -70,6 +76,29 @@
         "rules": {
           "suspicious": {
             "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/cose/src/**", "!packages/cose/src/cbor/cbor-x.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "cbor-x": "Import cbor-x through packages/cose/src/cbor/cbor-x.ts, which only loads its pure JS entry points."
+                },
+                "patterns": [
+                  {
+                    "group": ["cbor-x/*"],
+                    "message": "Import cbor-x through packages/cose/src/cbor/cbor-x.ts, which only loads its pure JS entry points."
+                  }
+                ]
+              }
+            }
           }
         }
       }
