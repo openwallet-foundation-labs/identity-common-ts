@@ -1,5 +1,5 @@
 /**
- * WRPRC Validator
+ * Registration Certificate Validator
  *
  * Validation functions for ETSI TS 119 475 Wallet-Relying Party Registration Certificates.
  *
@@ -18,11 +18,16 @@ import {
   ValidationIssues,
 } from '@owf/identity-common'
 import type { z } from 'zod'
-import { normalizeWRPRCPayload } from './dialect'
+import { normalizeRegistrationCertificatePayload } from './dialect'
 import { ALL_ENTITLEMENTS, ALL_PSP_SUB_ENTITLEMENTS, ATTESTATION_PROVIDER_ENTITLEMENTS } from './entitlements'
-import { zLegalPersonSubject, zNaturalPersonSubject, zWRPRCJWTHeader, zWRPRCPayload } from './schemas'
-import type { WRPRCPayload } from './types'
-import { WRPRCValidationError } from './wrprc-error'
+import { RegistrationCertificateValidationError } from './registration-certificate-error'
+import {
+  zLegalPersonSubject,
+  zNaturalPersonSubject,
+  zRegistrationCertificateJWTHeader,
+  zRegistrationCertificatePayload,
+} from './schemas'
+import type { RegistrationCertificatePayload } from './types'
 
 // ============================================================================
 // Validation Result Types
@@ -35,7 +40,7 @@ import { WRPRCValidationError } from './wrprc-error'
  * matching on message text. Requirement identifiers from ETSI TS 119 475 v1.2.1
  * are given where a code maps to one.
  */
-export const WRPRC_VALIDATION_CODES = {
+export const REGISTRATION_CERTIFICATE_VALIDATION_CODES = {
   /** No entitlement present (GEN-5.2.4-03) */
   MISSING_ENTITLEMENT: 'missing_entitlement',
   /** Sub-entitlement present without its base entitlement (GEN-5.2.4-04) */
@@ -60,28 +65,31 @@ export const WRPRC_VALIDATION_CODES = {
   EXPIRES_BEFORE_ISSUED: VALIDATION_CODES.EXPIRES_BEFORE_ISSUED,
   /** typ of the JWT header is not rc-wrp+jwt, with `expected` and `actual` as context */
   INVALID_TYP: VALIDATION_CODES.INVALID_TYP,
-  /** Selected WRPRC identity does not match the access certificate subject */
+  /** Selected registration certificate identity does not match the access certificate subject */
   ACCESS_CERTIFICATE_IDENTITY_MISMATCH: 'access_certificate_identity_mismatch',
 } as const
 
 /** A semantic validation code emitted by this validator */
-export type WRPRCValidationCode = (typeof WRPRC_VALIDATION_CODES)[keyof typeof WRPRC_VALIDATION_CODES]
+export type RegistrationCertificateValidationCode =
+  (typeof REGISTRATION_CERTIFICATE_VALIDATION_CODES)[keyof typeof REGISTRATION_CERTIFICATE_VALIDATION_CODES]
 
 /**
- * An issue of a WRPRC validation, with a `WRPRCValidationCode` from the semantic checks or
+ * An issue of a registration certificate validation, with a `RegistrationCertificateValidationCode` from the semantic checks or
  * a code of `SCHEMA_VALIDATION_CODES` from schema parsing. `requirement` is the ETSI TS 119 475 requirement.
  */
-export type WRPRCValidationIssue = ValidationIssueOf<WRPRCValidationCode | SchemaValidationCode>
+export type RegistrationCertificateValidationIssue = ValidationIssueOf<
+  RegistrationCertificateValidationCode | SchemaValidationCode
+>
 
 /**
- * Result of WRPRC validation: errors make the WRPRC invalid, warnings don't but should be
+ * Result of registration certificate validation: errors make the registration certificate invalid, warnings don't but should be
  * noted
  */
-export type ValidationResult = CommonValidationResult<WRPRCValidationIssue>
+export type ValidationResult = CommonValidationResult<RegistrationCertificateValidationIssue>
 
 /** Parse with a schema of this package, with its schema issues as a result when it fails */
-const parseWRPRCSchema = <Schema extends z.ZodType>(schema: Schema, value: unknown) =>
-  parseWithSchema(schema, value, { codes: WRPRC_VALIDATION_CODES })
+const parseRegistrationCertificateSchema = <Schema extends z.ZodType>(schema: Schema, value: unknown) =>
+  parseWithSchema(schema, value, { codes: REGISTRATION_CERTIFICATE_VALIDATION_CODES })
 
 // ============================================================================
 // Core Validation Functions
@@ -90,7 +98,10 @@ const parseWRPRCSchema = <Schema extends z.ZodType>(schema: Schema, value: unkno
 /**
  * Entitlement-driven checks: GEN-5.2.4-03 to GEN-5.2.4-06.
  */
-function validateEntitlementRequirements(payload: WRPRCPayload, issues: ValidationIssues<WRPRCValidationCode>): void {
+function validateEntitlementRequirements(
+  payload: RegistrationCertificatePayload,
+  issues: ValidationIssues<RegistrationCertificateValidationCode>
+): void {
   for (const entitlement of payload.entitlements) {
     const known =
       ALL_ENTITLEMENTS.includes(entitlement as (typeof ALL_ENTITLEMENTS)[number]) ||
@@ -100,7 +111,7 @@ function validateEntitlementRequirements(payload: WRPRCPayload, issues: Validati
         severity: 'warning',
         path: ['entitlements'],
         message: `Unknown entitlement URI: ${entitlement}. This may be a national or EU-defined extension.`,
-        code: WRPRC_VALIDATION_CODES.UNKNOWN_ENTITLEMENT,
+        code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.UNKNOWN_ENTITLEMENT,
       })
     }
   }
@@ -110,7 +121,7 @@ function validateEntitlementRequirements(payload: WRPRCPayload, issues: Validati
     issues.add({
       path: ['entitlements'],
       message: 'At least one entitlement must be specified (GEN-5.2.4-03)',
-      code: WRPRC_VALIDATION_CODES.MISSING_ENTITLEMENT,
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.MISSING_ENTITLEMENT,
       requirement: 'GEN-5.2.4-03',
     })
   }
@@ -125,7 +136,7 @@ function validateEntitlementRequirements(payload: WRPRCPayload, issues: Validati
     issues.add({
       path: ['entitlements'],
       message: 'Service provider sub-entitlements require Service_Provider entitlement (GEN-5.2.4-04)',
-      code: WRPRC_VALIDATION_CODES.MISSING_BASE_ENTITLEMENT,
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.MISSING_BASE_ENTITLEMENT,
       requirement: 'GEN-5.2.4-04',
     })
   }
@@ -140,7 +151,7 @@ function validateEntitlementRequirements(payload: WRPRCPayload, issues: Validati
       path: ['provides_attestations'],
       message:
         'Attestation providers should include provides_attestations field (GEN-5.2.4-05). This is recommended but not required.',
-      code: WRPRC_VALIDATION_CODES.MISSING_PROVIDES_ATTESTATIONS,
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.MISSING_PROVIDES_ATTESTATIONS,
       requirement: 'GEN-5.2.4-05',
     })
   }
@@ -151,8 +162,8 @@ function validateEntitlementRequirements(payload: WRPRCPayload, issues: Validati
     issues.add({
       severity: 'warning',
       path: ['credentials'],
-      message: 'Service provider WRPRCs should include the credentials field (GEN-5.2.4-06)',
-      code: WRPRC_VALIDATION_CODES.MISSING_CREDENTIALS,
+      message: 'Service provider registration certificates should include the credentials field (GEN-5.2.4-06)',
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.MISSING_CREDENTIALS,
       requirement: 'GEN-5.2.4-06',
     })
   }
@@ -160,28 +171,34 @@ function validateEntitlementRequirements(payload: WRPRCPayload, issues: Validati
     issues.add({
       severity: 'warning',
       path: ['purpose'],
-      message: 'Service provider WRPRCs should include the purpose field (GEN-5.2.4-06)',
-      code: WRPRC_VALIDATION_CODES.MISSING_PURPOSE,
+      message: 'Service provider registration certificates should include the purpose field (GEN-5.2.4-06)',
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.MISSING_PURPOSE,
       requirement: 'GEN-5.2.4-06',
     })
   }
 }
 
 /**
- * Validate a WRPRC payload against the schema and semantic rules.
+ * Validate a registration certificate payload against the schema and semantic rules.
  *
  * @param accessCertificateSub Required subject from the presented access certificate.
  */
-export function validateWRPRCPayload(payload: unknown, accessCertificateSub: string): ValidationResult {
-  const result = parseWRPRCSchema(zWRPRCPayload, normalizeWRPRCPayload(payload))
+export function validateRegistrationCertificatePayload(
+  payload: unknown,
+  accessCertificateSub: string
+): ValidationResult {
+  const result = parseRegistrationCertificateSchema(
+    zRegistrationCertificatePayload,
+    normalizeRegistrationCertificatePayload(payload)
+  )
 
   if (!result.success) {
     return toValidationResult(result.issues)
   }
 
   // Additional semantic validations
-  const validPayload: WRPRCPayload = result.data
-  const issues = new ValidationIssues<WRPRCValidationCode>()
+  const validPayload: RegistrationCertificatePayload = result.data
+  const issues = new ValidationIssues<RegistrationCertificateValidationCode>()
 
   validateEntitlementRequirements(validPayload, issues)
 
@@ -191,14 +208,14 @@ export function validateWRPRCPayload(payload: unknown, accessCertificateSub: str
     issues.add({
       path: ['sub'],
       message: subResult.message,
-      code: WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER,
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER,
     })
   } else if (subResult.unknownPrefix) {
     issues.add({
       severity: 'warning',
       path: ['sub'],
       message: `Unknown semantic identifier initial characters: ${subResult.unknownPrefix}. This may be a national scheme (ETSI EN 319 412-1).`,
-      code: WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX,
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX,
     })
   }
 
@@ -210,7 +227,7 @@ export function validateWRPRCPayload(payload: unknown, accessCertificateSub: str
       issues.add({
         path: ['exp'],
         message: 'exp must be at most 12 months after iat (GEN-5.2.4-08)',
-        code: WRPRC_VALIDATION_CODES.EXP_TOO_LATE,
+        code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.EXP_TOO_LATE,
         requirement: 'GEN-5.2.4-08',
       })
     }
@@ -218,20 +235,20 @@ export function validateWRPRCPayload(payload: unknown, accessCertificateSub: str
       issues.add({
         path: ['exp'],
         message: 'exp must be after iat',
-        code: WRPRC_VALIDATION_CODES.EXPIRES_BEFORE_ISSUED,
+        code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.EXPIRES_BEFORE_ISSUED,
         context: { issuedAt: secondsToDate(validPayload.iat), expiresAt: secondsToDate(validPayload.exp) },
       })
     }
   }
 
-  // The intermediary identity replaces the WRPRC subject for this cross-certificate check.
+  // The intermediary identity replaces the registration certificate subject for this cross-certificate check.
   const expectedAccessCertificateSub = validPayload.intermediary?.sub ?? validPayload.sub
   const identityPath = validPayload.intermediary ? ['intermediary', 'sub'] : ['sub']
   if (accessCertificateSub !== expectedAccessCertificateSub) {
     issues.add({
       path: identityPath,
       message: `${validPayload.intermediary ? 'intermediary.sub' : 'sub'} must match the access certificate subject`,
-      code: WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
     })
   }
 
@@ -239,19 +256,23 @@ export function validateWRPRCPayload(payload: unknown, accessCertificateSub: str
 }
 
 /**
- * Validate a JWT header for WRPRC
+ * Validate a JWT header for registration certificate
  */
-export function validateWRPRCJWTHeader(header: unknown): ValidationResult {
-  const result = parseWRPRCSchema(zWRPRCJWTHeader, header)
+export function validateRegistrationCertificateJWTHeader(header: unknown): ValidationResult {
+  const result = parseRegistrationCertificateSchema(zRegistrationCertificateJWTHeader, header)
   return toValidationResult(result.success ? [] : result.issues)
 }
 
 /**
- * Validate a complete WRPRC (header + payload)
+ * Validate a complete registration certificate (header + payload)
  */
-export function validateWRPRC(header: unknown, payload: unknown, accessCertificateSub: string): ValidationResult {
-  const headerResult = validateWRPRCJWTHeader(header)
-  const payloadResult = validateWRPRCPayload(payload, accessCertificateSub)
+export function validateRegistrationCertificate(
+  header: unknown,
+  payload: unknown,
+  accessCertificateSub: string
+): ValidationResult {
+  const headerResult = validateRegistrationCertificateJWTHeader(header)
+  const payloadResult = validateRegistrationCertificatePayload(payload, accessCertificateSub)
 
   return toValidationResult([
     ...prefixIssuePaths('header', headerResult.issues),
@@ -266,14 +287,14 @@ export function validateWRPRC(header: unknown, payload: unknown, accessCertifica
 /**
  * Check if payload represents a legal person
  */
-export function isLegalPersonWRPRC(payload: WRPRCPayload): boolean {
+export function isLegalPersonRegistrationCertificate(payload: RegistrationCertificatePayload): boolean {
   return typeof payload.sub_ln === 'string' && payload.sub_ln.length > 0
 }
 
 /**
  * Check if payload represents a natural person
  */
-export function isNaturalPersonWRPRC(payload: WRPRCPayload): boolean {
+export function isNaturalPersonRegistrationCertificate(payload: RegistrationCertificatePayload): boolean {
   return (
     typeof payload.sub_gn === 'string' &&
     payload.sub_gn.length > 0 &&
@@ -283,17 +304,20 @@ export function isNaturalPersonWRPRC(payload: WRPRCPayload): boolean {
 }
 
 /**
- * Validate as legal person WRPRC
+ * Validate as legal person registration certificate
  */
-export function validateLegalPersonWRPRC(payload: unknown): ValidationResult {
-  const result = parseWRPRCSchema(zLegalPersonSubject, normalizeWRPRCPayload(payload))
+export function validateLegalPersonRegistrationCertificate(payload: unknown): ValidationResult {
+  const result = parseRegistrationCertificateSchema(
+    zLegalPersonSubject,
+    normalizeRegistrationCertificatePayload(payload)
+  )
 
   if (!result.success) {
     return toValidationResult(result.issues)
   }
 
   // Additional validation for legal person identifier format
-  const issues = new ValidationIssues<WRPRCValidationCode>()
+  const issues = new ValidationIssues<RegistrationCertificateValidationCode>()
   const sub: string = result.data.sub
   // Legal person identifiers should follow ETSI EN 319 412-1 clause 5.1.4
   // Format: 3-character prefix (or national scheme `XX:`) + 2-letter country code + hyphen + identifier
@@ -303,7 +327,7 @@ export function validateLegalPersonWRPRC(payload: unknown): ValidationResult {
       path: ['sub'],
       message:
         'Legal person identifier should follow format: PREFIX + COUNTRY + "-" + ID (e.g., "LEIXG-529900T8BM49AURSDO55")',
-      code: WRPRC_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
     })
   }
 
@@ -311,17 +335,20 @@ export function validateLegalPersonWRPRC(payload: unknown): ValidationResult {
 }
 
 /**
- * Validate as natural person WRPRC
+ * Validate as natural person registration certificate
  */
-export function validateNaturalPersonWRPRC(payload: unknown): ValidationResult {
-  const result = parseWRPRCSchema(zNaturalPersonSubject, normalizeWRPRCPayload(payload))
+export function validateNaturalPersonRegistrationCertificate(payload: unknown): ValidationResult {
+  const result = parseRegistrationCertificateSchema(
+    zNaturalPersonSubject,
+    normalizeRegistrationCertificatePayload(payload)
+  )
 
   if (!result.success) {
     return toValidationResult(result.issues)
   }
 
   // Additional validation for natural person identifier format
-  const issues = new ValidationIssues<WRPRCValidationCode>()
+  const issues = new ValidationIssues<RegistrationCertificateValidationCode>()
   const sub: string = result.data.sub
   // Natural person identifiers should follow ETSI EN 319 412-1 clause 5.1.3
   // Format: 3-character prefix (or national scheme `XX:`) + 2-letter country code + hyphen + identifier
@@ -331,7 +358,7 @@ export function validateNaturalPersonWRPRC(payload: unknown): ValidationResult {
       path: ['sub'],
       message:
         'Natural person identifier should follow format: PREFIX + COUNTRY + "-" + ID (e.g., "TINIT-RSSMRA85T10A562S")',
-      code: WRPRC_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
     })
   }
 
@@ -385,30 +412,38 @@ function validateSemanticIdentifier(identifier: string): {
 // ============================================================================
 
 /**
- * Assert that a WRPRC payload is valid, throws WRPRCError if not
+ * Assert that a registration certificate payload is valid, throws RegistrationCertificateError if not
  */
-export function assertValidWRPRCPayload(
+export function assertValidRegistrationCertificatePayload(
   payload: unknown,
   accessCertificateSub: string
-): asserts payload is WRPRCPayload {
-  const result = validateWRPRCPayload(payload, accessCertificateSub)
-  if (!result.valid) throw new WRPRCValidationError('Invalid WRPRC payload', result.issues)
+): asserts payload is RegistrationCertificatePayload {
+  const result = validateRegistrationCertificatePayload(payload, accessCertificateSub)
+  if (!result.valid)
+    throw new RegistrationCertificateValidationError('Invalid registration certificate payload', result.issues)
 }
 
 /**
- * Parse a WRPRC payload into its canonical form, accepting either dialect spelling.
+ * Parse a registration certificate payload into its canonical form, accepting either dialect spelling.
  *
- * @throws WRPRCError if the payload is invalid
+ * @throws RegistrationCertificateError if the payload is invalid
  */
-export function parseWRPRCPayload(payload: unknown, accessCertificateSub: string): WRPRCPayload {
-  assertValidWRPRCPayload(payload, accessCertificateSub)
-  return zWRPRCPayload.parse(normalizeWRPRCPayload(payload))
+export function parseRegistrationCertificatePayload(
+  payload: unknown,
+  accessCertificateSub: string
+): RegistrationCertificatePayload {
+  assertValidRegistrationCertificatePayload(payload, accessCertificateSub)
+  return zRegistrationCertificatePayload.parse(normalizeRegistrationCertificatePayload(payload))
 }
 
 /**
- * Assert that a WRPRC is valid (header + payload), throws WRPRCError if not
+ * Assert that a registration certificate is valid (header + payload), throws RegistrationCertificateError if not
  */
-export function assertValidWRPRC(header: unknown, payload: unknown, accessCertificateSub: string): void {
-  const result = validateWRPRC(header, payload, accessCertificateSub)
-  if (!result.valid) throw new WRPRCValidationError('Invalid WRPRC', result.issues)
+export function assertValidRegistrationCertificate(
+  header: unknown,
+  payload: unknown,
+  accessCertificateSub: string
+): void {
+  const result = validateRegistrationCertificate(header, payload, accessCertificateSub)
+  if (!result.valid) throw new RegistrationCertificateValidationError('Invalid registration certificate', result.issues)
 }
