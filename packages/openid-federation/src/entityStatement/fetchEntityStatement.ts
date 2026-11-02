@@ -1,5 +1,5 @@
 import { type EntityConfigurationClaims, fetchEntityConfiguration } from '../entityConfiguration'
-import { OpenIdFederationError } from '../error/OpenIdFederationError'
+import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
 import { type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
@@ -61,7 +61,7 @@ export const fetchEntityStatement = async ({
   })
 
   if (!isSameEntityId(claims.iss, iss) || !isSameEntityId(claims.sub, sub)) {
-    throw new OpenIdFederationError(
+    throw new OpenidFederationError(
       PolicyErrorStage.Validation,
       `entity statement fetched for issuer '${iss}' and subject '${sub}' has issuer '${claims.iss}' and subject '${claims.sub}'`
     )

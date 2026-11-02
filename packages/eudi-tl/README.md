@@ -106,7 +106,7 @@ a release of this package:
 
    ```typescript
    const current = getPointerSigningCertificates(lotl, {
-     tslType: TSLType.EUlistofthelists,
+     tslType: TslType.EUlistofthelists,
    });
    ```
 

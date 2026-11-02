@@ -24,7 +24,7 @@ import { RegistrationCertificateValidationError } from './registration-certifica
 import {
   zLegalPersonSubject,
   zNaturalPersonSubject,
-  zRegistrationCertificateJWTHeader,
+  zRegistrationCertificateJwtHeader,
   zRegistrationCertificatePayload,
 } from './schemas'
 import type { RegistrationCertificatePayload } from './types'
@@ -258,8 +258,8 @@ export function validateRegistrationCertificatePayload(
 /**
  * Validate a JWT header for registration certificate
  */
-export function validateRegistrationCertificateJWTHeader(header: unknown): ValidationResult {
-  const result = parseRegistrationCertificateSchema(zRegistrationCertificateJWTHeader, header)
+export function validateRegistrationCertificateJwtHeader(header: unknown): ValidationResult {
+  const result = parseRegistrationCertificateSchema(zRegistrationCertificateJwtHeader, header)
   return toValidationResult(result.success ? [] : result.issues)
 }
 
@@ -271,7 +271,7 @@ export function validateRegistrationCertificate(
   payload: unknown,
   accessCertificateSub: string
 ): ValidationResult {
-  const headerResult = validateRegistrationCertificateJWTHeader(header)
+  const headerResult = validateRegistrationCertificateJwtHeader(header)
   const payloadResult = validateRegistrationCertificatePayload(payload, accessCertificateSub)
 
   return toValidationResult([

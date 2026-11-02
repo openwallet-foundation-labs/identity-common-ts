@@ -8,12 +8,12 @@ import {
 import { base64, base64url, decodeJwt, stringToBytes } from '@owf/identity-common'
 import {
   fetchStatusList,
-  getListFromStatusListJWT,
+  getListFromStatusListJwt,
   type StatusList,
   StatusListCwt,
   StatusListError,
   type StatusListInfo,
-  type StatusListJWTPayload,
+  type StatusListJwtPayload,
   StatusListEntryNotValidError as TokenStatusListEntryNotValidError,
   verifyStatus,
   verifyStatusListJwtHeader,
@@ -153,11 +153,11 @@ async function verifyStatusListJwt(
   ctx: Pick<MdocContext, 'x509' | 'cose'>
 ) {
   let header: Record<string, unknown>
-  let payload: StatusListJWTPayload
+  let payload: StatusListJwtPayload
   let signature: Uint8Array
   try {
     let encodedSignature: string
-    ;({ header, payload, signature: encodedSignature } = decodeJwt<Record<string, unknown>, StatusListJWTPayload>(jwt))
+    ;({ header, payload, signature: encodedSignature } = decodeJwt<Record<string, unknown>, StatusListJwtPayload>(jwt))
     if (!isJsonObject(header) || !isJsonObject(payload)) throw new Error('The header and payload must be objects')
     signature = base64url.decode(encodedSignature)
   } catch {
@@ -237,7 +237,7 @@ async function verifyStatusListJwt(
     }
   }, InvalidSignatureError)
 
-  return { statusListJwt: { header, payload, statusList: getListFromStatusListJWT(jwt) }, chain }
+  return { statusListJwt: { header, payload, statusList: getListFromStatusListJwt(jwt) }, chain }
 }
 
 export type VerifyStatusListTokenOptions = {
@@ -259,7 +259,7 @@ export type VerifyStatusListTokenOptions = {
 /** A status list served in JWT format, once verified. */
 export type VerifiedStatusListJwt = {
   header: Record<string, unknown>
-  payload: StatusListJWTPayload
+  payload: StatusListJwtPayload
   statusList: StatusList
 }
 

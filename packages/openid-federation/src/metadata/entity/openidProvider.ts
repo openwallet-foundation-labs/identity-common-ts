@@ -3,11 +3,11 @@ import { createEntity } from './utils'
 
 /**
  *
- * {@link https://openid.github.io/federation-wallet/main.html#name-wallet-architecture-entity- | OpenID Credential Issuer}
+ * {@link https://openid.net/specs/openid-federation-1_0.html#section-5.1.3-1 | openID Provider}
  *
  */
-export const openIdCredentialIssuerEntityMetadata = createEntity({
-  identifier: 'openid_credential_issuer',
+export const openidProviderEntityMetadata = createEntity({
+  identifier: 'openid_provider',
   additionalValidation: {
     client_registration_types_supported: z.array(z.string()).optional(),
     federation_registration_endpoint: z.url().optional(),
@@ -21,4 +21,4 @@ export const openIdCredentialIssuerEntityMetadata = createEntity({
   },
 })
 
-export type OpenIdCredentialIssuerMetadata = z.input<(typeof openIdCredentialIssuerEntityMetadata)['schema']>
+export type OpenidProviderMetadata = z.input<(typeof openidProviderEntityMetadata)['schema']>

@@ -14,7 +14,7 @@ import { verifyJarmAuthorizationResponse } from '../jarm/jarm-authorization-resp
 import { zJarmHeader } from '../jarm/jarm-authorization-response/z-jarm-authorization-response'
 import { isJarmResponseMode } from '../jarm/jarm-response-mode'
 import type { ParsedOpenid4vpAuthorizationResponse } from './parse-authorization-response'
-import { parseOpenid4VpAuthorizationResponsePayload } from './parse-authorization-response-payload'
+import { parseOpenid4vpAuthorizationResponsePayload } from './parse-authorization-response-payload'
 import { validateOpenid4vpAuthorizationResponsePayload } from './validate-authorization-response'
 
 export interface ParseJarmAuthorizationResponseOptions {
@@ -48,10 +48,10 @@ export async function parseJarmAuthorizationResponse(
     headerSchema: zJarmHeader,
   })
 
-  const authorizationResponsePayload = parseOpenid4VpAuthorizationResponsePayload(
+  const authorizationResponsePayload = parseOpenid4vpAuthorizationResponsePayload(
     verifiedJarmResponse.jarmAuthorizationResponse
   )
-  const validateOpenId4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
+  const validateOpenid4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
     authorizationRequestPayload: authorizationRequestPayload,
     authorizationResponsePayload: authorizationResponsePayload,
   })
@@ -69,7 +69,7 @@ export async function parseJarmAuthorizationResponse(
   }
 
   return {
-    ...validateOpenId4vpResponse,
+    ...validateOpenid4vpResponse,
     jarm: { ...verifiedJarmResponse, jarmHeader },
 
     expectedNonce: authorizationRequestPayload.nonce,

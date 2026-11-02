@@ -1,2 +1,2 @@
-export * from './OpenIdFederationError'
+export * from './OpenidFederationError'
 export * from './PolicyErrorStage'

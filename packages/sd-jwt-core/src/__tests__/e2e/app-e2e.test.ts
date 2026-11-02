@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { hasher as digest, generateSalt, type Signer } from '@owf/crypto'
 import { describe, expect, test } from 'vitest'
-import { type DisclosureFrame, type PresentationFrame, SDJwtInstance, type SdJwtPayload, type Verifier } from '../..'
+import { type DisclosureFrame, type PresentationFrame, SdJwtInstance, type SdJwtPayload, type Verifier } from '../..'
 
 const createSignerVerifier = () => {
   const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
@@ -20,7 +20,7 @@ const createSignerVerifier = () => {
 describe('App', () => {
   test('Example', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -103,10 +103,10 @@ describe('App', () => {
       firstname: true,
       id: true,
     }
-    const presentedSDJwt = await sdjwt.present<typeof claims>(encodedSdjwt, presentationFrame)
-    expect(presentedSDJwt).toBeDefined()
+    const presentedSdJwt = await sdjwt.present<typeof claims>(encodedSdjwt, presentationFrame)
+    expect(presentedSdJwt).toBeDefined()
 
-    const presentationClaims = await sdjwt.getClaims(presentedSDJwt)
+    const presentationClaims = await sdjwt.getClaims(presentedSdJwt)
     expect(presentationClaims).toBeDefined()
     expect(presentationClaims).toEqual({
       lastname: 'Doe',
@@ -123,7 +123,7 @@ describe('App', () => {
 
   test('rejects tampered disclosure bytes', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -218,7 +218,7 @@ describe('App', () => {
 async function JSONtest(filename: string) {
   const test = loadTestJsonFile(filename)
   const { signer, verifier } = createSignerVerifier()
-  const sdjwt = new SDJwtInstance<SdJwtPayload>({
+  const sdjwt = new SdJwtInstance<SdJwtPayload>({
     signer,
     signAlg: 'EdDSA',
     verifier,
@@ -239,11 +239,11 @@ async function JSONtest(filename: string) {
     payload: test.claims,
   })
 
-  const presentedSDJwt = await sdjwt.present<typeof test.claims>(encodedSdjwt, test.presentationFrames)
+  const presentedSdJwt = await sdjwt.present<typeof test.claims>(encodedSdjwt, test.presentationFrames)
 
-  expect(presentedSDJwt).toBeDefined()
+  expect(presentedSdJwt).toBeDefined()
 
-  const presentationClaims = await sdjwt.getClaims(presentedSDJwt)
+  const presentationClaims = await sdjwt.getClaims(presentedSdJwt)
 
   expect(presentationClaims).toEqual(test.presentedClaims)
 

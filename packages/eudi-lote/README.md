@@ -18,18 +18,18 @@ This SDK implements the ETSI TS 119 602 standard for LoTE documents, enabling:
 
 ## Supported Lists
 
-`validateLoTEProfile` is tested against these published lists:
+`validateLoteProfile` is tested against these published lists:
 
 | List | Profile | Mode |
 | --- | --- | --- |
-| [EU PID Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pid-providers.json) (EC acceptance) | `EUPIDProvidersList` | `strict` |
-| [EU Wallet Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wallet-providers.json) (EC acceptance) | `EUWalletProvidersList` | `strict` |
-| [EU WRPAC Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wrpac-providers.json) (EC acceptance) | `EUWRPACProvidersList` | `strict` |
-| [EU Pub-EAA Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pub-eaa-providers.json) (EC acceptance) | `EUPubEAAProvidersList` | `strict` |
-| [German PID Providers](https://trustlists.eudihub.de/pid-provider.jwt) | `EUPIDProvidersList` | `compat`, `allowedTerritories: ['DE']` |
-| [German Wallet Providers](https://trustlists-sandbox.eudihub.de/wallet-provider.jwt) (sandbox) | `EUWalletProvidersList` | `compat`, `allowedTerritories: ['DE']` |
-| [Norwegian PID Providers](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_pid.jws) (sandbox) | `EUPIDProvidersList` | `compat`, `allowedTerritories: ['NO']` |
-| [Norwegian Access Certificate Authorities](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_aca.jws) (sandbox) | `EUWRPACProvidersList` | `compat`, `allowedTerritories: ['NO']` |
+| [EU PID Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pid-providers.json) (EC acceptance) | `LoteProfile.EuPidProvidersList` | `strict` |
+| [EU Wallet Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wallet-providers.json) (EC acceptance) | `LoteProfile.EuWalletProvidersList` | `strict` |
+| [EU WRPAC Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wrpac-providers.json) (EC acceptance) | `LoteProfile.EuWrpacProvidersList` | `strict` |
+| [EU Pub-EAA Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pub-eaa-providers.json) (EC acceptance) | `LoteProfile.EuPubEaaProvidersList` | `strict` |
+| [German PID Providers](https://trustlists.eudihub.de/pid-provider.jwt) | `LoteProfile.EuPidProvidersList` | `compat`, `allowedTerritories: ['DE']` |
+| [German Wallet Providers](https://trustlists-sandbox.eudihub.de/wallet-provider.jwt) (sandbox) | `LoteProfile.EuWalletProvidersList` | `compat`, `allowedTerritories: ['DE']` |
+| [Norwegian PID Providers](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_pid.jws) (sandbox) | `LoteProfile.EuPidProvidersList` | `compat`, `allowedTerritories: ['NO']` |
+| [Norwegian Access Certificate Authorities](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_aca.jws) (sandbox) | `LoteProfile.EuWrpacProvidersList` | `compat`, `allowedTerritories: ['NO']` |
 | [Norwegian Wallet Providers](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_wallet.jws) (sandbox) | `EUWalletProvidersList` | Not supported: its trusted entity has no `TrustedEntityServices`, which the JSON schema requires |
 
 ## Installation
@@ -46,14 +46,14 @@ pnpm add @owf/eudi-lote
 
 ```typescript
 import {
-  createLoTE,
+  createLote,
   trustedEntity,
   service,
   addTrustedEntity,
 } from '@owf/eudi-lote';
 
 // Create the base LoTE document (only SchemeOperatorName is required)
-let lote = createLoTE({
+let lote = createLote({
   SchemeOperatorName: [{ lang: 'en', value: 'Example Trust Operator' }],
   SchemeOperatorAddress: {
     SchemeOperatorPostalAddress: [
@@ -126,7 +126,7 @@ const svc = service()
   // X.509 subject names
   .addX509SubjectName('CN=Test CA, O=Test Org, C=DE')
   // X.509 Subject Key Identifiers
-  .addX509SKI('base64encodedSKI==')
+  .addX509Ski('base64encodedSKI==')
   // JWK public keys
   .addPublicKey({ kty: 'EC', crv: 'P-256', x: '...', y: '...' })
   // Other identifiers
@@ -156,7 +156,7 @@ const svc = service()
 Reference other LoTE documents:
 
 ```typescript
-const lote = createLoTE({
+const lote = createLote({
   SchemeOperatorName: [{ lang: 'en', value: 'Master Registry' }],
   PointersToOtherLoTE: [
     {
@@ -179,12 +179,12 @@ const lote = createLoTE({
 ### Signing a LoTE Document
 
 ```typescript
-import { signLoTE } from '@owf/eudi-lote';
+import { signLote } from '@owf/eudi-lote';
 import { ES256 } from '@owf/crypto';
 
 // With a local key
 const signer = await ES256.getSigner(privateKeyPem);
-const signed = await signLoTE({
+const signed = await signLote({
   lote,
   keyId: 'lote-signer-2025',
   signer,
@@ -196,7 +196,7 @@ console.log(signed.jws); // The signed JWS
 ### Using a KMS/HSM Signer
 
 ```typescript
-const signed = await signLoTE({
+const signed = await signLote({
   lote,
   keyId: 'lote-signer-2025',
   signer: async (data) => {
@@ -209,32 +209,32 @@ const signed = await signLoTE({
 
 ```typescript
 import {
-  validateLoTE,
-  assertValidLoTE,
+  validateLote,
+  assertValidLote,
 } from '@owf/eudi-lote';
 
 // Get the validation result with all issues
-const result = validateLoTE(lote);
+const result = validateLote(lote);
 for (const issue of result.issues) {
   // e.g. error invalid_format LoTE.ListAndSchemeInformation.DistributionPoints.0: Invalid URL
   console.log(issue.severity, issue.code, `${issue.path.join('.')}: ${issue.message}`);
 }
 
 // Or throw on invalid
-assertValidLoTE(lote); // throws LoTEValidationError if invalid
+assertValidLote(lote); // throws LoteValidationError if invalid
 ```
 
 ### Updating a LoTE Document
 
 ```typescript
 import {
-  updateLoTEVersion,
+  updateLoteVersion,
   addTrustedEntity,
   removeTrustedEntity,
 } from '@owf/eudi-lote';
 
 // Increment version and update timestamps
-let updatedList = updateLoTEVersion(lote);
+let updatedList = updateLoteVersion(lote);
 
 // Add new entity
 updatedList = addTrustedEntity(updatedList, newEntity);
@@ -247,69 +247,69 @@ updatedList = removeTrustedEntity(updatedList, 'Old Gym Name');
 
 ### Signing
 
-#### `signLoTE(options): Promise<SignedLoTE>`
+#### `signLote(options): Promise<SignedLote>`
 
 Signs a LoTE document using the provided signer function.
 
-#### `createLoTE(schemeInfo, entities?): LoTEDocument`
+#### `createLote(schemeInfo, entities?): LoteDocument`
 
 Creates a new LoTE document with the given scheme information. Only `SchemeOperatorName` is required per ETSI TS 119 602.
 
-#### `updateLoTEVersion(lote): LoTEDocument`
+#### `updateLoteVersion(lote): LoteDocument`
 
 Increments the sequence number and updates timestamps.
 
-#### `addTrustedEntity(lote, entity): LoTEDocument`
+#### `addTrustedEntity(lote, entity): LoteDocument`
 
 Adds a trusted entity to the list.
 
-#### `removeTrustedEntity(lote, entityName): LoTEDocument`
+#### `removeTrustedEntity(lote, entityName): LoteDocument`
 
 Removes an entity by name.
 
 ### Validation
 
-#### `validateLoTE(lote, { mode? }): ValidationResult`
+#### `validateLote(lote, { mode? }): ValidationResult`
 
 Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns `{ valid, issues }`, where each issue has a `severity`, a `code`, a `path` into the document and a `message`. Schema issues have a code of `SCHEMA_VALIDATION_CODES` from `@owf/identity-common`, such as `missing` or `invalid_value`, and the profile checks one of `LOTE_VALIDATION_CODES`. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
 
-When valid, the result has the document as `lote`: a `LoTEDocument`, or a `CompatLoTEDocument` in compat mode. A `CompatLoTEDocument` is not a `LoTEDocument`, as its `LoTELegalNotice` can be an array.
+When valid, the result has the document as `lote`: a `LoteDocument`, or a `CompatLoteDocument` in compat mode. A `CompatLoteDocument` is not a `LoteDocument`, as its `LoTELegalNotice` can be an array.
 
 ```typescript
-const result = validateLoTE(lote, { mode: 'compat' });
+const result = validateLote(lote, { mode: 'compat' });
 if (result.valid) {
-  result.lote; // CompatLoTEDocument
+  result.lote; // CompatLoteDocument
 }
 ```
 
-The rules of the EU lists (2-letter country codes, non-empty names, at least one digital identity, X.509 certificate encoding, and so on) are not part of the JSON schema: `validateLoTEProfile` applies them. The known differences from the JSON schema are listed in [`src/__tests__/schema-drift.test.mts`](./src/__tests__/schema-drift.test.mts).
+The rules of the EU lists (2-letter country codes, non-empty names, at least one digital identity, X.509 certificate encoding, and so on) are not part of the JSON schema: `validateLoteProfile` applies them. The known differences from the JSON schema are listed in [`src/__tests__/schema-drift.test.mts`](./src/__tests__/schema-drift.test.mts).
 
-#### `assertValidLoTE(lote, { mode? }): asserts lote is LoTEDocument`
+#### `assertValidLote(lote, { mode? }): asserts lote is LoteDocument`
 
-Type assertion that throws `LoTEValidationError`, a `LoTEError` with the `issues` of `validateLoTE`, if the LoTE document is invalid. In compat mode it asserts a `CompatLoTEDocument`.
+Type assertion that throws `LoteValidationError`, a `LoteError` with the `issues` of `validateLote`, if the LoTE document is invalid. In compat mode it asserts a `CompatLoteDocument`.
 
-#### `validateLoTEProfile(lote, profile: LoTEProfile | LoTEProfile[], options?): ValidationResult`
+#### `validateLoteProfile(lote, profile: LoteProfile | LoteProfile[], options?): ValidationResult`
 
-Validates a LoTE document against a known LoTE Profile, such as EU PID Providers List, mDL Providers List, etc. Returns `{ valid, issues }` like `validateLoTE`. A document whose `LoTEType` matches none of the profiles gets an `unexpected_lote_type` issue for each profile.
+Validates a LoTE document against a known LoTE Profile, such as EU PID Providers List, mDL Providers List, etc. Returns `{ valid, issues }` like `validateLote`. A document whose `LoTEType` matches none of the profiles gets an `unexpected_lote_type` issue for each profile.
 
-When valid, the result has the LoTEType of the profile the document matches as `loteType`, and the document as `lote`, typed as the `LoTEProfileDocument` of that profile: its `LoTEType`, `ServiceTypeIdentifier` and `ServiceStatus` are the values the profile allows. Check `valid` and then `loteType` to narrow `lote` to one profile.
+When valid, the result has the LoTEType of the profile the document matches as `loteType`, and the document as `lote`, typed as the `LoteProfileDocument` of that profile: its `LoTEType`, `ServiceTypeIdentifier` and `ServiceStatus` are the values the profile allows. Check `valid` and then `loteType` to narrow `lote` to one profile.
 
 ```typescript
-const result = validateLoTEProfile(lote, [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUPubEAAProvidersList]);
-if (result.valid && result.loteType === LOTE_TYPES.EUPubEAAProvidersList) {
-  result.lote; // LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList>
+const result = validateLoteProfile(lote, [LoteProfile.EuPidProvidersList, LoteProfile.EuPubEaaProvidersList]);
+if (result.valid && result.loteType === LOTE_TYPES.EuPubEaaProvidersList) {
+  result.lote; // LoteProfileDocument<LoteProfile.EuPubEaaProvidersList>
 }
 ```
 
 Options:
 
 - `mode`: `strict` (default) validates the list exactly as the profile defines it. `compat` also accepts deviations of lists in use that don't change who is trusted. The table below lists them.
-- `allowedTerritories`: compat mode only. The accepted `SchemeTerritory` values, `['EU']` by default. Pass the territory of a national list of an EU type, such as `['DE']`. In strict mode the territory must be `EU` (TS 119 602 D to I), and passing `allowedTerritories` throws a `LoTEError`.
+- `allowedTerritories`: compat mode only. The accepted `SchemeTerritory` values, `['EU']` by default. Pass the territory of a national list of an EU type, such as `['DE']`. In strict mode the territory must be `EU` (TS 119 602 D to I), and passing `allowedTerritories` throws a `LoteError`.
 
 | What | Profile(s) | Notes |
 | --- | --- | --- |
-| A `LoTELegalNotice` that is an array of localized URIs | All, and `validateLoTE` | The German EUDI Wallet sandbox lists |
-| A `PolicyOrLegalNotice` item with both `LoTEPolicy` and `LoTELegalNotice` | All, and `validateLoTE` | The German EUDI Wallet sandbox lists |
+| A `LoTELegalNotice` that is an array of localized URIs | All, and `validateLote` | The German EUDI Wallet sandbox lists |
+| A `PolicyOrLegalNotice` item with both `LoTEPolicy` and `LoTELegalNotice` | All, and `validateLote` | The German EUDI Wallet sandbox lists |
 | A `ServiceStatus` of `http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified`, with an optional `StatusStartingTime` | EU PID Providers List | No profile defines this status. The German PID Providers List sets it |
 | A `SchemeTerritory` other than `EU` | All | Only the values passed in `allowedTerritories`, such as `['DE']` |
 
@@ -317,15 +317,15 @@ A Pub-EAA Providers List gives every service a `ServiceStatus` (TS 119 602 H), a
 
 ```typescript
 // The German EUDI Wallet PID Providers List
-validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList, { mode: 'compat', allowedTerritories: ['DE'] });
+validateLoteProfile(lote, LoteProfile.EuPidProvidersList, { mode: 'compat', allowedTerritories: ['DE'] });
 ```
 
 #### `getNotifiedTrustedEntities(lote): TrustedEntity[]`
 
-Returns the trusted entities of a list validated with `validateLoTEProfile`, with only their notified services. It leaves out withdrawn services, and entities with no notified service left. A service without a `ServiceStatus` is notified, as in the profiles that don't define one.
+Returns the trusted entities of a list validated with `validateLoteProfile`, with only their notified services. It leaves out withdrawn services, and entities with no notified service left. A service without a `ServiceStatus` is notified, as in the profiles that don't define one.
 
 ```typescript
-const result = validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList);
+const result = validateLoteProfile(lote, LoteProfile.EuPubEaaProvidersList);
 if (result.valid) {
   const trustedEntities = getNotifiedTrustedEntities(result.lote);
 }
@@ -348,7 +348,7 @@ Methods:
 - `.infoUri(uri, lang?)` - Information URI
 - `.addExtension(extension)` - Add an extension
 - `.addService(service)` - Add a service
-- `.build()` - Build the entity, checked against the JSON schema rules (use `validateLoTEProfile` on the list for the EU rules)
+- `.build()` - Build the entity, checked against the JSON schema rules (use `validateLoteProfile` on the list for the EU rules)
 
 #### `service(): ServiceBuilder`
 
@@ -362,7 +362,7 @@ Methods:
 - `.statusStartingTime(isoTimestamp)` - When status became effective
 - `.addCertificate(base64Cert)` - Add X.509 certificate
 - `.addX509SubjectName(subjectName)` - Add X.509 subject name
-- `.addX509SKI(base64SKI)` - Add X.509 Subject Key Identifier
+- `.addX509Ski(base64SKI)` - Add X.509 Subject Key Identifier
 - `.addPublicKey(jwk)` - Add JWK public key
 - `.addOtherId(identifier)` - Add custom identifier
 - `.addEndpoint(uri)` or `.addEndpoint(type, uri)` - Add service endpoint, with an optional `ServiceType`
@@ -374,22 +374,22 @@ Methods:
 
 See [src/types.ts](./src/types.ts) for complete type definitions including:
 
-- `LoTEDocument` - Root LoTE document structure
+- `LoteDocument` - Root LoTE document structure
 - `TrustedEntity` - Entity in the LoTE document
 - `Service` - Service provided by an entity
 - `ServiceDigitalIdentity` - Digital identity for a service
 - `ServiceHistory` / `ServiceHistoryInstance` - Historical service states
-- `PointersToOtherLoTE` / `OtherLoTEPointer` - Cross-list references
-- `ValidationResult` / `LoTEValidationIssue` - Validation types
+- `PointersToOtherLoTE` / `OtherLotePointer` - Cross-list references
+- `ValidationResult` / `LoteValidationIssue` - Validation types
 
 All document types are derived from Zod schemas. You can import and use the schemas
 directly for custom validation or to build upon:
 
 ```typescript
-import { zLoTEDocument, zTrustedEntity } from '@owf/eudi-lote';
+import { zLoteDocument, zTrustedEntity } from '@owf/eudi-lote';
 
 // Use schemas for custom validation
-const result = zLoTEDocument.safeParse(data);
+const result = zLoteDocument.safeParse(data);
 
 // Compose with your own schemas
 const zMyTrustedEntity = zTrustedEntity.extend({ customField: z.string() });
@@ -410,7 +410,7 @@ The SDK supports delegating signing to external services:
 ```typescript
 import { CryptographyClient } from '@azure/keyvault-keys';
 
-const signed = await signLoTE({
+const signed = await signLote({
   lote,
   keyId: 'lote-signer',
   signer: async (data) => {
@@ -425,7 +425,7 @@ const signed = await signLoTE({
 ```typescript
 import { KMSClient, SignCommand } from '@aws-sdk/client-kms';
 
-const signed = await signLoTE({
+const signed = await signLote({
   lote,
   keyId: 'lote-signer',
   signer: async (data) => {
@@ -448,7 +448,7 @@ const signed = await signLoTE({
 - **Validate trust anchors** - Verify the signer's certificate chain
 - **Check sequence numbers** - Ensure you have the latest version
 - **Use HTTPS** - Always use HTTPS for distribution points
-- **Validate before signing** - Use `assertValidLoTE` before signing
+- **Validate before signing** - Use `assertValidLote` before signing
 
 ## License
 

@@ -1,8 +1,8 @@
 import { parseWithSchema } from '@owf/identity-common'
-import { LoTEValidationError } from './lote-error'
+import { LoteValidationError } from './lote-error'
 import { zTrustedEntity, zTrustedEntityService } from './schemas'
 import type {
-  JWKPublicKey,
+  JwkPublicKey,
   PostalAddress,
   ServiceHistoryInstance,
   ServiceInformation,
@@ -119,7 +119,7 @@ export class TrustedEntityBuilder {
     )
 
     if (!result.success) {
-      throw new LoTEValidationError('Invalid TrustedEntity', result.issues)
+      throw new LoteValidationError('Invalid TrustedEntity', result.issues)
     }
 
     return result.data
@@ -186,7 +186,7 @@ export class ServiceBuilder {
   /**
    * Add an X.509 Subject Key Identifier (base64-encoded) to the digital identity
    */
-  addX509SKI(ski: string): this {
+  addX509Ski(ski: string): this {
     this.info.ServiceDigitalIdentity = this.info.ServiceDigitalIdentity ?? {}
     this.info.ServiceDigitalIdentity.X509SKIs = this.info.ServiceDigitalIdentity.X509SKIs ?? []
     this.info.ServiceDigitalIdentity.X509SKIs.push(ski)
@@ -206,7 +206,7 @@ export class ServiceBuilder {
   /**
    * Add a public key (JWK) to the digital identity
    */
-  addPublicKey(jwk: JWKPublicKey): this {
+  addPublicKey(jwk: JwkPublicKey): this {
     this.info.ServiceDigitalIdentity = this.info.ServiceDigitalIdentity ?? {}
     this.info.ServiceDigitalIdentity.PublicKeyValues = this.info.ServiceDigitalIdentity.PublicKeyValues ?? []
     this.info.ServiceDigitalIdentity.PublicKeyValues.push(jwk)
@@ -268,7 +268,7 @@ export class ServiceBuilder {
     const result = parseWithSchema(zTrustedEntityService, data, { codes: LOTE_VALIDATION_CODES })
 
     if (!result.success) {
-      throw new LoTEValidationError('Invalid TrustedEntityService', result.issues)
+      throw new LoteValidationError('Invalid TrustedEntityService', result.issues)
     }
 
     return result.data

@@ -235,7 +235,7 @@ export interface TrustedListPointerFilter {
  * const esList = await loadTrustedList(esXml, { trustAnchors: esAnchors })
  * ```
  *
- * Passing `{ tslType: TSLType.EUlistofthelists }` returns the LOTL's own
+ * Passing `{ tslType: TslType.EUlistofthelists }` returns the LOTL's own
  * currently published signing certificates (from its self-pointer), which is
  * how a deployment refreshes its pinned set as the scheme operator rotates keys.
  */

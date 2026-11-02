@@ -237,7 +237,7 @@ export function isValidEntitlement(uri: string): boolean {
 /**
  * Check if a given URI is a PSP sub-entitlement
  */
-export function isPSPSubEntitlement(uri: string): boolean {
+export function isPspSubEntitlement(uri: string): boolean {
   return ALL_PSP_SUB_ENTITLEMENTS.includes(uri as (typeof ALL_PSP_SUB_ENTITLEMENTS)[number])
 }
 

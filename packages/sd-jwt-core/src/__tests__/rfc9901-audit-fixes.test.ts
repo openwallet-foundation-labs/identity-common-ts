@@ -2,7 +2,7 @@ import Crypto from 'node:crypto'
 import { hasher as digest, generateSalt } from '@owf/crypto'
 import { describe, expect, test } from 'vitest'
 import { unpackObj } from '../decode'
-import { GeneralJSON, Jwt, KBJwt, SDJwtInstance } from '../index'
+import { GeneralJson, Jwt, KbJwt, SdJwtInstance } from '../index'
 import { selectDisclosures, transformPresentationFrame } from '../present'
 import type { Signer, Verifier } from '../types'
 import { Disclosure } from '../utils'
@@ -59,7 +59,7 @@ describe('RFC 9901 audit fixes', () => {
 
   test('validates JWT claims after disclosure processing', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance({
+    const sdjwt = new SdJwtInstance({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -118,14 +118,14 @@ describe('RFC 9901 audit fixes', () => {
 
   test('validates key binding audience, age, and claim types', async () => {
     const { signer } = createSignerVerifier()
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: { typ: 'kb+jwt', alg: 'EdDSA' },
       payload: { iat: 900, aud: 'verifier-a', nonce: 'nonce', sd_hash: 'hash' },
     })
     await kbJwt.sign(signer)
 
     await expect(
-      kbJwt.verifyKB({
+      kbJwt.verifyKb({
         verifier: () => true,
         payload: {},
         nonce: 'nonce',
@@ -134,7 +134,7 @@ describe('RFC 9901 audit fixes', () => {
     ).rejects.toThrow('Verify Error: Invalid Key Binding audience')
 
     await expect(
-      kbJwt.verifyKB({
+      kbJwt.verifyKb({
         verifier: () => true,
         payload: {},
         nonce: 'nonce',
@@ -147,7 +147,7 @@ describe('RFC 9901 audit fixes', () => {
     })
 
     ;(kbJwt.payload as Record<string, unknown>).iat = '900'
-    await expect(kbJwt.verifyKB({ verifier: () => true, payload: {}, nonce: 'nonce' })).rejects.toThrow(
+    await expect(kbJwt.verifyKb({ verifier: () => true, payload: {}, nonce: 'nonce' })).rejects.toThrow(
       'Invalid Key Binding Jwt'
     )
   })
@@ -157,7 +157,7 @@ describe('RFC 9901 audit fixes', () => {
 
     expect(
       () =>
-        new SDJwtInstance({
+        new SdJwtInstance({
           signer,
           signAlg: 'EdDSA',
           verifier,
@@ -170,7 +170,7 @@ describe('RFC 9901 audit fixes', () => {
 
   test('rejects duplicate salts during issuance', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance({
+    const sdjwt = new SdJwtInstance({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -185,7 +185,7 @@ describe('RFC 9901 audit fixes', () => {
 
   test('rejects disclosures and kb_jwt outside the first General JSON header', () => {
     expect(() =>
-      GeneralJSON.fromSerialized({
+      GeneralJson.fromSerialized({
         payload: 'payload',
         signatures: [
           { protected: 'header-1', signature: 'sig-1', header: {} },

@@ -6,8 +6,8 @@ import {
   generateSigX5ts,
   generateX5tO,
   generateX5tS256,
-  JAdESError,
-  JAdESProfile,
+  JadesError,
+  JadesProfile,
   Token,
   validateProfile,
   verify,
@@ -124,7 +124,7 @@ describe('Token and verification', () => {
 
     const compact = token.toString()
     const general = token.toJSON()
-    const flattened = token.toFlattenedJSON()
+    const flattened = token.toFlattenedJson()
     expect((await verifyCompact<{ hello: string }>(compact, verifier)).payload.hello).toBe('world')
     expect((await verifyGeneral(general, verifier)).valid).toBe(true)
     expect((await verifyFlattened(flattened, verifier)).valid).toBe(true)
@@ -220,7 +220,7 @@ describe('Token and verification', () => {
     await token.sign(await ES256.getSigner(TEST_PRIVATE_KEY))
     expect(() => token.toString()).toThrow('Compact JWS cannot carry')
     expect(token.toJSON().signatures[0].header).toEqual({ etsiU: [{ sigTst: timestamp }] })
-    expect(() => token.setUnprotectedHeader({ etsiU: [], kid: 'bad' } as never)).toThrow(JAdESError)
+    expect(() => token.setUnprotectedHeader({ etsiU: [], kid: 'bad' } as never)).toThrow(JadesError)
   })
 })
 
@@ -241,23 +241,23 @@ describe('baseline profile validation', () => {
   }
 
   it('accepts iat, not only the obsolete sigT, at B-B', () => {
-    expect(validateProfile(protectedHeader(), JAdESProfile.B_B).valid).toBe(true)
+    expect(validateProfile(protectedHeader(), JadesProfile.B_B).valid).toBe(true)
   })
 
   it('requires exactly one RFC 3161 token in each baseline sigTst', () => {
-    expect(validateProfile(protectedHeader(), JAdESProfile.B_T, btHeader).valid).toBe(true)
+    expect(validateProfile(protectedHeader(), JadesProfile.B_T, btHeader).valid).toBe(true)
     const twoTokens: UnprotectedHeaderParams = {
       etsiU: [{ sigTst: { tstTokens: [...timestamp.tstTokens, ...timestamp.tstTokens] } }],
     }
-    expect(validateProfile(protectedHeader(), JAdESProfile.B_T, twoTokens).valid).toBe(false)
+    expect(validateProfile(protectedHeader(), JadesProfile.B_T, twoTokens).valid).toBe(false)
   })
 
   it('requires evidence of signature and timestamp validation data at B-LT', () => {
-    expect(validateProfile(protectedHeader(), JAdESProfile.B_LT, bltHeader).valid).toBe(true)
+    expect(validateProfile(protectedHeader(), JadesProfile.B_LT, bltHeader).valid).toBe(true)
     const incomplete: UnprotectedHeaderParams = {
       etsiU: [{ sigTst: timestamp }, { xVals: certificateValues }, { rVals: revocationValues }],
     }
-    expect(validateProfile(protectedHeader(), JAdESProfile.B_LT, incomplete).missing).toContain(
+    expect(validateProfile(protectedHeader(), JadesProfile.B_LT, incomplete).missing).toContain(
       'Validation data for electronic time-stamps is not evidenced'
     )
   })
@@ -266,11 +266,11 @@ describe('baseline profile validation', () => {
     const withReference = {
       etsiU: [...bltHeader.etsiU, { xRefs: [{ digAlg: 'S256', digVal: 'YWJj' }] }],
     } as UnprotectedHeaderParams
-    expect(validateProfile(protectedHeader(), JAdESProfile.B_LT, withReference).valid).toBe(false)
+    expect(validateProfile(protectedHeader(), JadesProfile.B_LT, withReference).valid).toBe(false)
   })
 
   it('requires an archive timestamp only at B-LTA', () => {
-    expect(validateProfile(protectedHeader(), JAdESProfile.B_LTA, bltHeader).valid).toBe(false)
-    expect(validateProfile(protectedHeader(), JAdESProfile.B_LTA, bltaHeader).valid).toBe(true)
+    expect(validateProfile(protectedHeader(), JadesProfile.B_LTA, bltHeader).valid).toBe(false)
+    expect(validateProfile(protectedHeader(), JadesProfile.B_LTA, bltaHeader).valid).toBe(true)
   })
 })

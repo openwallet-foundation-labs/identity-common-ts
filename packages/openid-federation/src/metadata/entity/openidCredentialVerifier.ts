@@ -13,4 +13,4 @@ export const openidCredentialVerifierEntityMetadata = createEntity({
   },
 })
 
-export type OpenIdCredentialVerifierMetadata = z.input<(typeof openidCredentialVerifierEntityMetadata)['schema']>
+export type OpenidCredentialVerifierMetadata = z.input<(typeof openidCredentialVerifierEntityMetadata)['schema']>

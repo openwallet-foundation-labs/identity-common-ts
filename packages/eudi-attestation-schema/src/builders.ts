@@ -1,15 +1,15 @@
 import { SchemaMetaError } from './schema-meta-error'
-import { zSchemaMeta, zSchemaURI, zTrustAuthority } from './schemas'
+import { zSchemaMeta, zSchemaUri, zTrustAuthority } from './schemas'
 import type {
   AttestationFormat,
-  AttestationLoS,
+  AttestationLos,
   BindingType,
   FrameworkType,
   IssuanceProfile,
   Oid4vciCredentialMetadata,
   SchemaMeta,
-  SchemaURI,
-  SchemaURIMeta,
+  SchemaUri,
+  SchemaUriMeta,
   SdJwtVcTypeMetadata,
   TrustAuthority,
 } from './types'
@@ -64,9 +64,9 @@ export class TrustAuthorityBuilder {
 }
 
 /**
- * Builder for creating SchemaURI objects with a fluent API
+ * Builder for creating SchemaUri objects with a fluent API
  */
-export class SchemaURIBuilder {
+export class SchemaUriBuilder {
   private data: Record<string, unknown> = {}
 
   /**
@@ -99,7 +99,7 @@ export class SchemaURIBuilder {
    * - mso_mdoc: provide { doctype_value }
    * - other formats: provide {}
    */
-  meta(meta: SchemaURIMeta): this {
+  meta(meta: SchemaUriMeta): this {
     this.data.meta = meta
     return this
   }
@@ -128,10 +128,10 @@ export class SchemaURIBuilder {
   }
 
   /**
-   * Build the SchemaURI object
+   * Build the SchemaUri object
    */
-  build(): SchemaURI {
-    const result = zSchemaURI.safeParse(this.data)
+  build(): SchemaUri {
+    const result = zSchemaUri.safeParse(this.data)
 
     if (!result.success) {
       const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
@@ -192,7 +192,7 @@ export class SchemaMetaBuilder {
   /**
    * Set the level of security
    */
-  attestationLoS(los: AttestationLoS): this {
+  attestationLoS(los: AttestationLos): this {
     this.data.attestationLoS = los
     return this
   }
@@ -208,9 +208,9 @@ export class SchemaMetaBuilder {
   /**
    * Add a schema URI
    */
-  addSchemaURI(schemaURI: SchemaURI): this {
+  addSchemaUri(schemaUri: SchemaUri): this {
     this.data.schemaURIs = this.data.schemaURIs ?? []
-    this.data.schemaURIs.push(schemaURI)
+    this.data.schemaURIs.push(schemaUri)
     return this
   }
 
@@ -252,8 +252,8 @@ export function trustAuthority(): TrustAuthorityBuilder {
 }
 
 /**
- * Create a new SchemaURIBuilder
+ * Create a new SchemaUriBuilder
  */
-export function schemaURI(): SchemaURIBuilder {
-  return new SchemaURIBuilder()
+export function schemaUri(): SchemaUriBuilder {
+  return new SchemaUriBuilder()
 }

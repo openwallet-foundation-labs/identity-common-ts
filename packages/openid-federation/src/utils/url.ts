@@ -1,4 +1,4 @@
-import { OpenIdFederationError } from '../error/OpenIdFederationError'
+import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 
 /**
@@ -22,7 +22,7 @@ import { PolicyErrorStage } from '../error/PolicyErrorStage'
 export const addPaths = (baseUrl: string, ...paths: Array<string>) => {
   const [scheme, rest] = baseUrl.split('://')
   if (!rest) {
-    throw new OpenIdFederationError(PolicyErrorStage.Validation, 'not a valid URL')
+    throw new OpenidFederationError(PolicyErrorStage.Validation, 'not a valid URL')
   }
 
   const urlWithoutScheme = rest

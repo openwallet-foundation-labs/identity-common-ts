@@ -9,7 +9,7 @@ export interface ValidateOpenid4vpAuthorizationRequestDcApiPayloadOptions {
 }
 
 /**
- * Validate the OpenId4Vp Authorization Request parameters for the dc_api response mode
+ * Validate the OpenID4VP Authorization Request parameters for the dc_api response mode
  */
 export const validateOpenid4vpAuthorizationRequestDcApiPayload = (
   options: ValidateOpenid4vpAuthorizationRequestDcApiPayloadOptions

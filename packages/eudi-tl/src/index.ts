@@ -10,7 +10,7 @@ export {
   ACTIVE_SERVICE_STATUSES,
   ServiceStatus,
   ServiceType,
-  TSLType,
+  TslType,
 } from './constants'
 export {
   getEuLotlTrustAnchors,

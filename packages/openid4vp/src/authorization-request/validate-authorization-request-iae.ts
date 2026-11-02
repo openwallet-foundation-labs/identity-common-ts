@@ -11,7 +11,7 @@ export interface ValidateOpenid4vpAuthorizationRequestIaePayloadOptions {
 }
 
 /**
- * Validate the OpenId4Vp Authorization Request parameters for the IAE (Interactive Authorization Endpoint) response mode
+ * Validate the OpenID4VP Authorization Request parameters for the IAE (Interactive Authorization Endpoint) response mode
  *
  * The IAE flow is part of OpenID4VCI 1.1 and is used when the authorization server needs to
  * interact directly with the wallet during the authorization process.

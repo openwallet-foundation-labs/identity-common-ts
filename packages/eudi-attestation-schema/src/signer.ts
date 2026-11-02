@@ -11,7 +11,7 @@ import type { SignedSchemaMeta, SignOptions } from './types'
  * @example Using a local key via @owf/crypto:
  * ```typescript
  * import { ES256 } from '@owf/crypto'
- * import { signSchemaMeta, schemaMeta, schemaURI } from '@owf/eudi-attestation-schema'
+ * import { signSchemaMeta, schemaMeta, schemaUri } from '@owf/eudi-attestation-schema'
  *
  * const { privateKey } = await ES256.generateKeyPair()
  * const signer = await ES256.getSigner(privateKey)
@@ -21,7 +21,7 @@ import type { SignedSchemaMeta, SignOptions } from './types'
  *   .rulebookURI('https://example.com/rulebook.md')
  *   .attestationLoS('iso_18045_basic')
  *   .bindingType('key')
- *   .addSchemaURI(schemaURI().format('dc+sd-jwt').uri('https://example.com/schema.json').build())
+ *   .addSchemaUri(schemaUri().format('dc+sd-jwt').uri('https://example.com/schema.json').build())
  *   .build()
  *
  * const signed = await signSchemaMeta({

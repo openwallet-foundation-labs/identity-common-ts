@@ -10,11 +10,11 @@
  */
 
 import { pemToDer } from '@owf/crypto'
-import { decode, JAdESProfile, Token, validateProfile } from '@owf/eudi-jades'
+import { decode, JadesProfile, Token, validateProfile } from '@owf/eudi-jades'
 import { REGISTRATION_CERTIFICATE_DIALECTS, toRegistrationCertificateDialect } from './dialect'
 import { RegistrationCertificateError } from './registration-certificate-error'
 import type {
-  RegistrationCertificateJWTHeader,
+  RegistrationCertificateJwtHeader,
   RegistrationCertificatePayload,
   SignedRegistrationCertificate,
   SignOptions,
@@ -68,7 +68,7 @@ export async function signRegistrationCertificate(options: SignOptions): Promise
 
   return {
     jws: token.toString(),
-    header: token.getProtectedHeader() as RegistrationCertificateJWTHeader,
+    header: token.getProtectedHeader() as RegistrationCertificateJwtHeader,
     payload,
   }
 }
@@ -105,7 +105,7 @@ export function decodeRegistrationCertificate(
   }
 
   // GEN-5.2.1-04
-  const profile = validateProfile(decoded.header, JAdESProfile.B_B, decoded.unprotectedHeader)
+  const profile = validateProfile(decoded.header, JadesProfile.B_B, decoded.unprotectedHeader)
   if (!profile.valid) {
     throw new RegistrationCertificateError(
       `Registration certificate signature does not meet the JAdES B-B profile (GEN-5.2.1-04): ${profile.missing?.join(', ')}`
@@ -117,7 +117,7 @@ export function decodeRegistrationCertificate(
 
   return {
     jws,
-    header: decoded.header as RegistrationCertificateJWTHeader,
+    header: decoded.header as RegistrationCertificateJwtHeader,
     payload,
   }
 }

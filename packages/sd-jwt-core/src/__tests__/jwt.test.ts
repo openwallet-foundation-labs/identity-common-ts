@@ -2,7 +2,7 @@ import Crypto from 'node:crypto'
 import { describe, expect, test } from 'vitest'
 import { Jwt } from '../jwt'
 import type { Signer, Verifier } from '../types'
-import { base64urlEncode, JwtTimeClaimError, SDJWTError } from '../utils'
+import { base64urlEncode, JwtTimeClaimError, SdJwtError } from '../utils'
 
 describe('JWT', () => {
   test('create', async () => {
@@ -86,7 +86,7 @@ describe('JWT', () => {
     try {
       await newJwt.verify(() => false)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTError)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
   })
 
@@ -141,7 +141,7 @@ describe('JWT', () => {
     try {
       jwt.encodeJwt()
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTError)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
   })
 
@@ -159,7 +159,7 @@ describe('JWT', () => {
     try {
       await jwt.sign(testSigner)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTError)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
   })
 
@@ -179,7 +179,7 @@ describe('JWT', () => {
     try {
       await jwt.sign(testSigner)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTError)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
   })
 
@@ -197,7 +197,7 @@ describe('JWT', () => {
     try {
       await jwt.verify(testVerifier)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTError)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
   })
 
@@ -254,7 +254,7 @@ describe('JWT', () => {
 
     const error = await jwt.verify(testVerifier, { currentDate: 1100 }).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(JwtTimeClaimError)
-    expect(error).toBeInstanceOf(SDJWTError)
+    expect(error).toBeInstanceOf(SdJwtError)
     expect(error).toMatchObject({
       name: 'JwtTimeClaimError',
       message: 'Verify Error: JWT is expired',

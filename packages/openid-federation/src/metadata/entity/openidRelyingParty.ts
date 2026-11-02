@@ -13,4 +13,4 @@ export const openidRelyingPartyEntityMetadata = createEntity({
   },
 })
 
-export type OpenIdRelyingPartyMetadata = z.input<(typeof openidRelyingPartyEntityMetadata)['schema']>
+export type OpenidRelyingPartyMetadata = z.input<(typeof openidRelyingPartyEntityMetadata)['schema']>

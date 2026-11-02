@@ -13,7 +13,7 @@ import type { TypeMetadataFormat } from '@sd-jwt/sd-jwt-vc'
 import type { z } from 'zod'
 import type {
   zAttestationFormat,
-  zAttestationLoS,
+  zAttestationLos,
   zBindingType,
   zFrameworkType,
   zIssuanceProfile,
@@ -24,7 +24,7 @@ import type {
   zOid4vciDisplay,
   zProofType,
   zSchemaMeta,
-  zSchemaURI,
+  zSchemaUri,
   zSdJwtMeta,
   zSdJwtVcTypeMetadata,
   zStatusMechanism,
@@ -36,7 +36,7 @@ import type {
 // ============================================================================
 
 export type AttestationFormat = z.infer<typeof zAttestationFormat>
-export type AttestationLoS = z.infer<typeof zAttestationLoS>
+export type AttestationLos = z.infer<typeof zAttestationLos>
 export type BindingType = z.infer<typeof zBindingType>
 export type FrameworkType = z.infer<typeof zFrameworkType>
 
@@ -52,8 +52,8 @@ export type Oid4vciDisplay = z.infer<typeof zOid4vciDisplay>
 export type Oid4vciClaimDisplay = z.infer<typeof zOid4vciClaimDisplay>
 export type Oid4vciClaim = z.infer<typeof zOid4vciClaim>
 export type SdJwtVcTypeMetadata = z.infer<typeof zSdJwtVcTypeMetadata>
-export type SchemaURIMeta = SdJwtMeta | MsoMdocMeta
-export type SchemaURI = z.infer<typeof zSchemaURI>
+export type SchemaUriMeta = SdJwtMeta | MsoMdocMeta
+export type SchemaUri = z.infer<typeof zSchemaUri>
 export type ProofType = z.infer<typeof zProofType>
 export type StatusMechanism = z.infer<typeof zStatusMechanism>
 export type IssuanceProfile = z.infer<typeof zIssuanceProfile>
@@ -111,7 +111,7 @@ export interface ResolvedSchemaReference {
   format: AttestationFormat
   uri: string
   integrity: string
-  meta?: SchemaURIMeta
+  meta?: SchemaUriMeta
   rawSchema: unknown
   /** Present for `dc+sd-jwt` references that resolve to Type Metadata, merged over `extends`. */
   typeMetadata?: TypeMetadataFormat

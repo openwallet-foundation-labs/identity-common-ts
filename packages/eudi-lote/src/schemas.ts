@@ -26,7 +26,7 @@ export const zLocalizedString = z.object({
   value: z.string(),
 })
 
-export const zLocalizedURI = z.object({
+export const zLocalizedUri = z.object({
   lang: z.string(),
   uriValue: z.url(),
 })
@@ -47,12 +47,12 @@ export const zPostalAddress = z.object({
 
 export const zSchemeOperatorAddress = z.object({
   SchemeOperatorPostalAddress: z.array(zPostalAddress),
-  SchemeOperatorElectronicAddress: z.array(zLocalizedURI),
+  SchemeOperatorElectronicAddress: z.array(zLocalizedUri),
 })
 
 export const zTrustedEntityAddress = z.object({
   TEPostalAddress: z.array(zPostalAddress),
-  TEElectronicAddress: z.array(zLocalizedURI),
+  TEElectronicAddress: z.array(zLocalizedUri),
 })
 
 // ============================================================================
@@ -71,7 +71,7 @@ export const zPkiObject = z.object({
  */
 export const zX509CertificateRef = zPkiObject
 
-export const zJWKPublicKey = z.looseObject({
+export const zJwkPublicKey = z.looseObject({
   // RFC 7517 as the JSON schema references it lists EC, RSA and oct; OKP (RFC 8037) is accepted too
   kty: z.enum(['RSA', 'EC', 'OKP', 'oct']),
   kid: z.string().optional(),
@@ -86,7 +86,7 @@ export const zJWKPublicKey = z.looseObject({
 export const zServiceDigitalIdentity = z.object({
   X509Certificates: z.array(zX509CertificateRef).optional(),
   X509SubjectNames: z.array(z.string()).optional(),
-  PublicKeyValues: z.array(zJWKPublicKey).optional(),
+  PublicKeyValues: z.array(zJwkPublicKey).optional(),
   X509SKIs: z.array(z.string()).optional(),
   OtherIds: z.array(z.string()).optional(),
 })
@@ -169,9 +169,9 @@ export const zServiceInformation = z.object({
   ServiceTypeIdentifier: z.url().optional(),
   ServiceStatus: z.url().optional(),
   StatusStartingTime: zDateTime.optional(),
-  SchemeServiceDefinitionURI: z.array(zLocalizedURI).optional(),
+  SchemeServiceDefinitionURI: z.array(zLocalizedUri).optional(),
   ServiceSupplyPoints: z.array(zServiceSupplyPoint).optional(),
-  ServiceDefinitionURI: z.array(zLocalizedURI).optional(),
+  ServiceDefinitionURI: z.array(zLocalizedUri).optional(),
   ServiceInformationExtensions: z.array(z.unknown()).optional(),
 })
 
@@ -197,7 +197,7 @@ export const zTrustedEntityInformation = z.object({
   TEName: z.array(zLocalizedString).min(1),
   TETradeName: z.array(zLocalizedString).optional(),
   TEAddress: zTrustedEntityAddress,
-  TEInformationURI: z.array(zLocalizedURI).optional(),
+  TEInformationURI: z.array(zLocalizedUri).optional(),
   TEInformationExtensions: z.array(z.unknown()).optional(),
 })
 
@@ -211,7 +211,7 @@ export const zTrustedEntity = z.object({
 // ============================================================================
 
 export const zPolicyOrLegalNotice = z.object({
-  LoTEPolicy: zLocalizedURI.optional(),
+  LoTEPolicy: zLocalizedUri.optional(),
   // The JSON schema of TS 119 602 types LoTELegalNotice as a plain string, the XML schema as a multilingual string
   LoTELegalNotice: z.union([z.string(), zLocalizedString]).optional(),
 })
@@ -258,18 +258,18 @@ export const zPolicyOrLegalNoticeList = z.array(zPolicyOrLegalNotice).superRefin
   })
 })
 
-export const zLoTEQualifier = z.object({
+export const zLoteQualifier = z.object({
   LoTEType: z.url(),
   SchemeOperatorName: z.array(zLocalizedString).min(1),
-  SchemeTypeCommunityRules: z.array(zLocalizedURI).optional(),
+  SchemeTypeCommunityRules: z.array(zLocalizedUri).optional(),
   SchemeTerritory: z.string().length(2).optional(),
   MimeType: z.string(),
 })
 
-export const zOtherLoTEPointer = z.object({
+export const zOtherLotePointer = z.object({
   LoTELocation: z.url(),
   ServiceDigitalIdentities: z.array(zServiceDigitalIdentity).min(1),
-  LoTEQualifiers: z.array(zLoTEQualifier).min(1),
+  LoTEQualifiers: z.array(zLoteQualifier).min(1),
 })
 
 export const zListAndSchemeInformation = z.object({
@@ -279,13 +279,13 @@ export const zListAndSchemeInformation = z.object({
   SchemeOperatorName: z.array(zLocalizedString).min(1),
   SchemeOperatorAddress: zSchemeOperatorAddress.optional(),
   SchemeName: z.array(zLocalizedString).optional(),
-  SchemeInformationURI: z.array(zLocalizedURI).optional(),
+  SchemeInformationURI: z.array(zLocalizedUri).optional(),
   StatusDeterminationApproach: z.url().optional(),
-  SchemeTypeCommunityRules: z.array(zLocalizedURI).optional(),
+  SchemeTypeCommunityRules: z.array(zLocalizedUri).optional(),
   SchemeTerritory: z.string().length(2).optional(),
   PolicyOrLegalNotice: zPolicyOrLegalNoticeList.optional(),
   HistoricalInformationPeriod: z.number().optional(),
-  PointersToOtherLoTE: z.array(zOtherLoTEPointer).optional(),
+  PointersToOtherLoTE: z.array(zOtherLotePointer).optional(),
   ListIssueDateTime: zDateTime,
   NextUpdate: zDateTime,
   DistributionPoints: z.array(z.url()).optional(),
@@ -296,13 +296,13 @@ export const zListAndSchemeInformation = z.object({
 // LoTE Root Schemas
 // ============================================================================
 
-export const zLoTE = z.object({
+export const zLote = z.object({
   ListAndSchemeInformation: zListAndSchemeInformation,
   TrustedEntitiesList: z.array(zTrustedEntity).optional(),
 })
 
-export const zLoTEDocument = z.object({
-  LoTE: zLoTE,
+export const zLoteDocument = z.object({
+  LoTE: zLote,
 })
 
 /**
@@ -313,7 +313,7 @@ export const zCompatPolicyOrLegalNoticeList = z
   .array(
     zPolicyOrLegalNotice
       .extend({
-        LoTELegalNotice: z.union([z.string(), zLocalizedString, z.array(zLocalizedURI)]).optional(),
+        LoTELegalNotice: z.union([z.string(), zLocalizedString, z.array(zLocalizedUri)]).optional(),
       })
       .superRefine((item, ctx) => {
         if (item.LoTEPolicy !== undefined || item.LoTELegalNotice !== undefined) return
@@ -322,9 +322,9 @@ export const zCompatPolicyOrLegalNoticeList = z
   )
   .min(1)
 
-/** `zLoTEDocument` with the `PolicyOrLegalNotice` of `zCompatPolicyOrLegalNoticeList` */
-export const zCompatLoTEDocument = zLoTEDocument.extend({
-  LoTE: zLoTE.extend({
+/** `zLoteDocument` with the `PolicyOrLegalNotice` of `zCompatPolicyOrLegalNoticeList` */
+export const zCompatLoteDocument = zLoteDocument.extend({
+  LoTE: zLote.extend({
     ListAndSchemeInformation: zListAndSchemeInformation.extend({
       PolicyOrLegalNotice: zCompatPolicyOrLegalNoticeList.optional(),
     }),

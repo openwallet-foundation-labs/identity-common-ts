@@ -1,8 +1,8 @@
 import { splitSdJwt } from './decode'
 import { SD_SEPARATOR } from './types'
-import { SDJWTError } from './utils'
+import { SdJwtError } from './utils'
 
-export type FlattenJSONData = {
+export type FlattenJsonData = {
   jwtData: {
     protected: string
     payload: string
@@ -12,7 +12,7 @@ export type FlattenJSONData = {
   kb_jwt?: string
 }
 
-export type FlattenJSONSerialized = {
+export type FlattenJsonSerialized = {
   payload: string
   signature: string
   protected: string
@@ -22,7 +22,7 @@ export type FlattenJSONSerialized = {
   }
 }
 
-export class FlattenJSON {
+export class FlattenJson {
   public disclosures: Array<string>
   public kb_jwt?: string
 
@@ -30,7 +30,7 @@ export class FlattenJSON {
   public signature: string
   public protected: string
 
-  constructor(data: FlattenJSONData) {
+  constructor(data: FlattenJsonData) {
     this.disclosures = data.disclosures
     this.kb_jwt = data.kb_jwt
     this.payload = data.jwtData.payload
@@ -43,10 +43,10 @@ export class FlattenJSON {
 
     const { 0: protectedHeader, 1: payload, 2: signature } = jwt.split('.')
     if (!protectedHeader || !payload || !signature) {
-      throw new SDJWTError('Invalid JWT')
+      throw new SdJwtError('Invalid JWT')
     }
 
-    return new FlattenJSON({
+    return new FlattenJson({
       jwtData: {
         protected: protectedHeader,
         payload,
@@ -57,8 +57,8 @@ export class FlattenJSON {
     })
   }
 
-  public static fromSerialized(json: FlattenJSONSerialized) {
-    return new FlattenJSON({
+  public static fromSerialized(json: FlattenJsonSerialized) {
+    return new FlattenJson({
       jwtData: {
         protected: json.protected,
         payload: json.payload,
@@ -69,7 +69,7 @@ export class FlattenJSON {
     })
   }
 
-  public toJson(): FlattenJSONSerialized {
+  public toJson(): FlattenJsonSerialized {
     return {
       payload: this.payload,
       signature: this.signature,

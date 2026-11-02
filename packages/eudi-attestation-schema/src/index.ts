@@ -1,9 +1,9 @@
 // Builders
 export {
   SchemaMetaBuilder,
-  SchemaURIBuilder,
+  SchemaUriBuilder,
   schemaMeta,
-  schemaURI,
+  schemaUri,
   TrustAuthorityBuilder,
   trustAuthority,
 } from './builders'
@@ -27,11 +27,11 @@ export { SchemaMetaError } from './schema-meta-error'
 // Schemas
 export {
   AttestationFormatValues,
-  AttestationLoSValues,
+  AttestationLosValues,
   BindingTypeValues,
   FrameworkTypeValues,
   zAttestationFormat,
-  zAttestationLoS,
+  zAttestationLos,
   zBindingType,
   zFrameworkType,
   zIssuanceProfile,
@@ -42,7 +42,7 @@ export {
   zOid4vciDisplay,
   zProofType,
   zSchemaMeta,
-  zSchemaURI,
+  zSchemaUri,
   zSdJwtMeta,
   zSdJwtVcTypeMetadata,
   zSha256Sri,
@@ -69,7 +69,7 @@ export {
 // Types
 export type {
   AttestationFormat,
-  AttestationLoS,
+  AttestationLos,
   BindingType,
   BuildCredentialConfigurationTemplateOptions,
   BuildDcqlFromSchemaMetaOptions,
@@ -91,8 +91,8 @@ export type {
   ResolverContent,
   ResolveSchemaReferencesOptions,
   SchemaMeta,
-  SchemaURI,
-  SchemaURIMeta,
+  SchemaUri,
+  SchemaUriMeta,
   SdJwtMeta,
   SdJwtVcTypeMetadata,
   SignedSchemaMeta,
