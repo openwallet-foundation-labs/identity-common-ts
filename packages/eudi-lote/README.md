@@ -286,7 +286,7 @@ The rules of the EU lists (2-letter country codes, non-empty names, at least one
 
 #### `assertValidLote(lote, { mode? }): asserts lote is LoteDocument`
 
-Type assertion that throws `LoteValidationError`, a `LoteError` with the `issues` of `validateLote`, if the LoTE document is invalid. In compat mode it asserts a `CompatLoteDocument`.
+Type assertion that throws `LoteValidationError`, a `ValidationError` of `@owf/identity-common` with the `issues` of `validateLote`, if the LoTE document is invalid. In compat mode it asserts a `CompatLoteDocument`.
 
 #### `validateLoteProfile(lote, profile: LoteProfile | LoteProfile[], options?): ValidationResult`
 

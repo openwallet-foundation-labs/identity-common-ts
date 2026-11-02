@@ -4,7 +4,7 @@
  */
 
 import { ES256 } from '@owf/crypto'
-import { base64urlEncode } from '@owf/identity-common'
+import { base64urlEncode, ValidationError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
   assertValidRegistrationCertificate,
@@ -220,7 +220,8 @@ describe('assertValidRegistrationCertificate', () => {
     try {
       assertValidRegistrationCertificate(invalidHeader, payload, 'LEINL-529900T8BM49AURSDO55')
     } catch (error) {
-      expect(error).toBeInstanceOf(RegistrationCertificateError)
+      expect(error).toBeInstanceOf(RegistrationCertificateValidationError)
+      expect(error).toBeInstanceOf(ValidationError)
       expect((error as RegistrationCertificateValidationError).issues).toEqual(
         validateRegistrationCertificate(invalidHeader, payload, 'LEINL-529900T8BM49AURSDO55').issues
       )

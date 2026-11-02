@@ -1,11 +1,11 @@
-import { decodeJwt } from '@owf/identity-common'
+import { decodeJwt, ValidationError } from '@owf/identity-common'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   assertValidLote,
   getNotifiedTrustedEntities,
   LOTE_VALIDATION_CODES,
   LoteError,
-  type LoteValidationError,
+  LoteValidationError,
   validateLote,
 } from '../index'
 import { LOTE_TYPES } from '../profiles'
@@ -733,7 +733,8 @@ describe('LoTE Validator', () => {
         expect.fail('Should have thrown')
       } catch (error) {
         expect((error as Error).message).toContain('ListAndSchemeInformation')
-        expect(error).toBeInstanceOf(LoteError)
+        expect(error).toBeInstanceOf(LoteValidationError)
+        expect(error).toBeInstanceOf(ValidationError)
         expect((error as LoteValidationError).issues).toEqual(validateLote({ LoTE: {} }).issues)
       }
     })
@@ -1172,7 +1173,7 @@ describe('LoTE Validator', () => {
     it('should assert the type of the mode', () => {
       const lote: unknown = decodeJwt(GermanSandboxWalletProvidersJWT).payload
 
-      expect(() => assertValidLote(lote)).toThrow(LoteError)
+      expect(() => assertValidLote(lote)).toThrow(LoteValidationError)
       assertValidLote(lote, { mode: 'compat' })
       expectTypeOf(lote).toEqualTypeOf<CompatLoteDocument>()
     })

@@ -1,4 +1,4 @@
-import { IdentityError, validationErrorMessage } from '@owf/identity-common'
+import { IdentityError, ValidationError } from '@owf/identity-common'
 import type { TrustedListValidationIssue } from './validate'
 
 /**
@@ -32,15 +32,7 @@ export class TrustedListParseError extends TrustedListError {
  * The parsed list does not conform to the TS 119 612 schema or to a profile, with the
  * `issues` of the validation. The message lists the errors among them.
  */
-export class TrustedListValidationError extends TrustedListParseError {
-  readonly issues: TrustedListValidationIssue[]
-
-  constructor(message: string, issues: TrustedListValidationIssue[]) {
-    super(validationErrorMessage(message, issues))
-    this.name = 'TrustedListValidationError'
-    this.issues = issues
-  }
-}
+export class TrustedListValidationError extends ValidationError<TrustedListValidationIssue> {}
 
 /**
  * The trusted list's own XAdES/XMLDSig signature is missing, invalid, or does

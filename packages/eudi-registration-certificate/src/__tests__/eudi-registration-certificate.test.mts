@@ -11,6 +11,7 @@ import {
   isValidEntitlement,
   PSP_SUB_ENTITLEMENTS,
   RegistrationCertificateError,
+  RegistrationCertificateValidationError,
   registrationCertificate,
   validateLegalPersonRegistrationCertificate,
   validateNaturalPersonRegistrationCertificate,
@@ -413,7 +414,7 @@ describe('RegistrationCertificateBuilder', () => {
   it('should throw on invalid payload', () => {
     expect(() => {
       registrationCertificate().name('Test').build()
-    }).toThrow(RegistrationCertificateError)
+    }).toThrow(RegistrationCertificateValidationError)
   })
 })
 

@@ -5,13 +5,14 @@ import { ValidationError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import z from 'zod'
 import { cborEncode } from '../cbor'
-import { CwtPayload, type CwtPayloadDecodedStructure, RegisteredCwtClaimKey } from '../cose'
+import { CoseValidationError, CwtPayload, type CwtPayloadDecodedStructure, RegisteredCwtClaimKey } from '../cose'
 import { TypedMap } from '../utils/typed-map'
 
 const invalidClaims = () => cborEncode(new Map<number, unknown>([[RegisteredCwtClaimKey.ExpirationTime, 'tomorrow']]))
 
 describe('a cose structure that does not match its schema', () => {
-  it('is rejected with the ValidationError of @owf/identity-common', () => {
+  it('is rejected with a CoseValidationError, a ValidationError of @owf/identity-common', () => {
+    expect(() => CwtPayload.decode(invalidClaims())).toThrow(CoseValidationError)
     expect(() => CwtPayload.decode(invalidClaims())).toThrow(ValidationError)
   })
 

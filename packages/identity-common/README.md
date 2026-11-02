@@ -92,7 +92,7 @@ z.object({ exp: z.number(), iat: z.number() }).superRefine((payload, ctx) => {
 })
 ```
 
-When an assert or parse function finds an error, it throws the validation error of its package, e.g. `RegistrationCertificateValidationError`, with the `issues` of the validation. It extends the error of the package, e.g. `RegistrationCertificateError`, and `validationErrorMessage` builds its message.
+When an assert or parse function finds an error, it throws the validation error of its package, e.g. `RegistrationCertificateValidationError`, with the `issues` of the validation. It extends `ValidationError`, so `instanceof ValidationError` catches the validation errors of every package, and `validationErrorMessage` builds its message.
 
 `parseWithErrorHandling(schema, value, message)` parses without `codes` and throws a `ValidationError` with the issues. The message lists the errors with their path, never the parsed value.
 

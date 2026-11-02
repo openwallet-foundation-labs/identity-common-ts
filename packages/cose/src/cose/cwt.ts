@@ -284,7 +284,7 @@ export class Cwt<
    * @throws CwtDetachedPayloadError if the token carries a detached (null) payload.
    * @throws CwtPayloadDecodeError if the payload is not a valid claims set for this CWT type. The
    *   underlying error is available on the `cause` property.
-   * @throws ValidationError (from `@owf/identity-common`) if a header map is not valid for this CWT
+   * @throws CoseValidationError if a header map is not valid for this CWT
    *   type's header structures.
    */
   public static fromToken<T extends AnyCwt>(

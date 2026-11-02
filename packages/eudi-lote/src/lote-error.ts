@@ -1,4 +1,4 @@
-import { IdentityError, validationErrorMessage } from '@owf/identity-common'
+import { IdentityError, ValidationError } from '@owf/identity-common'
 import type { LoteValidationIssue } from './validator'
 
 /**
@@ -14,12 +14,4 @@ export class LoteError extends IdentityError {
 /**
  * Thrown when a LoTE document or one of its parts does not pass validation, with the `issues` of the validation. The message lists the errors among them.
  */
-export class LoteValidationError extends LoteError {
-  readonly issues: LoteValidationIssue[]
-
-  constructor(message: string, issues: LoteValidationIssue[]) {
-    super(validationErrorMessage(message, issues))
-    this.name = 'LoteValidationError'
-    this.issues = issues
-  }
-}
+export class LoteValidationError extends ValidationError<LoteValidationIssue> {}

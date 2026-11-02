@@ -1,4 +1,4 @@
-import { IdentityError } from '@owf/identity-common'
+import { IdentityError, ValidationError } from '@owf/identity-common'
 
 /**
  * Base error class for the COSE structures in this package.
@@ -17,6 +17,9 @@ export class CoseError extends IdentityError {
     this.cause = options?.cause
   }
 }
+
+/** A COSE or CBOR structure does not match its schema, with the `issues` of the validation */
+export class CoseValidationError extends ValidationError {}
 
 export class CoseUnsupportedMacError extends CoseError {}
 export class CoseInvalidSignatureError extends CoseError {}

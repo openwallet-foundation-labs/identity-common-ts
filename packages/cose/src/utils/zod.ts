@@ -1,6 +1,7 @@
-import { schemaIssueToValidationIssue, ValidationError, zodErrorMap } from '@owf/identity-common'
+import { schemaIssueToValidationIssue, zodErrorMap } from '@owf/identity-common'
 import z from 'zod'
 import type { $ZodType } from 'zod/v4/core'
+import { CoseValidationError } from '../cose/error'
 
 export const zUint8Array = z.instanceof<typeof Uint8Array<ArrayBufferLike>>(Uint8Array)
 
@@ -19,7 +20,7 @@ export function parseStructureWithErrorHandling<Schema extends ZodTypeAny>(
   const parseResult = z.safeParse(schema, data, { reportInput: true, error: zodErrorMap })
 
   if (!parseResult.success) {
-    throw new ValidationError(customErrorMessage ?? `Error decoding ${structureName}`, issuesOf(parseResult.error))
+    throw new CoseValidationError(customErrorMessage ?? `Error decoding ${structureName}`, issuesOf(parseResult.error))
   }
 
   return parseResult.data
@@ -34,7 +35,7 @@ export function decodeStructureWithErrorHandling<Schema extends ZodTypeAny>(
   const decodeResult = z.safeDecode(schema, data, { reportInput: true, error: zodErrorMap })
 
   if (!decodeResult.success) {
-    throw new ValidationError(customErrorMessage ?? `Error decoding ${structureName}`, issuesOf(decodeResult.error))
+    throw new CoseValidationError(customErrorMessage ?? `Error decoding ${structureName}`, issuesOf(decodeResult.error))
   }
 
   return decodeResult.data
@@ -49,7 +50,7 @@ export function encodeStructureWithErrorHandling<Schema extends ZodTypeAny>(
   const encodeResult = z.safeEncode(schema, data, { reportInput: true, error: zodErrorMap })
 
   if (!encodeResult.success) {
-    throw new ValidationError(customErrorMessage ?? `Error encoding ${structureName}`, issuesOf(encodeResult.error))
+    throw new CoseValidationError(customErrorMessage ?? `Error encoding ${structureName}`, issuesOf(encodeResult.error))
   }
 
   return encodeResult.data
