@@ -14,7 +14,7 @@ Now accepted by `validateLoTE`:
 - a `Country` that is not a 2-letter code, and a `ServiceDigitalIdentity` with no identity;
 - any URI as a certificate's `encoding` and any string as its `specRef`, and `oct` as a JWK `kty`.
 
-Now rejected by `validateLoTE`, as the JSON schema does: a `PolicyOrLegalNotice` that is empty, that has an item with neither key, that mixes policies and legal notices, or whose items all carry both `LoTEPolicy` and `LoTELegalNotice` (the schema's `oneOf`: every item has `LoTEPolicy`, or every item has `LoTELegalNotice`, not both). The exported `PkiObjectSchema` also requires its `encoding` to be a URI, as the schema's `pkiOb` does.
+Now rejected by `validateLoTE`, as the JSON schema does: a `PolicyOrLegalNotice` that is empty, that has an item with neither key, that mixes policies and legal notices, or whose items all carry both `LoTEPolicy` and `LoTELegalNotice` (the schema's `oneOf`: every item has `LoTEPolicy`, or every item has `LoTELegalNotice`, not both). The exported `zPkiObject` also requires its `encoding` to be a URI, as the schema's `pkiOb` does.
 
 Still checked by the EU profiles in `validateLoTEProfile`, on the scheme information, the pointers to other lists, the entities and the service history: non-empty `lang` and `value`, a 2-letter `Country`, at least one digital identity, a non-empty certificate `val`, `encoding` `urn:ietf:params:tls-cert-type:x509` and `specRef` `RFC5280` when present, no `oct` key, a non-empty `MimeType`.
 
@@ -27,7 +27,7 @@ Other changes:
 - `createLoTE` leaves `TrustedEntitiesList` out when there are no entities, instead of writing `[]`, which the JSON schema rejects (`minItems: 1`), and writes no key for an optional field left undefined.
 - `removeTrustedEntity` removes the key when the last entity goes. When no entity matches, it returns the list as it was: it no longer adds the key to a list that had none.
 - `ServiceBuilder.addEndpoint(uri)` adds a supply point without `ServiceType`; `addEndpoint(type, uri)` is unchanged.
-- New exports: `PolicyOrLegalNoticeListSchema` and `hasDigitalIdentity`.
+- New exports: `zPolicyOrLegalNoticeList` and `hasDigitalIdentity`.
 
 Breaking type and behaviour changes:
 
@@ -36,4 +36,4 @@ Breaking type and behaviour changes:
 - `X509CertificateRef.encoding` and `.specRef` are typed `string`, no longer the literals `urn:ietf:params:tls-cert-type:x509` and `RFC5280`.
 - `JWKPublicKey.kty` adds `oct`.
 - `validateLoTE`, `assertValidLoTE` and the `trustedEntity()` and `service()` builders check the JSON schema rules only. A list or entity that failed them before may now pass with a 3-letter country, an empty name or no service identity: run `validateLoTEProfile` for the EU rules.
-- `validateLoTE` rejects the `PolicyOrLegalNotice` forms listed above, which it used to accept, and `PkiObjectSchema` rejects an `encoding` that is not a URI.
+- `validateLoTE` rejects the `PolicyOrLegalNotice` forms listed above, which it used to accept, and `zPkiObject` rejects an `encoding` that is not a URI.

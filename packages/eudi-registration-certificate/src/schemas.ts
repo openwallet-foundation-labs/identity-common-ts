@@ -7,7 +7,7 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
-import { VALIDATION_CODES, type ValidationIssueContexts, type ValidationIssueParams } from '@owf/identity-common'
+import { zTyp } from '@owf/identity-common'
 import { z } from 'zod'
 
 // ============================================================================
@@ -17,7 +17,7 @@ import { z } from 'zod'
 /**
  * Multilingual string schema (B.2.6 Class MultiLangString)
  */
-export const MultiLangStringSchema = z.object({
+export const zMultiLangString = z.object({
   /** Language code per BCP47/RFC 5646 */
   lang: z.string().min(2),
   /** Localized string value */
@@ -31,7 +31,7 @@ export const MultiLangStringSchema = z.object({
 /**
  * Supervisory Authority schema for Data Protection Authority
  */
-export const SupervisoryAuthoritySchema = z.object({
+export const zSupervisoryAuthority = z.object({
   /** Email address of the Data Protection Authority */
   email: z.email().optional(),
   /** Telephone number of the Data Protection Authority */
@@ -46,7 +46,7 @@ export const SupervisoryAuthoritySchema = z.object({
  * `path` follows the DCQL claims path pointer: string for an object key, integer for an
  * array index, null to select every element of an array.
  */
-export const ClaimSchema = z.object({
+export const zClaim = z.object({
   /** Path pointer that specifies the path to a claim within the Credential */
   path: z.array(z.union([z.string(), z.number().int(), z.null()])).min(1),
   /** Array of expected values of the claim */
@@ -59,22 +59,22 @@ export const ClaimSchema = z.object({
  * The subfield is named `claim` (singular) even though it holds an array. This follows
  * ETSI TS 119 475 v1.2.1 Tables 8 and 9 and Annex C verbatim; see the package README.
  */
-export const CredentialSchema = z.object({
+export const zCredential = z.object({
   /** Format of the attestation (e.g., "dc+sd-jwt", "mso_mdoc") */
   format: z.string().min(1),
   /** Object defining additional properties per Credential Format */
   meta: z.record(z.string(), z.unknown()),
   /** Array of claim objects specifying requestable attributes */
-  claim: z.array(ClaimSchema).optional(),
+  claim: z.array(zClaim).optional(),
 })
 
 /** Credential issued by the WRP for `provides_attestations` (Table 8) */
-export const ProvidedAttestationSchema = CredentialSchema.omit({ claim: true }).strict()
+export const zProvidedAttestation = zCredential.omit({ claim: true }).strict()
 
 /**
  * Status list reference for certificate validity
  */
-export const StatusListSchema = z.object({
+export const zStatusList = z.object({
   /** Index in the status list */
   idx: z.number().int().nonnegative(),
   /** URI to the status list */
@@ -84,8 +84,8 @@ export const StatusListSchema = z.object({
 /**
  * Status schema for WRPRC validity
  */
-export const StatusSchema = z.object({
-  status_list: StatusListSchema,
+export const zStatus = z.object({
+  status_list: zStatusList,
 })
 
 /**
@@ -95,7 +95,7 @@ export const StatusSchema = z.object({
  * The common name subfield is `sname` per the normative Table 10. The informative
  * Annex C example spells it `name`; see the package README.
  */
-export const IntermediarySchema = z.object({
+export const zIntermediary = z.object({
   /** Semantic identifier of the intermediary (from the intermediary's WRPAC) */
   sub: z.string().min(1),
   /** Common name of the intermediary */
@@ -109,7 +109,7 @@ export const IntermediarySchema = z.object({
 /**
  * WRPRC Payload schema according to ETSI TS 119 475 clause 5.2.4
  */
-export const WRPRCPayloadSchema = z.object({
+export const zWRPRCPayload = z.object({
   /** The subject trade name of the WRPRC (B.2.1 tradeName) */
   name: z.string().min(1),
 
@@ -132,7 +132,7 @@ export const WRPRCPayloadSchema = z.object({
   registry_uri: z.url(),
 
   /** Descriptions of the services provided by the WRP (array of arrays of localized values) */
-  srv_description: z.array(z.array(MultiLangStringSchema)).optional(),
+  srv_description: z.array(z.array(zMultiLangString)).optional(),
 
   /** List of entitlements assigned to the WRP (Annex A.2 URI or OID form) */
   entitlements: z.array(z.string().min(1)).min(1),
@@ -147,7 +147,7 @@ export const WRPRCPayloadSchema = z.object({
   support_uri: z.url().or(z.email()).optional(),
 
   /** Data Protection Authority supervising the WRP */
-  supervisory_authority: SupervisoryAuthoritySchema.optional(),
+  supervisory_authority: zSupervisoryAuthority.optional(),
 
   /** Policy identifier as defined in clause 6.1.3 */
   policy_id: z.array(z.string()).optional(),
@@ -167,22 +167,22 @@ export const WRPRCPayloadSchema = z.object({
   iat: z.number().int().positive(),
 
   /** Status list for WRPRC validity */
-  status: StatusSchema.optional(),
+  status: zStatus.optional(),
 
   /** Purpose of the intended data processing (localized values) */
-  purpose: z.array(MultiLangStringSchema).optional(),
+  purpose: z.array(zMultiLangString).optional(),
 
   /** Set of credentials intended to be requested by the WRP */
-  credentials: z.array(CredentialSchema).optional(),
+  credentials: z.array(zCredential).optional(),
 
   /**
    * Set of credentials issued by the WRP (for attestation providers, Table 8).
    * These entries contain only `format` and `meta`; claim queries are not present.
    */
-  provides_attestations: z.array(ProvidedAttestationSchema).optional(),
+  provides_attestations: z.array(zProvidedAttestation).optional(),
 
   /** Intermediary information when WRP acts through an intermediary (Table 10) */
-  intermediary: IntermediarySchema.optional(),
+  intermediary: zIntermediary.optional(),
 
   /** Whether the WRP is a public sector body (Table 10) */
   public_body: z.boolean().optional(),
@@ -215,23 +215,6 @@ export const WRPRC_JWS_ALGORITHMS = [
   'EdDSA',
 ] as const
 
-/** The `typ` of a WRPRC as JWT (clause 5.2.2, Table 5) */
-const WRPRC_JWT_TYP = 'rc-wrp+jwt'
-
-/** `typ`, with an `invalid_typ` issue that carries the expected and the actual value */
-const WRPRCJWTTypSchema = z.custom<typeof WRPRC_JWT_TYP>().superRefine((typ, ctx) => {
-  if (typ === WRPRC_JWT_TYP) return
-  const params: ValidationIssueParams<'invalid_typ', ValidationIssueContexts['invalid_typ']> = {
-    code: VALIDATION_CODES.INVALID_TYP,
-    context: { expected: [WRPRC_JWT_TYP], actual: typ },
-  }
-  ctx.addIssue({
-    code: 'custom',
-    message: typ === undefined ? `typ is missing, it must be ${WRPRC_JWT_TYP}` : `typ must be ${WRPRC_JWT_TYP}`,
-    params,
-  })
-})
-
 /**
  * JWT Header schema according to ETSI TS 119 475 clause 5.2.2 (Table 5).
  *
@@ -239,9 +222,9 @@ const WRPRCJWTTypSchema = z.custom<typeof WRPRC_JWT_TYP>().superRefine((typ, ctx
  * requires a JAdES B-B signature, whose protected header carries `iat` as the claimed
  * signing time (ETSI TS 119 182-1 clause 5.1.9). The informative Annex C header omits it.
  */
-export const WRPRCJWTHeaderSchema = z.object({
+export const zWRPRCJWTHeader = z.object({
   /** Type of the Web Token - must be "rc-wrp+jwt" for JWT */
-  typ: WRPRCJWTTypSchema,
+  typ: zTyp('rc-wrp+jwt'),
   /** Algorithm used to sign the JWT */
   alg: z.enum(WRPRC_JWS_ALGORITHMS),
   /** Certificate chain to verify the JWT */
@@ -258,7 +241,7 @@ export const WRPRCJWTHeaderSchema = z.object({
  * GEN-5.2.1-05 requires an advanced electronic signature per RFC 9052 and RFC 9360
  * rather than a JAdES profile, so no claimed signing time is imposed here.
  */
-export const WRPRCCWTHeaderSchema = z.object({
+export const zWRPRCCWTHeader = z.object({
   /** Type of the Web Token - must be "rc-wrp+cwt" for CWT */
   typ: z.literal('rc-wrp+cwt'),
   /** Algorithm used to sign the CWT per RFC 9052 */
@@ -276,17 +259,17 @@ export const WRPRCCWTHeaderSchema = z.object({
 /**
  * Complete JWT WRPRC schema
  */
-export const WRPRCJWTSchema = z.object({
-  header: WRPRCJWTHeaderSchema,
-  payload: WRPRCPayloadSchema,
+export const zWRPRCJWT = z.object({
+  header: zWRPRCJWTHeader,
+  payload: zWRPRCPayload,
 })
 
 /**
  * Complete CWT WRPRC schema
  */
-export const WRPRCCWTSchema = z.object({
-  header: WRPRCCWTHeaderSchema,
-  payload: WRPRCPayloadSchema,
+export const zWRPRCCWT = z.object({
+  header: zWRPRCCWTHeader,
+  payload: zWRPRCPayload,
 })
 
 // ============================================================================
@@ -296,19 +279,23 @@ export const WRPRCCWTSchema = z.object({
 /**
  * Schema for legal person WRPRC subject
  */
-export const LegalPersonSubjectSchema = WRPRCPayloadSchema.extend({
-  sub_ln: z.string().min(1),
-}).omit({
-  sub_gn: true,
-  sub_fn: true,
-})
+export const zLegalPersonSubject = zWRPRCPayload
+  .extend({
+    sub_ln: z.string().min(1),
+  })
+  .omit({
+    sub_gn: true,
+    sub_fn: true,
+  })
 
 /**
  * Schema for natural person WRPRC subject
  */
-export const NaturalPersonSubjectSchema = WRPRCPayloadSchema.extend({
-  sub_gn: z.string().min(1),
-  sub_fn: z.string().min(1),
-}).omit({
-  sub_ln: true,
-})
+export const zNaturalPersonSubject = zWRPRCPayload
+  .extend({
+    sub_gn: z.string().min(1),
+    sub_fn: z.string().min(1),
+  })
+  .omit({
+    sub_ln: true,
+  })

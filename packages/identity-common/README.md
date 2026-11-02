@@ -50,7 +50,51 @@ If it is not available, make sure to add a polyfill like [this one](https://gith
 
 ## API Reference
 
-*Documentation will be added as the API is developed.*
+### Validation
+
+Validators of the packages in this project return `{ valid, issues }`. Each issue has a `severity` (`error`, `warning` or `info`), a `code`, a `path` into the validated value, a `message`, and an optional `requirement` and `context`. `valid` is `false` when any issue is an error.
+
+The type of an issue ties each code to its context. The codes of a validator are a closed union, so checking the code narrows the context:
+
+```typescript
+for (const issue of result.issues) {
+  if (issue.code === 'expired') console.log(issue.context.expiredAt)
+}
+```
+
+A validator collects its issues with `ValidationIssues`, which checks that each code gets its context. Validators parse with `parseWithSchema(schema, value, { codes })`, which gives the issues of a zod schema as validation issues, with the path zod gives them. Checks in a zod schema add theirs with `addValidationIssue`. The issues zod reports itself get a code of `SCHEMA_VALIDATION_CODES`, with a context:
+
+| Code | When | Context |
+| --- | --- | --- |
+| `missing` | a required value is absent | |
+| `not_allowed` | a value is present that must not be | |
+| `invalid_type` | a value has the wrong type | `expected`, e.g. `string` or `int` |
+| `invalid_value` | a value is not one of the allowed ones, or matches none of the forms of a union | `allowed`, when the schema lists them |
+| `invalid_format` | a string does not have the format | `format`, e.g. `url` |
+| `too_small`, `too_big` | a number, length or number of items is out of range | `minimum` or `maximum`, `inclusive`, `origin` |
+| `unrecognized_keys` | an object has members the schema does not allow | `keys` |
+
+zod's `custom` code never reaches the issues. A custom issue needs a code of the validator (`codes`) or of `SCHEMA_VALIDATION_CODES`. Without one, `parseWithSchema` throws, as the schema has a check the validator does not list. `zTyp` is a zod schema for a `typ` header that reports an `invalid_typ` issue.
+
+```typescript
+import { addValidationIssue, ValidationIssues } from '@owf/identity-common'
+
+const issues = new ValidationIssues<'expired' | 'missing_name'>()
+issues.add({ code: 'expired', path: ['exp'], message: 'Expired', context: { expiredAt } })
+issues.result() // { valid: false, issues: [...] }
+
+z.object({ exp: z.number(), iat: z.number() }).superRefine((payload, ctx) => {
+  if (payload.exp > payload.iat) return
+  addValidationIssue(ctx, {
+    code: 'expires_before_issued',
+    path: ['exp'],
+    message: 'exp must be after iat',
+    context: { issuedAt: secondsToDate(payload.iat), expiresAt: secondsToDate(payload.exp) },
+  })
+})
+```
+
+When an assert or parse function finds an error, it throws the validation error of its package, e.g. `WRPRCValidationError`, with the `issues` of the validation. It extends the error of the package, e.g. `WRPRCError`, and `validationErrorMessage` builds its message.
 
 ## Related Packages
 

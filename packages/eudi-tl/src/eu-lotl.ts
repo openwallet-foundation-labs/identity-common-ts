@@ -1,8 +1,8 @@
-import { base64, validationErrors } from '@owf/identity-common'
+import { base64 } from '@owf/identity-common'
 import { EU_LOTL_SIGNING_CERTIFICATES } from './eu-lotl-anchors'
 import { type ParseTrustedListOptions, parseTrustedList } from './parse'
 import { TrustedListProfiles } from './profiles'
-import { TrustedListParseException } from './trusted-list-exception'
+import { TrustedListValidationError } from './trusted-list-error'
 import type { TrustedList } from './types'
 import { validateTrustedListProfile } from './validate'
 import { type VerifyTrustedListOptions, type VerifyTrustedListResult, verifyTrustedListSignature } from './verify'
@@ -58,11 +58,6 @@ export async function loadEuLotl(
   await verifyEuLotlSignature(xml, options)
   const lotl = parseTrustedList(xml, options)
   const profile = validateTrustedListProfile(lotl, TrustedListProfiles.euLotl)
-  if (!profile.valid) {
-    const details = validationErrors(profile)
-      .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-      .join('; ')
-    throw new TrustedListParseException(`Not a conforming EU List of Trusted Lists: ${details}`)
-  }
+  if (!profile.valid) throw new TrustedListValidationError('Not a conforming EU List of Trusted Lists', profile.issues)
   return lotl
 }

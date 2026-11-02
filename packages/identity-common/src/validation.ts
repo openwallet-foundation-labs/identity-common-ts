@@ -28,7 +28,7 @@ export interface ValidationIssue<Code extends string = string, Context = unknown
 }
 
 /** The result of a validation */
-export interface ValidationResult<Issue extends ValidationIssue = ValidationIssue> {
+export interface ValidationResult<Issue = ValidationIssue> {
   /** Whether none of the issues is an error */
   valid: boolean
   /** All issues, errors, warnings and infos, in the order they were found */
@@ -53,85 +53,112 @@ export const VALIDATION_CODES = {
 /** A code of {@link VALIDATION_CODES} */
 export type CommonValidationCode = (typeof VALIDATION_CODES)[keyof typeof VALIDATION_CODES]
 
-/** The context of the issues with a code of {@link VALIDATION_CODES} */
+/**
+ * Codes for the structural checks of a schema, the same in every package. Schema issues
+ * only have these codes or one of the validator, never a code of the schema library.
+ */
+export const SCHEMA_VALIDATION_CODES = {
+  /** A required value is missing */
+  MISSING: 'missing',
+  /** A value is present that must not be */
+  NOT_ALLOWED: 'not_allowed',
+  /** A value has the wrong type, with the `expected` type as context, e.g. `string` or `int` */
+  INVALID_TYPE: 'invalid_type',
+  /** A value is not one of the allowed ones, with these as `allowed` when the schema lists them */
+  INVALID_VALUE: 'invalid_value',
+  /** A string does not have the required format, with the `format` as context, e.g. `url` */
+  INVALID_FORMAT: 'invalid_format',
+  /** A number, string length or array length is below the `minimum` */
+  TOO_SMALL: 'too_small',
+  /** A number, string length or array length is above the `maximum` */
+  TOO_BIG: 'too_big',
+  /** An object has members the schema does not allow, with their `keys` as context */
+  UNRECOGNIZED_KEYS: 'unrecognized_keys',
+} as const
+
+/** A code of {@link SCHEMA_VALIDATION_CODES} */
+export type SchemaValidationCode = (typeof SCHEMA_VALIDATION_CODES)[keyof typeof SCHEMA_VALIDATION_CODES]
+
+/** The context of the issues with a code of {@link VALIDATION_CODES} or {@link SCHEMA_VALIDATION_CODES} */
 export interface ValidationIssueContexts {
   invalid_typ: { expected: string[]; actual: unknown }
   expired: { expiredAt: Date }
   not_yet_valid: { validFrom: Date }
   expires_before_issued: { issuedAt: Date; expiresAt: Date }
+  invalid_type: { expected: string }
+  invalid_value: { allowed?: unknown[] }
+  invalid_format: { format: string }
+  /** `origin` is what is measured: `number`, `string` for its length, `array` for its items, ... */
+  too_small: { minimum: number; inclusive: boolean; origin: string }
+  too_big: { maximum: number; inclusive: boolean; origin: string }
+  unrecognized_keys: { keys: string[] }
 }
 
-/** An issue with a code of {@link VALIDATION_CODES}, which always carries its context */
-export type CommonValidationIssue<Code extends CommonValidationCode = CommonValidationCode> = {
-  [C in Code]: ValidationIssue<C, ValidationIssueContexts[C]> & { context: ValidationIssueContexts[C] }
+/** The fields of an issue besides its code and context */
+type ValidationIssueFields = Omit<ValidationIssue, 'code' | 'context'>
+
+/** The context of a code: the one of `Contexts`, else the one of {@link ValidationIssueContexts}, else none */
+type ValidationContextOf<Code, Contexts> = Code extends keyof Contexts
+  ? Contexts[Code]
+  : Code extends keyof ValidationIssueContexts
+    ? ValidationIssueContexts[Code]
+    : undefined
+
+/** The code of an issue with the context of that code, which is required when the code has one */
+type CodeWithContext<Code extends string, Contexts> = {
+  [C in Code]: { code: C } & (ValidationContextOf<C, Contexts> extends undefined
+    ? { context?: undefined }
+    : { context: ValidationContextOf<C, Contexts> })
 }[Code]
 
 /**
- * The issues of a validator with the given codes: those of {@link VALIDATION_CODES} with
- * their context, and the others, so `issue.code === 'invalid_typ'` narrows the context.
+ * The issues of a validator with the given codes, each with the context of its code. The
+ * codes of {@link VALIDATION_CODES} have the context of {@link ValidationIssueContexts},
+ * the ones in `Contexts` the context given there, and other codes none.
+ *
+ * The codes are a closed union, so checking the code narrows the context:
+ * `if (issue.code === 'expired') issue.context.expiredAt`. A validator only creates issues
+ * with its codes: {@link ValidationIssues} checks them, and `schemaIssueToValidationIssue`
+ * only accepts a schema issue with one of them or of {@link SCHEMA_VALIDATION_CODES}.
  */
-export type ValidationIssueOf<Code extends string> =
-  | CommonValidationIssue<Extract<Code, CommonValidationCode>>
-  | ValidationIssue<Exclude<Code, CommonValidationCode>>
-
-/** The issue codes of zod, which schema validation issues keep unless they carry their own */
-export type SchemaIssueCode =
-  | 'invalid_type'
-  | 'too_big'
-  | 'too_small'
-  | 'invalid_format'
-  | 'not_multiple_of'
-  | 'unrecognized_keys'
-  | 'invalid_union'
-  | 'invalid_key'
-  | 'invalid_element'
-  | 'invalid_value'
-  | 'custom'
+export type ValidationIssueOf<Code extends string, Contexts extends object = object> = ValidationIssueFields &
+  CodeWithContext<Code, Contexts>
 
 /**
- * What a custom schema issue carries in its `params` to become an issue with its own code,
- * e.g. with zod: `ctx.addIssue({ code: 'custom', message, params: { code: 'invalid_typ', context } })`
+ * An issue to add, as {@link ValidationIssueOf}, but an error unless `severity` says
+ * otherwise and with an empty `path` unless given
  */
-export interface ValidationIssueParams<Code extends string = string, Context = unknown> {
-  code: Code
-  /** Defaults to `error` */
-  severity?: ValidationSeverity
-  requirement?: string
-  context?: Context
-}
+export type ValidationIssueInput<Code extends string, Contexts extends object = object> = Omit<
+  ValidationIssueFields,
+  'severity' | 'path'
+> &
+  Partial<Pick<ValidationIssueFields, 'severity' | 'path'>> &
+  CodeWithContext<Code, Contexts>
 
 /**
- * The structural part of a schema validation issue, as reported by zod and similar
- * schema libraries, so this package does not depend on one of them.
+ * Collects the issues of a validation with the given codes, each with the context of its
+ * code, e.g. for checks that are not part of a schema.
+ *
+ * @example
+ * ```typescript
+ * const issues = new ValidationIssues<'expired' | 'missing_name'>()
+ * issues.add({ code: 'expired', path: ['exp'], message: 'Expired', context: { expiredAt } })
+ * return issues.result()
+ * ```
  */
-export interface SchemaIssue {
-  code: string
-  path: readonly PropertyKey[]
-  message: string
-  /** The params of a custom issue, see {@link ValidationIssueParams} */
-  params?: Record<string, unknown>
-}
+export class ValidationIssues<Code extends string, Contexts extends object = object> {
+  readonly issues: ValidationIssueOf<Code, Contexts>[] = []
 
-function issueParams(params: Record<string, unknown> | undefined): ValidationIssueParams | undefined {
-  return typeof params?.code === 'string' ? (params as unknown as ValidationIssueParams) : undefined
-}
+  add(issue: ValidationIssueInput<Code, Contexts>): void {
+    this.issues.push({
+      ...issue,
+      severity: issue.severity ?? 'error',
+      path: issue.path ?? [],
+    } as ValidationIssueOf<Code, Contexts>)
+  }
 
-/**
- * Convert a schema validation issue into a validation issue. A custom issue whose `params`
- * are {@link ValidationIssueParams} gets their code, severity, requirement and context.
- */
-export function schemaIssueToValidationIssue(
-  issue: SchemaIssue,
-  severity: ValidationSeverity = 'error'
-): ValidationIssue {
-  const params = issueParams(issue.params)
-  return {
-    severity: params?.severity ?? severity,
-    code: params?.code ?? issue.code,
-    path: issue.path.map((key) => (typeof key === 'number' ? key : String(key))),
-    message: issue.message,
-    ...(params?.requirement ? { requirement: params.requirement } : {}),
-    ...(params?.context !== undefined ? { context: params.context } : {}),
+  result(): ValidationResult<ValidationIssueOf<Code, Contexts>> {
+    return { valid: !this.issues.some((issue) => issue.severity === 'error'), issues: this.issues }
   }
 }
 
@@ -148,6 +175,16 @@ export function validationErrors<Issue extends ValidationIssue>(result: Validati
 /** The result of a validation with the given issues, valid when none of them is an error */
 export function toValidationResult<Issue extends ValidationIssue>(issues: Issue[]): ValidationResult<Issue> {
   return { valid: !hasValidationErrors(issues), issues }
+}
+
+/**
+ * The message of an error thrown for a failed validation: the given message, followed by
+ * the errors among the issues with their path
+ */
+export function validationErrorMessage(message: string, issues: readonly ValidationIssue[]): string {
+  const errors = issues.filter((issue) => issue.severity === 'error')
+  const lines = errors.map((issue) => (issue.path.length ? `${issue.path.join('.')}: ${issue.message}` : issue.message))
+  return lines.length ? `${message}\n${lines.join('\n')}` : message
 }
 
 /** The issues with their path below the given one, e.g. `payload` for those of a JWT payload */

@@ -4,7 +4,8 @@ import {
   assertValidLoTE,
   getNotifiedTrustedEntities,
   LOTE_VALIDATION_CODES,
-  LoTEException,
+  LoTEError,
+  type LoTEValidationError,
   validateLoTE,
 } from '../index'
 import { LOTE_TYPES } from '../profiles'
@@ -732,6 +733,8 @@ describe('LoTE Validator', () => {
         expect.fail('Should have thrown')
       } catch (error) {
         expect((error as Error).message).toContain('ListAndSchemeInformation')
+        expect(error).toBeInstanceOf(LoTEError)
+        expect((error as LoTEValidationError).issues).toEqual(validateLoTE({ LoTE: {} }).issues)
       }
     })
   })
@@ -977,10 +980,11 @@ describe('LoTE Validator', () => {
       expect(result.issues).toEqual([
         {
           severity: 'error',
-          code: expect.any(String),
+          code: 'invalid_value',
           path: ['LoTE', 'ListAndSchemeInformation', 'StatusDeterminationApproach'],
           message:
             'Profile EUWRPACProvidersList: StatusDeterminationApproach must be http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
+          context: { allowed: ['http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU'] },
         },
       ])
     })
@@ -1039,6 +1043,7 @@ describe('LoTE Validator', () => {
             code: 'invalid_value',
             path: ['LoTE', 'ListAndSchemeInformation', 'SchemeTerritory'],
             message: `Profile ${profile}: SchemeTerritory must be EU`,
+            context: { allowed: ['EU'] },
           },
         ])
         expect(validateLoTEProfile(lote, profile, { mode: 'compat', allowedTerritories: ['NO'] })).toMatchObject({
@@ -1085,7 +1090,7 @@ describe('LoTE Validator', () => {
           // @ts-expect-error allowedTerritories is compat mode only
           allowedTerritories: ['DE'],
         })
-      ).toThrow(new LoTEException('allowedTerritories only applies in compat mode'))
+      ).toThrow(new LoTEError('allowedTerritories only applies in compat mode'))
     })
 
     it('should only accept the German notified status in compat mode, on a PID list', () => {
@@ -1167,7 +1172,7 @@ describe('LoTE Validator', () => {
     it('should assert the type of the mode', () => {
       const lote: unknown = decodeJwt(GermanSandboxWalletProvidersJWT).payload
 
-      expect(() => assertValidLoTE(lote)).toThrow(LoTEException)
+      expect(() => assertValidLoTE(lote)).toThrow(LoTEError)
       assertValidLoTE(lote, { mode: 'compat' })
       expectTypeOf(lote).toEqualTypeOf<CompatLoTEDocument>()
     })

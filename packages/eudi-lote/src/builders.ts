@@ -1,5 +1,6 @@
-import { LoTEException } from './lote-exception'
-import { TrustedEntitySchema, TrustedEntityServiceSchema } from './schemas'
+import { parseWithSchema } from '@owf/identity-common'
+import { LoTEValidationError } from './lote-error'
+import { zTrustedEntity, zTrustedEntityService } from './schemas'
 import type {
   JWKPublicKey,
   PostalAddress,
@@ -9,6 +10,7 @@ import type {
   TrustedEntityInformation,
   TrustedEntityService,
 } from './types'
+import { LOTE_VALIDATION_CODES } from './validator'
 
 /**
  * Builder for creating TrustedEntity objects with a fluent API
@@ -107,14 +109,17 @@ export class TrustedEntityBuilder {
    * Build the TrustedEntity object
    */
   build(): TrustedEntity {
-    const result = TrustedEntitySchema.safeParse({
-      TrustedEntityInformation: this.info,
-      TrustedEntityServices: this.services,
-    })
+    const result = parseWithSchema(
+      zTrustedEntity,
+      {
+        TrustedEntityInformation: this.info,
+        TrustedEntityServices: this.services,
+      },
+      { codes: LOTE_VALIDATION_CODES }
+    )
 
     if (!result.success) {
-      const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-      throw new LoTEException(`Invalid TrustedEntity:\n${messages}`)
+      throw new LoTEValidationError('Invalid TrustedEntity', result.issues)
     }
 
     return result.data
@@ -260,11 +265,10 @@ export class ServiceBuilder {
       data.ServiceHistory = this.history
     }
 
-    const result = TrustedEntityServiceSchema.safeParse(data)
+    const result = parseWithSchema(zTrustedEntityService, data, { codes: LOTE_VALIDATION_CODES })
 
     if (!result.success) {
-      const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-      throw new LoTEException(`Invalid TrustedEntityService:\n${messages}`)
+      throw new LoTEValidationError('Invalid TrustedEntityService', result.issues)
     }
 
     return result.data

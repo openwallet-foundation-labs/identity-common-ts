@@ -1,11 +1,6 @@
 import { base64 } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
-import {
-  loadTrustedList,
-  setTrustedListCrypto,
-  TrustedListSignatureException,
-  verifyTrustedListSignature,
-} from '../index'
+import { loadTrustedList, setTrustedListCrypto, TrustedListSignatureError, verifyTrustedListSignature } from '../index'
 import { SIGNED_TSL_XML, SIGNER_CERT_BASE64, UNSIGNED_TSL_XML } from './fixtures.mjs'
 
 /**
@@ -32,17 +27,17 @@ describe('verifyTrustedListSignature', () => {
       verifyTrustedListSignature(SIGNED_TSL_XML, {
         trustAnchors: [new Uint8Array([1, 2, 3])],
       })
-    ).rejects.toThrow(TrustedListSignatureException)
+    ).rejects.toThrow(TrustedListSignatureError)
   })
 
   it('rejects a tampered document', async () => {
     const tampered = SIGNED_TSL_XML.replace('Test Qualified CA S.A.', 'Evil Qualified CA S.A.')
     expect(tampered).not.toBe(SIGNED_TSL_XML)
-    await expect(verifyTrustedListSignature(tampered)).rejects.toThrow(TrustedListSignatureException)
+    await expect(verifyTrustedListSignature(tampered)).rejects.toThrow(TrustedListSignatureError)
   })
 
   it('rejects a list without a signature', async () => {
-    await expect(verifyTrustedListSignature(UNSIGNED_TSL_XML)).rejects.toThrow(TrustedListSignatureException)
+    await expect(verifyTrustedListSignature(UNSIGNED_TSL_XML)).rejects.toThrow(TrustedListSignatureError)
   })
 
   it('verifies through a caller-installed ("bring your own crypto") engine', async () => {
@@ -91,6 +86,6 @@ describe('loadTrustedList', () => {
   })
 
   it('does not parse when the signature check fails', async () => {
-    await expect(loadTrustedList(UNSIGNED_TSL_XML)).rejects.toThrow(TrustedListSignatureException)
+    await expect(loadTrustedList(UNSIGNED_TSL_XML)).rejects.toThrow(TrustedListSignatureError)
   })
 })

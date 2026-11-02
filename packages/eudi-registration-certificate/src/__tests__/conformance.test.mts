@@ -19,8 +19,8 @@ import {
   WRP_ENTITLEMENTS,
   WRPRC_DIALECTS,
   WRPRC_VALIDATION_CODES,
-  WRPRCPayloadSchema,
   wrprc,
+  zWRPRCPayload,
 } from '../index'
 
 const base = () =>
@@ -277,7 +277,7 @@ describe('Annex C example', () => {
       intermediary: { sub: 'LEIXG-INTERMEDIARY-1234567890', sname: 'Intermediary Services Ltd.' },
     }
 
-    expect(WRPRCPayloadSchema.safeParse(annexC).success).toBe(true)
+    expect(zWRPRCPayload.safeParse(annexC).success).toBe(true)
     expect(validateWRPRCPayload(annexC, annexC.intermediary.sub).valid).toBe(true)
   })
 })

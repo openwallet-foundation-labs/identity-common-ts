@@ -15,10 +15,12 @@ import {
   IDENTIFIER_TYPES,
   parseWRPRC,
   signWRPRC,
+  validateWRPRC,
   validateWRPRCPayload,
   WRP_ENTITLEMENTS,
   WRPRC_VALIDATION_CODES,
-  WRPRCException,
+  WRPRCError,
+  WRPRCValidationError,
   wrprc,
 } from '../index'
 
@@ -129,7 +131,7 @@ describe('signWRPRC error paths', () => {
         certificates: [],
         signer: await signerFor(),
       })
-    ).rejects.toThrow(WRPRCException)
+    ).rejects.toThrow(WRPRCError)
   })
 
   it('rejects a malformed PEM certificate', async () => {
@@ -202,6 +204,20 @@ describe('assertValidWRPRC', () => {
       /header/
     )
     expect(() => assertValidWRPRC(header, { name: 'incomplete' }, 'LEINL-529900T8BM49AURSDO55')).toThrow(/payload/)
+  })
+
+  it('throws a WRPRCValidationError with the issues of the validation', () => {
+    const payload = base().build()
+    const invalidHeader = { ...header, typ: 'JWT' }
+    expect(() => assertValidWRPRC(invalidHeader, payload, 'LEINL-529900T8BM49AURSDO55')).toThrow(WRPRCValidationError)
+    try {
+      assertValidWRPRC(invalidHeader, payload, 'LEINL-529900T8BM49AURSDO55')
+    } catch (error) {
+      expect(error).toBeInstanceOf(WRPRCError)
+      expect((error as WRPRCValidationError).issues).toEqual(
+        validateWRPRC(invalidHeader, payload, 'LEINL-529900T8BM49AURSDO55').issues
+      )
+    }
   })
 })
 

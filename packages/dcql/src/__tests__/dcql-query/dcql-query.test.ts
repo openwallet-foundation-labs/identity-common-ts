@@ -308,6 +308,14 @@ const exampleSdJwtVc = {
 } satisfies DcqlW3cVcCredential
 
 describe('dcql-query', () => {
+  it('rejects a meta that is an array', () => {
+    for (const format of ['mso_mdoc', 'dc+sd-jwt'] as const) {
+      expect(() => DcqlQuery.parse({ credentials: [{ id: 'credential', format, meta: [] as never }] })).toThrow(
+        'Expected an object, but received an array'
+      )
+    }
+  })
+
   it('mdoc mvrc query fails with invalid mdoc', (_t) => {
     const query = DcqlQuery.parse(mdocMvrcQuery)
     DcqlQuery.validate(query)

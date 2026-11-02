@@ -3,6 +3,8 @@ import { parseCertificate, verifyCertificateSignature, X509Exception } from '@ow
 import { describe, expect, it } from 'vitest'
 import {
   type AccessCertificate,
+  AccessCertificateError,
+  AccessCertificateValidationError,
   type AccessCertificateValidationResult,
   ACCESS_CERTIFICATE_VALIDATION_CODES as CODES,
   getAccessCertificateSubjectIdentifier,
@@ -176,6 +178,18 @@ describe('validateAccessCertificate', () => {
   it('throws from parseAndValidateAccessCertificate', () => {
     expect(() => parseAndValidateAccessCertificate(CA_CERTIFICATE_PEM, { now: NOW })).toThrow(
       /Invalid access certificate/
+    )
+    const error = (() => {
+      try {
+        parseAndValidateAccessCertificate(CA_CERTIFICATE_PEM, { now: NOW })
+      } catch (error) {
+        return error
+      }
+    })()
+    expect(error).toBeInstanceOf(AccessCertificateValidationError)
+    expect(error).toBeInstanceOf(AccessCertificateError)
+    expect((error as AccessCertificateValidationError).issues).toEqual(
+      validateAccessCertificate(parseAccessCertificate(CA_CERTIFICATE_PEM), { now: NOW }).issues
     )
     expect(parseAndValidateAccessCertificate(OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM, { now: NOW }).subjectType).toBe(
       'legal'

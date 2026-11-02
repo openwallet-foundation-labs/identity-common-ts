@@ -42,6 +42,19 @@ export const vIncludesAll = <T extends unknown[]>(subset: T) => {
   )
 }
 
+/**
+ * An object with the given entries. `v.object` also accepts an array, as an object without
+ * members, which passes when all members are optional.
+ */
+export const vObject = <const TEntries extends v.ObjectEntries>(entries: TEntries) =>
+  v.pipe(
+    v.custom<v.InferInput<v.ObjectSchema<TEntries, undefined>>>(
+      (input) => !Array.isArray(input),
+      'Expected an object, but received an array'
+    ),
+    v.object(entries)
+  )
+
 export const vIdString = v.pipe(v.string(), v.regex(idRegex), v.nonEmpty())
 export const vBase64url = v.regex(/^(?:[\w-]{4})*(?:[\w-]{2}(?:==)?|[\w-]{3}=?)?$/iu, 'must be base64url')
 

@@ -86,7 +86,7 @@ for (const issue of issues) {
   console.log(issue.severity, issue.code, issue.path.join('.'), issue.requirement ?? '')
 }
 
-// Or throw an AccessCertificateException on errors
+// Or throw an AccessCertificateValidationError, an AccessCertificateError, with these issues when one is an error
 const checked = parseAndValidateAccessCertificate(pem)
 ```
 

@@ -232,10 +232,12 @@ for (const issue of result.issues) {
 
 `accessCertificateSub` is required for payload validation, parsing, signing, and decoding. It is compared with `intermediary.sub` when the WRPRC has an intermediary, and with `sub` otherwise.
 
-Each issue has a `severity`, a `code` from `WRPRC_VALIDATION_CODES` or, for schema issues, the zod issue code, a `path` into the payload and, where a check has one, the ETSI TS 119 475 `requirement`. Checks that recur in other specifications use the codes of `VALIDATION_CODES` from `@owf/identity-common` and carry a typed `context`:
+Each issue has a `severity`, a `code` from `WRPRC_VALIDATION_CODES` or, for schema issues, from `SCHEMA_VALIDATION_CODES` of `@owf/identity-common`, a `path` into the payload and, where a check has one, the ETSI TS 119 475 `requirement`. Checks that recur in other specifications use the codes of `VALIDATION_CODES` from `@owf/identity-common` and carry a typed `context`:
 
 - `invalid_typ`, when the JWT header `typ` is not `rc-wrp+jwt`, with `expected` and `actual`;
 - `expires_before_issued`, when `exp` is at or before `iat`, with `issuedAt` and `expiresAt`.
+
+Checking the code, e.g. `issue.code === 'invalid_typ'`, narrows the `context` to the one of that code. `assertValidWRPRCPayload`, `parseWRPRCPayload` and `assertValidWRPRC` throw a `WRPRCValidationError` with the same `issues`. It extends `WRPRCError`, the error of the other failures.
 
 ### Checking a Request for Over-Asking
 
@@ -253,6 +255,7 @@ for (const issue of result.issues) {
 }
 ```
 
+- The query is parsed and validated with the [`dcql`](../dcql) library. A query it rejects, or a claims query without `path` (the `namespace` and `claim_name` form of earlier OpenID4VP drafts), gives an `invalid_query` issue.
 - A requested credential needs a registered one of the same `format` whose `meta` it stays within: every requested `vct_values` or `type_values` entry is registered, and `doctype_value` is the same.
 - A requested claim needs a registered claim with the same path or a parent path, as registering `address` covers `address.locality`. `null` in a registered path covers every array element. A registered claim with `values` only allows requests for some of these values.
 - A credential query without `claims` asks for no selectively disclosable claims, so only its credential is checked.
@@ -334,12 +337,12 @@ This library is **platform agnostic** and works in:
 
 ### Schemas
 
-- `WRPRCPayloadSchema` - Full WRPRC payload validation
-- `WRPRCJWTHeaderSchema` - JWT header validation
-- `WRPRCCWTHeaderSchema` - CWT header validation
-- `CredentialSchema` - Credential specification validation
-- `ClaimSchema` - Claim specification validation
-- `MultiLangStringSchema` - Multilingual string validation
+- `zWRPRCPayload` - Full WRPRC payload validation
+- `zWRPRCJWTHeader` - JWT header validation
+- `zWRPRCCWTHeader` - CWT header validation
+- `zCredential` - Credential specification validation
+- `zClaim` - Claim specification validation
+- `zMultiLangString` - Multilingual string validation
 
 ### Types
 

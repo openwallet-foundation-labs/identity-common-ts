@@ -221,7 +221,7 @@ for (const issue of result.issues) {
 }
 
 // Or throw on invalid
-assertValidLoTE(lote); // throws LoTEException if invalid
+assertValidLoTE(lote); // throws LoTEValidationError if invalid
 ```
 
 ### Updating a LoTE Document
@@ -271,7 +271,7 @@ Removes an entity by name.
 
 #### `validateLoTE(lote, { mode? }): ValidationResult`
 
-Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns `{ valid, issues }`, where each issue has a `severity`, a `code`, a `path` into the document and a `message`. Schema issues carry the zod issue code. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
+Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns `{ valid, issues }`, where each issue has a `severity`, a `code`, a `path` into the document and a `message`. Schema issues have a code of `SCHEMA_VALIDATION_CODES` from `@owf/identity-common`, such as `missing` or `invalid_value`, and the profile checks one of `LOTE_VALIDATION_CODES`. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
 
 When valid, the result has the document as `lote`: a `LoTEDocument`, or a `CompatLoTEDocument` in compat mode. A `CompatLoTEDocument` is not a `LoTEDocument`, as its `LoTELegalNotice` can be an array.
 
@@ -286,7 +286,7 @@ The rules of the EU lists (2-letter country codes, non-empty names, at least one
 
 #### `assertValidLoTE(lote, { mode? }): asserts lote is LoTEDocument`
 
-Type assertion that throws `LoTEException` if the LoTE document is invalid. In compat mode it asserts a `CompatLoTEDocument`.
+Type assertion that throws `LoTEValidationError`, a `LoTEError` with the `issues` of `validateLoTE`, if the LoTE document is invalid. In compat mode it asserts a `CompatLoTEDocument`.
 
 #### `validateLoTEProfile(lote, profile: LoTEProfile | LoTEProfile[], options?): ValidationResult`
 
@@ -304,7 +304,7 @@ if (result.valid && result.loteType === LOTE_TYPES.EUPubEAAProvidersList) {
 Options:
 
 - `mode`: `strict` (default) validates the list exactly as the profile defines it. `compat` also accepts deviations of lists in use that don't change who is trusted. The table below lists them.
-- `allowedTerritories`: compat mode only. The accepted `SchemeTerritory` values, `['EU']` by default. Pass the territory of a national list of an EU type, such as `['DE']`. In strict mode the territory must be `EU` (TS 119 602 D to I), and passing `allowedTerritories` throws a `LoTEException`.
+- `allowedTerritories`: compat mode only. The accepted `SchemeTerritory` values, `['EU']` by default. Pass the territory of a national list of an EU type, such as `['DE']`. In strict mode the territory must be `EU` (TS 119 602 D to I), and passing `allowedTerritories` throws a `LoTEError`.
 
 | What | Profile(s) | Notes |
 | --- | --- | --- |
@@ -386,13 +386,13 @@ All document types are derived from Zod schemas. You can import and use the sche
 directly for custom validation or to build upon:
 
 ```typescript
-import { LoTEDocumentSchema, TrustedEntitySchema } from '@owf/eudi-lote';
+import { zLoTEDocument, zTrustedEntity } from '@owf/eudi-lote';
 
 // Use schemas for custom validation
-const result = LoTEDocumentSchema.safeParse(data);
+const result = zLoTEDocument.safeParse(data);
 
 // Compose with your own schemas
-const mySchema = TrustedEntitySchema.extend({ customField: z.string() });
+const mySchema = zTrustedEntity.extend({ customField: z.string() });
 ```
 
 ### SignerFunction

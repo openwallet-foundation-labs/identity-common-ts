@@ -82,11 +82,14 @@ describe('checkOverAsking', () => {
 
   it('checks only the credential of a query without claims', () => {
     expect(
-      checkOverAsking({ credentials: [{ format: 'dc+sd-jwt', meta: { vct_values: [PID_VCT] } }] }, registered)
+      checkOverAsking(
+        { credentials: [{ id: 'pid', format: 'dc+sd-jwt', meta: { vct_values: [PID_VCT] } }] },
+        registered
+      )
     ).toEqual({ valid: true, issues: [] })
   })
 
-  it('reads mdoc claims in either form, and a parsed DcqlQuery', () => {
+  it('reads mdoc claims by their path, and a parsed DcqlQuery', () => {
     const query = DcqlQuery.parse({
       credentials: [
         {
@@ -95,14 +98,29 @@ describe('checkOverAsking', () => {
           meta: { doctype_value: PID_DOCTYPE },
           claims: [
             { path: [PID_DOCTYPE, 'family_name'], intent_to_retain: false },
-            { namespace: PID_DOCTYPE, claim_name: 'family_name' },
             { path: [PID_DOCTYPE, 'portrait'], intent_to_retain: false },
           ],
         },
       ],
     })
     expect(codesAndPaths(checkOverAsking(query, registered))).toEqual([
-      { severity: 'error', code: CODES.CLAIM_NOT_REGISTERED, path: ['credentials', 0, 'claims', 2] },
+      { severity: 'error', code: CODES.CLAIM_NOT_REGISTERED, path: ['credentials', 0, 'claims', 1] },
+    ])
+  })
+
+  it('rejects the namespace and claim_name form of earlier drafts, which OpenID4VP 1.0 section 6.3 drops', () => {
+    const query = {
+      credentials: [
+        {
+          id: 'mdl',
+          format: 'mso_mdoc',
+          meta: { doctype_value: PID_DOCTYPE },
+          claims: [{ namespace: PID_DOCTYPE, claim_name: 'family_name' }],
+        },
+      ],
+    }
+    expect(codesAndPaths(checkOverAsking(query, registered))).toEqual([
+      { severity: 'error', code: CODES.INVALID_QUERY, path: ['credentials', 0, 'claims', 0] },
     ])
   })
 
@@ -125,8 +143,16 @@ describe('checkOverAsking', () => {
       { severity: 'error', code: CODES.INVALID_QUERY, path: ['credentials'] },
     ])
     expect(codesAndPaths(checkOverAsking(sdJwtQuery([{ id: 'no_path' }]), registered))).toEqual([
-      { severity: 'error', code: CODES.INVALID_QUERY, path: ['credentials', 0, 'claims', 0] },
+      { severity: 'error', code: CODES.INVALID_QUERY, path: ['credentials', 0, 'claims', 0, 'path'] },
     ])
+    // Checks of DcqlQuery.validate, which only give the member
+    const pid = sdJwtQuery([{ path: ['given_name'] }]).credentials[0]
+    expect(codesAndPaths(checkOverAsking({ credentials: [pid, pid] }, registered))).toEqual([
+      { severity: 'error', code: CODES.INVALID_QUERY, path: ['credentials'] },
+    ])
+    expect(
+      codesAndPaths(checkOverAsking({ credentials: [pid], credential_sets: [{ options: [['other']] }] }, registered))
+    ).toEqual([{ severity: 'error', code: CODES.INVALID_QUERY, path: ['credential_sets'] }])
   })
 
   it('reports every credential as not registered without a registration', () => {

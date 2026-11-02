@@ -6,36 +6,37 @@
 
 import {
   hasValidationErrors,
-  type SchemaIssueCode,
-  schemaIssueToValidationIssue,
+  parseWithSchema,
+  type SchemaValidationCode,
   type ValidationIssueOf,
-  validationErrors,
 } from '@owf/identity-common'
 import type z from 'zod'
-import { LoTEException } from './lote-exception'
+import { LoTEValidationError } from './lote-error'
 import {
   createProfileSchema,
   type LoTEProfileValidationOptions,
   type LoTEValidationMode,
   profileDefinitions,
 } from './profiles'
-import { CompatLoTEDocumentSchema, LoTEDocumentSchema } from './schemas'
+import { zCompatLoTEDocument, zLoTEDocument } from './schemas'
 import type { CompatLoTEDocument, LoTEDocument } from './types'
 
 /**
- * Codes for the profile checks, beyond schema parsing, whose issues carry the zod issue
- * code instead.
+ * Codes for the profile checks of LoTE. The other checks have a code of
+ * `SCHEMA_VALIDATION_CODES`.
  */
 export const LOTE_VALIDATION_CODES = {
   /** `LoTEType` is not the one of any of the requested profiles */
   UNEXPECTED_LOTE_TYPE: 'unexpected_lote_type',
+  /** `NextUpdate` is more than 6 months after `ListIssueDateTime` */
+  NEXT_UPDATE_TOO_LATE: 'next_update_too_late',
 } as const
 
 /** A profile validation code emitted by this validator */
 export type LoTEValidationCode = (typeof LOTE_VALIDATION_CODES)[keyof typeof LOTE_VALIDATION_CODES]
 
-/** An issue of a LoTE validation, with a zod issue code for schema issues */
-export type LoTEValidationIssue = ValidationIssueOf<LoTEValidationCode | SchemaIssueCode>
+/** An issue of a LoTE validation, with a code of `SCHEMA_VALIDATION_CODES` for schema issues */
+export type LoTEValidationIssue = ValidationIssueOf<LoTEValidationCode | SchemaValidationCode>
 
 /**
  * Validation result, with all issues of the document. When valid, `lote` is the validated
@@ -47,9 +48,6 @@ export type ValidationResult<T = LoTEDocument> =
 
 /** The document `validateLoTE` accepts in a mode */
 type ModeLoTEDocument<M extends LoTEValidationMode> = M extends 'compat' ? CompatLoTEDocument : LoTEDocument
-
-const fromZodIssue = (issue: z.ZodError['issues'][number]): LoTEValidationIssue =>
-  schemaIssueToValidationIssue(issue) as LoTEValidationIssue
 
 /**
  * Validate a LoTE document against ETSI TS 119 602 schema
@@ -72,8 +70,10 @@ export function validateLoTE<M extends LoTEValidationMode = 'strict'>(
   loteDocument: unknown,
   { mode }: { mode?: M } = {}
 ): ValidationResult<ModeLoTEDocument<M>> {
-  const result = (mode === 'compat' ? CompatLoTEDocumentSchema : LoTEDocumentSchema).safeParse(loteDocument)
-  const issues = result.success ? [] : result.error.issues.map(fromZodIssue)
+  const result = parseWithSchema(mode === 'compat' ? zCompatLoTEDocument : zLoTEDocument, loteDocument, {
+    codes: LOTE_VALIDATION_CODES,
+  })
+  const issues = result.success ? [] : result.issues
 
   if (hasValidationErrors(issues)) {
     return { valid: false, issues }
@@ -88,19 +88,14 @@ export function validateLoTE<M extends LoTEValidationMode = 'strict'>(
  *
  * @param loteDocument - The LoTE document to validate
  * @param options.mode - As in `validateLoTE`. Defaults to `strict`.
- * @throws Error if validation fails
+ * @throws LoTEValidationError with the issues of the validation if it fails
  */
 export function assertValidLoTE<M extends LoTEValidationMode = 'strict'>(
   loteDocument: unknown,
   options: { mode?: M } = {}
 ): asserts loteDocument is ModeLoTEDocument<M> {
   const result = validateLoTE(loteDocument, options)
-  if (!result.valid) {
-    const errorMessages = validationErrors(result)
-      .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-      .join('\n')
-    throw new LoTEException(`Invalid LoTE document:\n${errorMessages}`)
-  }
+  if (!result.valid) throw new LoTEValidationError('Invalid LoTE document', result.issues)
 }
 
 /**
@@ -169,7 +164,7 @@ function getDocumentLoTEType(loteDocument: unknown): string | undefined {
  * The valid result has them left out in `notifiedTrustedEntities`.
  * @param options.allowedTerritories - Compat mode only. The accepted `SchemeTerritory` values,
  * `['EU']` by default.
- * @throws LoTEException if `allowedTerritories` is passed in strict mode
+ * @throws LoTEError if `allowedTerritories` is passed in strict mode
  * @returns Validation result with the issues of the document, and when valid the LoTEType of the
  * profile the document matches and the document typed as the `LoTEProfileDocument` of that profile
  *
@@ -191,14 +186,13 @@ export function validateLoTEProfile<P extends LoTEProfile, M extends LoTEValidat
   const matchedProfile = profiles.find((p) => profileDefinitions[p].list.loTEType === documentLoTEType)
 
   if (matchedProfile) {
-    const result = createProfileSchema(profileDefinitions[matchedProfile], options).safeParse(loteDocument)
+    const result = parseWithSchema(createProfileSchema(profileDefinitions[matchedProfile], options), loteDocument, {
+      codes: LOTE_VALIDATION_CODES,
+    })
 
     const issues = result.success
       ? []
-      : result.error.issues.map((issue) => ({
-          ...fromZodIssue(issue),
-          message: `Profile ${matchedProfile}: ${issue.message}`,
-        }))
+      : result.issues.map((issue) => ({ ...issue, message: `Profile ${matchedProfile}: ${issue.message}` }))
 
     if (hasValidationErrors(issues)) {
       return { valid: false, issues }

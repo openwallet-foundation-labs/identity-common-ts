@@ -14,7 +14,7 @@ import { decode, JAdESProfile, Token, validateProfile } from '@owf/eudi-jades'
 import { toWRPRCDialect, WRPRC_DIALECTS } from './dialect'
 import type { SignedWRPRC, SignOptions, WRPRCJWTHeader, WRPRCPayload } from './types'
 import { assertValidWRPRCPayload, parseWRPRCPayload } from './validator'
-import { WRPRCException } from './wrprc-exception'
+import { WRPRCError } from './wrprc-error'
 
 // ============================================================================
 // JWT Signing
@@ -42,14 +42,14 @@ export async function signWRPRC(options: SignOptions): Promise<SignedWRPRC> {
   assertValidWRPRCPayload(payload, accessCertificateSub)
 
   if (!certificates || certificates.length === 0) {
-    throw new WRPRCException('At least one certificate is required for x5c header')
+    throw new WRPRCError('At least one certificate is required for x5c header')
   }
 
   // Extract base64 content from PEM certificates
   const x5c = certificates.map((cert) => {
     const content = pemToDer(cert)
     if (!content) {
-      throw new WRPRCException('Invalid PEM certificate format')
+      throw new WRPRCError('Invalid PEM certificate format')
     }
     return content
   })
@@ -83,7 +83,7 @@ export function decodeWRPRC(jws: string, accessCertificateSub: string): SignedWR
   try {
     decoded = decode<WRPRCPayload>(jws)
   } catch (error) {
-    throw new WRPRCException(
+    throw new WRPRCError(
       `WRPRC signature does not meet the JAdES B-B profile (GEN-5.2.1-04): ${(error as Error).message}`,
       error
     )
@@ -91,13 +91,13 @@ export function decodeWRPRC(jws: string, accessCertificateSub: string): SignedWR
 
   // Validate typ header
   if (decoded.header.typ !== 'rc-wrp+jwt') {
-    throw new WRPRCException(`Invalid WRPRC type: expected "rc-wrp+jwt", got "${decoded.header.typ}"`)
+    throw new WRPRCError(`Invalid WRPRC type: expected "rc-wrp+jwt", got "${decoded.header.typ}"`)
   }
 
   // GEN-5.2.1-04
   const profile = validateProfile(decoded.header, JAdESProfile.B_B, decoded.unprotectedHeader)
   if (!profile.valid) {
-    throw new WRPRCException(
+    throw new WRPRCError(
       `WRPRC signature does not meet the JAdES B-B profile (GEN-5.2.1-04): ${profile.missing?.join(', ')}`
     )
   }
@@ -121,7 +121,7 @@ export function decodeWRPRC(jws: string, accessCertificateSub: string): SignedWR
 export function parseWRPRC(jws: string): { header: unknown; payload: unknown; signature: string } {
   const parts = jws.split('.')
   if (parts.length !== 3) {
-    throw new WRPRCException('Invalid compact JWS: expected 3 parts')
+    throw new WRPRCError('Invalid compact JWS: expected 3 parts')
   }
   const decoded = decode(jws)
 

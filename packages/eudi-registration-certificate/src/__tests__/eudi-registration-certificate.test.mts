@@ -16,9 +16,9 @@ import {
   validateWRPRCJWTHeader,
   validateWRPRCPayload,
   WRP_ENTITLEMENTS,
-  WRPRCException,
-  WRPRCPayloadSchema,
+  WRPRCError,
   wrprc,
+  zWRPRCPayload,
 } from '../index'
 
 // ============================================================================
@@ -57,31 +57,31 @@ const validJWTHeader = {
 // Schema Tests
 // ============================================================================
 
-describe('WRPRCPayloadSchema', () => {
+describe('zWRPRCPayload', () => {
   it('should validate a legal person payload', () => {
-    const result = WRPRCPayloadSchema.safeParse(validLegalPersonPayload)
+    const result = zWRPRCPayload.safeParse(validLegalPersonPayload)
     expect(result.success).toBe(true)
   })
 
   it('should validate a natural person payload', () => {
-    const result = WRPRCPayloadSchema.safeParse(validNaturalPersonPayload)
+    const result = zWRPRCPayload.safeParse(validNaturalPersonPayload)
     expect(result.success).toBe(true)
   })
 
   it('should reject payload without required fields', () => {
-    const result = WRPRCPayloadSchema.safeParse({})
+    const result = zWRPRCPayload.safeParse({})
     expect(result.success).toBe(false)
   })
 
   it('should reject payload with empty entitlements', () => {
     const payload = { ...validLegalPersonPayload, entitlements: [] }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zWRPRCPayload.safeParse(payload)
     expect(result.success).toBe(false)
   })
 
   it('should reject payload with invalid country code', () => {
     const payload = { ...validLegalPersonPayload, country: 'GERMANY' }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zWRPRCPayload.safeParse(payload)
     expect(result.success).toBe(false)
   })
 
@@ -92,21 +92,21 @@ describe('WRPRCPayloadSchema', () => {
       info_uri: 'https://example.com',
       support_uri: 'https://example.com/support',
     }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zWRPRCPayload.safeParse(payload)
     expect(result.success).toBe(true)
   })
 
   it('should accept a payload with a jti', () => {
     const jti_uuid = '0c1f7a2e-3d4b-4c5a-8e9f-1a2b3c4d5e6f'
     const payload = { ...validLegalPersonPayload, jti: jti_uuid }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zWRPRCPayload.safeParse(payload)
 
     expect(result.success).toBe(true)
     expect(result.data?.jti).toBe(jti_uuid)
   })
 
   it('should accept a payload without a jti', () => {
-    const result = WRPRCPayloadSchema.safeParse(validLegalPersonPayload)
+    const result = zWRPRCPayload.safeParse(validLegalPersonPayload)
 
     expect(result.success).toBe(true)
     expect(result.data?.jti).toBeUndefined()
@@ -114,7 +114,7 @@ describe('WRPRCPayloadSchema', () => {
 
   it('should reject an empty jti', () => {
     const payload = { ...validLegalPersonPayload, jti: '' }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zWRPRCPayload.safeParse(payload)
     expect(result.success).toBe(false)
   })
 })
@@ -409,7 +409,7 @@ describe('WRPRCBuilder', () => {
   it('should throw on invalid payload', () => {
     expect(() => {
       wrprc().name('Test').build()
-    }).toThrow(WRPRCException)
+    }).toThrow(WRPRCError)
   })
 })
 
@@ -493,18 +493,18 @@ describe('Factory Functions', () => {
 })
 
 // ============================================================================
-// Exception Tests
+// Error Tests
 // ============================================================================
 
-describe('WRPRCException', () => {
-  it('should create exception with message', () => {
-    const error = new WRPRCException('Test error')
+describe('WRPRCError', () => {
+  it('should create an error with message', () => {
+    const error = new WRPRCError('Test error')
     expect(error.message).toBe('Test error')
-    expect(error.name).toBe('WRPRCException')
+    expect(error.name).toBe('WRPRCError')
   })
 
   it('should be instanceof Error', () => {
-    const error = new WRPRCException('Test')
+    const error = new WRPRCError('Test')
     expect(error).toBeInstanceOf(Error)
   })
 })

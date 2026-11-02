@@ -1,6 +1,6 @@
 import * as v from 'valibot'
 import { DcqlUndefinedClaimSetIdError } from '../dcql-error/e-dcql.js'
-import { idRegex, vIdString, vNonEmptyArray } from '../u-dcql.js'
+import { idRegex, vIdString, vNonEmptyArray, vObject } from '../u-dcql.js'
 import { DcqlClaimsQuery } from './m-dcql-claims-query.js'
 import { DcqlTrustedAuthoritiesQuery } from './m-dcql-trusted-authorities.js'
 
@@ -54,7 +54,7 @@ export namespace DcqlCredentialQuery {
     ),
     meta: v.pipe(
       v.optional(
-        v.object({
+        vObject({
           doctype_value: v.pipe(
             v.optional(v.string()),
             v.description(
@@ -83,7 +83,7 @@ export namespace DcqlCredentialQuery {
     meta: v.pipe(
       v.optional(
         v.pipe(
-          v.object({
+          vObject({
             vct_values: v.optional(v.array(v.string())),
           }),
           v.description(

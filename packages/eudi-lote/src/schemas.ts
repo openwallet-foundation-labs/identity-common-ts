@@ -14,18 +14,19 @@
  * @see https://forge.etsi.org/rep/esi/x19_60201_lists_of_trusted_entities
  */
 
+import { addValidationIssue } from '@owf/identity-common'
 import { z } from 'zod'
 
 // ============================================================================
 // Localized Value Schemas
 // ============================================================================
 
-export const LocalizedStringSchema = z.object({
+export const zLocalizedString = z.object({
   lang: z.string(),
   value: z.string(),
 })
 
-export const LocalizedURISchema = z.object({
+export const zLocalizedURI = z.object({
   lang: z.string(),
   uriValue: z.url(),
 })
@@ -34,7 +35,7 @@ export const LocalizedURISchema = z.object({
 // Address Schemas
 // ============================================================================
 
-export const PostalAddressSchema = z.object({
+export const zPostalAddress = z.object({
   lang: z.string(),
   StreetAddress: z.string(),
   Locality: z.string().optional(),
@@ -44,21 +45,21 @@ export const PostalAddressSchema = z.object({
   Country: z.string(),
 })
 
-export const SchemeOperatorAddressSchema = z.object({
-  SchemeOperatorPostalAddress: z.array(PostalAddressSchema),
-  SchemeOperatorElectronicAddress: z.array(LocalizedURISchema),
+export const zSchemeOperatorAddress = z.object({
+  SchemeOperatorPostalAddress: z.array(zPostalAddress),
+  SchemeOperatorElectronicAddress: z.array(zLocalizedURI),
 })
 
-export const TrustedEntityAddressSchema = z.object({
-  TEPostalAddress: z.array(PostalAddressSchema),
-  TEElectronicAddress: z.array(LocalizedURISchema),
+export const zTrustedEntityAddress = z.object({
+  TEPostalAddress: z.array(zPostalAddress),
+  TEElectronicAddress: z.array(zLocalizedURI),
 })
 
 // ============================================================================
 // Digital Identity Schemas
 // ============================================================================
 
-export const PkiObjectSchema = z.object({
+export const zPkiObject = z.object({
   encoding: z.url().optional(),
   specRef: z.string().optional(),
   val: z.string(),
@@ -68,9 +69,9 @@ export const PkiObjectSchema = z.object({
  * An X509Certificates entry: the JSON schema's `pkiOb`. The usual values are `encoding`
  * `urn:ietf:params:tls-cert-type:x509` and `specRef` `RFC5280`, but any URI and string are allowed.
  */
-export const X509CertificateRefSchema = PkiObjectSchema
+export const zX509CertificateRef = zPkiObject
 
-export const JWKPublicKeySchema = z.looseObject({
+export const zJWKPublicKey = z.looseObject({
   // RFC 7517 as the JSON schema references it lists EC, RSA and oct; OKP (RFC 8037) is accepted too
   kty: z.enum(['RSA', 'EC', 'OKP', 'oct']),
   kid: z.string().optional(),
@@ -82,16 +83,16 @@ export const JWKPublicKeySchema = z.looseObject({
  * The JSON schema requires none of the identity kinds (`{}` validates); the EU profiles
  * require at least one (`hasDigitalIdentity`).
  */
-export const ServiceDigitalIdentitySchema = z.object({
-  X509Certificates: z.array(X509CertificateRefSchema).optional(),
+export const zServiceDigitalIdentity = z.object({
+  X509Certificates: z.array(zX509CertificateRef).optional(),
   X509SubjectNames: z.array(z.string()).optional(),
-  PublicKeyValues: z.array(JWKPublicKeySchema).optional(),
+  PublicKeyValues: z.array(zJWKPublicKey).optional(),
   X509SKIs: z.array(z.string()).optional(),
   OtherIds: z.array(z.string()).optional(),
 })
 
 /** Whether a ServiceDigitalIdentity carries at least one identity of any kind */
-export function hasDigitalIdentity(id: z.infer<typeof ServiceDigitalIdentitySchema>): boolean {
+export function hasDigitalIdentity(id: z.infer<typeof zServiceDigitalIdentity>): boolean {
   return Boolean(
     id.X509Certificates?.length ||
       id.X509SubjectNames?.length ||
@@ -144,68 +145,75 @@ export function rfc3339DateTimeToMs(value: string): number {
   return date.getTime()
 }
 
-const DateTimeSchema = z.string().refine(isRfc3339DateTime, { message: 'Invalid RFC 3339 date-time' })
+const zDateTime = z.string().superRefine((value, ctx) => {
+  if (isRfc3339DateTime(value)) return
+  addValidationIssue(ctx, {
+    code: 'invalid_format',
+    message: 'Invalid RFC 3339 date-time',
+    context: { format: 'RFC 3339 date-time' },
+  })
+})
 
 // ============================================================================
 // Service Schemas
 // ============================================================================
 
-export const ServiceSupplyPointSchema = z.object({
+export const zServiceSupplyPoint = z.object({
   ServiceType: z.string().optional(),
   uriValue: z.url(),
 })
 
-export const ServiceInformationSchema = z.object({
-  ServiceName: z.array(LocalizedStringSchema).min(1),
-  ServiceDigitalIdentity: ServiceDigitalIdentitySchema,
+export const zServiceInformation = z.object({
+  ServiceName: z.array(zLocalizedString).min(1),
+  ServiceDigitalIdentity: zServiceDigitalIdentity,
   ServiceTypeIdentifier: z.url().optional(),
   ServiceStatus: z.url().optional(),
-  StatusStartingTime: DateTimeSchema.optional(),
-  SchemeServiceDefinitionURI: z.array(LocalizedURISchema).optional(),
-  ServiceSupplyPoints: z.array(ServiceSupplyPointSchema).optional(),
-  ServiceDefinitionURI: z.array(LocalizedURISchema).optional(),
+  StatusStartingTime: zDateTime.optional(),
+  SchemeServiceDefinitionURI: z.array(zLocalizedURI).optional(),
+  ServiceSupplyPoints: z.array(zServiceSupplyPoint).optional(),
+  ServiceDefinitionURI: z.array(zLocalizedURI).optional(),
   ServiceInformationExtensions: z.array(z.unknown()).optional(),
 })
 
-export const ServiceHistoryInstanceSchema = z.object({
-  ServiceName: z.array(LocalizedStringSchema).min(1),
-  ServiceDigitalIdentity: ServiceDigitalIdentitySchema,
+export const zServiceHistoryInstance = z.object({
+  ServiceName: z.array(zLocalizedString).min(1),
+  ServiceDigitalIdentity: zServiceDigitalIdentity,
   ServiceStatus: z.url(),
-  StatusStartingTime: DateTimeSchema,
+  StatusStartingTime: zDateTime,
   ServiceTypeIdentifier: z.url().optional(),
   ServiceInformationExtensions: z.array(z.unknown()).optional(),
 })
 
-export const TrustedEntityServiceSchema = z.object({
-  ServiceInformation: ServiceInformationSchema,
-  ServiceHistory: z.array(ServiceHistoryInstanceSchema).optional(),
+export const zTrustedEntityService = z.object({
+  ServiceInformation: zServiceInformation,
+  ServiceHistory: z.array(zServiceHistoryInstance).optional(),
 })
 
 // ============================================================================
 // Trusted Entity Schemas
 // ============================================================================
 
-export const TrustedEntityInformationSchema = z.object({
-  TEName: z.array(LocalizedStringSchema).min(1),
-  TETradeName: z.array(LocalizedStringSchema).optional(),
-  TEAddress: TrustedEntityAddressSchema,
-  TEInformationURI: z.array(LocalizedURISchema).optional(),
+export const zTrustedEntityInformation = z.object({
+  TEName: z.array(zLocalizedString).min(1),
+  TETradeName: z.array(zLocalizedString).optional(),
+  TEAddress: zTrustedEntityAddress,
+  TEInformationURI: z.array(zLocalizedURI).optional(),
   TEInformationExtensions: z.array(z.unknown()).optional(),
 })
 
-export const TrustedEntitySchema = z.object({
-  TrustedEntityInformation: TrustedEntityInformationSchema,
-  TrustedEntityServices: z.array(TrustedEntityServiceSchema).min(1),
+export const zTrustedEntity = z.object({
+  TrustedEntityInformation: zTrustedEntityInformation,
+  TrustedEntityServices: z.array(zTrustedEntityService).min(1),
 })
 
 // ============================================================================
 // List and Scheme Information Schemas
 // ============================================================================
 
-export const PolicyOrLegalNoticeSchema = z.object({
-  LoTEPolicy: LocalizedURISchema.optional(),
+export const zPolicyOrLegalNotice = z.object({
+  LoTEPolicy: zLocalizedURI.optional(),
   // The JSON schema of TS 119 602 types LoTELegalNotice as a plain string, the XML schema as a multilingual string
-  LoTELegalNotice: z.union([z.string(), LocalizedStringSchema]).optional(),
+  LoTELegalNotice: z.union([z.string(), zLocalizedString]).optional(),
 })
 
 /**
@@ -214,19 +222,24 @@ export const PolicyOrLegalNoticeSchema = z.object({
  * or a list of legal notices, possibly with the other key on some items but not on all;
  * not an empty list, not a list where every item has both.
  */
-export const PolicyOrLegalNoticeListSchema = z.array(PolicyOrLegalNoticeSchema).superRefine((items, ctx) => {
+export const zPolicyOrLegalNoticeList = z.array(zPolicyOrLegalNotice).superRefine((items, ctx) => {
   const policies = items.every((item) => item.LoTEPolicy !== undefined)
   const notices = items.every((item) => item.LoTELegalNotice !== undefined)
   if (policies !== notices) return
   if (policies) {
-    ctx.addIssue({
-      code: 'custom',
-      message:
-        items.length === 0
-          ? 'PolicyOrLegalNotice needs at least one item'
-          : 'PolicyOrLegalNotice cannot have both LoTEPolicy and LoTELegalNotice on every item',
-      path: [],
-    })
+    if (items.length === 0) {
+      addValidationIssue(ctx, {
+        code: 'too_small',
+        message: 'PolicyOrLegalNotice needs at least one item',
+        context: { minimum: 1, inclusive: true, origin: 'array' },
+      })
+    } else {
+      addValidationIssue(ctx, {
+        code: 'invalid_value',
+        message: 'PolicyOrLegalNotice cannot have both LoTEPolicy and LoTELegalNotice on every item',
+        context: {},
+      })
+    }
     return
   }
   // Neither holds: the kind of the first item that has one sets what the others lack
@@ -234,8 +247,8 @@ export const PolicyOrLegalNoticeListSchema = z.array(PolicyOrLegalNoticeSchema).
   const key = first?.LoTEPolicy !== undefined ? 'LoTEPolicy' : 'LoTELegalNotice'
   items.forEach((item, index) => {
     if (item[key] === undefined) {
-      ctx.addIssue({
-        code: 'custom',
+      addValidationIssue(ctx, {
+        code: 'missing',
         message: first
           ? `Every item has a LoTEPolicy, or every item has a LoTELegalNotice: this one has no ${key}`
           : 'An item needs LoTEPolicy or LoTELegalNotice',
@@ -245,36 +258,36 @@ export const PolicyOrLegalNoticeListSchema = z.array(PolicyOrLegalNoticeSchema).
   })
 })
 
-export const LoTEQualifierSchema = z.object({
+export const zLoTEQualifier = z.object({
   LoTEType: z.url(),
-  SchemeOperatorName: z.array(LocalizedStringSchema).min(1),
-  SchemeTypeCommunityRules: z.array(LocalizedURISchema).optional(),
+  SchemeOperatorName: z.array(zLocalizedString).min(1),
+  SchemeTypeCommunityRules: z.array(zLocalizedURI).optional(),
   SchemeTerritory: z.string().length(2).optional(),
   MimeType: z.string(),
 })
 
-export const OtherLoTEPointerSchema = z.object({
+export const zOtherLoTEPointer = z.object({
   LoTELocation: z.url(),
-  ServiceDigitalIdentities: z.array(ServiceDigitalIdentitySchema).min(1),
-  LoTEQualifiers: z.array(LoTEQualifierSchema).min(1),
+  ServiceDigitalIdentities: z.array(zServiceDigitalIdentity).min(1),
+  LoTEQualifiers: z.array(zLoTEQualifier).min(1),
 })
 
-export const ListAndSchemeInformationSchema = z.object({
+export const zListAndSchemeInformation = z.object({
   LoTEVersionIdentifier: z.number().int(),
   LoTESequenceNumber: z.number().int(),
   LoTEType: z.url().optional(),
-  SchemeOperatorName: z.array(LocalizedStringSchema).min(1),
-  SchemeOperatorAddress: SchemeOperatorAddressSchema.optional(),
-  SchemeName: z.array(LocalizedStringSchema).optional(),
-  SchemeInformationURI: z.array(LocalizedURISchema).optional(),
+  SchemeOperatorName: z.array(zLocalizedString).min(1),
+  SchemeOperatorAddress: zSchemeOperatorAddress.optional(),
+  SchemeName: z.array(zLocalizedString).optional(),
+  SchemeInformationURI: z.array(zLocalizedURI).optional(),
   StatusDeterminationApproach: z.url().optional(),
-  SchemeTypeCommunityRules: z.array(LocalizedURISchema).optional(),
+  SchemeTypeCommunityRules: z.array(zLocalizedURI).optional(),
   SchemeTerritory: z.string().length(2).optional(),
-  PolicyOrLegalNotice: PolicyOrLegalNoticeListSchema.optional(),
+  PolicyOrLegalNotice: zPolicyOrLegalNoticeList.optional(),
   HistoricalInformationPeriod: z.number().optional(),
-  PointersToOtherLoTE: z.array(OtherLoTEPointerSchema).optional(),
-  ListIssueDateTime: DateTimeSchema,
-  NextUpdate: DateTimeSchema,
+  PointersToOtherLoTE: z.array(zOtherLoTEPointer).optional(),
+  ListIssueDateTime: zDateTime,
+  NextUpdate: zDateTime,
   DistributionPoints: z.array(z.url()).optional(),
   SchemeExtensions: z.array(z.unknown()).optional(),
 })
@@ -283,34 +296,37 @@ export const ListAndSchemeInformationSchema = z.object({
 // LoTE Root Schemas
 // ============================================================================
 
-export const LoTESchema = z.object({
-  ListAndSchemeInformation: ListAndSchemeInformationSchema,
-  TrustedEntitiesList: z.array(TrustedEntitySchema).optional(),
+export const zLoTE = z.object({
+  ListAndSchemeInformation: zListAndSchemeInformation,
+  TrustedEntitiesList: z.array(zTrustedEntity).optional(),
 })
 
-export const LoTEDocumentSchema = z.object({
-  LoTE: LoTESchema,
+export const zLoTEDocument = z.object({
+  LoTE: zLoTE,
 })
 
 /**
  * The `PolicyOrLegalNotice` that lists in use publish: a `LoTELegalNotice` that is an array of
  * localized URIs, and items that carry both keys (the German EUDI Wallet sandbox lists).
  */
-export const CompatPolicyOrLegalNoticeListSchema = z
+export const zCompatPolicyOrLegalNoticeList = z
   .array(
-    PolicyOrLegalNoticeSchema.extend({
-      LoTELegalNotice: z.union([z.string(), LocalizedStringSchema, z.array(LocalizedURISchema)]).optional(),
-    }).refine((item) => item.LoTEPolicy !== undefined || item.LoTELegalNotice !== undefined, {
-      message: 'An item needs LoTEPolicy or LoTELegalNotice',
-    })
+    zPolicyOrLegalNotice
+      .extend({
+        LoTELegalNotice: z.union([z.string(), zLocalizedString, z.array(zLocalizedURI)]).optional(),
+      })
+      .superRefine((item, ctx) => {
+        if (item.LoTEPolicy !== undefined || item.LoTELegalNotice !== undefined) return
+        addValidationIssue(ctx, { code: 'missing', message: 'An item needs LoTEPolicy or LoTELegalNotice' })
+      })
   )
   .min(1)
 
-/** `LoTEDocumentSchema` with the `PolicyOrLegalNotice` of `CompatPolicyOrLegalNoticeListSchema` */
-export const CompatLoTEDocumentSchema = LoTEDocumentSchema.extend({
-  LoTE: LoTESchema.extend({
-    ListAndSchemeInformation: ListAndSchemeInformationSchema.extend({
-      PolicyOrLegalNotice: CompatPolicyOrLegalNoticeListSchema.optional(),
+/** `zLoTEDocument` with the `PolicyOrLegalNotice` of `zCompatPolicyOrLegalNoticeList` */
+export const zCompatLoTEDocument = zLoTEDocument.extend({
+  LoTE: zLoTE.extend({
+    ListAndSchemeInformation: zListAndSchemeInformation.extend({
+      PolicyOrLegalNotice: zCompatPolicyOrLegalNoticeList.optional(),
     }),
   }),
 })
