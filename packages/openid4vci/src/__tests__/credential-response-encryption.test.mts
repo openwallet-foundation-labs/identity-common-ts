@@ -4,7 +4,7 @@ import { ContentType } from '@openid4vc/utils'
 import * as jose from 'jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
 import {
   type CredentialConfigurationSupportedWithFormats,
@@ -122,7 +122,10 @@ const credentialResponseEncryption = {
 }
 
 beforeAll(() => server.listen())
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  server.resetHandlers()
+  vi.restoreAllMocks()
+})
 afterAll(() => server.close())
 
 describe('Credential Response Encryption', () => {
@@ -238,6 +241,8 @@ describe('Credential Response Encryption', () => {
       nonce: cNonce,
     })
 
+    const decryptJweSpy = vi.spyOn(callbacks, 'decryptJwe')
+
     const result = await client.retrieveCredentials({
       issuerMetadata,
       accessToken: 'test-access-token',
@@ -249,6 +254,7 @@ describe('Credential Response Encryption', () => {
       credentialResponseEncryption,
     })
 
+    expect(decryptJweSpy).toHaveBeenCalledWith(expect.any(String), { jwk: credentialResponseEncryption.jwk })
     expect(result.credentialResponse).toEqual({
       credential: 'some-credential',
       notification_id: '3b926f09-d603-4e8b-a75d-eaa8965f0fe3',
@@ -285,6 +291,8 @@ describe('Credential Response Encryption', () => {
 
     callbacks.fetch = fetch
 
+    const decryptJweSpy = vi.spyOn(callbacks, 'decryptJwe')
+
     const result = await client.retrieveDeferredCredentials({
       issuerMetadata,
       accessToken: 'test-access-token',
@@ -292,6 +300,7 @@ describe('Credential Response Encryption', () => {
       credentialResponseEncryption,
     })
 
+    expect(decryptJweSpy).toHaveBeenCalledWith(expect.any(String), { jwk: credentialResponseEncryption.jwk })
     expect(result.deferredCredentialResponse.credentials).toEqual([{ credential: 'deferred-credential-value' }])
   })
 
