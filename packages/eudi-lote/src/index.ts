@@ -102,12 +102,14 @@ export type {
 export type {
   LoTEProfileDocument,
   LoTEProfileValidationResult,
-  ValidationError,
+  LoTEValidationCode,
+  LoTEValidationIssue,
   ValidationResult,
 } from './validator'
 export {
   assertValidLoTE,
   getNotifiedTrustedEntities,
+  LOTE_VALIDATION_CODES,
   LoTEProfile,
   validateLoTE,
   validateLoTEProfile,

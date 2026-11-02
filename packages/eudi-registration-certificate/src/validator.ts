@@ -6,7 +6,18 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
-import { secondsToDate } from '@owf/identity-common'
+import {
+  type ValidationResult as CommonValidationResult,
+  prefixIssuePaths,
+  type SchemaIssueCode,
+  schemaIssueToValidationIssue,
+  secondsToDate,
+  toValidationResult,
+  VALIDATION_CODES,
+  type ValidationIssueOf,
+  validationErrors,
+} from '@owf/identity-common'
+import type { z } from 'zod'
 import { normalizeWRPRCPayload } from './dialect'
 import { ALL_ENTITLEMENTS, ALL_PSP_SUB_ENTITLEMENTS, ATTESTATION_PROVIDER_ENTITLEMENTS } from './entitlements'
 import {
@@ -50,8 +61,10 @@ export const WRPRC_VALIDATION_CODES = {
   IDENTIFIER_FORMAT_WARNING: 'identifier_format_warning',
   /** exp more than 12 months after iat (GEN-5.2.4-08) */
   EXP_TOO_LATE: 'exp_too_late',
-  /** exp at or before iat */
-  EXP_BEFORE_IAT: 'exp_before_iat',
+  /** exp at or before iat, with `issuedAt` and `expiresAt` as context */
+  EXPIRES_BEFORE_ISSUED: VALIDATION_CODES.EXPIRES_BEFORE_ISSUED,
+  /** typ of the JWT header is not rc-wrp+jwt, with `expected` and `actual` as context */
+  INVALID_TYP: VALIDATION_CODES.INVALID_TYP,
   /** Selected WRPRC identity does not match the access certificate subject */
   ACCESS_CERTIFICATE_IDENTITY_MISMATCH: 'access_certificate_identity_mismatch',
 } as const
@@ -60,31 +73,19 @@ export const WRPRC_VALIDATION_CODES = {
 export type WRPRCValidationCode = (typeof WRPRC_VALIDATION_CODES)[keyof typeof WRPRC_VALIDATION_CODES]
 
 /**
- * A single validation error
+ * An issue of a WRPRC validation, with a `WRPRCValidationCode` from the semantic checks or
+ * a zod issue code from schema parsing. `requirement` is the ETSI TS 119 475 requirement.
  */
-export interface ValidationError {
-  /** Path to the invalid field */
-  path: string[]
-  /** Error message */
-  message: string
-  /**
-   * Error code. Either a `WRPRCValidationCode` from the semantic checks, or a zod issue
-   * code forwarded from schema parsing, so the string stays open for the latter.
-   */
-  code: WRPRCValidationCode | (string & {})
-}
+export type WRPRCValidationIssue = ValidationIssueOf<WRPRCValidationCode | SchemaIssueCode>
 
 /**
- * Result of WRPRC validation
+ * Result of WRPRC validation: errors make the WRPRC invalid, warnings don't but should be
+ * noted
  */
-export interface ValidationResult {
-  /** Whether the WRPRC is valid */
-  valid: boolean
-  /** List of validation errors (empty if valid) */
-  errors: ValidationError[]
-  /** Warnings that don't invalidate the certificate but should be noted */
-  warnings: ValidationError[]
-}
+export type ValidationResult = CommonValidationResult<WRPRCValidationIssue>
+
+const fromZodError = (error: z.ZodError): ValidationResult =>
+  toValidationResult(error.issues.map((issue) => schemaIssueToValidationIssue(issue) as WRPRCValidationIssue))
 
 // ============================================================================
 // Core Validation Functions
@@ -93,17 +94,14 @@ export interface ValidationResult {
 /**
  * Entitlement-driven checks: GEN-5.2.4-03 to GEN-5.2.4-06.
  */
-function validateEntitlementRequirements(
-  payload: WRPRCPayload,
-  errors: ValidationError[],
-  warnings: ValidationError[]
-): void {
+function validateEntitlementRequirements(payload: WRPRCPayload, issues: WRPRCValidationIssue[]): void {
   for (const entitlement of payload.entitlements) {
     const known =
       ALL_ENTITLEMENTS.includes(entitlement as (typeof ALL_ENTITLEMENTS)[number]) ||
       ALL_PSP_SUB_ENTITLEMENTS.includes(entitlement as (typeof ALL_PSP_SUB_ENTITLEMENTS)[number])
     if (!known) {
-      warnings.push({
+      issues.push({
+        severity: 'warning',
         path: ['entitlements'],
         message: `Unknown entitlement URI: ${entitlement}. This may be a national or EU-defined extension.`,
         code: WRPRC_VALIDATION_CODES.UNKNOWN_ENTITLEMENT,
@@ -113,10 +111,12 @@ function validateEntitlementRequirements(
 
   // GEN-5.2.4-03: At least one entitlement must be specified
   if (payload.entitlements.length === 0) {
-    errors.push({
+    issues.push({
+      severity: 'error',
       path: ['entitlements'],
       message: 'At least one entitlement must be specified (GEN-5.2.4-03)',
       code: WRPRC_VALIDATION_CODES.MISSING_ENTITLEMENT,
+      requirement: 'GEN-5.2.4-03',
     })
   }
 
@@ -127,10 +127,12 @@ function validateEntitlementRequirements(
 
   // GEN-5.2.4-04: If sub-entitlements are present, a base entitlement must also be present
   if (hasSubEntitlement && !hasServiceProvider) {
-    errors.push({
+    issues.push({
+      severity: 'error',
       path: ['entitlements'],
       message: 'Service provider sub-entitlements require Service_Provider entitlement (GEN-5.2.4-04)',
       code: WRPRC_VALIDATION_CODES.MISSING_BASE_ENTITLEMENT,
+      requirement: 'GEN-5.2.4-04',
     })
   }
 
@@ -139,28 +141,34 @@ function validateEntitlementRequirements(
     ATTESTATION_PROVIDER_ENTITLEMENTS.includes(e as (typeof ATTESTATION_PROVIDER_ENTITLEMENTS)[number])
   )
   if (hasAttestationProviderRole && !payload.provides_attestations) {
-    warnings.push({
+    issues.push({
+      severity: 'warning',
       path: ['provides_attestations'],
       message:
         'Attestation providers should include provides_attestations field (GEN-5.2.4-05). This is recommended but not required.',
       code: WRPRC_VALIDATION_CODES.MISSING_PROVIDES_ATTESTATIONS,
+      requirement: 'GEN-5.2.4-05',
     })
   }
 
   // GEN-5.2.4-06: service providers carry the intended use fields of Table 9. The registry
   // may not have provided them, so these are warnings rather than errors.
   if (hasServiceProvider && !payload.credentials) {
-    warnings.push({
+    issues.push({
+      severity: 'warning',
       path: ['credentials'],
       message: 'Service provider WRPRCs should include the credentials field (GEN-5.2.4-06)',
       code: WRPRC_VALIDATION_CODES.MISSING_CREDENTIALS,
+      requirement: 'GEN-5.2.4-06',
     })
   }
   if (hasServiceProvider && !payload.purpose) {
-    warnings.push({
+    issues.push({
+      severity: 'warning',
       path: ['purpose'],
       message: 'Service provider WRPRCs should include the purpose field (GEN-5.2.4-06)',
       code: WRPRC_VALIDATION_CODES.MISSING_PURPOSE,
+      requirement: 'GEN-5.2.4-06',
     })
   }
 }
@@ -172,35 +180,29 @@ function validateEntitlementRequirements(
  */
 export function validateWRPRCPayload(payload: unknown, accessCertificateSub: string): ValidationResult {
   const result = WRPRCPayloadSchema.safeParse(normalizeWRPRCPayload(payload))
-  const errors: ValidationError[] = []
-  const warnings: ValidationError[] = []
 
   if (!result.success) {
-    for (const issue of result.error.issues) {
-      errors.push({
-        path: issue.path.map(String),
-        message: issue.message,
-        code: issue.code,
-      })
-    }
-    return { valid: false, errors, warnings }
+    return fromZodError(result.error)
   }
 
   // Additional semantic validations
   const validPayload: WRPRCPayload = result.data
+  const issues: WRPRCValidationIssue[] = []
 
-  validateEntitlementRequirements(validPayload, errors, warnings)
+  validateEntitlementRequirements(validPayload, issues)
 
   // Validate subject identifier format (semantic identifier)
   const subResult = validateSemanticIdentifier(validPayload.sub)
   if (!subResult.valid) {
-    errors.push({
+    issues.push({
+      severity: 'error',
       path: ['sub'],
       message: subResult.message,
       code: WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER,
     })
   } else if (subResult.unknownPrefix) {
-    warnings.push({
+    issues.push({
+      severity: 'warning',
       path: ['sub'],
       message: `Unknown semantic identifier initial characters: ${subResult.unknownPrefix}. This may be a national scheme (ETSI EN 319 412-1).`,
       code: WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX,
@@ -212,17 +214,21 @@ export function validateWRPRCPayload(payload: unknown, accessCertificateSub: str
     const maxExp = secondsToDate(validPayload.iat)
     maxExp.setUTCFullYear(maxExp.getUTCFullYear() + 1)
     if (secondsToDate(validPayload.exp) > maxExp) {
-      errors.push({
+      issues.push({
+        severity: 'error',
         path: ['exp'],
         message: 'exp must be at most 12 months after iat (GEN-5.2.4-08)',
         code: WRPRC_VALIDATION_CODES.EXP_TOO_LATE,
+        requirement: 'GEN-5.2.4-08',
       })
     }
     if (validPayload.exp <= validPayload.iat) {
-      errors.push({
+      issues.push({
+        severity: 'error',
         path: ['exp'],
         message: 'exp must be after iat',
-        code: WRPRC_VALIDATION_CODES.EXP_BEFORE_IAT,
+        code: WRPRC_VALIDATION_CODES.EXPIRES_BEFORE_ISSUED,
+        context: { issuedAt: secondsToDate(validPayload.iat), expiresAt: secondsToDate(validPayload.exp) },
       })
     }
   }
@@ -231,14 +237,15 @@ export function validateWRPRCPayload(payload: unknown, accessCertificateSub: str
   const expectedAccessCertificateSub = validPayload.intermediary?.sub ?? validPayload.sub
   const identityPath = validPayload.intermediary ? ['intermediary', 'sub'] : ['sub']
   if (accessCertificateSub !== expectedAccessCertificateSub) {
-    errors.push({
+    issues.push({
+      severity: 'error',
       path: identityPath,
       message: `${validPayload.intermediary ? 'intermediary.sub' : 'sub'} must match the access certificate subject`,
       code: WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
     })
   }
 
-  return { valid: errors.length === 0, errors, warnings }
+  return toValidationResult(issues)
 }
 
 /**
@@ -246,20 +253,7 @@ export function validateWRPRCPayload(payload: unknown, accessCertificateSub: str
  */
 export function validateWRPRCJWTHeader(header: unknown): ValidationResult {
   const result = WRPRCJWTHeaderSchema.safeParse(header)
-  const errors: ValidationError[] = []
-  const warnings: ValidationError[] = []
-
-  if (!result.success) {
-    for (const issue of result.error.issues) {
-      errors.push({
-        path: issue.path.map(String),
-        message: issue.message,
-        code: issue.code,
-      })
-    }
-  }
-
-  return { valid: errors.length === 0, errors, warnings }
+  return result.success ? toValidationResult([]) : fromZodError(result.error)
 }
 
 /**
@@ -269,17 +263,10 @@ export function validateWRPRC(header: unknown, payload: unknown, accessCertifica
   const headerResult = validateWRPRCJWTHeader(header)
   const payloadResult = validateWRPRCPayload(payload, accessCertificateSub)
 
-  const errors = [
-    ...headerResult.errors.map((e) => ({ ...e, path: ['header', ...e.path] })),
-    ...payloadResult.errors.map((e) => ({ ...e, path: ['payload', ...e.path] })),
-  ]
-
-  const warnings = [
-    ...headerResult.warnings.map((w) => ({ ...w, path: ['header', ...w.path] })),
-    ...payloadResult.warnings.map((w) => ({ ...w, path: ['payload', ...w.path] })),
-  ]
-
-  return { valid: errors.length === 0, errors, warnings }
+  return toValidationResult([
+    ...prefixIssuePaths('header', headerResult.issues),
+    ...prefixIssuePaths('payload', payloadResult.issues),
+  ])
 }
 
 // ============================================================================
@@ -310,35 +297,27 @@ export function isNaturalPersonWRPRC(payload: WRPRCPayload): boolean {
  */
 export function validateLegalPersonWRPRC(payload: unknown): ValidationResult {
   const result = LegalPersonSubjectSchema.safeParse(normalizeWRPRCPayload(payload))
-  const errors: ValidationError[] = []
-  const warnings: ValidationError[] = []
 
   if (!result.success) {
-    for (const issue of result.error.issues) {
-      errors.push({
-        path: issue.path.map(String),
-        message: issue.message,
-        code: issue.code,
-      })
-    }
+    return fromZodError(result.error)
   }
 
   // Additional validation for legal person identifier format
-  if (result.success) {
-    const sub: string = result.data.sub
-    // Legal person identifiers should follow ETSI EN 319 412-1 clause 5.1.4
-    // Format: 3-character prefix (or national scheme `XX:`) + 2-letter country code + hyphen + identifier
-    if (!/^(?:[A-Z]{3}|[A-Z]{2}:)[A-Z]{2}-.+$/.test(sub)) {
-      warnings.push({
-        path: ['sub'],
-        message:
-          'Legal person identifier should follow format: PREFIX + COUNTRY + "-" + ID (e.g., "LEIXG-529900T8BM49AURSDO55")',
-        code: WRPRC_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
-      })
-    }
+  const issues: WRPRCValidationIssue[] = []
+  const sub: string = result.data.sub
+  // Legal person identifiers should follow ETSI EN 319 412-1 clause 5.1.4
+  // Format: 3-character prefix (or national scheme `XX:`) + 2-letter country code + hyphen + identifier
+  if (!/^(?:[A-Z]{3}|[A-Z]{2}:)[A-Z]{2}-.+$/.test(sub)) {
+    issues.push({
+      severity: 'warning',
+      path: ['sub'],
+      message:
+        'Legal person identifier should follow format: PREFIX + COUNTRY + "-" + ID (e.g., "LEIXG-529900T8BM49AURSDO55")',
+      code: WRPRC_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
+    })
   }
 
-  return { valid: errors.length === 0, errors, warnings }
+  return toValidationResult(issues)
 }
 
 /**
@@ -346,35 +325,27 @@ export function validateLegalPersonWRPRC(payload: unknown): ValidationResult {
  */
 export function validateNaturalPersonWRPRC(payload: unknown): ValidationResult {
   const result = NaturalPersonSubjectSchema.safeParse(normalizeWRPRCPayload(payload))
-  const errors: ValidationError[] = []
-  const warnings: ValidationError[] = []
 
   if (!result.success) {
-    for (const issue of result.error.issues) {
-      errors.push({
-        path: issue.path.map(String),
-        message: issue.message,
-        code: issue.code,
-      })
-    }
+    return fromZodError(result.error)
   }
 
   // Additional validation for natural person identifier format
-  if (result.success) {
-    const sub: string = result.data.sub
-    // Natural person identifiers should follow ETSI EN 319 412-1 clause 5.1.3
-    // Format: 3-character prefix (or national scheme `XX:`) + 2-letter country code + hyphen + identifier
-    if (!/^(?:[A-Z]{3}|[A-Z]{2}:)[A-Z]{2}-.+$/.test(sub)) {
-      warnings.push({
-        path: ['sub'],
-        message:
-          'Natural person identifier should follow format: PREFIX + COUNTRY + "-" + ID (e.g., "TINIT-RSSMRA85T10A562S")',
-        code: WRPRC_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
-      })
-    }
+  const issues: WRPRCValidationIssue[] = []
+  const sub: string = result.data.sub
+  // Natural person identifiers should follow ETSI EN 319 412-1 clause 5.1.3
+  // Format: 3-character prefix (or national scheme `XX:`) + 2-letter country code + hyphen + identifier
+  if (!/^(?:[A-Z]{3}|[A-Z]{2}:)[A-Z]{2}-.+$/.test(sub)) {
+    issues.push({
+      severity: 'warning',
+      path: ['sub'],
+      message:
+        'Natural person identifier should follow format: PREFIX + COUNTRY + "-" + ID (e.g., "TINIT-RSSMRA85T10A562S")',
+      code: WRPRC_VALIDATION_CODES.IDENTIFIER_FORMAT_WARNING,
+    })
   }
 
-  return { valid: errors.length === 0, errors, warnings }
+  return toValidationResult(issues)
 }
 
 // ============================================================================
@@ -423,6 +394,9 @@ function validateSemanticIdentifier(identifier: string): {
 // Assertion Functions
 // ============================================================================
 
+const describe = (issues: WRPRCValidationIssue[]) =>
+  issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('\n')
+
 /**
  * Assert that a WRPRC payload is valid, throws WRPRCException if not
  */
@@ -432,8 +406,8 @@ export function assertValidWRPRCPayload(
 ): asserts payload is WRPRCPayload {
   const result = validateWRPRCPayload(payload, accessCertificateSub)
   if (!result.valid) {
-    const messages = result.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('\n')
-    throw new WRPRCException(`Invalid WRPRC payload:\n${messages}`, result.errors)
+    const errors = validationErrors(result)
+    throw new WRPRCException(`Invalid WRPRC payload:\n${describe(errors)}`, errors)
   }
 }
 
@@ -453,7 +427,7 @@ export function parseWRPRCPayload(payload: unknown, accessCertificateSub: string
 export function assertValidWRPRC(header: unknown, payload: unknown, accessCertificateSub: string): void {
   const result = validateWRPRC(header, payload, accessCertificateSub)
   if (!result.valid) {
-    const messages = result.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('\n')
-    throw new WRPRCException(`Invalid WRPRC:\n${messages}`, result.errors)
+    const errors = validationErrors(result)
+    throw new WRPRCException(`Invalid WRPRC:\n${describe(errors)}`, errors)
   }
 }

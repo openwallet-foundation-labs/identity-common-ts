@@ -1,3 +1,4 @@
+import { validationErrors } from '@owf/identity-common'
 import {
   ATTRIBUTE_TYPES,
   assembleCertificate,
@@ -162,9 +163,10 @@ export async function createAccessCertificate(options: CreateAccessCertificateOp
 
   const result = validateAccessCertificate(accessCertificate, { now: false })
   if (!result.valid) {
+    const errors = validationErrors(result)
     throw new AccessCertificateException(
-      `Created access certificate does not conform: ${result.errors.map((e) => e.message).join('; ')}`,
-      result.errors
+      `Created access certificate does not conform: ${errors.map((issue) => issue.message).join('; ')}`,
+      errors
     )
   }
   return accessCertificate

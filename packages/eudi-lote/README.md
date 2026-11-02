@@ -213,10 +213,11 @@ import {
   assertValidLoTE,
 } from '@owf/eudi-lote';
 
-// Get validation result with error details
+// Get the validation result with all issues
 const result = validateLoTE(lote);
-if (!result.valid) {
-  console.log('Validation errors:', result.errors);
+for (const issue of result.issues) {
+  // e.g. error invalid_format LoTE.ListAndSchemeInformation.DistributionPoints.0: Invalid URL
+  console.log(issue.severity, issue.code, `${issue.path.join('.')}: ${issue.message}`);
 }
 
 // Or throw on invalid
@@ -270,7 +271,7 @@ Removes an entity by name.
 
 #### `validateLoTE(lote, { mode? }): ValidationResult`
 
-Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns validation result with error details. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
+Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns `{ valid, issues }`, where each issue has a `severity`, a `code`, a `path` into the document and a `message`. Schema issues carry the zod issue code. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
 
 When valid, the result has the document as `lote`: a `LoTEDocument`, or a `CompatLoTEDocument` in compat mode. A `CompatLoTEDocument` is not a `LoTEDocument`, as its `LoTELegalNotice` can be an array.
 
@@ -289,7 +290,7 @@ Type assertion that throws `LoTEException` if the LoTE document is invalid. In c
 
 #### `validateLoTEProfile(lote, profile: LoTEProfile | LoTEProfile[], options?): ValidationResult`
 
-Validates a LoTE document against a known LoTE Profile, such as EU PID Providers List, mDL Providers List, etc. Returns validation result with error details.
+Validates a LoTE document against a known LoTE Profile, such as EU PID Providers List, mDL Providers List, etc. Returns `{ valid, issues }` like `validateLoTE`. A document whose `LoTEType` matches none of the profiles gets an `unexpected_lote_type` issue for each profile.
 
 When valid, the result has the LoTEType of the profile the document matches as `loteType`, and the document as `lote`, typed as the `LoTEProfileDocument` of that profile: its `LoTEType`, `ServiceTypeIdentifier` and `ServiceStatus` are the values the profile allows. Check `valid` and then `loteType` to narrow `lote` to one profile.
 
@@ -379,7 +380,7 @@ See [src/types.ts](./src/types.ts) for complete type definitions including:
 - `ServiceDigitalIdentity` - Digital identity for a service
 - `ServiceHistory` / `ServiceHistoryInstance` - Historical service states
 - `PointersToOtherLoTE` / `OtherLoTEPointer` - Cross-list references
-- `ValidationResult` / `ValidationError` - Validation types
+- `ValidationResult` / `LoTEValidationIssue` - Validation types
 
 All document types are derived from Zod schemas. You can import and use the schemas
 directly for custom validation or to build upon:

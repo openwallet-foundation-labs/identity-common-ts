@@ -73,13 +73,15 @@ describe('semantic identifier initial characters', () => {
     const result = validateWRPRCPayload(base().identifier('ZZZNL-12345').build(), 'ZZZNL-12345')
 
     expect(result.valid).toBe(true)
-    expect(result.warnings.map((w) => w.code)).toContain(WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
+    expect(result.issues.filter((issue) => issue.severity === 'warning').map((issue) => issue.code)).toContain(
+      WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX
+    )
   })
 
   it('does not warn for the corrected Table 2 and Table 4 characters', () => {
     for (const sub of ['EORNL-1', 'LEIXG-1', 'NTRNL-1', 'VATNL-1', 'EXCNL-1', 'TINIT-1', 'PASDE-1', 'IDCIT-1']) {
       const result = validateWRPRCPayload(base().identifier(sub).build(), sub)
-      const codes = result.warnings.map((w) => w.code)
+      const codes = result.issues.filter((issue) => issue.severity === 'warning').map((issue) => issue.code)
       expect(codes, sub).not.toContain(WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
     }
   })
@@ -90,7 +92,7 @@ describe('semantic identifier initial characters', () => {
 
       expect(result.valid, sub).toBe(true)
       expect(
-        result.warnings.map((w) => w.code),
+        result.issues.filter((issue) => issue.severity === 'warning').map((issue) => issue.code),
         sub
       ).toContain(WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
     }
@@ -99,14 +101,18 @@ describe('semantic identifier initial characters', () => {
   it('rejects a colon in a three-character initial', () => {
     const result = validateWRPRCPayload(base().identifier('HRN:DE-1').build(), 'HRN:DE-1')
 
-    expect(result.errors.map((e) => e.code)).toContain(WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER)
+    expect(result.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code)).toContain(
+      WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER
+    )
   })
 
   it('rejects an identifier that does not follow the semantic format', () => {
     const result = validateWRPRCPayload(base().identifier('not-a-semantic-id').build(), 'not-a-semantic-id')
 
     expect(result.valid).toBe(false)
-    expect(result.errors.map((e) => e.code)).toContain(WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER)
+    expect(result.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code)).toContain(
+      WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER
+    )
   })
 })
 

@@ -125,8 +125,12 @@ authenticity is established elsewhere, or for inspection:
 import { parseTrustedList, validateTrustedList } from '@owf/eudi-tl';
 
 const trustedList = parseTrustedList(xml);
-const { valid, errors } = validateTrustedList(trustedList);
+const { valid, issues } = validateTrustedList(trustedList);
 ```
+
+Each issue has a `severity`, a `code`, a `path` into the list, such as
+`['providers', 0, 'services', 1, 'serviceStatus']`, and a `message`, the same
+`ValidationIssue` that the other validators of this repository return.
 
 The certificates embedded in a list are parsed with the `asn1js` defaults
 (`maxDepth` 100, `maxNodes` 10000, `maxContentLength` 16MB). Pass

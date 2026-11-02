@@ -1,7 +1,9 @@
+import { VALIDATION_CODES, type ValidationSeverity } from '@owf/identity-common'
 import { parseCertificate, verifyCertificateSignature, X509Exception } from '@owf/x509'
 import { describe, expect, it } from 'vitest'
 import {
   type AccessCertificate,
+  type AccessCertificateValidationResult,
   ACCESS_CERTIFICATE_VALIDATION_CODES as CODES,
   getAccessCertificateSubjectIdentifier,
   parseAccessCertificate,
@@ -67,17 +69,35 @@ describe('parseAccessCertificate', () => {
   })
 })
 
+/** The codes of the issues with the given severity */
+const codes = (result: AccessCertificateValidationResult, severity: ValidationSeverity) =>
+  result.issues.filter((issue) => issue.severity === severity).map((issue) => issue.code)
+
 describe('validateAccessCertificate', () => {
   const ac = parseAccessCertificate(OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM)
 
   it('accepts a conforming certificate', () => {
-    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [] })
+    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, issues: [] })
   })
 
-  it('checks the validity period', () => {
-    const codes = (now: Date) => validateAccessCertificate(ac, { now }).errors.map((e) => e.code)
-    expect(codes(new Date('2020-01-01T00:00:00Z'))).toEqual([CODES.NOT_YET_VALID])
-    expect(codes(new Date('2040-01-01T00:00:00Z'))).toEqual([CODES.EXPIRED])
+  it('checks the validity period, with the common codes and the dates as context', () => {
+    const issues = (now: Date) => validateAccessCertificate(ac, { now }).issues
+    expect(issues(new Date('2020-01-01T00:00:00Z'))).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        code: VALIDATION_CODES.NOT_YET_VALID,
+        path: ['certificate', 'notBefore'],
+        context: { validFrom: ac.certificate.notBefore },
+      }),
+    ])
+    expect(issues(new Date('2040-01-01T00:00:00Z'))).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        code: VALIDATION_CODES.EXPIRED,
+        path: ['certificate', 'notAfter'],
+        context: { expiredAt: ac.certificate.notAfter },
+      }),
+    ])
     expect(validateAccessCertificate(ac, { now: false }).valid).toBe(true)
   })
 
@@ -85,14 +105,25 @@ describe('validateAccessCertificate', () => {
     // The CA certificate is a legal person certificate without any TS 119 411-8 content
     const result = validateAccessCertificate(parseAccessCertificate(CA_CERTIFICATE_PEM), { now: NOW })
     expect(result.valid).toBe(false)
-    expect(result.errors.map((e) => e.code)).toEqual([
+    expect(codes(result, 'error')).toEqual([
       CODES.CA_CERTIFICATE,
       CODES.MISSING_POLICY,
       CODES.MISSING_CPS_URI,
       CODES.MISSING_CONTACT,
     ])
-    expect(result.errors.find((e) => e.code === CODES.MISSING_CONTACT)?.requirement).toBe('GEN-6.6.1-07')
-    expect(result.warnings.map((e) => e.code)).toEqual([CODES.MISSING_DIGITAL_SIGNATURE_KEY_USAGE])
+    expect(result.issues.find((issue) => issue.code === CODES.MISSING_CONTACT)?.requirement).toBe('GEN-6.6.1-07')
+    expect(codes(result, 'warning')).toEqual([CODES.MISSING_DIGITAL_SIGNATURE_KEY_USAGE])
+  })
+
+  it('reports each issue pointing at the checked certificate field', () => {
+    const result = validateAccessCertificate(parseAccessCertificate(CA_CERTIFICATE_PEM), { now: NOW })
+    expect(result.issues.map(({ severity, code, path }) => ({ severity, code, path }))).toEqual([
+      { severity: 'error', code: CODES.CA_CERTIFICATE, path: ['certificate', 'basicConstraints', 'cA'] },
+      { severity: 'warning', code: CODES.MISSING_DIGITAL_SIGNATURE_KEY_USAGE, path: ['certificate', 'keyUsage'] },
+      { severity: 'error', code: CODES.MISSING_POLICY, path: ['certificate', 'policies'] },
+      { severity: 'error', code: CODES.MISSING_CPS_URI, path: ['certificate', 'policies'] },
+      { severity: 'error', code: CODES.MISSING_CONTACT, path: ['certificate', 'subjectAlternativeNames'] },
+    ])
   })
 
   it('accepts TSP allocated policy OIDs when configured', () => {
@@ -102,7 +133,7 @@ describe('validateAccessCertificate', () => {
       qualified: false,
       certificate: { ...ac.certificate, policies: [] },
     }
-    expect(validateAccessCertificate(withoutPolicy, { now: NOW }).errors.map((e) => e.code)).toEqual([
+    expect(codes(validateAccessCertificate(withoutPolicy, { now: NOW }), 'error')).toEqual([
       CODES.MISSING_POLICY,
       CODES.MISSING_CPS_URI,
     ])
@@ -117,20 +148,20 @@ describe('validateAccessCertificate', () => {
   })
 
   it('checks the organizationIdentifier encoding', () => {
-    const codes = (organizationIdentifier: string) =>
-      validateAccessCertificate(withSubject(ac, { organizationIdentifier }), { now: NOW }).errors.map((e) => e.code)
-    expect(codes('123456789')).toEqual([CODES.INVALID_ORGANIZATION_IDENTIFIER])
-    expect(codes('VATGR-123456789')).toEqual([CODES.INVALID_GREECE_COUNTRY_CODE])
-    expect(codes('VATEL-123456789')).toEqual([])
+    const identifierCodes = (organizationIdentifier: string) =>
+      codes(validateAccessCertificate(withSubject(ac, { organizationIdentifier }), { now: NOW }), 'error')
+    expect(identifierCodes('123456789')).toEqual([CODES.INVALID_ORGANIZATION_IDENTIFIER])
+    expect(identifierCodes('VATGR-123456789')).toEqual([CODES.INVALID_GREECE_COUNTRY_CODE])
+    expect(identifierCodes('VATEL-123456789')).toEqual([])
   })
 
   it('checks natural person names', () => {
     const natural: AccessCertificate = { ...ac, subjectType: 'natural', qualified: false }
     const result = validateAccessCertificate(natural, { now: NOW })
-    expect(result.errors.map((e) => e.code)).toEqual([CODES.MISSING_NATURAL_PERSON_NAME])
-    expect(result.warnings.map((e) => e.code)).toEqual([CODES.MISSING_SERIAL_NUMBER])
+    expect(codes(result, 'error')).toEqual([CODES.MISSING_NATURAL_PERSON_NAME])
+    expect(codes(result, 'warning')).toEqual([CODES.MISSING_SERIAL_NUMBER])
     const named = withSubject(natural, { givenName: 'Erika', serialNumber: 'PNODE-1234' })
-    expect(validateAccessCertificate(named, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [] })
+    expect(validateAccessCertificate(named, { now: NOW })).toEqual({ valid: true, issues: [] })
   })
 
   it('checks QC statements of qualified certificates', () => {
@@ -138,8 +169,8 @@ describe('validateAccessCertificate', () => {
       { ...ac, certificate: { ...ac.certificate, qcStatements: undefined } },
       { now: NOW }
     )
-    expect(result.errors.map((e) => e.code)).toEqual([CODES.MISSING_QC_COMPLIANCE])
-    expect(result.warnings.map((e) => e.code)).toEqual([CODES.QC_TYPE_MISMATCH])
+    expect(codes(result, 'error')).toEqual([CODES.MISSING_QC_COMPLIANCE])
+    expect(codes(result, 'warning')).toEqual([CODES.QC_TYPE_MISMATCH])
   })
 
   it('throws from parseAndValidateAccessCertificate', () => {

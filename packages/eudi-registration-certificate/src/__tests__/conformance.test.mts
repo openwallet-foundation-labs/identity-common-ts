@@ -6,13 +6,14 @@
  */
 
 import { ES256 } from '@owf/crypto'
-import { base64urlDecode, base64urlEncode } from '@owf/identity-common'
+import { base64urlDecode, base64urlEncode, VALIDATION_CODES } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
   decodeWRPRC,
   parseWRPRCPayload,
   signWRPRC,
   toWRPRCDialect,
+  validateWRPRC,
   validateWRPRCJWTHeader,
   validateWRPRCPayload,
   WRP_ENTITLEMENTS,
@@ -73,7 +74,7 @@ describe('Table 10 fields', () => {
       .build()
     const result = validateWRPRCPayload(payload, payload.sub)
     expect(result.valid).toBe(false)
-    expect(result.errors.some((e) => e.code === 'exp_too_late')).toBe(true)
+    expect(result.issues.some((issue) => issue.severity === 'error' && issue.code === 'exp_too_late')).toBe(true)
   })
 
   it('checks intermediary.sub against the access certificate subject', () => {
@@ -83,7 +84,12 @@ describe('Table 10 fields', () => {
     const mismatch = base().intermediary({ sub: 'LEINL-INTERMEDIARY', sname: 'Intermediary BV' }).build()
     const result = validateWRPRCPayload(mismatch, 'LEINL-OTHER')
     expect(result.valid).toBe(false)
-    expect(result.errors.some((e) => e.code === WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH)).toBe(true)
+    expect(
+      result.issues.some(
+        (issue) =>
+          issue.severity === 'error' && issue.code === WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH
+      )
+    ).toBe(true)
   })
 
   it('checks sub against the access certificate subject when there is no intermediary', () => {
@@ -93,8 +99,9 @@ describe('Table 10 fields', () => {
 
     const result = validateWRPRCPayload(payload, 'LEINL-OTHER')
     expect(result.valid).toBe(false)
-    expect(result.errors).toContainEqual(
+    expect(result.issues).toContainEqual(
       expect.objectContaining({
+        severity: 'error',
         path: ['sub'],
         code: WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
       })
@@ -115,7 +122,9 @@ describe('validation codes', () => {
       .build()
     const result = validateWRPRCPayload(payload, payload.sub)
 
-    expect(result.errors.map((e) => e.code)).toContain(WRPRC_VALIDATION_CODES.EXP_TOO_LATE)
+    expect(result.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code)).toContain(
+      WRPRC_VALIDATION_CODES.EXP_TOO_LATE
+    )
   })
 })
 
@@ -270,5 +279,70 @@ describe('Annex C example', () => {
 
     expect(WRPRCPayloadSchema.safeParse(annexC).success).toBe(true)
     expect(validateWRPRCPayload(annexC, annexC.intermediary.sub).valid).toBe(true)
+  })
+})
+
+describe('issues', () => {
+  it('reports errors and warnings in one list with severity and requirement', () => {
+    const payload = base()
+      .expiresAt(1_700_000_000 + 400 * 24 * 3600)
+      .build()
+    const result = validateWRPRCPayload(payload, payload.sub)
+
+    expect(result.issues).toContainEqual({
+      severity: 'error',
+      code: WRPRC_VALIDATION_CODES.EXP_TOO_LATE,
+      path: ['exp'],
+      message: 'exp must be at most 12 months after iat (GEN-5.2.4-08)',
+      requirement: 'GEN-5.2.4-08',
+    })
+    expect(Object.keys(result)).toEqual(['valid', 'issues'])
+  })
+
+  it('reports exp before iat with the common code and the times as context', () => {
+    const payload = base().expiresAt(1_600_000_000).build()
+    const result = validateWRPRCPayload(payload, payload.sub)
+
+    expect(result.issues).toContainEqual({
+      severity: 'error',
+      code: VALIDATION_CODES.EXPIRES_BEFORE_ISSUED,
+      path: ['exp'],
+      message: 'exp must be after iat',
+      context: { issuedAt: new Date(payload.iat * 1000), expiresAt: new Date(1_600_000_000 * 1000) },
+    })
+  })
+
+  it('reports a wrong typ with the common code and the expected and actual typ', () => {
+    const result = validateWRPRCJWTHeader({ typ: 'JWT', alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 })
+
+    expect(result).toEqual({
+      valid: false,
+      issues: [
+        {
+          severity: 'error',
+          code: VALIDATION_CODES.INVALID_TYP,
+          path: ['typ'],
+          message: 'typ must be rc-wrp+jwt',
+          context: { expected: ['rc-wrp+jwt'], actual: 'JWT' },
+        },
+      ],
+    })
+    expect(
+      validateWRPRCJWTHeader({ alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 }).issues.map((issue) => issue.message)
+    ).toEqual(['typ is missing, it must be rc-wrp+jwt'])
+    expect(validateWRPRCJWTHeader({ typ: 'rc-wrp+jwt', alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 }).valid).toBe(
+      true
+    )
+  })
+
+  it('prefixes header and payload issues and keeps array indices as numbers', () => {
+    const payload = { ...base().build(), entitlements: [42] }
+    const result = validateWRPRC({ alg: 'ES256' }, payload, 'LEINL-529900T8BM49AURSDO55')
+
+    expect(result.valid).toBe(false)
+    expect(result.issues.some((issue) => issue.path[0] === 'header')).toBe(true)
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ severity: 'error', path: ['payload', 'entitlements', 0] })
+    )
   })
 })

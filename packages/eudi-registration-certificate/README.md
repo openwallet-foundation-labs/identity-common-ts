@@ -221,19 +221,42 @@ import { validateWRPRCPayload } from '@owf/eudi-registration-certificate'
 
 const result = validateWRPRCPayload(payload, accessCertificateSub)
 
-if (result.valid) {
-  console.log('WRPRC is valid')
-} else {
-  console.log('Errors:', result.errors)
-}
+console.log(result.valid ? 'WRPRC is valid' : 'WRPRC is invalid')
 
-// Warnings are returned even for valid payloads
-if (result.warnings.length > 0) {
-  console.log('Warnings:', result.warnings)
+// Errors and warnings in one list; warnings are returned even for valid payloads
+for (const issue of result.issues) {
+  // e.g. error exp_too_late exp: exp must be at most 12 months after iat (GEN-5.2.4-08)
+  console.log(issue.severity, issue.code, `${issue.path.join('.')}: ${issue.message}`)
 }
 ```
 
 `accessCertificateSub` is required for payload validation, parsing, signing, and decoding. It is compared with `intermediary.sub` when the WRPRC has an intermediary, and with `sub` otherwise.
+
+Each issue has a `severity`, a `code` from `WRPRC_VALIDATION_CODES` or, for schema issues, the zod issue code, a `path` into the payload and, where a check has one, the ETSI TS 119 475 `requirement`. Checks that recur in other specifications use the codes of `VALIDATION_CODES` from `@owf/identity-common` and carry a typed `context`:
+
+- `invalid_typ`, when the JWT header `typ` is not `rc-wrp+jwt`, with `expected` and `actual`;
+- `expires_before_issued`, when `exp` is at or before `iat`, with `issuedAt` and `expiresAt`.
+
+### Checking a Request for Over-Asking
+
+`checkOverAsking` compares the DCQL query of an OpenID4VP request with the `credentials` of the WRPRC, and reports every credential and claim the request asks for beyond the registration:
+
+```typescript
+import { checkOverAsking } from '@owf/eudi-registration-certificate'
+
+const result = checkOverAsking(authorizationRequest.dcql_query, wrprcPayload.credentials)
+
+// The same { valid, issues } as validateWRPRCPayload: valid is false when any issue is an error
+for (const issue of result.issues) {
+  // e.g. error credentials.0.claims.1: Credential query pid asks for the claim ["birthdate"], which is not registered
+  console.log(issue.severity, `${issue.path.join('.')}: ${issue.message}`)
+}
+```
+
+- A requested credential needs a registered one of the same `format` whose `meta` it stays within: every requested `vct_values` or `type_values` entry is registered, and `doctype_value` is the same.
+- A requested claim needs a registered claim with the same path or a parent path, as registering `address` covers `address.locality`. `null` in a registered path covers every array element. A registered claim with `values` only allows requests for some of these values.
+- A credential query without `claims` asks for no selectively disclosable claims, so only its credential is checked.
+- A registered credential without claims gives a warning for each credential query with claims, as the registration does not say which claims are allowed.
 
 ### Entitlement Constants
 

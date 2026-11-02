@@ -283,7 +283,7 @@ describe('ETSI TS 119 602 v1.1.1 JSON schema drift', () => {
     const json = asJson(document)
 
     expect(schemaAccepts(json)).toBe(true)
-    expect(validateLoTE(json)).toMatchObject({ valid: true, errors: [] })
+    expect(validateLoTE(json)).toMatchObject({ valid: true, issues: [] })
   })
 
   it.each(bothReject)('both reject %s', (_, document, path) => {
@@ -291,7 +291,7 @@ describe('ETSI TS 119 602 v1.1.1 JSON schema drift', () => {
 
     expect(schemaAccepts(json)).toBe(false)
     expect(schemaErrorPaths().some((p) => p === path || p.startsWith(`${path}.`))).toBe(true)
-    expect(validateLoTE(json).errors.map((e) => e.path)).toContain(path)
+    expect(validateLoTE(json).issues.map((issue) => issue.path.join('.'))).toContain(path)
   })
 
   it.each(looserThanSchema)('only validateLoTE accepts %s (%s)', (_, document) => {
