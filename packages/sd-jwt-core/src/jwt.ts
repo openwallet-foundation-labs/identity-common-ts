@@ -253,7 +253,7 @@ export class Jwt<
     this.encoded = data?.encoded
   }
 
-  public static decodeJWT<
+  public static decodeJwt<
     Header extends Record<string, unknown> = Record<string, unknown>,
     Payload extends Record<string, unknown> = Record<string, unknown>,
   >(jwt: string): { header: Header; payload: Payload; signature: Base64urlString } {
@@ -264,7 +264,7 @@ export class Jwt<
     Header extends Record<string, unknown> = Record<string, unknown>,
     Payload extends Record<string, unknown> = Record<string, unknown>,
   >(encodedJwt: string): Jwt<Header, Payload> {
-    const { header, payload, signature } = Jwt.decodeJWT<Header, Payload>(encodedJwt)
+    const { header, payload, signature } = Jwt.decodeJwt<Header, Payload>(encodedJwt)
 
     const jwt = new Jwt<Header, Payload>({
       header,

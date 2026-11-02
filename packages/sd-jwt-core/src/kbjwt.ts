@@ -95,7 +95,7 @@ export class KbJwt<Header extends KbJwtHeader = KbJwtHeader, Payload extends KbJ
   public static fromKbEncode<Header extends KbJwtHeader = KbJwtHeader, Payload extends KbJwtPayload = KbJwtPayload>(
     encodedJwt: string
   ): KbJwt<Header, Payload> {
-    const { header, payload, signature } = Jwt.decodeJWT<Header, Payload>(encodedJwt)
+    const { header, payload, signature } = Jwt.decodeJwt<Header, Payload>(encodedJwt)
 
     const jwt = new KbJwt<Header, Payload>({
       header,

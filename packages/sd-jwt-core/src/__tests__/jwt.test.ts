@@ -19,7 +19,7 @@ describe('JWT', () => {
     const jwt = `${base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}.${base64urlEncode(
       JSON.stringify({ sub: '1234567890', name: 'John Doe' })
     )}.signature`
-    const result = Jwt.decodeJWT(jwt)
+    const result = Jwt.decodeJwt(jwt)
     expect(result).toEqual({
       header: { alg: 'HS256', typ: 'JWT' },
       payload: { sub: '1234567890', name: 'John Doe' },
@@ -29,12 +29,12 @@ describe('JWT', () => {
 
   test('throws an error when JWT string is not correctly formed', () => {
     const jwt = 'abc.def'
-    expect(() => Jwt.decodeJWT(jwt)).toThrow('Invalid JWT as input')
+    expect(() => Jwt.decodeJwt(jwt)).toThrow('Invalid JWT as input')
   })
 
   test('throws an error when JWT parts are missing', () => {
     const jwt = `${base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}`
-    expect(() => Jwt.decodeJWT(jwt)).toThrow('Invalid JWT as input')
+    expect(() => Jwt.decodeJwt(jwt)).toThrow('Invalid JWT as input')
   })
 
   test('set', async () => {
