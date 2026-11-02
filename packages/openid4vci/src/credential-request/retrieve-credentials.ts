@@ -55,7 +55,7 @@ async function handleCredentialResponse<T, Schema extends z.ZodType<T>>(options:
   // Check if the response is encrypted (Content-Type: application/jwt)
   if (isResponseContentType(ContentType.Jwt, response)) {
     const jwe = await response.clone().text()
-    const decryptResult = await decryptJwe(jwe)
+    const decryptResult = await decryptJwe(jwe, { jwk: credentialResponseEncryption?.jwk })
 
     if (!decryptResult.decrypted) {
       return { ok: false, parseResult: undefined }
