@@ -2,7 +2,7 @@ import { base64url, stringToBytes } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import { JWT_STATUS_LIST_TYPE } from '../jwt-types'
 import { StatusList } from '../status-list'
-import { SLException, StatusListEntryNotValidException } from '../status-list-exception'
+import { StatusListEntryNotValidError, StatusListError } from '../status-list-error'
 import { verifyStatus, verifyStatusListJwtClaims, verifyStatusListJwtHeader } from '../status-list-jwt'
 import { StatusType } from '../types'
 
@@ -90,8 +90,8 @@ describe('verifyStatus (JWT)', () => {
   it('reports a status that is not Valid with its index and status', () => {
     const verification = () => verifyStatus({ uri, idx: 3, token: statusListToken({}, [3]) })
 
-    expect(verification).toThrow(StatusListEntryNotValidException)
-    expect(verification).toThrow(SLException)
+    expect(verification).toThrow(StatusListEntryNotValidError)
+    expect(verification).toThrow(StatusListError)
     expect(verification).toThrow(expect.objectContaining({ idx: 3, status: StatusType.Invalid }))
   })
 
@@ -116,12 +116,12 @@ describe('verifyStatus (JWT)', () => {
       name: 'an lst that is not deflate',
       claims: { status_list: { bits: 1, lst: base64url.encode(new Uint8Array([1, 2, 3])) } },
     },
-  ])('rejects a token with $name as an SLException', ({ claims }) => {
+  ])('rejects a token with $name as an StatusListError', ({ claims }) => {
     const verification = () => verifyStatus({ uri, idx: 0, token: statusListToken(claims) })
 
-    expect(verification).toThrow(SLException)
+    expect(verification).toThrow(StatusListError)
     expect(verification).toThrow('The status list token has no valid status_list claim')
-    expect(verification).not.toThrow(StatusListEntryNotValidException)
+    expect(verification).not.toThrow(StatusListEntryNotValidError)
   })
 
   it('verifies the header and the claims before reading the status list', () => {

@@ -2,65 +2,65 @@
 import type { Hasher } from '@owf/identity-common'
 import type { z } from 'zod'
 import type {
-  AdoTstSchema,
-  CertIdSchema,
-  CommitmentReferenceSchema,
-  EtsiUClearInstanceSchema,
-  EtsiUSchema,
-  FlattenedJWSSchema,
-  GeneralJWSSchema,
-  OIdSchema,
-  PkiObjectSchema,
-  ProtectedHeaderParamsSchema,
-  ProtectedHeaderSchema,
-  RRefsSchema,
-  RValsSchema,
-  SigDSchema,
-  SignAlgSchema,
-  SignaturePolicySchema,
-  SignatureProductionPlaceSchema,
-  SignerAttributesSchema,
-  SignOptionsSchema,
-  SigTstSchema,
-  TstContainerSchema,
-  TstTokenSchema,
-  TstTokensSchema,
-  UnprotectedHeaderSchema,
-  ValidationValuesSchema,
-  VerifyOptionsSchema,
-  X5tOSchema,
-  XRefsSchema,
-  XValsSchema,
+  zAdoTst,
+  zCertId,
+  zCommitmentReference,
+  zEtsiU,
+  zEtsiUClearInstance,
+  zFlattenedJWS,
+  zGeneralJWS,
+  zOId,
+  zPkiObject,
+  zProtectedHeader,
+  zProtectedHeaderParams,
+  zRRefs,
+  zRVals,
+  zSigD,
+  zSignAlg,
+  zSignaturePolicy,
+  zSignatureProductionPlace,
+  zSignerAttributes,
+  zSignOptions,
+  zSigTst,
+  zTstContainer,
+  zTstToken,
+  zTstTokens,
+  zUnprotectedHeader,
+  zValidationValues,
+  zVerifyOptions,
+  zX5tO,
+  zXRefs,
+  zXVals,
 } from './schemas'
 
-export type SignAlg = z.infer<typeof SignAlgSchema>
-export type OId = z.infer<typeof OIdSchema>
-export type PkiObject = z.infer<typeof PkiObjectSchema>
-export type TstToken = z.infer<typeof TstTokenSchema>
-export type TstContainer = z.infer<typeof TstContainerSchema>
-export type TstTokens = z.infer<typeof TstTokensSchema>
-export type X5tO = z.infer<typeof X5tOSchema>
-export type CommitmentReference = z.infer<typeof CommitmentReferenceSchema>
-export type SignatureProductionPlace = z.infer<typeof SignatureProductionPlaceSchema>
-export type SignerAttributes = z.infer<typeof SignerAttributesSchema>
-export type SignaturePolicy = z.infer<typeof SignaturePolicySchema>
-export type SigD = z.infer<typeof SigDSchema>
-export type ProtectedHeaderParams = z.infer<typeof ProtectedHeaderParamsSchema>
-export type ProtectedHeader = z.infer<typeof ProtectedHeaderSchema>
-export type UnprotectedHeaderParams = z.infer<typeof UnprotectedHeaderSchema>
-export type EtsiU = z.infer<typeof EtsiUSchema>
-export type EtsiUClearInstance = z.infer<typeof EtsiUClearInstanceSchema>
-export type SigTst = z.infer<typeof SigTstSchema>
-export type AdoTst = z.infer<typeof AdoTstSchema>
-export type XVals = z.infer<typeof XValsSchema>
-export type RVals = z.infer<typeof RValsSchema>
-export type ValidationValues = z.infer<typeof ValidationValuesSchema>
-export type CertId = z.infer<typeof CertIdSchema>
-export type XRefs = z.infer<typeof XRefsSchema>
-export type RRefs = z.infer<typeof RRefsSchema>
+export type SignAlg = z.infer<typeof zSignAlg>
+export type OId = z.infer<typeof zOId>
+export type PkiObject = z.infer<typeof zPkiObject>
+export type TstToken = z.infer<typeof zTstToken>
+export type TstContainer = z.infer<typeof zTstContainer>
+export type TstTokens = z.infer<typeof zTstTokens>
+export type X5tO = z.infer<typeof zX5tO>
+export type CommitmentReference = z.infer<typeof zCommitmentReference>
+export type SignatureProductionPlace = z.infer<typeof zSignatureProductionPlace>
+export type SignerAttributes = z.infer<typeof zSignerAttributes>
+export type SignaturePolicy = z.infer<typeof zSignaturePolicy>
+export type SigD = z.infer<typeof zSigD>
+export type ProtectedHeaderParams = z.infer<typeof zProtectedHeaderParams>
+export type ProtectedHeader = z.infer<typeof zProtectedHeader>
+export type UnprotectedHeaderParams = z.infer<typeof zUnprotectedHeader>
+export type EtsiU = z.infer<typeof zEtsiU>
+export type EtsiUClearInstance = z.infer<typeof zEtsiUClearInstance>
+export type SigTst = z.infer<typeof zSigTst>
+export type AdoTst = z.infer<typeof zAdoTst>
+export type XVals = z.infer<typeof zXVals>
+export type RVals = z.infer<typeof zRVals>
+export type ValidationValues = z.infer<typeof zValidationValues>
+export type CertId = z.infer<typeof zCertId>
+export type XRefs = z.infer<typeof zXRefs>
+export type RRefs = z.infer<typeof zRRefs>
 export type ArcTst = TstContainer
-export type GeneralJWS = z.infer<typeof GeneralJWSSchema>
-export type FlattenedJWS = z.infer<typeof FlattenedJWSSchema>
+export type GeneralJWS = z.infer<typeof zGeneralJWS>
+export type FlattenedJWS = z.infer<typeof zFlattenedJWS>
 export type CompactJWS = string
 
 /** Callbacks the token needs from its host environment. */
@@ -68,7 +68,7 @@ export type TokenContext = {
   hasher: Hasher
 }
 
-export type SignOptions = z.infer<typeof SignOptionsSchema> & {
+export type SignOptions = z.infer<typeof zSignOptions> & {
   signer: (data: string) => Promise<string>
 }
-export type VerifyOptions = z.infer<typeof VerifyOptionsSchema>
+export type VerifyOptions = z.infer<typeof zVerifyOptions>

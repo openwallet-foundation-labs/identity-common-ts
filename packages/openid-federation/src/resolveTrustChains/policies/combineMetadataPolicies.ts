@@ -1,7 +1,7 @@
 import type { EntityStatementClaims } from '../../entityStatement'
 import { OpenIdFederationError } from '../../error/OpenIdFederationError'
 import { PolicyErrorStage } from '../../error/PolicyErrorStage'
-import { isExistingPolicyKey, metadataPolicySchema } from '../../metadata'
+import { isExistingPolicyKey, zMetadataPolicy } from '../../metadata'
 import type { MetadataPolicy } from '../../metadata/metadataPolicy'
 import { objectToEntries } from '../../utils/data'
 import { combineExistingMetadataPolicyOperators } from './combineExistingMetadataPolicyOperators'
@@ -65,7 +65,7 @@ export function combineMetadataPolicies({
         })
 
         // Check if the the new properties are able to be combined
-        const combinedPolicyRules = metadataPolicySchema.safeParse(combinedPolicyRulesRaw)
+        const combinedPolicyRules = zMetadataPolicy.safeParse(combinedPolicyRulesRaw)
         if (!combinedPolicyRules.success) throw combinedPolicyRules.error
 
         mergedPolicyMap.setPropertyValue(serviceKey, servicePropertyKey, combinedPolicyRules.data)

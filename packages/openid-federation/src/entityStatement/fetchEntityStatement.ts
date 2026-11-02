@@ -4,7 +4,7 @@ import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
 import { type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
 import { validate } from '../utils/validate'
-import { entityStatementJwtSchema } from './entityStatementJwt'
+import { zEntityStatementJwt } from './entityStatementJwt'
 
 export type FetchEntityStatementOptions = {
   iss: string
@@ -55,7 +55,7 @@ export const fetchEntityStatement = async ({
 
   // Parse the JWT into its claims and header claims
   const { claims } = validate({
-    schema: entityStatementJwtSchema,
+    schema: zEntityStatementJwt,
     data: entityStatementJwt,
     errorMessage: 'fetched entity statement JWT is invalid',
   })

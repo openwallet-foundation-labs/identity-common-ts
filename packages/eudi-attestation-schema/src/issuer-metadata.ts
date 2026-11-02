@@ -9,7 +9,7 @@
  */
 
 import { getClaimsFromSchema } from './dcql'
-import { SchemaMetaException } from './schema-meta-exception'
+import { SchemaMetaError } from './schema-meta-error'
 import type {
   AttestationFormat,
   BuildCredentialConfigurationTemplateOptions,
@@ -37,7 +37,7 @@ function getSchemaURI(schemaMeta: SchemaMeta, format: AttestationFormat): Schema
   const entry = schemaMeta.schemaURIs.find((value) => value.formatIdentifier === format)
 
   if (!entry) {
-    throw new SchemaMetaException(`SchemaMeta has no schemaURI for format '${format}'`)
+    throw new SchemaMetaError(`SchemaMeta has no schemaURI for format '${format}'`)
   }
 
   return entry

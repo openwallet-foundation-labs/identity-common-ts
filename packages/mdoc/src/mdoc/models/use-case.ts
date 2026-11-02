@@ -2,14 +2,14 @@ import { CborStructure, TypedMap, typedMap } from '@owf/cose'
 import { z } from 'zod'
 import { zInteger, zUnsignedInteger } from '../../utils/zodInteger'
 
-const useCaseSchema = typedMap([
+const zUseCase = typedMap([
   ['mandatory', z.boolean()],
   ['purposeHints', z.map(z.string(), zInteger).exactOptional()],
   ['documentSets', z.array(z.array(zUnsignedInteger).min(1)).min(1)],
 ] as const)
 
-export type UseCaseEncodedStructure = z.input<typeof useCaseSchema>
-export type UseCaseDecodedStructure = z.output<typeof useCaseSchema>
+export type UseCaseEncodedStructure = z.input<typeof zUseCase>
+export type UseCaseDecodedStructure = z.output<typeof zUseCase>
 
 export type UseCaseOptions = {
   /**
@@ -33,7 +33,7 @@ export type UseCaseOptions = {
  */
 export class UseCase extends CborStructure<UseCaseEncodedStructure, UseCaseDecodedStructure> {
   public static override get encodingSchema() {
-    return useCaseSchema
+    return zUseCase
   }
 
   public get mandatory() {

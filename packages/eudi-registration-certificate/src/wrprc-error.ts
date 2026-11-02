@@ -1,10 +1,10 @@
-import { IdentityException, validationErrorMessage } from '@owf/identity-common'
+import { IdentityError, validationErrorMessage } from '@owf/identity-common'
 import type { WRPRCValidationIssue } from './validator'
 
 /**
  * WRPRCError is the error of WRPRC operations.
  */
-export class WRPRCError extends IdentityException {
+export class WRPRCError extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
     Object.setPrototypeOf(this, WRPRCError.prototype)

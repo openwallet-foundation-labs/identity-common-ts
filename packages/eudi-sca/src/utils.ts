@@ -159,9 +159,9 @@ const ISO4217_CODES = [
   'ZWL',
 ] as const
 
-export const Iso4217CurrencyCode = z.enum(ISO4217_CODES)
+export const zIso4217CurrencyCode = z.enum(ISO4217_CODES)
 
-export const Iso4217Amount = z
+export const zIso4217Amount = z
   .string()
   .regex(/^\d+\.\d+ [A-Z]{3}$/)
   .refine((val) => ISO4217_CODES.includes(val.split(' ')[1] as (typeof ISO4217_CODES)[number]), {

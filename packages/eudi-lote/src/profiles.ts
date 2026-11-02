@@ -368,8 +368,8 @@ const serviceStatusOneOf = <const T extends readonly [string, ...string[]]>(stat
         : `ServiceStatus must be one of the following: ${statuses.join(', ')}`,
   })
 
-const noServiceStatus = z.undefined({ error: 'ServiceStatus must not be present' }).optional()
-const withoutServiceStatus = { strict: noServiceStatus, compat: noServiceStatus }
+const zNoServiceStatus = z.undefined({ error: 'ServiceStatus must not be present' }).optional()
+const withoutServiceStatus = { strict: zNoServiceStatus, compat: zNoServiceStatus }
 
 // ETSI TS 119 602 H
 const pubEAAServiceStatus = serviceStatusOneOf([
@@ -394,7 +394,7 @@ export const profileDefinitions = {
       ],
       informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PIDProvider/',
       serviceStatus: {
-        strict: noServiceStatus,
+        strict: zNoServiceStatus,
         // The German PID Providers List sets this status, which no profile defines
         compat: serviceStatusOneOf(['http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified']).optional(),
       },

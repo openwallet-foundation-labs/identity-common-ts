@@ -392,7 +392,7 @@ import { zLoTEDocument, zTrustedEntity } from '@owf/eudi-lote';
 const result = zLoTEDocument.safeParse(data);
 
 // Compose with your own schemas
-const mySchema = zTrustedEntity.extend({ customField: z.string() });
+const zMyTrustedEntity = zTrustedEntity.extend({ customField: z.string() });
 ```
 
 ### SignerFunction

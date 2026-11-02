@@ -138,7 +138,7 @@ describe('assertValidSchemaMeta', () => {
     expect(() => assertValidSchemaMeta(validSchemaMeta)).not.toThrow()
   })
 
-  it('throws SchemaMetaException for invalid SchemaMeta', () => {
+  it('throws SchemaMetaError for invalid SchemaMeta', () => {
     expect(() => assertValidSchemaMeta({})).toThrow('Invalid SchemaMeta')
   })
 

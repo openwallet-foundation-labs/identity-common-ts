@@ -18,18 +18,18 @@ import { z } from 'zod'
  * Presence of an `Identifier` in `identifiers` means the MSO carrying that
  * id in its `identifier_list` element is revoked; absence means valid.
  */
-const identifierInfoSchema = z.map(z.union([z.string(), z.number()]), z.unknown())
+const zIdentifierInfo = z.map(z.union([z.string(), z.number()]), z.unknown())
 
-const identifierListSchema = typedMap(
+const zIdentifierList = typedMap(
   [
-    ['identifiers', z.map(zUint8Array, identifierInfoSchema)],
+    ['identifiers', z.map(zUint8Array, zIdentifierInfo)],
     ['aggregation_uri', z.string().exactOptional()],
   ],
   { allowAdditionalKeys: true }
 )
 
-export type IdentifierListDecodedStructure = z.output<typeof identifierListSchema>
-export type IdentifierListEncodedStructure = z.input<typeof identifierListSchema>
+export type IdentifierListDecodedStructure = z.output<typeof zIdentifierList>
+export type IdentifierListEncodedStructure = z.input<typeof zIdentifierList>
 
 export type IdentifierListOptions = {
   identifiers: Array<Uint8Array>
@@ -38,7 +38,7 @@ export type IdentifierListOptions = {
 
 export class IdentifierList extends CborStructure<IdentifierListEncodedStructure, IdentifierListDecodedStructure> {
   public static override get encodingSchema() {
-    return identifierListSchema
+    return zIdentifierList
   }
 
   public get identifiers() {

@@ -315,7 +315,7 @@ describe('Extending Cwt for a specific cwt type', () => {
     Profile = 65001,
   }
 
-  const exampleCwtPayloadSchema = extendCwtPayloadClaims(
+  const zExampleCwtPayload = extendCwtPayloadClaims(
     [
       // `sub` is optional in the registered claims, but required for this cwt type
       [RegisteredCwtClaimKey.Subject, z.string()],
@@ -334,9 +334,9 @@ describe('Extending Cwt for a specific cwt type', () => {
     }
   }
 
-  class ExampleCwtPayload extends CwtPayload<z.infer<typeof exampleCwtPayloadSchema>> {
+  class ExampleCwtPayload extends CwtPayload<z.infer<typeof zExampleCwtPayload>> {
     public static override get encodingSchema() {
-      return exampleCwtPayloadSchema
+      return zExampleCwtPayload
     }
 
     public get nickname() {
@@ -369,7 +369,7 @@ describe('Extending Cwt for a specific cwt type', () => {
     const cwt = new ExampleCwt({
       protectedHeaders: protectedHeaders(),
       payload: ExampleCwtPayload.fromDecodedStructure(
-        exampleCwtPayloadSchema.parse(
+        zExampleCwtPayload.parse(
           new Map<number, unknown>([
             [RegisteredCwtClaimKey.Subject, 'coap://light.example'],
             [ExampleClaimKey.Nickname, 'lamp'],
@@ -422,7 +422,7 @@ describe('Extending Cwt for a specific cwt type', () => {
 
   test('should name a claim the cwt type adds in a validation error', () => {
     expect(() =>
-      exampleCwtPayloadSchema.parse(
+      zExampleCwtPayload.parse(
         new Map<number, unknown>([
           [RegisteredCwtClaimKey.Subject, 'coap://light.example'],
           [ExampleClaimKey.Nickname, 42],
@@ -444,7 +444,7 @@ describe('Extending Cwt for a specific cwt type', () => {
 
   test('should reject headers missing a label the cwt type requires', async () => {
     const payload = ExampleCwtPayload.fromDecodedStructure(
-      exampleCwtPayloadSchema.parse(new Map<number, unknown>([[RegisteredCwtClaimKey.Subject, 'coap://light.example']]))
+      zExampleCwtPayload.parse(new Map<number, unknown>([[RegisteredCwtClaimKey.Subject, 'coap://light.example']]))
     )
 
     const missingProfile = () =>
@@ -464,7 +464,7 @@ describe('Extending Cwt for a specific cwt type', () => {
 
   test('should not let an unprotected label satisfy a protected one the cwt type requires', async () => {
     const payload = ExampleCwtPayload.fromDecodedStructure(
-      exampleCwtPayloadSchema.parse(new Map<number, unknown>([[RegisteredCwtClaimKey.Subject, 'coap://light.example']]))
+      zExampleCwtPayload.parse(new Map<number, unknown>([[RegisteredCwtClaimKey.Subject, 'coap://light.example']]))
     )
 
     expect(

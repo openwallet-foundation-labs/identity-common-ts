@@ -69,22 +69,22 @@ import type { SessionTranscript } from './session-transcript'
  */
 const isAnsweredByAlternative = (match: ElementMatch) => match.options?.[0].alternativeElementSetIndex !== undefined
 
-const deviceResponseEncodedSchema = typedMap([
+const zDeviceResponseEncoded = typedMap([
   ['version', z.string()],
   ['status', z.number()],
   ['documents', z.array(z.unknown()).exactOptional()],
   ['documentErrors', z.array(z.unknown()).exactOptional()],
 ] as const)
 
-const deviceResponseDecodedSchema = typedMap([
+const zDeviceResponseDecoded = typedMap([
   ['version', z.string()],
   ['status', z.number()],
   ['documents', z.array(z.instanceof(Document)).exactOptional()],
   ['documentErrors', z.array(z.instanceof(DocumentError)).exactOptional()],
 ] as const)
 
-export type DeviceResponseEncodedStructure = z.input<typeof deviceResponseEncodedSchema>
-export type DeviceResponseDecodedStructure = z.output<typeof deviceResponseDecodedSchema>
+export type DeviceResponseEncodedStructure = z.input<typeof zDeviceResponseEncoded>
+export type DeviceResponseDecodedStructure = z.output<typeof zDeviceResponseDecoded>
 
 export type DeviceResponseOptions = {
   version?: string
@@ -168,7 +168,7 @@ export type DeviceResponseDocumentOptions = {
 
 export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure, DeviceResponseDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(deviceResponseEncodedSchema.in, deviceResponseDecodedSchema.out, {
+    return z.codec(zDeviceResponseEncoded.in, zDeviceResponseDecoded.out, {
       decode: (input) => {
         const map = TypedMap.fromMap(input) as DeviceResponseDecodedStructure
 

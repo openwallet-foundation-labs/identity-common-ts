@@ -1,8 +1,8 @@
 import { nowInSeconds } from '@owf/identity-common'
 import { getJwtTimeValidationOptions, Jwt, type VerifierOptions, validateJwtPayload } from './jwt'
-import { timeClaimException } from './time-claim-error'
+import { timeClaimError } from './time-claim-error'
 import { KB_JWT_TYP, type KbVerifier, type kbHeader, type kbPayload } from './types'
-import { SDJWTException } from './utils'
+import { SDJWTError } from './utils'
 
 export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload = kbPayload> extends Jwt<
   Header,
@@ -22,7 +22,7 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
     options?: VerifierOptions
   }) {
     if (!this.header || !this.payload || !this.signature) {
-      throw new SDJWTException('Verify Error: Invalid JWT')
+      throw new SDJWTError('Verify Error: Invalid JWT')
     }
 
     if (
@@ -36,23 +36,23 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
       typeof this.payload.sd_hash !== 'string' ||
       this.payload.sd_hash.length === 0
     ) {
-      throw new SDJWTException('Invalid Key Binding Jwt')
+      throw new SDJWTError('Invalid Key Binding Jwt')
     }
 
     if (
       values.options?.allowedKeyBindingAlgorithms &&
       !values.options.allowedKeyBindingAlgorithms.includes(this.header.alg)
     ) {
-      throw new SDJWTException(`Verify Error: Disallowed Key Binding alg ${this.header.alg}`)
+      throw new SDJWTError(`Verify Error: Disallowed Key Binding alg ${this.header.alg}`)
     }
 
     // RFC 7515 Section 4.1.11, checked here so the failure names the Key Binding JWT
     if ('crit' in this.header) {
-      throw new SDJWTException('Verify Error: unsupported critical header parameters in Key Binding JWT')
+      throw new SDJWTError('Verify Error: unsupported critical header parameters in Key Binding JWT')
     }
 
     if (this.payload.nonce !== values.nonce) {
-      throw new SDJWTException('Verify Error: Invalid Nonce')
+      throw new SDJWTError('Verify Error: Invalid Nonce')
     }
 
     if (values.options?.expectedKeyBindingAudience !== undefined) {
@@ -60,7 +60,7 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
         ? values.options.expectedKeyBindingAudience
         : [values.options.expectedKeyBindingAudience]
       if (!expectedAudiences.includes(this.payload.aud)) {
-        throw new SDJWTException('Verify Error: Invalid Key Binding audience')
+        throw new SDJWTError('Verify Error: Invalid Key Binding audience')
       }
     }
 
@@ -68,7 +68,7 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
       const currentDate = values.options.currentDate ?? nowInSeconds()
       const skew = values.options.skewSeconds ?? 0
       if (this.payload.iat + values.options.keyBindingMaxAgeSeconds + skew < currentDate) {
-        throw timeClaimException('key-binding-jwt', 'tooOld', {
+        throw timeClaimError('key-binding-jwt', 'tooOld', {
           claim: 'iat',
           value: this.payload.iat,
           currentDate,

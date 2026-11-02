@@ -56,7 +56,7 @@ const conditionalCombinationErrors = (policy: Record<string, unknown>): Array<st
   return errors
 }
 
-export const metadataPolicySchema = z
+export const zMetadataPolicy = z
   .object(
     Object.entries(allSupportedPolicies).reduce(
       // biome-ignore lint/performance/noAccumulatingSpread: In this case we want to use the spread operator
@@ -96,4 +96,4 @@ export const metadataPolicySchema = z
     }
   })
 
-export type MetadataPolicyOperator = z.input<typeof metadataPolicySchema>
+export type MetadataPolicyOperator = z.input<typeof zMetadataPolicy>

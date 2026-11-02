@@ -15,15 +15,15 @@ import type { Namespace } from './namespace'
 //   "elementIdentifier" : DataElementIdentifier,
 //   "elementValue" : DataElementValue
 // }
-export const issuerSignedItemSchema = typedMap([
+export const zIssuerSignedItem = typedMap([
   ['digestID', z.number()],
   ['random', zUint8Array],
   ['elementIdentifier', z.string()],
   ['elementValue', z.unknown()],
 ])
 
-export type IssuerSignedItemEncodedStructure = z.input<typeof issuerSignedItemSchema>
-export type IssuerSignedItemDecodedStructure = z.output<typeof issuerSignedItemSchema>
+export type IssuerSignedItemEncodedStructure = z.input<typeof zIssuerSignedItem>
+export type IssuerSignedItemDecodedStructure = z.output<typeof zIssuerSignedItem>
 
 // NOTE: Id vs ID above (user-facing API uses digestId, CBOR uses digestID)
 export type IssuerSignedItemOptions = {
@@ -42,7 +42,7 @@ export class IssuerSignedItem extends OriginalBytesCborStructure<
   IssuerSignedItemDecodedStructure
 > {
   public static override get encodingSchema() {
-    return issuerSignedItemSchema
+    return zIssuerSignedItem
   }
 
   /**

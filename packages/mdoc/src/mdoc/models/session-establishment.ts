@@ -6,13 +6,13 @@ import type { EDeviceKey } from './e-device-key'
 import { EReaderKey } from './e-reader-key'
 import type { SessionTranscript } from './session-transcript'
 
-const sessionEstablishmentSchema = typedMap([
+const zSessionEstablishment = typedMap([
   ['eReaderKey', z.instanceof(EReaderKey)],
   ['data', zUint8Array],
 ] as const)
 
-export type SessionEstablishmentDecodedStructure = z.output<typeof sessionEstablishmentSchema>
-export type SessionEstablishmentEncodedStructure = z.input<typeof sessionEstablishmentSchema>
+export type SessionEstablishmentDecodedStructure = z.output<typeof zSessionEstablishment>
+export type SessionEstablishmentEncodedStructure = z.input<typeof zSessionEstablishment>
 
 export type SessionEstablishmentOptions = {
   eReaderKey: EReaderKey
@@ -24,7 +24,7 @@ export class SessionEstablishment extends CborStructure<
   SessionEstablishmentDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(sessionEstablishmentSchema.in, sessionEstablishmentSchema.out, {
+    return z.codec(zSessionEstablishment.in, zSessionEstablishment.out, {
       decode: (input) => {
         const map: SessionEstablishmentDecodedStructure = TypedMap.fromMap(input)
 

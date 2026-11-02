@@ -1,5 +1,5 @@
 import { VALIDATION_CODES, type ValidationSeverity } from '@owf/identity-common'
-import { parseCertificate, verifyCertificateSignature, X509Exception } from '@owf/x509'
+import { parseCertificate, verifyCertificateSignature, X509Error } from '@owf/x509'
 import { describe, expect, it } from 'vitest'
 import {
   type AccessCertificate,
@@ -67,7 +67,7 @@ describe('parseAccessCertificate', () => {
   })
 
   it('rejects malformed input', () => {
-    expect(() => parseAccessCertificate('not a certificate!')).toThrow(X509Exception)
+    expect(() => parseAccessCertificate('not a certificate!')).toThrow(X509Error)
   })
 })
 

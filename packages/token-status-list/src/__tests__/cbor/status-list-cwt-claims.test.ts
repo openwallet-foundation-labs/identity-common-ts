@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import { StatusListCwt } from '../../cbor/status-list-cwt'
 import { type CreateStatusListCwtPayloadOptions, StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
-import { SLException } from '../../status-list-exception'
+import { StatusListError } from '../../status-list-error'
 import { StatusType } from '../../types'
 import { sign1Context, signKey } from '../context'
 
@@ -40,7 +40,7 @@ describe('StatusListCwtPayload.verifyClaims', () => {
   })
 
   test('rejects a token published for a different uri', () => {
-    expect(() => payload().verifyClaims({ uri: 'https://example.com/statuslists/2', now })).toThrow(SLException)
+    expect(() => payload().verifyClaims({ uri: 'https://example.com/statuslists/2', now })).toThrow(StatusListError)
     expect(() => payload().verifyClaims({ uri: 'https://example.com/statuslists/2', now })).toThrow(
       `The 'Subject (2)' claim '${uri}' does not match the expected value 'https://example.com/statuslists/2'`
     )
@@ -118,7 +118,7 @@ describe('StatusListCwt.verify', () => {
 
     await expect(
       cwt.verify({ key: signKey, uri: 'https://example.com/other', now }, { sign1: sign1Context })
-    ).rejects.toThrow(SLException)
+    ).rejects.toThrow(StatusListError)
   })
 
   test('checks only the status at an index through verifyStatus', async () => {

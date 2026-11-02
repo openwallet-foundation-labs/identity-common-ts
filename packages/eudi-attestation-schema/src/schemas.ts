@@ -16,7 +16,7 @@ import { z } from 'zod'
 
 export const AttestationFormatValues = ['dc+sd-jwt', 'mso_mdoc'] as const
 
-export const AttestationFormatSchema = z.enum(AttestationFormatValues)
+export const zAttestationFormat = z.enum(AttestationFormatValues)
 
 export const AttestationLoSValues = [
   'iso_18045_high',
@@ -25,21 +25,21 @@ export const AttestationLoSValues = [
   'iso_18045_basic',
 ] as const
 
-export const AttestationLoSSchema = z.enum(AttestationLoSValues)
+export const zAttestationLoS = z.enum(AttestationLoSValues)
 
 export const BindingTypeValues = ['claim', 'key', 'biometric', 'none'] as const
 
-export const BindingTypeSchema = z.enum(BindingTypeValues)
+export const zBindingType = z.enum(BindingTypeValues)
 
 export const FrameworkTypeValues = ['etsi_tl', 'x509'] as const
 
-export const FrameworkTypeSchema = z.enum(FrameworkTypeValues)
+export const zFrameworkType = z.enum(FrameworkTypeValues)
 
 export const VerificationMethodTypeValues = ['X509Certificate'] as const
 
-export const VerificationMethodTypeSchema = z.enum(VerificationMethodTypeValues)
+export const zVerificationMethodType = z.enum(VerificationMethodTypeValues)
 
-const Base64DerCertificateSchema = z
+const zBase64DerCertificate = z
   .string()
   .regex(
     /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/,
@@ -47,10 +47,10 @@ const Base64DerCertificateSchema = z
   )
   .min(4)
 
-const X509CertificateVerificationMethodSchema = z
+const zX509CertificateVerificationMethod = z
   .object({
     type: z.literal('X509Certificate'),
-    x509Certificate: Base64DerCertificateSchema,
+    x509Certificate: zBase64DerCertificate,
   })
   .strict()
 
@@ -62,11 +62,11 @@ const X509CertificateVerificationMethodSchema = z
  * Trust list based authority: `value` identifies the list, `verificationMethod` is how the
  * list itself is signed/verified.
  */
-const EtsiTlTrustAuthoritySchema = z
+const zEtsiTlTrustAuthority = z
   .object({
     frameworkType: z.literal('etsi_tl'),
     value: z.string().min(1),
-    verificationMethod: X509CertificateVerificationMethodSchema,
+    verificationMethod: zX509CertificateVerificationMethod,
   })
   .strict()
 
@@ -74,17 +74,14 @@ const EtsiTlTrustAuthoritySchema = z
  * Direct root CA trust anchor: `value` is the base64-encoded DER certificate itself, so no
  * trust list needs to be hosted and no separate verificationMethod is required.
  */
-const X509TrustAuthoritySchema = z
+const zX509TrustAuthority = z
   .object({
     frameworkType: z.literal('x509'),
-    value: Base64DerCertificateSchema,
+    value: zBase64DerCertificate,
   })
   .strict()
 
-export const TrustAuthoritySchema = z.discriminatedUnion('frameworkType', [
-  EtsiTlTrustAuthoritySchema,
-  X509TrustAuthoritySchema,
-])
+export const zTrustAuthority = z.discriminatedUnion('frameworkType', [zEtsiTlTrustAuthority, zX509TrustAuthority])
 
 // ============================================================================
 // SchemaURI Meta Sub-schemas
@@ -94,7 +91,7 @@ export const TrustAuthoritySchema = z.discriminatedUnion('frameworkType', [
  * Portable OID4VCI display and claims metadata. It excludes issuer deployment
  * fields such as endpoints, scopes, and configuration identifiers.
  */
-export const Oid4vciDisplaySchema = z
+export const zOid4vciDisplay = z
   .object({
     name: z.string().min(1),
     locale: z.string().min(1).optional(),
@@ -118,31 +115,31 @@ export const Oid4vciDisplaySchema = z
   })
   .strict()
 
-const Oid4vciClaimsPathSchema = z.array(z.union([z.string(), z.number().int().nonnegative(), z.null()])).min(1)
+const zOid4vciClaimsPath = z.array(z.union([z.string(), z.number().int().nonnegative(), z.null()])).min(1)
 
-export const Oid4vciClaimDisplaySchema = z
+export const zOid4vciClaimDisplay = z
   .object({
     name: z.string().min(1).optional(),
     locale: z.string().min(1).optional(),
   })
   .strict()
 
-export const Oid4vciClaimSchema = z
+export const zOid4vciClaim = z
   .object({
-    path: Oid4vciClaimsPathSchema,
+    path: zOid4vciClaimsPath,
     mandatory: z.boolean().optional(),
-    display: z.array(Oid4vciClaimDisplaySchema).min(1).optional(),
+    display: z.array(zOid4vciClaimDisplay).min(1).optional(),
   })
   .strict()
 
-export const Oid4vciCredentialMetadataSchema = z
+export const zOid4vciCredentialMetadata = z
   .object({
-    display: z.array(Oid4vciDisplaySchema).min(1).optional(),
-    claims: z.array(Oid4vciClaimSchema).min(1).optional(),
+    display: z.array(zOid4vciDisplay).min(1).optional(),
+    claims: z.array(zOid4vciClaim).min(1).optional(),
   })
   .strict()
 
-export const SdJwtVcTypeMetadataSchema = z.looseObject({
+export const zSdJwtVcTypeMetadata = z.looseObject({
   vct: z.string().min(1),
 })
 
@@ -150,11 +147,11 @@ export const SdJwtVcTypeMetadataSchema = z.looseObject({
  * Credential-type metadata for dc+sd-jwt format.
  * vct identifies the credential type per SD-JWT VC spec.
  */
-export const SdJwtMetaSchema = z
+export const zSdJwtMeta = z
   .object({
     vct: z.string().min(1),
-    credential_metadata: Oid4vciCredentialMetadataSchema.optional(),
-    sd_jwt_vc_metadata: SdJwtVcTypeMetadataSchema.optional(),
+    credential_metadata: zOid4vciCredentialMetadata.optional(),
+    sd_jwt_vc_metadata: zSdJwtVcTypeMetadata.optional(),
   })
   .superRefine((data, ctx) => {
     if (data.sd_jwt_vc_metadata?.vct !== undefined && data.sd_jwt_vc_metadata.vct !== data.vct) {
@@ -171,10 +168,10 @@ export const SdJwtMetaSchema = z
  * Credential-type metadata for mso_mdoc format.
  * doctype_value is required.
  */
-export const MsoMdocMetaSchema = z
+export const zMsoMdocMeta = z
   .object({
     doctype_value: z.string().min(1),
-    credential_metadata: Oid4vciCredentialMetadataSchema.optional(),
+    credential_metadata: zOid4vciCredentialMetadata.optional(),
   })
   .strict()
 
@@ -182,7 +179,7 @@ export const MsoMdocMetaSchema = z
  * W3C SRI integrity metadata. Only sha256 is supported, so that a catalogue entry cannot
  * declare a digest that resolution would later reject.
  */
-export const Sha256SriSchema = z
+export const zSha256Sri = z
   .string()
   .regex(
     /^sha256-(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/,
@@ -195,19 +192,19 @@ export const Sha256SriSchema = z
 
 const _schemaURIBase = {
   uri: z.string().url(),
-  integrity: Sha256SriSchema,
+  integrity: zSha256Sri,
 }
 
-export const SchemaURISchema = z.discriminatedUnion('formatIdentifier', [
+export const zSchemaURI = z.discriminatedUnion('formatIdentifier', [
   z.object({
     ..._schemaURIBase,
     formatIdentifier: z.literal('dc+sd-jwt'),
-    meta: SdJwtMetaSchema,
+    meta: zSdJwtMeta,
   }),
   z.object({
     ..._schemaURIBase,
     formatIdentifier: z.literal('mso_mdoc'),
-    meta: MsoMdocMetaSchema,
+    meta: zMsoMdocMeta,
   }),
 ])
 
@@ -215,13 +212,13 @@ export const SchemaURISchema = z.discriminatedUnion('formatIdentifier', [
 // IssuanceProfile Sub-class
 // ============================================================================
 
-export const ProofTypeSchema = z
+export const zProofType = z
   .object({
     proof_signing_alg_values_supported: z.array(z.string().min(1)).min(1),
   })
   .strict()
 
-export const StatusMechanismSchema = z
+export const zStatusMechanism = z
   .object({
     type: z.literal('token_status_list'),
     required: z.boolean(),
@@ -233,13 +230,13 @@ export const StatusMechanismSchema = z
  * allowed set or a bound, never a deployment value: the catalogue narrows the space, the
  * issuer picks a conformant point inside it.
  */
-export const IssuanceProfileSchema = z
+export const zIssuanceProfile = z
   .object({
     credentialSigningAlgValuesSupported: z.array(z.string().min(1)).min(1).optional(),
     cryptographicBindingMethodsSupported: z.array(z.string().min(1)).min(1).optional(),
-    proofTypesSupported: z.record(z.string().min(1), ProofTypeSchema).optional(),
+    proofTypesSupported: z.record(z.string().min(1), zProofType).optional(),
     keyAttestationRequired: z.boolean().optional(),
-    statusMechanism: StatusMechanismSchema.optional(),
+    statusMechanism: zStatusMechanism.optional(),
     maxValidityPeriod: z.number().int().positive().optional(),
     batchIssuanceAllowed: z.boolean().optional(),
   })
@@ -249,22 +246,22 @@ export const IssuanceProfileSchema = z
 // SchemaMeta Main Class (Section 4.3.1)
 // ============================================================================
 
-const SemVerSchema = z
+const zSemVer = z
   .string()
   .regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/, 'version must be a SemVer string')
 
-export const SchemaMetaSchema = z
+export const zSchemaMeta = z
   .object({
     id: z.string().url(),
     iat: z.number().int().nonnegative().optional(),
-    version: SemVerSchema,
+    version: zSemVer,
     rulebookURI: z.string().url(),
-    rulebookIntegrity: Sha256SriSchema,
-    trustedAuthorities: z.array(TrustAuthoritySchema).optional(),
-    attestationLoS: AttestationLoSSchema,
-    bindingType: BindingTypeSchema,
-    schemaURIs: z.array(SchemaURISchema).min(1),
-    issuanceProfile: IssuanceProfileSchema.optional(),
+    rulebookIntegrity: zSha256Sri,
+    trustedAuthorities: z.array(zTrustAuthority).optional(),
+    attestationLoS: zAttestationLoS,
+    bindingType: zBindingType,
+    schemaURIs: z.array(zSchemaURI).min(1),
+    issuanceProfile: zIssuanceProfile.optional(),
   })
   .superRefine((data, ctx) => {
     const seen = new Set<string>()

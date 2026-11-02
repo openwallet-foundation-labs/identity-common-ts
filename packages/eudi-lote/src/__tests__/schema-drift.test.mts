@@ -201,7 +201,7 @@ const bothReject: Array<[string, unknown, string]> = [
 ]
 
 // validateLoTE accepts these, the schema does not: kept on purpose, each for its reason
-const looserThanSchema: Array<[string, unknown, string]> = [
+const zLooserThan: Array<[string, unknown, string]> = [
   ['an empty TrustedEntitiesList', withEntities(), 'lists written before createLoTE left the key out'],
   [
     'an entity without TEInformationURI',
@@ -245,7 +245,7 @@ const looserThanSchema: Array<[string, unknown, string]> = [
 ]
 
 // The schema accepts these, validateLoTE does not
-const stricterThanSchema: Array<[string, unknown, string]> = [
+const zStricterThan: Array<[string, unknown, string]> = [
   [
     'a URI with a port above 65535',
     withInfo({ LoTEType: 'https://example.com:70000/type' }),
@@ -294,14 +294,14 @@ describe('ETSI TS 119 602 v1.1.1 JSON schema drift', () => {
     expect(validateLoTE(json).issues.map((issue) => issue.path.join('.'))).toContain(path)
   })
 
-  it.each(looserThanSchema)('only validateLoTE accepts %s (%s)', (_, document) => {
+  it.each(zLooserThan)('only validateLoTE accepts %s (%s)', (_, document) => {
     const json = asJson(document)
 
     expect(schemaAccepts(json)).toBe(false)
     expect(validateLoTE(json).valid).toBe(true)
   })
 
-  it.each(stricterThanSchema)('only the schema accepts %s (%s)', (_, document) => {
+  it.each(zStricterThan)('only the schema accepts %s (%s)', (_, document) => {
     const json = asJson(document)
 
     expect(schemaAccepts(json)).toBe(true)

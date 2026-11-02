@@ -77,7 +77,7 @@ if (!result.valid) {
   console.error('Validation errors:', result.errors);
 }
 
-// Or use the assertion form (throws SchemaMetaException on invalid input)
+// Or use the assertion form (throws SchemaMetaError on invalid input)
 assertValidSchemaMeta(untrustedData);
 // untrustedData is now typed as SchemaMeta
 ```
@@ -190,7 +190,7 @@ A `dc+sd-jwt` reference resolves to an [SD-JWT VC Type Metadata](https://www.iet
 
 `resolveSchemaReferences` handles this automatically:
 
-- The document is validated against the canonical `TypeMetadataFormatSchema` from `@sd-jwt/sd-jwt-vc`. Unknown members are preserved.
+- The document is validated against the canonical `zTypeMetadataFormat` from `@sd-jwt/sd-jwt-vc`. Unknown members are preserved.
 - Its `vct` is cross-checked against `meta.vct` from the catalogue entry; a mismatch throws.
 - The `extends` chain is followed and merged, with the extending document winning and claims merged per path. `extends#integrity` is verified on each hop. Cycles throw, and `maxExtendsDepth` (default 10) bounds the chain.
 - The merged document is available as `resolvedReference.typeMetadata`; Type Metadata itself does not contain a JSON Schema.

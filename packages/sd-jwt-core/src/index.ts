@@ -22,7 +22,7 @@ import {
   type VerificationError,
   type VerificationErrorCode,
 } from './types'
-import { base64urlEncode, ensureError, SDJWTException, uint8ArrayToBase64Url } from './utils'
+import { base64urlEncode, ensureError, SDJWTError, uint8ArrayToBase64Url } from './utils'
 import { decodeBase64urlJsonStrict } from './utils/strict-json'
 
 export * from './decode'
@@ -52,7 +52,7 @@ function validateReservedFieldsInternal(payload: Record<string, unknown>): void 
 
     for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
       if (reservedFields.has(key)) {
-        throw new SDJWTException(`Reserved field name "${key}" is not allowed`)
+        throw new SDJWTError(`Reserved field name "${key}" is not allowed`)
       }
       visit(value)
     }
@@ -72,12 +72,12 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
   constructor(userConfig?: SDJWTConfig<T>) {
     if (userConfig) {
       if (userConfig.hashAlg && !IANA_HASH_ALGORITHMS.includes(userConfig.hashAlg)) {
-        throw new SDJWTException(`Invalid hash algorithm: ${userConfig.hashAlg}`)
+        throw new SDJWTError(`Invalid hash algorithm: ${userConfig.hashAlg}`)
       }
       const allowedDisclosureHashAlgorithms =
         userConfig.allowedDisclosureHashAlgorithms ?? DEFAULT_SECURE_HASH_ALGORITHMS
       if (userConfig.hashAlg && !allowedDisclosureHashAlgorithms.includes(userConfig.hashAlg)) {
-        throw new SDJWTException(`Disallowed hash algorithm: ${userConfig.hashAlg}`)
+        throw new SDJWTError(`Disallowed hash algorithm: ${userConfig.hashAlg}`)
       }
       this.userConfig = userConfig
     }
@@ -85,10 +85,10 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
 
   private async createKBJwt(options: KBOptions, sdHash: string): Promise<KBJwt> {
     if (!this.userConfig.kbSigner) {
-      throw new SDJWTException('Key Binding Signer not found')
+      throw new SDJWTError('Key Binding Signer not found')
     }
     if (!this.userConfig.kbSignAlg) {
-      throw new SDJWTException('Key Binding sign algorithm not specified')
+      throw new SDJWTError('Key Binding sign algorithm not specified')
     }
 
     const { payload } = options
@@ -106,7 +106,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
 
   private async SignJwt(jwt: Jwt) {
     if (!this.userConfig.signer) {
-      throw new SDJWTException('Signer not found')
+      throw new SDJWTError('Signer not found')
     }
     await jwt.sign(this.userConfig.signer)
     return jwt
@@ -114,7 +114,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
 
   private async VerifyJwt(jwt: Jwt, options?: T & VerifierOptions) {
     if (!this.userConfig.verifier) {
-      throw new SDJWTException('Verifier not found', { code: 'VERIFIER_NOT_FOUND' })
+      throw new SDJWTError('Verifier not found', { code: 'VERIFIER_NOT_FOUND' })
     }
     return jwt.verify<T>(this.userConfig.verifier, options)
   }
@@ -127,18 +127,18 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     }
   ): Promise<SDJWTCompact> {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
 
     if (!this.userConfig.saltGenerator) {
-      throw new SDJWTException('SaltGenerator not found')
+      throw new SDJWTError('SaltGenerator not found')
     }
 
     if (!this.userConfig.signAlg) {
-      throw new SDJWTException('sign alogrithm not specified')
+      throw new SDJWTError('sign alogrithm not specified')
     }
     if (this.userConfig.signAlg === 'none') {
-      throw new SDJWTException('sign algorithm "none" is not allowed')
+      throw new SDJWTError('sign algorithm "none" is not allowed')
     }
 
     this.validateReservedFields<Payload>(payload)
@@ -149,7 +149,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     const allowedDisclosureHashAlgorithms =
       this.userConfig.allowedDisclosureHashAlgorithms ?? DEFAULT_SECURE_HASH_ALGORITHMS
     if (!allowedDisclosureHashAlgorithms.includes(hashAlg)) {
-      throw new SDJWTException(`Disallowed hash algorithm: ${hashAlg}`)
+      throw new SDJWTError(`Disallowed hash algorithm: ${hashAlg}`)
     }
 
     const { packedClaims, disclosures } = await pack(
@@ -200,16 +200,16 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     }
   ): Promise<SDJWTCompact> {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const hasher = this.userConfig.hasher
 
     const sdjwt = await SDJwt.fromEncode(encodedSDJwt, hasher)
     if (sdjwt.kbJwt) {
-      throw new SDJWTException('Holder cannot present an SD-JWT with KB-JWT')
+      throw new SDJWTError('Holder cannot present an SD-JWT with KB-JWT')
     }
 
-    if (!sdjwt.jwt?.payload) throw new SDJWTException('Payload not found')
+    if (!sdjwt.jwt?.payload) throw new SDJWTError('Payload not found')
     const presentSdJwtWithoutKb = await sdjwt.present(presentationFrame, hasher)
 
     if (!options?.kb) {
@@ -227,13 +227,13 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
   // If requireKeyBindings is true, it will check if the key binding JWT is presentation and verify it
   public async verify(encodedSDJwt: string, options?: T & VerifierOptions) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const hasher = this.userConfig.hasher
 
     const sdjwt = await SDJwt.fromEncode(encodedSDJwt, hasher)
     if (!sdjwt.jwt?.payload) {
-      throw new SDJWTException('Invalid SD JWT')
+      throw new SDJWTError('Invalid SD JWT')
     }
     const { payload, header } = await this.validate(encodedSDJwt, options)
 
@@ -241,7 +241,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
       const keys = await sdjwt.keys(hasher)
       const missingKeys = options.requiredClaimKeys.filter((k) => !keys.includes(k))
       if (missingKeys.length > 0) {
-        throw new SDJWTException(`Missing required claim keys: ${missingKeys.join(', ')}`)
+        throw new SDJWTError(`Missing required claim keys: ${missingKeys.join(', ')}`)
       }
     }
 
@@ -250,10 +250,10 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     }
 
     if (!sdjwt.kbJwt) {
-      throw new SDJWTException('Key Binding JWT not exist')
+      throw new SDJWTError('Key Binding JWT not exist')
     }
     if (!this.userConfig.kbVerifier) {
-      throw new SDJWTException('Key Binding Verifier not found')
+      throw new SDJWTError('Key Binding Verifier not found')
     }
     const kb = await sdjwt.kbJwt.verifyKB({
       verifier: this.userConfig.kbVerifier,
@@ -275,7 +275,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     const sdHashStr = await this.calculateSDHash(presentSdJwtWithoutKb, sdjwt, hasher)
 
     if (sdHashStr !== sdHashfromKb) {
-      throw new SDJWTException('Invalid sd_hash in Key Binding JWT')
+      throw new SDJWTError('Invalid sd_hash in Key Binding JWT')
     }
 
     return { payload, header, kb }
@@ -312,7 +312,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     // Helper to convert exception to error code. The code is set where the error is thrown, so it
     // does not depend on the (human-readable) error message.
     const exceptionToCode = (error: Error): VerificationErrorCode =>
-      error instanceof SDJWTException && error.code ? error.code : 'UNKNOWN_ERROR'
+      error instanceof SDJWTError && error.code ? error.code : 'UNKNOWN_ERROR'
 
     // Check basic configuration first
     if (!this.userConfig.hasher) {
@@ -328,7 +328,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     }
 
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
 
     // hasher and verifier are guaranteed to be defined here
@@ -420,7 +420,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
           const error = ensureError(e)
           // Time checks (iat, nbf, exp, maximum age) carry their own KEY_BINDING_JWT_* code; any other
           // failure is reported as an invalid key binding.
-          const code = error instanceof SDJWTException && error.code ? error.code : 'KEY_BINDING_SIGNATURE_INVALID'
+          const code = error instanceof SDJWTError && error.code ? error.code : 'KEY_BINDING_SIGNATURE_INVALID'
           addError(code, `Key binding verification failed: ${error.message}`, error)
         }
       }
@@ -443,7 +443,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
 
   private async calculateSDHash(presentSdJwtWithoutKb: string, sdjwt: SDJwt, hasher: Hasher) {
     if (!sdjwt.jwt?.payload) {
-      throw new SDJWTException('Invalid SD JWT')
+      throw new SDJWTError('Invalid SD JWT')
     }
     const { _sd_alg } = getSDAlgAndPayload(sdjwt.jwt.payload)
     const sdHash = await hasher(presentSdJwtWithoutKb, _sd_alg)
@@ -460,13 +460,13 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
    */
   public async validate(encodedSDJwt: string, options?: T & VerifierOptions) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const hasher = this.userConfig.hasher
 
     const sdjwt = await SDJwt.fromEncode(encodedSDJwt, hasher)
     if (!sdjwt.jwt) {
-      throw new SDJWTException('Invalid SD JWT')
+      throw new SDJWTError('Invalid SD JWT')
     }
 
     const verifiedPayloads = await this.VerifyJwt(sdjwt.jwt, {
@@ -490,14 +490,14 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
 
   public decode<Header extends Record<string, unknown> = Record<string, unknown>>(endcodedSDJwt: SDJWTCompact) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     return SDJwt.fromEncode<Header, ExtendedPayload>(endcodedSDJwt, this.userConfig.hasher)
   }
 
   public async keys(endcodedSDJwt: SDJWTCompact) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const sdjwt = await SDJwt.fromEncode<Record<string, unknown>, ExtendedPayload>(
       endcodedSDJwt,
@@ -508,7 +508,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
 
   public async presentableKeys(endcodedSDJwt: SDJWTCompact) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const sdjwt = await SDJwt.fromEncode<Record<string, unknown>, ExtendedPayload>(
       endcodedSDJwt,
@@ -519,7 +519,7 @@ export class SDJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
 
   public async getClaims(endcodedSDJwt: SDJWTCompact): Promise<ExtendedPayload> {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const sdjwt = await SDJwt.fromEncode<Record<string, unknown>, ExtendedPayload>(
       endcodedSDJwt,
@@ -548,12 +548,12 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
   constructor(userConfig?: SDJWTConfig) {
     if (userConfig) {
       if (userConfig.hashAlg && !IANA_HASH_ALGORITHMS.includes(userConfig.hashAlg)) {
-        throw new SDJWTException(`Invalid hash algorithm: ${userConfig.hashAlg}`)
+        throw new SDJWTError(`Invalid hash algorithm: ${userConfig.hashAlg}`)
       }
       const allowedDisclosureHashAlgorithms =
         userConfig.allowedDisclosureHashAlgorithms ?? DEFAULT_SECURE_HASH_ALGORITHMS
       if (userConfig.hashAlg && !allowedDisclosureHashAlgorithms.includes(userConfig.hashAlg)) {
-        throw new SDJWTException(`Disallowed hash algorithm: ${userConfig.hashAlg}`)
+        throw new SDJWTError(`Disallowed hash algorithm: ${userConfig.hashAlg}`)
       }
       this.userConfig = userConfig
     }
@@ -561,10 +561,10 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
 
   private async createKBJwt(options: KBOptions, sdHash: string): Promise<KBJwt> {
     if (!this.userConfig.kbSigner) {
-      throw new SDJWTException('Key Binding Signer not found')
+      throw new SDJWTError('Key Binding Signer not found')
     }
     if (!this.userConfig.kbSignAlg) {
-      throw new SDJWTException('Key Binding sign algorithm not specified')
+      throw new SDJWTError('Key Binding sign algorithm not specified')
     }
 
     const { payload } = options
@@ -597,11 +597,11 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
     }
   ): Promise<GeneralJSON> {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
 
     if (!this.userConfig.saltGenerator) {
-      throw new SDJWTException('SaltGenerator not found')
+      throw new SDJWTError('SaltGenerator not found')
     }
 
     this.validateReservedFields<Payload>(payload)
@@ -668,16 +668,16 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
     }
   ): Promise<GeneralJSON> {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const hasher = this.userConfig.hasher
     const encodedSDJwt = generalJSON.toEncoded(0)
     const sdjwt = await SDJwt.fromEncode(encodedSDJwt, hasher)
     if (sdjwt.kbJwt) {
-      throw new SDJWTException('Holder cannot present an SD-JWT with KB-JWT')
+      throw new SDJWTError('Holder cannot present an SD-JWT with KB-JWT')
     }
 
-    if (!sdjwt.jwt?.payload) throw new SDJWTException('Payload not found')
+    if (!sdjwt.jwt?.payload) throw new SDJWTError('Payload not found')
     const disclosures = await sdjwt.getPresentDisclosures(presentationFrame, hasher)
     const encodedDisclosures = disclosures.map((d) => d.encode())
     const presentedGeneralJSON = new GeneralJSON({
@@ -705,7 +705,7 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
   // If requireKeyBindings is true, it will check if the key binding JWT is presentation and verify it
   public async verify(generalJSON: GeneralJSON, options?: VerifierOptions) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const hasher = this.userConfig.hasher
 
@@ -714,14 +714,14 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
     const encodedSDJwt = generalJSON.toEncoded(0)
     const sdjwt = await SDJwt.fromEncode(encodedSDJwt, hasher)
     if (!sdjwt.jwt?.payload) {
-      throw new SDJWTException('Invalid SD JWT')
+      throw new SDJWTError('Invalid SD JWT')
     }
 
     if (options?.requiredClaimKeys) {
       const keys = await sdjwt.keys(hasher)
       const missingKeys = options?.requiredClaimKeys.filter((k) => !keys.includes(k))
       if (missingKeys.length > 0) {
-        throw new SDJWTException(`Missing required claim keys: ${missingKeys.join(', ')}`)
+        throw new SDJWTError(`Missing required claim keys: ${missingKeys.join(', ')}`)
       }
     }
 
@@ -730,10 +730,10 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
     }
 
     if (!sdjwt.kbJwt) {
-      throw new SDJWTException('Key Binding JWT not exist')
+      throw new SDJWTError('Key Binding JWT not exist')
     }
     if (!this.userConfig.kbVerifier) {
-      throw new SDJWTException('Key Binding Verifier not found')
+      throw new SDJWTError('Key Binding Verifier not found')
     }
     const kb = await sdjwt.kbJwt.verifyKB({
       verifier: this.userConfig.kbVerifier,
@@ -754,7 +754,7 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
     const sdHashStr = await this.calculateSDHash(presentSdJwtWithoutKb, sdjwt, hasher)
 
     if (sdHashStr !== sdHashfromKb) {
-      throw new SDJWTException('Invalid sd_hash in Key Binding JWT')
+      throw new SDJWTError('Invalid sd_hash in Key Binding JWT')
     }
 
     return { payload, headers, kb }
@@ -762,7 +762,7 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
 
   private async calculateSDHash(presentSdJwtWithoutKb: string, sdjwt: SDJwt, hasher: Hasher) {
     if (!sdjwt.jwt?.payload) {
-      throw new SDJWTException('Invalid SD JWT')
+      throw new SDJWTError('Invalid SD JWT')
     }
     const { _sd_alg } = getSDAlgAndPayload(sdjwt.jwt.payload)
     const sdHash = await hasher(presentSdJwtWithoutKb, _sd_alg)
@@ -774,10 +774,10 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
   // Just checking signature and return its the claims
   public async validate(generalJSON: GeneralJSON, options?: VerifierOptions) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     if (!this.userConfig.verifier) {
-      throw new SDJWTException('Verifier not found')
+      throw new SDJWTError('Verifier not found')
     }
     const hasher = this.userConfig.hasher
     const verifier = this.userConfig.verifier
@@ -793,14 +793,14 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
         })
         const header = decodeBase64urlJsonStrict<Record<string, unknown>>(encodedHeader, 'Invalid JWT')
         if (typeof header.alg !== 'string' || header.alg === 'none') {
-          throw new SDJWTException('Verify Error: alg "none" is not allowed')
+          throw new SDJWTError('Verify Error: alg "none" is not allowed')
         }
         if (options?.allowedIssuerAlgorithms && !options.allowedIssuerAlgorithms.includes(header.alg)) {
-          throw new SDJWTException(`Verify Error: Disallowed alg ${header.alg}`)
+          throw new SDJWTError(`Verify Error: Disallowed alg ${header.alg}`)
         }
         // RFC 7515 Section 4.1.11, as in Jwt.verify
         if ('crit' in header) {
-          throw new SDJWTException('Verify Error: unsupported critical header parameters')
+          throw new SDJWTError('Verify Error: unsupported critical header parameters')
         }
         return { verified, header }
       })
@@ -808,13 +808,13 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
 
     const verified = results.every((r) => r.verified)
     if (!verified) {
-      throw new SDJWTException('Signature is not valid')
+      throw new SDJWTError('Signature is not valid')
     }
 
     const encodedSDJwt = generalJSON.toEncoded(0)
     const sdjwt = await SDJwt.fromEncode(encodedSDJwt, hasher)
     if (!sdjwt.jwt) {
-      throw new SDJWTException('Invalid SD JWT')
+      throw new SDJWTError('Invalid SD JWT')
     }
 
     const claims = await sdjwt.getClaims<ExtendedPayload>(hasher)
@@ -838,7 +838,7 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
 
   public async keys(generalSdjwt: GeneralJSON) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const endcodedSDJwt = generalSdjwt.toEncoded(0)
     const sdjwt = await SDJwt.fromEncode(endcodedSDJwt, this.userConfig.hasher)
@@ -847,7 +847,7 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
 
   public async presentableKeys(generalSdjwt: GeneralJSON) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const endcodedSDJwt = generalSdjwt.toEncoded(0)
     const sdjwt = await SDJwt.fromEncode(endcodedSDJwt, this.userConfig.hasher)
@@ -856,7 +856,7 @@ export class SDJwtGeneralJSONInstance<ExtendedPayload extends SdJwtPayload> {
 
   public async getClaims(generalSdjwt: GeneralJSON) {
     if (!this.userConfig.hasher) {
-      throw new SDJWTException('Hasher not found')
+      throw new SDJWTError('Hasher not found')
     }
     const endcodedSDJwt = generalSdjwt.toEncoded(0)
     const sdjwt = await SDJwt.fromEncode(endcodedSDJwt, this.userConfig.hasher)

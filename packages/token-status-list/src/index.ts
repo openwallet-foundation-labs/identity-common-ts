@@ -19,7 +19,7 @@ export type { EncryptBlock } from './ff1'
 export type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
 export { JWT_STATUS_LIST_TYPE, JWTClaimNames } from './jwt-types'
 export { StatusList } from './status-list'
-export { SLException, StatusListEntryNotValidException } from './status-list-exception'
+export { StatusListEntryNotValidError, StatusListError } from './status-list-error'
 export type {
   StatusListIndexAllocatorContext,
   StatusListIndexAllocatorOptions,

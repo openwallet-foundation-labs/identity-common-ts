@@ -6,15 +6,15 @@ import { Errors, type ErrorsEncodedStructure } from './errors'
 import { IssuerSigned, type IssuerSignedEncodedStructure } from './issuer-signed'
 import type { Namespace } from './namespace'
 
-const documentSchema = typedMap([
+const zDocument = typedMap([
   ['docType', z.string()],
   ['issuerSigned', z.instanceof(IssuerSigned)],
   ['deviceSigned', z.instanceof(DeviceSigned)],
   ['errors', z.instanceof(Errors).exactOptional()],
 ] as const)
 
-export type DocumentDecodedStructure = z.output<typeof documentSchema>
-export type DocumentEncodedStructure = z.input<typeof documentSchema>
+export type DocumentDecodedStructure = z.output<typeof zDocument>
+export type DocumentEncodedStructure = z.input<typeof zDocument>
 
 export type DocumentOptions = {
   docType: DocType
@@ -25,7 +25,7 @@ export type DocumentOptions = {
 
 export class Document extends CborStructure<DocumentEncodedStructure, DocumentDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(documentSchema.in, documentSchema.out, {
+    return z.codec(zDocument.in, zDocument.out, {
       decode: (input) => {
         const map: DocumentDecodedStructure = TypedMap.fromMap(input)
 

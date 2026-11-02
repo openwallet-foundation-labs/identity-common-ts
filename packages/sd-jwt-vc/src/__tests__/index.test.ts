@@ -2,15 +2,15 @@ import Crypto from 'node:crypto'
 import { hasher as digest, generateSalt } from '@owf/crypto'
 import {
   createHeaderAndPayload,
-  SLException,
   StatusList,
+  StatusListError,
   type StatusListJWTHeaderParameters,
 } from '@owf/token-status-list'
 import {
   type DisclosureFrame,
   type JwtPayload,
-  JwtTimeClaimException,
-  SDJWTException,
+  JwtTimeClaimError,
+  SDJWTError,
   SDJwtInstance,
   type Signer,
   type Verifier,
@@ -369,7 +369,7 @@ describe('Revocation', () => {
         Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
       statusValidator: async (status: number) => {
         if (status !== 0)
-          throw new SDJWTException('Credential has been revoked', { details: { status }, code: 'STATUS_INVALID' })
+          throw new SDJWTError('Credential has been revoked', { details: { status }, code: 'STATUS_INVALID' })
       },
     })
     const claims = {
@@ -391,7 +391,7 @@ describe('Revocation', () => {
   })
 
   test.each([
-    [new SDJWTException('Type metadata does not match', { code: 'INVALID_VCT' }), 'INVALID_VCT'],
+    [new SDJWTError('Type metadata does not match', { code: 'INVALID_VCT' }), 'INVALID_VCT'],
     [new Error('Type metadata could not be fetched'), 'VCT_VERIFICATION_FAILED'],
   ])('safeVerify keeps the code of a failed type metadata check: %s', async (error, expectedCode) => {
     const { signer, verifier } = createSignerVerifier()
@@ -583,7 +583,7 @@ describe('Revocation', () => {
     const encodedSdjwt = await sdjwtWithExpiredList.issue(expectedPayload)
 
     const error = await sdjwtWithExpiredList.verify(encodedSdjwt, { currentDate: 5000 }).catch((e: unknown) => e)
-    expect(error).toBeInstanceOf(SLException)
+    expect(error).toBeInstanceOf(StatusListError)
     expect(error).toMatchObject({
       message: 'Status List JWT verification failed: Verify Error: JWT is expired',
       details: { uri: 'https://example.com/status-list' },
@@ -591,7 +591,7 @@ describe('Revocation', () => {
 
     // the rejected claim is on the original exception
     const cause = (error as { cause?: unknown }).cause
-    expect(cause).toBeInstanceOf(JwtTimeClaimException)
+    expect(cause).toBeInstanceOf(JwtTimeClaimError)
     expect(cause).toMatchObject({
       code: 'JWT_EXPIRED',
       details: { claim: 'exp', value: 2000, currentDate: 5000, skewSeconds: 0 },

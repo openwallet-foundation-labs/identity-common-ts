@@ -1,6 +1,6 @@
 import { splitSdJwt } from './decode'
 import { SD_SEPARATOR, type Signer } from './types'
-import { base64urlEncode, SDJWTException } from './utils'
+import { base64urlEncode, SDJWTError } from './utils'
 
 export type GeneralJSONData = {
   payload: string
@@ -49,7 +49,7 @@ export class GeneralJSON {
 
     const { 0: protectedHeader, 1: payload, 2: signature } = jwt.split('.')
     if (!protectedHeader || !payload || !signature) {
-      throw new SDJWTException('Invalid JWT')
+      throw new SDJWTError('Invalid JWT')
     }
 
     return new GeneralJSON({
@@ -67,16 +67,16 @@ export class GeneralJSON {
 
   public static fromSerialized(json: GeneralJSONSerialized) {
     if (!json.signatures[0]) {
-      throw new SDJWTException('Invalid JSON')
+      throw new SDJWTError('Invalid JSON')
     }
     // RFC 7515 Section 4.1.11: crit MUST be integrity protected
     if (json.signatures.some((s) => s.header && 'crit' in s.header)) {
-      throw new SDJWTException('crit MUST only appear in the protected header')
+      throw new SDJWTError('crit MUST only appear in the protected header')
     }
     for (let index = 1; index < json.signatures.length; index++) {
       const header = json.signatures[index].header
       if (header && ('disclosures' in header || 'kb_jwt' in header)) {
-        throw new SDJWTException('disclosures and kb_jwt MUST only appear in the first unprotected header')
+        throw new SDJWTError('disclosures and kb_jwt MUST only appear in the first unprotected header')
       }
     }
     const disclosures = json.signatures[0].header?.disclosures ?? []
@@ -125,7 +125,7 @@ export class GeneralJSON {
 
   public toEncoded(index: number) {
     if (index < 0 || index >= this.signatures.length) {
-      throw new SDJWTException('Index out of bounds')
+      throw new SDJWTError('Index out of bounds')
     }
     const data: string[] = []
 

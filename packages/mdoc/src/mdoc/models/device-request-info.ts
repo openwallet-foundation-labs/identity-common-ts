@@ -4,13 +4,13 @@ import { structureArrayHooks } from '../../utils/structureArray'
 import { OriginalBytesCborStructure } from '../original-bytes-cbor-structure'
 import { UseCase, type UseCaseEncodedStructure, type UseCaseOptions } from './use-case'
 
-const deviceRequestInfoSchema = typedMap(
+const zDeviceRequestInfo = typedMap(
   [['useCases', z.array(z.instanceof(UseCase)).min(1).exactOptional()]] as const,
   structureArrayHooks('useCases', (useCase) => UseCase.fromEncodedStructure(useCase as UseCaseEncodedStructure))
 )
 
-export type DeviceRequestInfoEncodedStructure = z.input<typeof deviceRequestInfoSchema>
-export type DeviceRequestInfoDecodedStructure = z.output<typeof deviceRequestInfoSchema>
+export type DeviceRequestInfoEncodedStructure = z.input<typeof zDeviceRequestInfo>
+export type DeviceRequestInfoDecodedStructure = z.output<typeof zDeviceRequestInfo>
 
 export type DeviceRequestInfoOptions = {
   useCases?: Array<UseCase | UseCaseOptions>
@@ -28,7 +28,7 @@ export class DeviceRequestInfo extends OriginalBytesCborStructure<
   DeviceRequestInfoDecodedStructure
 > {
   public static override get encodingSchema() {
-    return deviceRequestInfoSchema
+    return zDeviceRequestInfo
   }
 
   public get useCases() {

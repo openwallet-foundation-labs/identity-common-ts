@@ -9,9 +9,9 @@ import type { Namespace } from './namespace'
 
 // Zod codec for ValueDigests
 // When parent uses mapsAsObjects: true, ALL maps become objects (even with integer keys!)
-const valueDigestsSchema = z.map(z.string(), z.map(z.number(), zUint8Array))
+const zValueDigests = z.map(z.string(), z.map(z.number(), zUint8Array))
 
-export type ValueDigestsStructure = z.infer<typeof valueDigestsSchema>
+export type ValueDigestsStructure = z.infer<typeof zValueDigests>
 
 export type ValueDigestOptions = {
   digests: ValueDigestsStructure
@@ -19,7 +19,7 @@ export type ValueDigestOptions = {
 
 export class ValueDigests extends CborStructure<ValueDigestsStructure> {
   public static override get encodingSchema() {
-    return valueDigestsSchema
+    return zValueDigests
   }
 
   public get valueDigests() {

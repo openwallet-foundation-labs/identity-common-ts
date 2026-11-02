@@ -2,8 +2,8 @@ import { zUint8Array } from '@owf/cose'
 import type z from 'zod'
 import { Handover } from './handover'
 
-const engagementToAppHandoverSchema = zUint8Array
-export type EngagementToAppHandoverStructure = z.infer<typeof engagementToAppHandoverSchema>
+const zEngagementToAppHandover = zUint8Array
+export type EngagementToAppHandoverStructure = z.infer<typeof zEngagementToAppHandover>
 
 /**
  * The handover of ISO/IEC TS 18013-7 Annex A, device retrieval to a website.
@@ -24,7 +24,7 @@ export type EngagementToAppHandoverStructure = z.infer<typeof engagementToAppHan
  */
 export class EngagementToAppHandover extends Handover<EngagementToAppHandoverStructure> {
   public static override get encodingSchema() {
-    return engagementToAppHandoverSchema
+    return zEngagementToAppHandover
   }
 
   public get readerEngagementBytesHash() {

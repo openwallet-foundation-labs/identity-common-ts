@@ -12,13 +12,13 @@ export type StatusValidatorContext = {
 
 export type StatusValidator = (status: number, context: StatusValidatorContext) => Promise<void>
 
-/** `details` of the exception with code `STATUS_INVALID` that the default status validator throws. */
+/** `details` of the error with code `STATUS_INVALID` that the default status validator throws. */
 export type StatusInvalidErrorDetails = StatusValidatorContext & {
   /** The status of the credential, e.g. `1` for invalid (revoked) or `2` for suspended. */
   status: number
 }
 
-/** `details` of the `SLException` thrown when the status list token fails verification. */
+/** `details` of the `StatusListError` thrown when the status list token fails verification. */
 export type StatusListVerificationErrorDetails = {
   /** URI of the status list. */
   uri: string
@@ -33,7 +33,7 @@ export type SDJWTVCConfig<T = unknown> = SDJWTConfig<T> & {
   // A function that fetches the status list from the uri. If not provided, the library will assume that the response is a compact JWT.
   statusListFetcher?: StatusListFetcher
   // validte the status and decide if the status is valid or not. If not provided, the code will continue if it is 0, otherwise it will throw an error.
-  // To have safeVerify report an invalid status as STATUS_INVALID, throw an SDJWTException with the code 'STATUS_INVALID'.
+  // To have safeVerify report an invalid status as STATUS_INVALID, throw an SDJWTError with the code 'STATUS_INVALID'.
   statusValidator?: StatusValidator
   // a function that fetches the type metadata format from the uri. If not provided, the library will assume that the response is a TypeMetadataFormat. Caching has to be implemented in this function. If the integrity value is passed, it to be validated according to https://www.w3.org/TR/SRI/
   vctFetcher?: VCTFetcher

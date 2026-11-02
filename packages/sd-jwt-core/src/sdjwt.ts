@@ -18,15 +18,15 @@ import {
   SD_SEPARATOR,
   type SDJWTCompact,
 } from './types'
-import { Disclosure, SDJWTException } from './utils'
+import { Disclosure, SDJWTError } from './utils'
 
 const createDisclosureSalt = async (saltGenerator: SaltGenerator, seenSalts: Set<string>) => {
   const salt = await saltGenerator(16)
   if (typeof salt !== 'string') {
-    throw new SDJWTException('SaltGenerator must return a string')
+    throw new SDJWTError('SaltGenerator must return a string')
   }
   if (seenSalts.has(salt)) {
-    throw new SDJWTException('Duplicate disclosure salt detected')
+    throw new SDJWTError('Duplicate disclosure salt detected')
   }
   seenSalts.add(salt)
   return salt
@@ -34,7 +34,7 @@ const createDisclosureSalt = async (saltGenerator: SaltGenerator, seenSalts: Set
 
 const addDisclosureDigest = (digest: string, seenDigests: Set<string>) => {
   if (seenDigests.has(digest)) {
-    throw new SDJWTException('Duplicate disclosure digest detected')
+    throw new SDJWTError('Duplicate disclosure digest detected')
   }
   seenDigests.add(digest)
 }
@@ -81,7 +81,7 @@ export class SDJwt<
   }> {
     const [encodedJwt, ...encodedDisclosures] = sdjwt.split(SD_SEPARATOR)
     if (encodedDisclosures.length === 0) {
-      throw new SDJWTException('Invalid SD-JWT: missing SD-JWT separator')
+      throw new SDJWTError('Invalid SD-JWT: missing SD-JWT separator')
     }
     const jwt = Jwt.fromEncode<Header, Payload>(encodedJwt)
 
@@ -150,7 +150,7 @@ export class SDJwt<
     hasher: Hasher
   ): Promise<Disclosure<unknown>[]> {
     if (!this.jwt?.payload || !this.disclosures) {
-      throw new SDJWTException('Invalid sd-jwt: jwt or disclosures is missing')
+      throw new SDJWTError('Invalid sd-jwt: jwt or disclosures is missing')
     }
     const { _sd_alg: alg } = getSDAlgAndPayload(this.jwt.payload)
     const hash = { alg, hasher }
@@ -166,7 +166,7 @@ export class SDJwt<
     const data: string[] = []
 
     if (!this.jwt) {
-      throw new SDJWTException('Invalid sd-jwt: jwt is missing')
+      throw new SDJWTError('Invalid sd-jwt: jwt is missing')
     }
 
     const encodedJwt = this.jwt.encodeJwt()
@@ -187,7 +187,7 @@ export class SDJwt<
 
   public async presentableKeys(hasher: Hasher): Promise<string[]> {
     if (!this.jwt?.payload || !this.disclosures) {
-      throw new SDJWTException('Invalid sd-jwt: jwt or disclosures is missing')
+      throw new SDJWTError('Invalid sd-jwt: jwt or disclosures is missing')
     }
     const { disclosureKeymap } = await unpack(this.jwt?.payload, this.disclosures, hasher)
     return Object.keys(disclosureKeymap).sort()
@@ -195,7 +195,7 @@ export class SDJwt<
 
   public async getClaims<T = Payload>(hasher: Hasher): Promise<T> {
     if (!this.jwt?.payload || !this.disclosures) {
-      throw new SDJWTException('Invalid sd-jwt: jwt or disclosures is missing')
+      throw new SDJWTError('Invalid sd-jwt: jwt or disclosures is missing')
     }
     const { unpackedObj } = await unpack(this.jwt.payload, this.disclosures, hasher)
     return unpackedObj as T

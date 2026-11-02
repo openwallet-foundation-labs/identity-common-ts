@@ -1,19 +1,19 @@
 import { z } from 'zod'
-import { jsonWebTokenSchema } from '../jsonWeb'
-import { dateSchema } from '../utils'
+import { zJsonWebToken } from '../jsonWeb'
+import { zDate } from '../utils'
 
 /**
  *
  * {@link https://openid.net/specs/openid-federation-1_0.html#section-7.1 | Trust Mark Claims}
  *
  */
-export const trustMarkClaimsSchema = z
+export const zTrustMarkClaims = z
   .object({
     iss: z.string(),
     sub: z.string(),
     trust_mark_type: z.string(),
-    iat: dateSchema,
-    exp: dateSchema.optional(),
+    iat: zDate,
+    exp: zDate.optional(),
     logo_uri: z.url().optional(),
     ref: z.url().optional(),
     delegation: z.string().optional(),
@@ -27,11 +27,11 @@ export const trustMarkClaimsSchema = z
  * {@link https://openid.net/specs/openid-federation-1_0.html#section-3.1.1 | trust_marks}
  *
  */
-export const trustMarkSchema = z
+export const zTrustMark = z
   .object({
     trust_mark_type: z.string(),
-    trust_mark: jsonWebTokenSchema({
-      claimsSchema: trustMarkClaimsSchema,
+    trust_mark: zJsonWebToken({
+      claimsSchema: zTrustMarkClaims,
     }),
   })
   .refine((entry) => entry.trust_mark_type === entry.trust_mark.claims.trust_mark_type, {
@@ -39,4 +39,4 @@ export const trustMarkSchema = z
     path: ['trust_mark_type'],
   })
 
-export type TrustMark = z.output<typeof trustMarkSchema>
+export type TrustMark = z.output<typeof zTrustMark>

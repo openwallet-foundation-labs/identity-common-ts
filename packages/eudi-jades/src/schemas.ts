@@ -7,46 +7,46 @@ import { DETACHED_MECHANISM_IDS } from './constants'
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 const BASE64URL = /^[A-Za-z0-9_-]+$/
 const UTC_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/
-const text = z.string().min(1)
-const digestAlgorithm = text.refine((value) => value.toLowerCase() !== 'md5', 'MD5 is prohibited by clause 6.2.1')
-const b64 = text.regex(BASE64, 'Expected a base64-encoded string')
-const b64u = text.regex(BASE64URL, 'Expected an unpadded base64url-encoded string')
-const uri = text.refine((value) => {
+const zText = z.string().min(1)
+const zDigestAlgorithm = zText.refine((value) => value.toLowerCase() !== 'md5', 'MD5 is prohibited by clause 6.2.1')
+const zBase64 = zText.regex(BASE64, 'Expected a base64-encoded string')
+const zBase64Url = zText.regex(BASE64URL, 'Expected an unpadded base64url-encoded string')
+const zUri = zText.refine((value) => {
   try {
     return Boolean(new URL(value).protocol)
   } catch {
     return false
   }
 }, 'Expected an absolute URI')
-const uriReference = text.refine((value) => !/\s/.test(value), 'Expected a URI reference')
-const dateTime = text.refine((value) => !Number.isNaN(Date.parse(value)), 'Expected an RFC 3339 date-time')
+const zUriReference = zText.refine((value) => !/\s/.test(value), 'Expected a URI reference')
+const zDateTime = zText.refine((value) => !Number.isNaN(Date.parse(value)), 'Expected an RFC 3339 date-time')
 
-export const ClaimedSigningTimeSchema = z
+export const zClaimedSigningTime = z
   .string()
   .regex(UTC_SECONDS, 'Expected an RFC 3339 UTC timestamp without fractional seconds')
   .refine((value) => !Number.isNaN(Date.parse(value)), 'Expected a valid date-time')
 
 /** JWS algorithm identifier from the IANA JOSE registry. */
-export const SignAlgSchema = text.refine((value) => value.toLowerCase() !== 'none', 'alg must identify a signature')
+export const zSignAlg = zText.refine((value) => value.toLowerCase() !== 'none', 'alg must identify a signature')
 
-export const OIdSchema = z
-  .object({ id: uri, desc: z.string().optional(), docRefs: z.array(uri).min(1).optional() })
+export const zOId = z
+  .object({ id: zUri, desc: z.string().optional(), docRefs: z.array(zUri).min(1).optional() })
   .strict()
 
-export const PkiObjectSchema = z.object({ encoding: uri.optional(), specRef: z.string().optional(), val: b64 }).strict()
+export const zPkiObject = z.object({ encoding: zUri.optional(), specRef: z.string().optional(), val: zBase64 }).strict()
 
-export const TstTokenSchema = z
-  .object({ type: z.string().optional(), encoding: uri.optional(), specRef: z.string().optional(), val: b64 })
+export const zTstToken = z
+  .object({ type: z.string().optional(), encoding: zUri.optional(), specRef: z.string().optional(), val: zBase64 })
   .strict()
-export const TstTokensSchema = z.array(TstTokenSchema).min(1)
-export const TstContainerSchema = z.object({ canonAlg: uri.optional(), tstTokens: TstTokensSchema }).strict()
-export const ArcTstSchema = TstContainerSchema
+export const zTstTokens = z.array(zTstToken).min(1)
+export const zTstContainer = z.object({ canonAlg: zUri.optional(), tstTokens: zTstTokens }).strict()
+export const zArcTst = zTstContainer
 /** sigTst and adoTst shall not contain canonAlg. */
-export const SigTstSchema = z.object({ tstTokens: TstTokensSchema }).strict()
-export const AdoTstSchema = SigTstSchema
+export const zSigTst = z.object({ tstTokens: zTstTokens }).strict()
+export const zAdoTst = zSigTst
 
-const CertificateDigestSchema = z.object({ digAlg: digestAlgorithm, digVal: b64u }).strict()
-export const X5tOSchema = CertificateDigestSchema.superRefine((value, context) => {
+const zCertificateDigest = z.object({ digAlg: zDigestAlgorithm, digVal: zBase64Url }).strict()
+export const zX5tO = zCertificateDigest.superRefine((value, context) => {
   if (value.digAlg.toLowerCase() === 'sha-256') {
     context.addIssue({
       code: 'custom',
@@ -56,14 +56,14 @@ export const X5tOSchema = CertificateDigestSchema.superRefine((value, context) =
   }
 })
 
-export const CommitmentReferenceSchema = z
+export const zCommitmentReference = z
   .object({
-    commId: OIdSchema,
+    commId: zOId,
     commQuals: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
   })
   .strict()
 
-export const SignatureProductionPlaceSchema = z
+export const zSignatureProductionPlace = z
   .object({
     addressCountry: z.string().optional(),
     addressLocality: z.string().optional(),
@@ -75,24 +75,24 @@ export const SignatureProductionPlaceSchema = z
   .strict()
   .refine((value) => Object.keys(value).length > 0, 'sigPl must not be empty')
 
-export const QualifiedArraySchema = z
-  .array(z.object({ mediaType: text, encoding: text, qVals: z.array(z.unknown()).min(1) }).strict())
+export const zQualifiedArray = z
+  .array(z.object({ mediaType: zText, encoding: zText, qVals: z.array(z.unknown()).min(1) }).strict())
   .min(1)
 
-export const CertifiedAttributeSchema = z.union([
-  z.object({ x509AttrCert: PkiObjectSchema }).strict(),
-  z.object({ otherAttrCert: PkiObjectSchema }).strict(),
+export const zCertifiedAttribute = z.union([
+  z.object({ x509AttrCert: zPkiObject }).strict(),
+  z.object({ otherAttrCert: zPkiObject }).strict(),
 ])
-export const SignerAttributesSchema = z
+export const zSignerAttributes = z
   .object({
-    certified: z.array(CertifiedAttributeSchema).min(1).optional(),
-    claimed: QualifiedArraySchema.optional(),
-    signedAssertions: QualifiedArraySchema.optional(),
+    certified: z.array(zCertifiedAttribute).min(1).optional(),
+    claimed: zQualifiedArray.optional(),
+    signedAssertions: zQualifiedArray.optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, 'srAts must not be empty')
 
-const UserNoticeSchema = z
+const zUserNotice = z
   .object({
     noticeRef: z
       .object({ organization: z.string(), noticeNumbers: z.array(z.number().int()).min(1) })
@@ -103,19 +103,19 @@ const UserNoticeSchema = z
   .strict()
   .refine((value) => Object.keys(value).length > 0, 'spUserNotice must not be empty')
 
-export const SignaturePolicyQualifierSchema = z.union([
-  z.object({ spURI: uri }).strict(),
-  z.object({ spUserNotice: UserNoticeSchema }).strict(),
-  z.object({ spDSpec: OIdSchema }).strict(),
+export const zSignaturePolicyQualifier = z.union([
+  z.object({ spURI: zUri }).strict(),
+  z.object({ spUserNotice: zUserNotice }).strict(),
+  z.object({ spDSpec: zOId }).strict(),
 ])
 
-export const SignaturePolicySchema = z
+export const zSignaturePolicy = z
   .object({
-    id: OIdSchema,
-    digAlg: digestAlgorithm.optional(),
-    digVal: b64u.optional(),
+    id: zOId,
+    digAlg: zDigestAlgorithm.optional(),
+    digVal: zBase64Url.optional(),
     digPSp: z.boolean().optional(),
-    sigPQuals: z.array(SignaturePolicyQualifierSchema).min(1).optional(),
+    sigPQuals: z.array(zSignaturePolicyQualifier).min(1).optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -131,12 +131,12 @@ export const SignaturePolicySchema = z
     }
   })
 
-export const SigDSchema = z
+export const zSigD = z
   .object({
-    mId: uri,
+    mId: zUri,
     pars: z.array(z.string()).min(1),
-    hashM: digestAlgorithm.optional(),
-    hashV: z.array(b64u).min(1).optional(),
+    hashM: zDigestAlgorithm.optional(),
+    hashV: z.array(zBase64Url).min(1).optional(),
     ctys: z.array(z.string()).min(1).optional(),
   })
   .strict()
@@ -166,163 +166,163 @@ export const SigDSchema = z
     }
   })
 
-export const SignaturePolicyStoreSchema = z.union([
-  z.object({ sigPolDoc: b64u, spDSpec: OIdSchema.optional() }).strict(),
-  z.object({ sigPolLocalURI: uriReference, spDSpec: OIdSchema.optional() }).strict(),
+export const zSignaturePolicyStore = z.union([
+  z.object({ sigPolDoc: zBase64Url, spDSpec: zOId.optional() }).strict(),
+  z.object({ sigPolLocalURI: zUriReference, spDSpec: zOId.optional() }).strict(),
 ])
-export const CertificateValueSchema = z.union([
-  z.object({ x509Cert: PkiObjectSchema }).strict(),
-  z.object({ otherCert: PkiObjectSchema }).strict(),
+export const zCertificateValue = z.union([
+  z.object({ x509Cert: zPkiObject }).strict(),
+  z.object({ otherCert: zPkiObject }).strict(),
 ])
-export const XValsSchema = z.array(CertificateValueSchema).min(1)
-export const RValsSchema = z
+export const zXVals = z.array(zCertificateValue).min(1)
+export const zRVals = z
   .object({
-    crlVals: z.array(PkiObjectSchema).min(1).optional(),
-    ocspVals: z.array(PkiObjectSchema).min(1).optional(),
+    crlVals: z.array(zPkiObject).min(1).optional(),
+    ocspVals: z.array(zPkiObject).min(1).optional(),
     otherVals: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, 'rVals must not be empty')
-export const ValidationValuesSchema = z
-  .object({ xVals: XValsSchema.optional(), rVals: RValsSchema.optional() })
+export const zValidationValues = z
+  .object({ xVals: zXVals.optional(), rVals: zRVals.optional() })
   .strict()
   .refine((value) => Object.keys(value).length > 0, 'Validation values must not be empty')
 
-export const CertIdSchema = z
-  .object({ digAlg: digestAlgorithm, digVal: b64u, kid: b64.optional(), x5u: uriReference.optional() })
+export const zCertId = z
+  .object({ digAlg: zDigestAlgorithm, digVal: zBase64Url, kid: zBase64.optional(), x5u: zUriReference.optional() })
   .strict()
-export const XRefsSchema = z.array(CertIdSchema).min(1)
-const CRLReferenceSchema = z
+export const zXRefs = z.array(zCertId).min(1)
+const zCRLReference = z
   .object({
-    digAlg: digestAlgorithm,
-    digVal: b64u,
+    digAlg: zDigestAlgorithm,
+    digVal: zBase64Url,
     crlId: z
       .object({
-        issuer: b64,
-        issueTime: dateTime,
+        issuer: zBase64,
+        issueTime: zDateTime,
         number: z.number().optional(),
-        uri: uriReference.optional(),
+        uri: zUriReference.optional(),
       })
       .strict()
       .optional(),
   })
   .strict()
-const OCSPReferenceSchema = z
+const zOCSPReference = z
   .object({
     ocspId: z
       .object({
-        responderId: z.union([z.object({ byName: b64 }).strict(), z.object({ byKey: b64 }).strict()]),
-        producedAt: dateTime,
-        uri: uriReference.optional(),
+        responderId: z.union([z.object({ byName: zBase64 }).strict(), z.object({ byKey: zBase64 }).strict()]),
+        producedAt: zDateTime,
+        uri: zUriReference.optional(),
       })
       .strict(),
-    digAlg: digestAlgorithm,
-    digVal: b64u,
+    digAlg: zDigestAlgorithm,
+    digVal: zBase64Url,
   })
   .strict()
-export const RRefsSchema = z
+export const zRRefs = z
   .object({
-    crlRefs: z.array(CRLReferenceSchema).min(1).optional(),
-    ocspRefs: z.array(OCSPReferenceSchema).min(1).optional(),
+    crlRefs: z.array(zCRLReference).min(1).optional(),
+    ocspRefs: z.array(zOCSPReference).min(1).optional(),
     otherRefs: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, 'rRefs must not be empty')
 
-export const JWSSignatureSchema = z
+export const zJWSSignature = z
   .object({
-    protected: b64u.optional(),
+    protected: zBase64Url.optional(),
     header: z.record(z.string(), z.unknown()).optional(),
-    signature: b64u,
+    signature: zBase64Url,
   })
   .strict()
-export const GeneralJWSSchema = z
-  .object({ payload: z.string().optional(), signatures: z.array(JWSSignatureSchema).min(1) })
+export const zGeneralJWS = z
+  .object({ payload: z.string().optional(), signatures: z.array(zJWSSignature).min(1) })
   .strict()
-export const FlattenedJWSSchema = z
+export const zFlattenedJWS = z
   .object({
-    protected: b64u.optional(),
+    protected: zBase64Url.optional(),
     header: z.record(z.string(), z.unknown()).optional(),
     payload: z.string().optional(),
-    signature: b64u,
+    signature: zBase64Url,
   })
   .strict()
-export const CompactJWSSchema = z.object({ protected: b64u, payload: z.string(), signature: b64u }).strict()
+export const zCompactJWS = z.object({ protected: zBase64Url, payload: z.string(), signature: zBase64Url }).strict()
 
-const CanonicalizedTstContainerSchema = TstContainerSchema.extend({ canonAlg: uri })
-const NoCanonTstContainerSchema = z.object({ canonAlg: z.never().optional(), tstTokens: TstTokensSchema }).strict()
+const zCanonicalizedTstContainer = zTstContainer.extend({ canonAlg: zUri })
+const zNoCanonTstContainer = z.object({ canonAlg: z.never().optional(), tstTokens: zTstTokens }).strict()
 const sharedEtsiUInstances = [
-  z.object({ sigPSt: SignaturePolicyStoreSchema }).strict(),
-  z.object({ sigTst: SigTstSchema }).strict(),
-  z.object({ xVals: XValsSchema }).strict(),
-  z.object({ rVals: RValsSchema }).strict(),
-  z.object({ axVals: XValsSchema }).strict(),
-  z.object({ arVals: RValsSchema }).strict(),
-  z.object({ anyValData: ValidationValuesSchema }).strict(),
-  z.object({ tstVD: ValidationValuesSchema }).strict(),
-  z.object({ xRefs: XRefsSchema }).strict(),
-  z.object({ rRefs: RRefsSchema }).strict(),
-  z.object({ axRefs: XRefsSchema }).strict(),
-  z.object({ arRefs: RRefsSchema }).strict(),
-  z.object({ cSig: z.union([GeneralJWSSchema, FlattenedJWSSchema, z.string()]) }).strict(),
+  z.object({ sigPSt: zSignaturePolicyStore }).strict(),
+  z.object({ sigTst: zSigTst }).strict(),
+  z.object({ xVals: zXVals }).strict(),
+  z.object({ rVals: zRVals }).strict(),
+  z.object({ axVals: zXVals }).strict(),
+  z.object({ arVals: zRVals }).strict(),
+  z.object({ anyValData: zValidationValues }).strict(),
+  z.object({ tstVD: zValidationValues }).strict(),
+  z.object({ xRefs: zXRefs }).strict(),
+  z.object({ rRefs: zRRefs }).strict(),
+  z.object({ axRefs: zXRefs }).strict(),
+  z.object({ arRefs: zRRefs }).strict(),
+  z.object({ cSig: z.union([zGeneralJWS, zFlattenedJWS, z.string()]) }).strict(),
 ] as const
-export const EtsiUClearInstanceSchema = z.union([
+export const zEtsiUClearInstance = z.union([
   ...sharedEtsiUInstances,
-  z.object({ arcTst: CanonicalizedTstContainerSchema }).strict(),
-  z.object({ sigRTst: CanonicalizedTstContainerSchema }).strict(),
-  z.object({ rfsTst: CanonicalizedTstContainerSchema }).strict(),
+  z.object({ arcTst: zCanonicalizedTstContainer }).strict(),
+  z.object({ sigRTst: zCanonicalizedTstContainer }).strict(),
+  z.object({ rfsTst: zCanonicalizedTstContainer }).strict(),
 ])
-const EncodedEtsiUInstanceSchema = z.union([
+const zEncodedEtsiUInstance = z.union([
   ...sharedEtsiUInstances,
-  z.object({ arcTst: NoCanonTstContainerSchema }).strict(),
-  z.object({ sigRTst: NoCanonTstContainerSchema }).strict(),
-  z.object({ rfsTst: NoCanonTstContainerSchema }).strict(),
+  z.object({ arcTst: zNoCanonTstContainer }).strict(),
+  z.object({ sigRTst: zNoCanonTstContainer }).strict(),
+  z.object({ rfsTst: zNoCanonTstContainer }).strict(),
 ])
-const EncodedEtsiUSchema = z
-  .array(b64u)
+const zEncodedEtsiU = z
+  .array(zBase64Url)
   .min(1)
   .superRefine((items, context) => {
     items.forEach((item, index) => {
       try {
-        const result = EncodedEtsiUInstanceSchema.safeParse(base64urlDecodeJson(item))
+        const result = zEncodedEtsiUInstance.safeParse(base64urlDecodeJson(item))
         if (!result.success) context.addIssue({ code: 'custom', path: [index], message: 'Invalid encoded etsiU value' })
       } catch {
         context.addIssue({ code: 'custom', path: [index], message: 'Invalid encoded etsiU JSON value' })
       }
     })
   })
-export const EtsiUSchema = z.union([z.array(EtsiUClearInstanceSchema).min(1), EncodedEtsiUSchema])
-export const UnprotectedHeaderSchema = z.object({ etsiU: EtsiUSchema }).strict()
+export const zEtsiU = z.union([z.array(zEtsiUClearInstance).min(1), zEncodedEtsiU])
+export const zUnprotectedHeader = z.object({ etsiU: zEtsiU }).strict()
 
 const protectedHeaderShape = {
-  alg: SignAlgSchema.optional(),
+  alg: zSignAlg.optional(),
   cty: z.string().optional(),
   kid: z.string().optional(),
-  jku: uri.optional(),
+  jku: zUri.optional(),
   jwk: z.record(z.string(), z.unknown()).optional(),
-  x5u: uri.optional(),
-  x5c: z.array(b64).min(1).optional(),
+  x5u: zUri.optional(),
+  x5c: z.array(zBase64).min(1).optional(),
   x5t: z.never().optional(),
-  'x5t#S256': b64u.optional(),
+  'x5t#S256': zBase64Url.optional(),
   typ: z.string().optional(),
-  crit: z.array(text).min(1).optional(),
+  crit: z.array(zText).min(1).optional(),
   b64: z.boolean().optional(),
   iat: z.number().int().optional(),
-  sigT: ClaimedSigningTimeSchema.optional(),
-  'x5t#o': X5tOSchema.optional(),
-  sigX5ts: z.array(CertificateDigestSchema).min(2).optional(),
-  srCms: z.array(CommitmentReferenceSchema).min(1).optional(),
-  sigPl: SignatureProductionPlaceSchema.optional(),
-  srAts: SignerAttributesSchema.optional(),
-  adoTst: AdoTstSchema.optional(),
-  sigPId: SignaturePolicySchema.optional(),
-  sigD: SigDSchema.optional(),
+  sigT: zClaimedSigningTime.optional(),
+  'x5t#o': zX5tO.optional(),
+  sigX5ts: z.array(zCertificateDigest).min(2).optional(),
+  srCms: z.array(zCommitmentReference).min(1).optional(),
+  sigPl: zSignatureProductionPlace.optional(),
+  srAts: zSignerAttributes.optional(),
+  adoTst: zAdoTst.optional(),
+  sigPId: zSignaturePolicy.optional(),
+  sigD: zSigD.optional(),
   etsiU: z.never().optional(),
 }
-export const ProtectedHeaderParamsSchema = z.object(protectedHeaderShape).passthrough()
+export const zProtectedHeaderParams = z.object(protectedHeaderShape).passthrough()
 
 function refineProtected(
-  header: z.infer<typeof ProtectedHeaderParamsSchema>,
+  header: z.infer<typeof zProtectedHeaderParams>,
   context: z.RefinementCtx,
   currentGeneration: boolean
 ): void {
@@ -380,20 +380,20 @@ function refineProtected(
   }
 }
 
-export const ProtectedHeaderSchema = ProtectedHeaderParamsSchema.superRefine((header, context) =>
+export const zProtectedHeader = zProtectedHeaderParams.superRefine((header, context) =>
   refineProtected(header, context, false)
 )
-export const ProtectedHeaderForSigningSchema = ProtectedHeaderParamsSchema.superRefine((header, context) =>
+export const zProtectedHeaderForSigning = zProtectedHeaderParams.superRefine((header, context) =>
   refineProtected(header, context, true)
 )
 
-export const SignOptionsSchema = z.object({
-  alg: SignAlgSchema,
+export const zSignOptions = z.object({
+  alg: zSignAlg,
   kid: z.string().optional(),
   certificates: z.array(z.string()).optional(),
 })
-export const VerifyOptionsSchema = z.object({
+export const zVerifyOptions = z.object({
   detachedPayload: z.union([z.string(), z.instanceof(Uint8Array)]).optional(),
   signatureIndex: z.number().int().nonnegative().optional(),
-  understoodCriticalParameters: z.array(text).optional(),
+  understoodCriticalParameters: z.array(zText).optional(),
 })

@@ -13,7 +13,7 @@ import {
   prepareCrl,
   toDer,
   verifyCrlSignature,
-  X509Exception,
+  X509Error,
 } from '../index'
 import { generateSubjectKey, webCryptoSigner, webCryptoVerifier } from './crypto.mjs'
 import { CA_CERTIFICATE_PEM, CA_PRIVATE_JWK, OPENSSL_CRL_PEM, OPENSSL_LEAF_CERTIFICATE_PEM } from './fixtures.mjs'
@@ -89,7 +89,7 @@ describe('parseCrl', () => {
 
   it('rejects malformed input', () => {
     expect(() => parseCrl(OPENSSL_LEAF_CERTIFICATE_PEM)).toThrow(/No PEM block with label "X509 CRL"/)
-    expect(() => parseCrl(toDer(OPENSSL_LEAF_CERTIFICATE_PEM))).toThrow(X509Exception)
+    expect(() => parseCrl(toDer(OPENSSL_LEAF_CERTIFICATE_PEM))).toThrow(X509Error)
   })
 })
 
@@ -291,6 +291,6 @@ describe('createCrl', () => {
     expect(parsed.revokedCertificates).toHaveLength(3_000)
     expect(getRevocationStatus(await issueLeaf('00000bb8'), parsed, { now: NOW }).status).toBe('revoked')
     expect(getRevocationStatus(await issueLeaf('00000bb9'), parsed, { now: NOW }).status).toBe('good')
-    expect(() => parseCrl(crl.der, { maxEntries: 1_000 })).toThrow(X509Exception)
+    expect(() => parseCrl(crl.der, { maxEntries: 1_000 })).toThrow(X509Error)
   })
 })

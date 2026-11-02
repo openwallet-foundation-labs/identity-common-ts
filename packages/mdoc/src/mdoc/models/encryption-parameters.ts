@@ -1,13 +1,13 @@
 import { CborStructure, CoseKey, type CoseKeyEncodedStructure, TypedMap, typedMap, zUint8Array } from '@owf/cose'
 import { z } from 'zod'
 
-const encryptionParametersSchema = typedMap([
+const zEncryptionParameters = typedMap([
   ['nonce', zUint8Array],
   ['recipientPublicKey', z.instanceof(CoseKey)],
 ] as const)
 
-export type EncryptionParametersDecodedStructure = z.output<typeof encryptionParametersSchema>
-export type EncryptionParametersEncodedStructure = z.input<typeof encryptionParametersSchema>
+export type EncryptionParametersDecodedStructure = z.output<typeof zEncryptionParameters>
+export type EncryptionParametersEncodedStructure = z.input<typeof zEncryptionParameters>
 
 export type EncryptionParametersOptions = {
   nonce: Uint8Array
@@ -24,7 +24,7 @@ export class EncryptionParameters extends CborStructure<
   EncryptionParametersDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(encryptionParametersSchema.in, encryptionParametersSchema.out, {
+    return z.codec(zEncryptionParameters.in, zEncryptionParameters.out, {
       decode: (input) => {
         const map = TypedMap.fromMap(input) as EncryptionParametersDecodedStructure
 
