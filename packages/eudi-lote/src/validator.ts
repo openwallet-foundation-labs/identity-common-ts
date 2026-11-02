@@ -7,17 +7,13 @@
 import type z from 'zod'
 import { LoTEException } from './lote-exception'
 import {
-  EUEAAProvidersListSchema,
-  EUPIDProvidersListSchema,
-  EUPubEAAProvidersListSchema,
-  EUWalletProvidersListSchema,
-  EUWRPACProvidersListSchema,
-  EUWRPRCProvidersListSchema,
-  LOTE_TYPES,
-  mDLProvidersListSchema,
+  createProfileSchema,
+  type LoTEProfileValidationOptions,
+  type LoTEValidationMode,
+  profileDefinitions,
 } from './profiles'
-import { LoTEDocumentSchema } from './schemas'
-import type { LoTEDocument } from './types'
+import { CompatLoTEDocumentSchema, LoTEDocumentSchema } from './schemas'
+import type { CompatLoTEDocument, LoTEDocument } from './types'
 
 /**
  * Validation error detail
@@ -30,20 +26,23 @@ export interface ValidationError {
 }
 
 /**
- * Validation result
+ * Validation result. When valid, `lote` is the validated document, typed by what was validated.
  */
-export interface ValidationResult {
-  /** Whether the LoTE document is valid */
-  valid: boolean
-  /** List of validation errors (if invalid) */
-  errors: ValidationError[]
-}
+export type ValidationResult<T = LoTEDocument> =
+  | { valid: true; errors: ValidationError[]; lote: T }
+  | { valid: false; errors: ValidationError[] }
+
+/** The document `validateLoTE` accepts in a mode */
+type ModeLoTEDocument<M extends LoTEValidationMode> = M extends 'compat' ? CompatLoTEDocument : LoTEDocument
 
 /**
  * Validate a LoTE document against ETSI TS 119 602 schema
  *
  * @param loteDocument - The LoTE document to validate
- * @returns Validation result with errors if invalid
+ * @param options.mode - `compat` also accepts the `PolicyOrLegalNotice` of lists in use:
+ * a `LoTELegalNotice` that is an array of localized URIs, and items with both keys. Defaults to `strict`.
+ * @returns Validation result with errors if invalid, or the document typed as a
+ * `LoTEDocument` (strict) or `CompatLoTEDocument` (compat)
  *
  * @example
  * ```typescript
@@ -53,11 +52,15 @@ export interface ValidationResult {
  * }
  * ```
  */
-export function validateLoTE(loteDocument: unknown): ValidationResult {
-  const result = LoTEDocumentSchema.safeParse(loteDocument)
+export function validateLoTE<M extends LoTEValidationMode = 'strict'>(
+  loteDocument: unknown,
+  { mode }: { mode?: M } = {}
+): ValidationResult<ModeLoTEDocument<M>> {
+  const result = (mode === 'compat' ? CompatLoTEDocumentSchema : LoTEDocumentSchema).safeParse(loteDocument)
 
   if (result.success) {
-    return { valid: true, errors: [] }
+    // The input, not the parsed copy: that drops the keys the schema doesn't know
+    return { valid: true, errors: [], lote: loteDocument as ModeLoTEDocument<M> }
   }
 
   const errors: ValidationError[] = result.error.issues.map((issue) => ({
@@ -72,10 +75,14 @@ export function validateLoTE(loteDocument: unknown): ValidationResult {
  * Assert that a LoTE document is valid, throwing if not
  *
  * @param loteDocument - The LoTE document to validate
+ * @param options.mode - As in `validateLoTE`. Defaults to `strict`.
  * @throws Error if validation fails
  */
-export function assertValidLoTE(loteDocument: unknown): asserts loteDocument is LoTEDocument {
-  const result = validateLoTE(loteDocument)
+export function assertValidLoTE<M extends LoTEValidationMode = 'strict'>(
+  loteDocument: unknown,
+  options: { mode?: M } = {}
+): asserts loteDocument is ModeLoTEDocument<M> {
+  const result = validateLoTE(loteDocument, options)
   if (!result.valid) {
     const errorMessages = result.errors.map((e) => `${e.path}: ${e.message}`).join('\n')
     throw new LoTEException(`Invalid LoTE document:\n${errorMessages}`)
@@ -95,21 +102,28 @@ export enum LoTEProfile {
   mDLProvidersList = 'mDLProvidersList',
 }
 
-const profileConfig: Record<LoTEProfile, { loTEType: string; schema: z.ZodType }> = {
-  [LoTEProfile.EUPIDProvidersList]: { loTEType: LOTE_TYPES.EUPIDProvidersList, schema: EUPIDProvidersListSchema },
-  [LoTEProfile.EUWalletProvidersList]: {
-    loTEType: LOTE_TYPES.EUWalletProvidersList,
-    schema: EUWalletProvidersListSchema,
-  },
-  [LoTEProfile.EUWRPACProvidersList]: { loTEType: LOTE_TYPES.EUWRPACProvidersList, schema: EUWRPACProvidersListSchema },
-  [LoTEProfile.EUWRPRCProvidersList]: { loTEType: LOTE_TYPES.EUWRPRCProvidersList, schema: EUWRPRCProvidersListSchema },
-  [LoTEProfile.EUEAAProvidersList]: { loTEType: LOTE_TYPES.EUEAAProvidersList, schema: EUEAAProvidersListSchema },
-  [LoTEProfile.EUPubEAAProvidersList]: {
-    loTEType: LOTE_TYPES.EUPubEAAProvidersList,
-    schema: EUPubEAAProvidersListSchema,
-  },
-  [LoTEProfile.mDLProvidersList]: { loTEType: LOTE_TYPES.mDLProvidersList, schema: mDLProvidersListSchema },
-}
+/**
+ * The document a profile accepts in a mode, with the profile's LoTEType, ServiceTypeIdentifier
+ * and ServiceStatus values as literal types
+ */
+export type LoTEProfileDocument<P extends LoTEProfile, M extends LoTEValidationMode = 'strict'> = P extends LoTEProfile
+  ? z.output<ReturnType<typeof createProfileSchema<(typeof profileDefinitions)[P], M>>>
+  : never
+
+/**
+ * Validation result of `validateLoTEProfile`. When valid, `loteType` is the LoTEType of the
+ * profile the document matches, and narrows `lote` to the `LoTEProfileDocument` of that profile.
+ */
+export type LoTEProfileValidationResult<P extends LoTEProfile, M extends LoTEValidationMode = 'strict'> =
+  | (P extends LoTEProfile
+      ? {
+          valid: true
+          errors: ValidationError[]
+          loteType: (typeof profileDefinitions)[P]['list']['loTEType']
+          lote: LoTEProfileDocument<P, M>
+        }
+      : never)
+  | { valid: false; errors: ValidationError[] }
 
 function getDocumentLoTEType(loteDocument: unknown): string | undefined {
   try {
@@ -127,20 +141,46 @@ function getDocumentLoTEType(loteDocument: unknown): string | undefined {
  *
  * @param loteDocument - The LoTE document to validate
  * @param profile - The profile(s) to validate against
- * @returns Validation result with errors if invalid
+ * @param options.mode - `strict` (the default) validates the list exactly as the profile defines it.
+ * `compat` also accepts the deviations of lists in use that don't change who is trusted: the
+ * `PolicyOrLegalNotice` that `validateLoTE` accepts in compat mode, and on a PID Providers List
+ * a `ServiceStatus` of `http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified` with a
+ * `StatusStartingTime`.
+ *
+ * A valid Pub-EAA Providers List can list a service as
+ * `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn` (TS 119 602 H): don't trust it.
+ * @param options.allowedTerritories - The accepted `SchemeTerritory` values, `['EU']` by default.
+ * @returns Validation result with errors if invalid, or the LoTEType of the profile the document
+ * matches and the document typed as the `LoTEProfileDocument` of that profile
+ *
+ * @example
+ * ```typescript
+ * // The German PID Providers List declares DE as its territory and sets a service status
+ * validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList, { mode: 'compat', allowedTerritories: ['DE'] })
+ * ```
  */
-export function validateLoTEProfile(loteDocument: unknown, profile: LoTEProfile | LoTEProfile[]): ValidationResult {
+export function validateLoTEProfile<P extends LoTEProfile, M extends LoTEValidationMode = 'strict'>(
+  loteDocument: unknown,
+  profile: P | P[],
+  options: LoTEProfileValidationOptions<M> = {}
+): LoTEProfileValidationResult<P, M> {
   const profiles = Array.isArray(profile) ? profile : [profile]
   const documentLoTEType = getDocumentLoTEType(loteDocument)
 
   // LoTEType is unique per profile, so at most one requested profile can match.
-  const matchedProfile = profiles.find((p) => profileConfig[p].loTEType === documentLoTEType)
+  const matchedProfile = profiles.find((p) => profileDefinitions[p].list.loTEType === documentLoTEType)
 
   if (matchedProfile) {
-    const result = profileConfig[matchedProfile].schema.safeParse(loteDocument)
+    const result = createProfileSchema(profileDefinitions[matchedProfile], options).safeParse(loteDocument)
 
     if (result.success) {
-      return { valid: true, errors: [] }
+      // The type of the matched profile, which TypeScript can't relate to P
+      return {
+        valid: true,
+        errors: [],
+        loteType: profileDefinitions[matchedProfile].list.loTEType,
+        lote: loteDocument,
+      } as unknown as LoTEProfileValidationResult<P, M>
     }
 
     return {
@@ -165,7 +205,7 @@ export function validateLoTEProfile(loteDocument: unknown, profile: LoTEProfile 
       },
       ...profiles.map((p) => ({
         path: 'LoTE.ListAndSchemeInformation.LoTEType',
-        message: `Profile ${p}: LoTEType must be ${profileConfig[p].loTEType}`,
+        message: `Profile ${p}: LoTEType must be ${profileDefinitions[p].list.loTEType}`,
       })),
     ],
   }

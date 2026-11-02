@@ -5,9 +5,41 @@
  * @see https://acceptance.eidas.ec.europa.eu/efda/wallet/lists-of-trusted-entities/mdl-providers
  */
 
-import type z from 'zod'
-import { hasDigitalIdentity, LoTEDocumentSchema, rfc3339DateTimeToMs } from './schemas'
-import type { LoTEDocument, PostalAddress, ServiceDigitalIdentity } from './types'
+import { z } from 'zod'
+import {
+  type CompatLoTEDocumentSchema,
+  CompatPolicyOrLegalNoticeListSchema,
+  hasDigitalIdentity,
+  ListAndSchemeInformationSchema,
+  LoTEDocumentSchema,
+  LoTESchema,
+  PolicyOrLegalNoticeListSchema,
+  rfc3339DateTimeToMs,
+  ServiceInformationSchema,
+  TrustedEntitySchema,
+  TrustedEntityServiceSchema,
+} from './schemas'
+import type { PostalAddress, ServiceDigitalIdentity } from './types'
+
+/**
+ * `strict` validates a list exactly as ETSI TS 119 602 defines it. `compat` also accepts the
+ * deviations of lists in use that don't change who is trusted (see `validateLoTEProfile`).
+ */
+export type LoTEValidationMode = 'strict' | 'compat'
+
+/** Options of `validateLoTEProfile` */
+export interface LoTEProfileValidationOptions<M extends LoTEValidationMode = LoTEValidationMode> {
+  /** Defaults to `strict` */
+  mode?: M
+  /**
+   * The `SchemeTerritory` values to accept. Defaults to `['EU']`, which the profiles require;
+   * pass e.g. `['DE']` to accept a national list of an EU type.
+   */
+  allowedTerritories?: readonly string[]
+}
+
+// What the profile refinements read, in strict and in compat mode
+type LoTEDocument = z.output<typeof CompatLoTEDocumentSchema>
 
 const SIX_MONTHS_IN_MS = 6 * 31 * 24 * 60 * 60 * 1000
 
@@ -123,7 +155,7 @@ type ListAndSchemeInformationRefinementOptions = {
   loTEType: string
   loTEVersionIdentifier: number
   statusDeterminationApproach: string
-  schemeTerritory: string
+  allowedTerritories?: readonly string[]
   schemeTypeCommunityRulesUri: string
   historicalInformationPeriod?: number
   requireNoHistoricalInformationPeriod?: boolean
@@ -132,10 +164,7 @@ type ListAndSchemeInformationRefinementOptions = {
 
 const listAndSchemeInformationRefinement =
   ({
-    loTEType,
-    loTEVersionIdentifier,
-    statusDeterminationApproach,
-    schemeTerritory,
+    allowedTerritories = ['EU'],
     schemeTypeCommunityRulesUri,
     historicalInformationPeriod,
     requireNoHistoricalInformationPeriod,
@@ -145,38 +174,11 @@ const listAndSchemeInformationRefinement =
     const info = LoTE.ListAndSchemeInformation
     const path = ['LoTE', 'ListAndSchemeInformation']
 
-    if (info.LoTEType !== loTEType) {
+    if (info.SchemeTerritory === undefined || !allowedTerritories.includes(info.SchemeTerritory)) {
       ctx.addIssue({
         code: 'invalid_value',
-        values: [loTEType],
-        message: `LoTEType must be ${loTEType}`,
-        path: [...path, 'LoTEType'],
-      })
-    }
-
-    if (info.LoTEVersionIdentifier !== loTEVersionIdentifier) {
-      ctx.addIssue({
-        code: 'invalid_value',
-        values: [loTEVersionIdentifier],
-        message: `LoTEVersionIdentifier must be ${loTEVersionIdentifier}`,
-        path: [...path, 'LoTEVersionIdentifier'],
-      })
-    }
-
-    if (info.StatusDeterminationApproach !== statusDeterminationApproach) {
-      ctx.addIssue({
-        code: 'invalid_value',
-        values: [statusDeterminationApproach],
-        message: `StatusDeterminationApproach must be ${statusDeterminationApproach}`,
-        path: [...path, 'StatusDeterminationApproach'],
-      })
-    }
-
-    if (info.SchemeTerritory !== schemeTerritory) {
-      ctx.addIssue({
-        code: 'invalid_value',
-        values: [schemeTerritory],
-        message: `SchemeTerritory must be ${schemeTerritory}`,
+        values: [...allowedTerritories],
+        message: `SchemeTerritory must be ${allowedTerritories.join(' or ')}`,
         path: [...path, 'SchemeTerritory'],
       })
     }
@@ -255,12 +257,14 @@ const listAndSchemeInformationRefinement =
   }
 
 type TrustedEntitiesListRefinementOptions = {
-  allowedServiceTypeIdentifiers: string[]
+  serviceTypeIdentifiers: readonly [string, ...string[]]
   informationUriPrefix?: string
+  /** The ServiceStatus schema of the profile in each mode */
+  serviceStatus: Record<LoTEValidationMode, z.ZodType<string | undefined>>
 }
 
 const trustedEntitiesListRefinement =
-  ({ allowedServiceTypeIdentifiers, informationUriPrefix }: TrustedEntitiesListRefinementOptions) =>
+  ({ informationUriPrefix }: TrustedEntitiesListRefinementOptions) =>
   ({ LoTE }: LoTEDocument, ctx: z.RefinementCtx<LoTEDocument>) => {
     LoTE.TrustedEntitiesList?.forEach((entity, index) => {
       const trustedEntityPath = ['LoTE', 'TrustedEntitiesList', index.toString()]
@@ -311,16 +315,11 @@ const trustedEntitiesListRefinement =
           )
         })
 
-        if (typeof service.ServiceInformation.ServiceStatus !== 'undefined') {
-          ctx.addIssue({
-            code: 'invalid_type',
-            expected: 'undefined',
-            message: 'ServiceStatus must not be present',
-            path: [...entityServicePath, 'ServiceInformation', 'ServiceStatus'],
-          })
-        }
-
-        if (typeof service.ServiceInformation.StatusStartingTime !== 'undefined') {
+        // The schema has checked ServiceStatus against the profile
+        if (
+          service.ServiceInformation.StatusStartingTime !== undefined &&
+          service.ServiceInformation.ServiceStatus === undefined
+        ) {
           ctx.addIssue({
             code: 'invalid_type',
             expected: 'undefined',
@@ -328,156 +327,222 @@ const trustedEntitiesListRefinement =
             path: [...entityServicePath, 'ServiceInformation', 'StatusStartingTime'],
           })
         }
-
-        if (
-          !service.ServiceInformation.ServiceTypeIdentifier ||
-          !allowedServiceTypeIdentifiers.includes(service.ServiceInformation.ServiceTypeIdentifier)
-        ) {
-          ctx.addIssue({
-            code: 'invalid_value',
-            message: `ServiceTypeIdentifier must be one of the following: ${allowedServiceTypeIdentifiers.join(', ')}`,
-            path: [...entityServicePath, 'ServiceInformation', 'ServiceTypeIdentifier'],
-            values: allowedServiceTypeIdentifiers,
-          })
-        }
       })
     })
   }
 
-// ETSI TS 119 602 D
-export const EUPIDProvidersListSchema = LoTEDocumentSchema.superRefine(
-  listAndSchemeInformationRefinement({
-    loTEType: LOTE_TYPES.EUPIDProvidersList,
-    loTEVersionIdentifier: 1,
-    statusDeterminationApproach: 'http://uri.etsi.org/19602/PIDProvidersList/StatusDetn/EU',
-    schemeTerritory: 'EU',
-    schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/PIDProviders/schemerules/EU',
-    requireNoHistoricalInformationPeriod: true,
-  })
-).superRefine(
-  trustedEntitiesListRefinement({
-    allowedServiceTypeIdentifiers: [
-      'http://uri.etsi.org/19602/SvcType/PID/Issuance',
-      'http://uri.etsi.org/19602/SvcType/PID/Revocation',
-    ],
-    informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PIDProvider/',
-  })
-)
+type ProfileDefinition = {
+  list: Omit<ListAndSchemeInformationRefinementOptions, 'allowedTerritories'>
+  entities: TrustedEntitiesListRefinementOptions
+}
 
-// ETSI TS 119 602 E
-export const EUWalletProvidersListSchema = LoTEDocumentSchema.superRefine(
-  listAndSchemeInformationRefinement({
-    loTEType: LOTE_TYPES.EUWalletProvidersList,
-    loTEVersionIdentifier: 1,
-    statusDeterminationApproach: 'http://uri.etsi.org/19602/WalletProvidersList/StatusDetn/EU',
-    schemeTerritory: 'EU',
-    schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/WalletProvidersList/schemerules/EU',
-    requireNoHistoricalInformationPeriod: true,
+const serviceStatusOneOf = <const T extends readonly [string, ...string[]]>(statuses: T) =>
+  z.enum(statuses, {
+    error: ({ input }) =>
+      input === undefined
+        ? 'ServiceStatus must be present'
+        : `ServiceStatus must be one of the following: ${statuses.join(', ')}`,
   })
-).superRefine(
-  trustedEntitiesListRefinement({
-    allowedServiceTypeIdentifiers: [
-      'http://uri.etsi.org/19602/SvcType/WalletSolution/Issuance',
-      'http://uri.etsi.org/19602/SvcType/WalletSolution/Revocation',
-    ],
-    informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/WalletProvider/',
-  })
-)
 
-// ETSI TS 119 602 F
-export const EUWRPACProvidersListSchema = LoTEDocumentSchema.superRefine(
-  listAndSchemeInformationRefinement({
-    loTEType: LOTE_TYPES.EUWRPACProvidersList,
-    loTEVersionIdentifier: 1,
-    statusDeterminationApproach: 'http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
-    schemeTerritory: 'EU',
-    schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/WRPACProvidersList/schemerules/EU',
-    requireNoHistoricalInformationPeriod: true,
-  })
-).superRefine(
-  trustedEntitiesListRefinement({
-    allowedServiceTypeIdentifiers: [
-      'http://uri.etsi.org/19602/SvcType/WRPAC/Issuance',
-      'http://uri.etsi.org/19602/SvcType/WRPAC/Revocation',
-    ],
-    informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/WRPACProvider/',
-  })
-)
-
-// ETSI TS 119 602 G
-export const EUWRPRCProvidersListSchema = LoTEDocumentSchema.superRefine(
-  listAndSchemeInformationRefinement({
-    loTEType: LOTE_TYPES.EUWRPRCProvidersList,
-    loTEVersionIdentifier: 1,
-    statusDeterminationApproach: 'http://uri.etsi.org/19602/WRPRCrovidersList/StatusDetn/EU',
-    schemeTerritory: 'EU',
-    schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/WRPRCProvidersList/schemerules/EU',
-    requireNoHistoricalInformationPeriod: true,
-  })
-).superRefine(
-  trustedEntitiesListRefinement({
-    allowedServiceTypeIdentifiers: [
-      'http://uri.etsi.org/19602/SvcType/WRPRC/Issuance',
-      'http://uri.etsi.org/19602/SvcType/WRPRC/Revocation',
-    ],
-    informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/WRPRCProvider/',
-  })
-)
-
-export const EUEAAProvidersListSchema = LoTEDocumentSchema.superRefine(
-  listAndSchemeInformationRefinement({
-    loTEType: LOTE_TYPES.EUEAAProvidersList,
-    loTEVersionIdentifier: 1,
-    statusDeterminationApproach: 'http://uri.etsi.org/19602/EAAProvidersList/StatusDetn/EU',
-    schemeTerritory: 'EU',
-    schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/EAAProvidersList/schemerules/EU',
-    requireNoPointersToOtherLoTE: true,
-  })
-).superRefine(
-  trustedEntitiesListRefinement({
-    allowedServiceTypeIdentifiers: [
-      'http://uri.etsi.org/19602/SvcType/EAA/Issuance',
-      'http://uri.etsi.org/19602/SvcType/EAA/Revocation',
-    ],
-    informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/EAAProvider/',
-  })
-)
+const noServiceStatus = z.undefined({ error: 'ServiceStatus must not be present' }).optional()
+const withoutServiceStatus = { strict: noServiceStatus, compat: noServiceStatus }
 
 // ETSI TS 119 602 H
-export const EUPubEAAProvidersListSchema = LoTEDocumentSchema.superRefine(
-  listAndSchemeInformationRefinement({
-    loTEType: LOTE_TYPES.EUPubEAAProvidersList,
-    loTEVersionIdentifier: 1,
-    statusDeterminationApproach: 'http://uri.etsi.org/19602/PubEAAProvidersList/StatusDetn/EU',
-    schemeTerritory: 'EU',
-    schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/PubEAAProvidersList/schemerules/EU',
-    requireNoPointersToOtherLoTE: true,
-    historicalInformationPeriod: 65535,
-  })
-).superRefine(
-  trustedEntitiesListRefinement({
-    allowedServiceTypeIdentifiers: [
-      'http://uri.etsi.org/19602/SvcType/PubEAA/Issuance',
-      'http://uri.etsi.org/19602/SvcType/PubEAA/Revocation',
-    ],
-    informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PubEAAProvider/',
-  })
-)
+const pubEAAServiceStatus = serviceStatusOneOf([
+  'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified',
+  'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn',
+])
 
-// mDL Providers List
-export const mDLProvidersListSchema = LoTEDocumentSchema.superRefine(
-  listAndSchemeInformationRefinement({
-    loTEType: LOTE_TYPES.mDLProvidersList,
-    loTEVersionIdentifier: 1,
-    statusDeterminationApproach: 'http://trust.ec.europa.eu/lists/mDL/mDLProvidersListStatusDetn',
-    schemeTerritory: 'EU',
-    schemeTypeCommunityRulesUri: 'http://trust.ec.europa.eu/lists/mDL/schemerules',
+export const profileDefinitions = {
+  // ETSI TS 119 602 D
+  EUPIDProvidersList: {
+    list: {
+      loTEType: LOTE_TYPES.EUPIDProvidersList,
+      loTEVersionIdentifier: 1,
+      statusDeterminationApproach: 'http://uri.etsi.org/19602/PIDProvidersList/StatusDetn/EU',
+      schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/PIDProviders/schemerules/EU',
+      requireNoHistoricalInformationPeriod: true,
+    },
+    entities: {
+      serviceTypeIdentifiers: [
+        'http://uri.etsi.org/19602/SvcType/PID/Issuance',
+        'http://uri.etsi.org/19602/SvcType/PID/Revocation',
+      ],
+      informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PIDProvider/',
+      serviceStatus: {
+        strict: noServiceStatus,
+        // The German PID Providers List sets this status, which no profile defines
+        compat: serviceStatusOneOf(['http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified']).optional(),
+      },
+    },
+  },
+
+  // ETSI TS 119 602 E
+  EUWalletProvidersList: {
+    list: {
+      loTEType: LOTE_TYPES.EUWalletProvidersList,
+      loTEVersionIdentifier: 1,
+      statusDeterminationApproach: 'http://uri.etsi.org/19602/WalletProvidersList/StatusDetn/EU',
+      schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/WalletProvidersList/schemerules/EU',
+      requireNoHistoricalInformationPeriod: true,
+    },
+    entities: {
+      serviceTypeIdentifiers: [
+        'http://uri.etsi.org/19602/SvcType/WalletSolution/Issuance',
+        'http://uri.etsi.org/19602/SvcType/WalletSolution/Revocation',
+      ],
+      informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/WalletProvider/',
+      serviceStatus: withoutServiceStatus,
+    },
+  },
+
+  // ETSI TS 119 602 F
+  EUWRPACProvidersList: {
+    list: {
+      loTEType: LOTE_TYPES.EUWRPACProvidersList,
+      loTEVersionIdentifier: 1,
+      statusDeterminationApproach: 'http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
+      schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/WRPACProvidersList/schemerules/EU',
+      requireNoHistoricalInformationPeriod: true,
+    },
+    entities: {
+      serviceTypeIdentifiers: [
+        'http://uri.etsi.org/19602/SvcType/WRPAC/Issuance',
+        'http://uri.etsi.org/19602/SvcType/WRPAC/Revocation',
+      ],
+      informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/WRPACProvider/',
+      serviceStatus: withoutServiceStatus,
+    },
+  },
+
+  // ETSI TS 119 602 G
+  EUWRPRCProvidersList: {
+    list: {
+      loTEType: LOTE_TYPES.EUWRPRCProvidersList,
+      loTEVersionIdentifier: 1,
+      statusDeterminationApproach: 'http://uri.etsi.org/19602/WRPRCrovidersList/StatusDetn/EU',
+      schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/WRPRCProvidersList/schemerules/EU',
+      requireNoHistoricalInformationPeriod: true,
+    },
+    entities: {
+      serviceTypeIdentifiers: [
+        'http://uri.etsi.org/19602/SvcType/WRPRC/Issuance',
+        'http://uri.etsi.org/19602/SvcType/WRPRC/Revocation',
+      ],
+      informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/WRPRCProvider/',
+      serviceStatus: withoutServiceStatus,
+    },
+  },
+
+  EUEAAProvidersList: {
+    list: {
+      loTEType: LOTE_TYPES.EUEAAProvidersList,
+      loTEVersionIdentifier: 1,
+      statusDeterminationApproach: 'http://uri.etsi.org/19602/EAAProvidersList/StatusDetn/EU',
+      schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/EAAProvidersList/schemerules/EU',
+      requireNoPointersToOtherLoTE: true,
+    },
+    entities: {
+      serviceTypeIdentifiers: [
+        'http://uri.etsi.org/19602/SvcType/EAA/Issuance',
+        'http://uri.etsi.org/19602/SvcType/EAA/Revocation',
+      ],
+      informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/EAAProvider/',
+      serviceStatus: withoutServiceStatus,
+    },
+  },
+
+  // ETSI TS 119 602 H
+  EUPubEAAProvidersList: {
+    list: {
+      loTEType: LOTE_TYPES.EUPubEAAProvidersList,
+      loTEVersionIdentifier: 1,
+      statusDeterminationApproach: 'http://uri.etsi.org/19602/PubEAAProvidersList/StatusDetn/EU',
+      schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/PubEAAProvidersList/schemerules/EU',
+      requireNoPointersToOtherLoTE: true,
+      historicalInformationPeriod: 65535,
+    },
+    entities: {
+      serviceTypeIdentifiers: [
+        'http://uri.etsi.org/19602/SvcType/PubEAA/Issuance',
+        'http://uri.etsi.org/19602/SvcType/PubEAA/Revocation',
+      ],
+      informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PubEAAProvider/',
+      // A withdrawn Pub-EAA provider stays listed: only a notified one is trusted
+      serviceStatus: {
+        strict: pubEAAServiceStatus,
+        compat: pubEAAServiceStatus,
+      },
+    },
+  },
+
+  // mDL Providers List
+  mDLProvidersList: {
+    list: {
+      loTEType: LOTE_TYPES.mDLProvidersList,
+      loTEVersionIdentifier: 1,
+      statusDeterminationApproach: 'http://trust.ec.europa.eu/lists/mDL/mDLProvidersListStatusDetn',
+      schemeTypeCommunityRulesUri: 'http://trust.ec.europa.eu/lists/mDL/schemerules',
+    },
+    entities: {
+      serviceTypeIdentifiers: [
+        'http://trust.ec.europa.eu/lists/mDL/SvcType/Issuance',
+        'http://trust.ec.europa.eu/lists/mDL/SvcType/Revocation',
+      ],
+      serviceStatus: withoutServiceStatus,
+    },
+  },
+} as const satisfies Record<keyof typeof LOTE_TYPES, ProfileDefinition>
+
+const policyOrLegalNoticeSchemas = {
+  strict: PolicyOrLegalNoticeListSchema.optional(),
+  compat: CompatPolicyOrLegalNoticeListSchema.optional(),
+}
+
+/**
+ * The schema of a profile in a mode. The rules that narrow a type (LoTEType, ServiceTypeIdentifier,
+ * ServiceStatus, and so on) are part of the shape, so the output type of the schema has them.
+ */
+export const createProfileSchema = <const D extends ProfileDefinition, M extends LoTEValidationMode = 'strict'>(
+  { list, entities }: D,
+  { mode = 'strict' as M, allowedTerritories }: LoTEProfileValidationOptions<M> = {}
+) => {
+  const serviceTypeIdentifiers = entities.serviceTypeIdentifiers as D['entities']['serviceTypeIdentifiers']
+  const service = TrustedEntityServiceSchema.extend({
+    ServiceInformation: ServiceInformationSchema.extend({
+      ServiceTypeIdentifier: z.enum(serviceTypeIdentifiers, {
+        error: `ServiceTypeIdentifier must be one of the following: ${serviceTypeIdentifiers.join(', ')}`,
+      }),
+      ServiceStatus: entities.serviceStatus[mode] as D['entities']['serviceStatus'][M],
+    }),
   })
-).superRefine(
-  trustedEntitiesListRefinement({
-    allowedServiceTypeIdentifiers: [
-      'http://trust.ec.europa.eu/lists/mDL/SvcType/Issuance',
-      'http://trust.ec.europa.eu/lists/mDL/SvcType/Revocation',
-    ],
+
+  return LoTEDocumentSchema.extend({
+    LoTE: LoTESchema.extend({
+      ListAndSchemeInformation: ListAndSchemeInformationSchema.extend({
+        LoTEType: z.literal(list.loTEType as D['list']['loTEType'], { error: `LoTEType must be ${list.loTEType}` }),
+        LoTEVersionIdentifier: z.literal(list.loTEVersionIdentifier as D['list']['loTEVersionIdentifier'], {
+          error: `LoTEVersionIdentifier must be ${list.loTEVersionIdentifier}`,
+        }),
+        StatusDeterminationApproach: z.literal(
+          list.statusDeterminationApproach as D['list']['statusDeterminationApproach'],
+          { error: `StatusDeterminationApproach must be ${list.statusDeterminationApproach}` }
+        ),
+        PolicyOrLegalNotice: policyOrLegalNoticeSchemas[mode],
+      }),
+      TrustedEntitiesList: z
+        .array(TrustedEntitySchema.extend({ TrustedEntityServices: z.array(service).min(1) }))
+        .optional(),
+    }),
   })
-)
+    .superRefine(listAndSchemeInformationRefinement({ ...list, allowedTerritories }))
+    .superRefine(trustedEntitiesListRefinement(entities))
+}
+
+export const EUPIDProvidersListSchema = createProfileSchema(profileDefinitions.EUPIDProvidersList)
+export const EUWalletProvidersListSchema = createProfileSchema(profileDefinitions.EUWalletProvidersList)
+export const EUWRPACProvidersListSchema = createProfileSchema(profileDefinitions.EUWRPACProvidersList)
+export const EUWRPRCProvidersListSchema = createProfileSchema(profileDefinitions.EUWRPRCProvidersList)
+export const EUEAAProvidersListSchema = createProfileSchema(profileDefinitions.EUEAAProvidersList)
+export const EUPubEAAProvidersListSchema = createProfileSchema(profileDefinitions.EUPubEAAProvidersList)
+export const mDLProvidersListSchema = createProfileSchema(profileDefinitions.mDLProvidersList)

@@ -204,7 +204,7 @@ if (!result.valid) {
 }
 
 // Or throw on invalid
-assertValidLoTE(lote); // throws ValidationError if invalid
+assertValidLoTE(lote); // throws LoTEException if invalid
 ```
 
 ### Updating a LoTE Document
@@ -252,19 +252,56 @@ Removes an entity by name.
 
 ### Validation
 
-#### `validateLoTE(lote): ValidationResult`
+#### `validateLoTE(lote, { mode? }): ValidationResult`
 
-Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns validation result with error details.
+Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns validation result with error details. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
+
+When valid, the result has the document as `lote`: a `LoTEDocument`, or a `CompatLoTEDocument` in compat mode. A `CompatLoTEDocument` is not a `LoTEDocument`, as its `LoTELegalNotice` can be an array.
+
+```typescript
+const result = validateLoTE(lote, { mode: 'compat' });
+if (result.valid) {
+  result.lote; // CompatLoTEDocument
+}
+```
 
 The rules of the EU lists (2-letter country codes, non-empty names, at least one digital identity, X.509 certificate encoding, and so on) are not part of the JSON schema: `validateLoTEProfile` applies them. The known differences from the JSON schema are listed in [`src/__tests__/schema-drift.test.mts`](./src/__tests__/schema-drift.test.mts).
 
-#### `assertValidLoTE(lote): asserts lote is LoTEDocument`
+#### `assertValidLoTE(lote, { mode? }): asserts lote is LoTEDocument`
 
-Type assertion that throws `ValidationError` if the LoTE document is invalid.
+Type assertion that throws `LoTEException` if the LoTE document is invalid. In compat mode it asserts a `CompatLoTEDocument`.
 
-#### `validateLoTEProfile(lote, profile: LoTEProfile | LoTEProfile[]): ValidationResult`
+#### `validateLoTEProfile(lote, profile: LoTEProfile | LoTEProfile[], options?): ValidationResult`
 
 Validates a LoTE document against a known LoTE Profile, such as EU PID Providers List, mDL Providers List, etc. Returns validation result with error details.
+
+When valid, the result has the LoTEType of the profile the document matches as `loteType`, and the document as `lote`, typed as the `LoTEProfileDocument` of that profile: its `LoTEType`, `ServiceTypeIdentifier` and `ServiceStatus` are the values the profile allows. Check `valid` and then `loteType` to narrow `lote` to one profile.
+
+```typescript
+const result = validateLoTEProfile(lote, [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUPubEAAProvidersList]);
+if (result.valid && result.loteType === LOTE_TYPES.EUPubEAAProvidersList) {
+  result.lote; // LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList>
+}
+```
+
+Options:
+
+- `mode`: `strict` (default) validates the list exactly as the profile defines it. `compat` also accepts deviations of lists in use that don't change who is trusted. The table below lists them, together with `allowedTerritories`, which applies in either mode.
+- `allowedTerritories`: the accepted `SchemeTerritory` values, `['EU']` by default. Pass the territory of a national list of an EU type, such as `['DE']`.
+
+| What | Profile(s) | Notes |
+| --- | --- | --- |
+| A `LoTELegalNotice` that is an array of localized URIs | All, and `validateLoTE` | The German EUDI Wallet sandbox lists |
+| A `PolicyOrLegalNotice` item with both `LoTEPolicy` and `LoTELegalNotice` | All, and `validateLoTE` | The German EUDI Wallet sandbox lists |
+| A `ServiceStatus` of `http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified`, with an optional `StatusStartingTime` | EU PID Providers List | No profile defines this status. The German PID Providers List sets it |
+| A `SchemeTerritory` other than `EU` | All | Only the values passed in `allowedTerritories`, such as `['DE']`. Works in strict mode too |
+
+A Pub-EAA Providers List gives every service a `ServiceStatus` (TS 119 602 H), and a withdrawn provider stays listed with `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn`. The list is still valid: only trust services with `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified`.
+
+```typescript
+// The German EUDI Wallet PID Providers List
+validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList, { mode: 'compat', allowedTerritories: ['DE'] });
+```
 
 ### Builders
 
