@@ -16,6 +16,10 @@ import {
   GermanSandboxWalletProvidersJWT,
   LP26PIDProvidersEmptyJWT,
   LP26WRPRCProvidersEmptyJWT,
+  NorwegianSandboxPIDProvidersJWT,
+  NorwegianSandboxWalletProvidersJWT,
+  NorwegianSandboxWRPACProvidersJWT,
+  PubEAAProvidersJWT,
   WalletProvidersJWT,
   WRPACProvidersJWT,
 } from './fixtures.mjs'
@@ -754,6 +758,13 @@ describe('LoTE Validator', () => {
       expect(result.valid).toBe(true)
     })
 
+    it('should validate against EUPubEAAProvidersList profile', () => {
+      const { payload: lote } = decodeJwt(PubEAAProvidersJWT)
+      const result = validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList)
+
+      expect(result.valid).toBe(true)
+    })
+
     it('should validate an EC list without trusted entities against EUPIDProvidersList profile', () => {
       const { payload: lote } = decodeJwt<any, LoTEDocument>(LP26PIDProvidersEmptyJWT)
 
@@ -1013,6 +1024,37 @@ describe('LoTE Validator', () => {
         valid: true,
         issues: [],
       })
+    })
+
+    it('should accept the Norwegian sandbox lists only in compat mode with territory NO', () => {
+      for (const [jwt, profile] of [
+        [NorwegianSandboxPIDProvidersJWT, LoTEProfile.EUPIDProvidersList],
+        [NorwegianSandboxWRPACProvidersJWT, LoTEProfile.EUWRPACProvidersList],
+      ] as const) {
+        const lote = decodeJwt(jwt).payload
+
+        expect(validateLoTEProfile(lote, profile).issues).toEqual([
+          {
+            severity: 'error',
+            code: 'invalid_value',
+            path: ['LoTE', 'ListAndSchemeInformation', 'SchemeTerritory'],
+            message: `Profile ${profile}: SchemeTerritory must be EU`,
+          },
+        ])
+        expect(validateLoTEProfile(lote, profile, { mode: 'compat', allowedTerritories: ['NO'] })).toMatchObject({
+          valid: true,
+          issues: [],
+        })
+      }
+    })
+
+    // Expected to fail: its trusted entity has no TrustedEntityServices, which the TS 119 602 JSON schema requires
+    it.fails('should accept the Norwegian sandbox Wallet Providers List in compat mode with territory NO', () => {
+      const lote = decodeJwt(NorwegianSandboxWalletProvidersJWT).payload
+
+      expect(
+        validateLoTEProfile(lote, LoTEProfile.EUWalletProvidersList, { mode: 'compat', allowedTerritories: ['NO'] })
+      ).toMatchObject({ valid: true, errors: [] })
     })
 
     it('should only accept the allowed territories, in compat mode only', () => {

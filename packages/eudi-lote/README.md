@@ -16,6 +16,22 @@ This SDK implements the ETSI TS 119 602 standard for LoTE documents, enabling:
 
 - [ETSI TS 119 602](https://www.etsi.org/deliver/etsi_ts/119600_119699/119602/01.01.01_60/ts_119602v010101p.pdf) - Trusted Lists
 
+## Supported Lists
+
+`validateLoTEProfile` is tested against these published lists:
+
+| List | Profile | Mode |
+| --- | --- | --- |
+| [EU PID Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pid-providers.json) (EC acceptance) | `EUPIDProvidersList` | `strict` |
+| [EU Wallet Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wallet-providers.json) (EC acceptance) | `EUWalletProvidersList` | `strict` |
+| [EU WRPAC Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wrpac-providers.json) (EC acceptance) | `EUWRPACProvidersList` | `strict` |
+| [EU Pub-EAA Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pub-eaa-providers.json) (EC acceptance) | `EUPubEAAProvidersList` | `strict` |
+| [German PID Providers](https://trustlists.eudihub.de/pid-provider.jwt) | `EUPIDProvidersList` | `compat`, `allowedTerritories: ['DE']` |
+| [German Wallet Providers](https://trustlists-sandbox.eudihub.de/wallet-provider.jwt) (sandbox) | `EUWalletProvidersList` | `compat`, `allowedTerritories: ['DE']` |
+| [Norwegian PID Providers](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_pid.jws) (sandbox) | `EUPIDProvidersList` | `compat`, `allowedTerritories: ['NO']` |
+| [Norwegian Access Certificate Authorities](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_aca.jws) (sandbox) | `EUWRPACProvidersList` | `compat`, `allowedTerritories: ['NO']` |
+| [Norwegian Wallet Providers](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_wallet.jws) (sandbox) | `EUWalletProvidersList` | Not supported: its trusted entity has no `TrustedEntityServices`, which the JSON schema requires |
+
 ## Installation
 
 ```bash

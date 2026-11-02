@@ -4,7 +4,7 @@ import { ContentType } from '@openid4vc/utils'
 import * as jose from 'jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
 import {
   type CredentialConfigurationSupportedWithFormats,
@@ -121,8 +121,17 @@ const credentialResponseEncryption = {
   enc: 'A256GCM',
 }
 
+// What the client sends to a V1 issuer, which expects the `alg` inside the `jwk`
+const v1CredentialResponseEncryption = {
+  ...credentialResponseEncryption,
+  jwk: { ...encryptionPublicJwk, alg: 'RSA-OAEP' },
+}
+
 beforeAll(() => server.listen())
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  server.resetHandlers()
+  vi.restoreAllMocks()
+})
 afterAll(() => server.close())
 
 describe('Credential Response Encryption', () => {
@@ -193,9 +202,9 @@ describe('Credential Response Encryption', () => {
 
         // Verify the request includes credential_response_encryption
         expect(parsedCredentialRequest.credentialRequest.credential_response_encryption).toEqual(
-          credentialResponseEncryption
+          v1CredentialResponseEncryption
         )
-        expect(parsedCredentialRequest.credentialResponseEncryption).toEqual(credentialResponseEncryption)
+        expect(parsedCredentialRequest.credentialResponseEncryption).toEqual(v1CredentialResponseEncryption)
 
         if (!parsedCredentialRequest.proofs?.jwt) {
           throw new Error('Missing required jwt proofs')
@@ -238,6 +247,8 @@ describe('Credential Response Encryption', () => {
       nonce: cNonce,
     })
 
+    const decryptJweSpy = vi.spyOn(callbacks, 'decryptJwe')
+
     const result = await client.retrieveCredentials({
       issuerMetadata,
       accessToken: 'test-access-token',
@@ -249,6 +260,7 @@ describe('Credential Response Encryption', () => {
       credentialResponseEncryption,
     })
 
+    expect(decryptJweSpy).toHaveBeenCalledWith(expect.any(String), { jwk: credentialResponseEncryption.jwk })
     expect(result.credentialResponse).toEqual({
       credential: 'some-credential',
       notification_id: '3b926f09-d603-4e8b-a75d-eaa8965f0fe3',
@@ -266,7 +278,7 @@ describe('Credential Response Encryption', () => {
           contentType: request.headers.get('Content-Type') ?? undefined,
         })
         expect(deferredCredentialRequest.transaction_id).toBe('txn-456')
-        expect(deferredCredentialRequest.credential_response_encryption).toEqual(credentialResponseEncryption)
+        expect(deferredCredentialRequest.credential_response_encryption).toEqual(v1CredentialResponseEncryption)
 
         const { deferredCredentialResponse, deferredCredentialResponseJwt } =
           await issuer.createDeferredCredentialResponse({
@@ -285,6 +297,8 @@ describe('Credential Response Encryption', () => {
 
     callbacks.fetch = fetch
 
+    const decryptJweSpy = vi.spyOn(callbacks, 'decryptJwe')
+
     const result = await client.retrieveDeferredCredentials({
       issuerMetadata,
       accessToken: 'test-access-token',
@@ -292,6 +306,7 @@ describe('Credential Response Encryption', () => {
       credentialResponseEncryption,
     })
 
+    expect(decryptJweSpy).toHaveBeenCalledWith(expect.any(String), { jwk: credentialResponseEncryption.jwk })
     expect(result.deferredCredentialResponse.credentials).toEqual([{ credential: 'deferred-credential-value' }])
   })
 
@@ -344,6 +359,73 @@ describe('Credential Response Encryption', () => {
     ).rejects.toThrow(
       "Encryption was requested via 'credential_response_encryption' but the credential response was not encrypted"
     )
+  })
+
+  test('places the response encryption alg next to the jwk for a Draft 15 issuer', async () => {
+    const draft15Metadata = {
+      ...issuerMetadata,
+      credentialIssuer: {
+        ...credentialIssuerMetadata,
+        credential_request_encryption: undefined,
+      },
+      originalDraftVersion: Openid4vciVersion.Draft15,
+    } satisfies IssuerMetadataResult
+
+    const requestBodies: Record<string, unknown>[] = []
+    const fetchDraft15Issuer: typeof fetch = async (_input, init) => {
+      requestBodies.push(JSON.parse(init?.body as string))
+      return Response.json({ error: 'invalid_credential_request' }, { status: 400 })
+    }
+    const draft15Client = new Openid4vciClient({ callbacks: { ...callbacks, fetch: fetchDraft15Issuer } })
+
+    // Only the outgoing requests matter, so the issuer rejects both
+    const jwkAlgOnly = { jwk: { ...encryptionPublicJwk, alg: 'RSA-OAEP' }, enc: 'A256GCM' }
+    await expect(
+      draft15Client.retrieveCredentials({
+        issuerMetadata: draft15Metadata,
+        accessToken: 'test-access-token',
+        credentialConfigurationId: 'pidSdJwt',
+        credentialResponseEncryption: jwkAlgOnly,
+      })
+    ).rejects.toThrow('Error retrieving credentials')
+    await expect(
+      draft15Client.retrieveDeferredCredentials({
+        issuerMetadata: draft15Metadata,
+        accessToken: 'test-access-token',
+        transactionId: 'txn-draft15',
+        credentialResponseEncryption: jwkAlgOnly,
+      })
+    ).rejects.toThrow('Error retrieving deferred credentials')
+
+    expect(requestBodies.map((body) => body.credential_response_encryption)).toEqual([
+      { ...jwkAlgOnly, alg: 'RSA-OAEP' },
+      { ...jwkAlgOnly, alg: 'RSA-OAEP' },
+    ])
+  })
+
+  test('fails before sending when the response encryption alg is missing', async () => {
+    const fetchSpy = vi.fn<typeof fetch>()
+    const noFetchClient = new Openid4vciClient({ callbacks: { ...callbacks, fetch: fetchSpy } })
+    const missingAlg = { jwk: encryptionPublicJwk, enc: 'A256GCM' }
+    const expectedError = "The 'jwk' in 'credentialResponseEncryption' is missing the required 'alg' parameter."
+
+    await expect(
+      noFetchClient.retrieveCredentials({
+        issuerMetadata,
+        accessToken: 'test-access-token',
+        credentialConfigurationId: 'pidSdJwt',
+        credentialResponseEncryption: missingAlg,
+      })
+    ).rejects.toThrow(expectedError)
+    await expect(
+      noFetchClient.retrieveDeferredCredentials({
+        issuerMetadata,
+        accessToken: 'test-access-token',
+        transactionId: 'txn-missing-alg',
+        credentialResponseEncryption: missingAlg,
+      })
+    ).rejects.toThrow(expectedError)
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
 
