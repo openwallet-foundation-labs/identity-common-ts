@@ -470,6 +470,24 @@ export async function retrieveDeferredCredentials(
   }
 }
 
+/**
+ * OpenID4VCI 1.0 §10 requires the `alg` inside the response encryption `jwk`, while draft 14/15 require it next
+ * to the `jwk`, so the `alg` is placed where the issuer's version expects it.
+ */
+function withCredentialResponseEncryptionAlg(
+  credentialResponseEncryption: CredentialResponseEncryption,
+  version: Openid4vciVersion
+): CredentialResponseEncryption {
+  const alg = credentialResponseEncryption.jwk.alg ?? credentialResponseEncryption.alg
+  if (!alg) {
+    throw new Openid4vciError(`The 'jwk' in 'credentialResponseEncryption' is missing the required 'alg' parameter.`)
+  }
+
+  return version === Openid4vciVersion.V1
+    ? { ...credentialResponseEncryption, jwk: { ...credentialResponseEncryption.jwk, alg } }
+    : { ...credentialResponseEncryption, alg }
+}
+
 async function encodeCredentialRequest(options: {
   credentialRequest: Record<string, unknown>
   callbacks: RetrieveCredentialsBaseOptions['callbacks']
@@ -488,6 +506,17 @@ async function encodeCredentialRequest(options: {
     )
   }
 
+  const credentialRequest =
+    responseEncryptionRequested && responseEncryptionRequirementApplies
+      ? {
+          ...options.credentialRequest,
+          credential_response_encryption: withCredentialResponseEncryptionAlg(
+            options.credentialRequest.credential_response_encryption as CredentialResponseEncryption,
+            options.issuerMetadata.originalDraftVersion
+          ),
+        }
+      : options.credentialRequest
+
   const issuerRequiresEncryption = supported?.encryption_required === true
   const responseEncryptionRequiresEncryptedRequest =
     responseEncryptionRequested &&
@@ -500,7 +529,7 @@ async function encodeCredentialRequest(options: {
   if (!shouldEncrypt) {
     return {
       contentType: ContentType.Json,
-      body: JSON.stringify(options.credentialRequest),
+      body: JSON.stringify(credentialRequest),
     }
   }
 
@@ -557,7 +586,7 @@ async function encodeCredentialRequest(options: {
     kid: jwk.kid,
     enc,
   }
-  const { jwe } = await encryptJwe(encryptor, JSON.stringify(options.credentialRequest))
+  const { jwe } = await encryptJwe(encryptor, JSON.stringify(credentialRequest))
 
   return {
     contentType: ContentType.Jwt,
