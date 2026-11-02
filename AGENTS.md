@@ -30,7 +30,7 @@ CI installs with `--frozen-lockfile`, so commit `pnpm-lock.yaml` with every depe
 
 - Make the smallest change that solves the whole task, including the callers and tests it affects.
 - Reuse before you write: what the package has, then `@owf/identity-common`, the platform, and a dependency the package already uses. Don't add a dependency for a few lines.
-- No abstractions, options or configuration nobody asked for. Follow the structure and naming of the surrounding code.
+- No abstractions, options or configuration nobody asked for. Follow the structure of the surrounding code and the naming rules in [CONTRIBUTING.md](CONTRIBUTING.md#naming).
 - Comment only what the code can't show: why it does something, or the requirement of the specification it implements. Don't comment self-explanatory code. Exported functions and types get JSDoc.
 - Shorter code must not drop a check: keep the validation of untrusted input and the error handling.
 

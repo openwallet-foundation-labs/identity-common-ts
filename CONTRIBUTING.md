@@ -301,6 +301,16 @@ pnpm test
 - Avoid `any` - use `unknown` when type is truly unknown
 - Document public APIs with JSDoc comments
 
+### Naming
+
+- Function names are camelCase.
+- Object property names are camelCase, unless the object reflects a specification. Then the specification's syntax is leading, e.g. the snake_case of OpenID4VC.
+- Don't abbreviate, unless the abbreviation is the common term. Write abbreviations as words in camelCase to avoid ambiguity: `getJwtToken` and `useApiKey`, not `getJWTToken` and `useAPIKey`.
+- Prefer an options object over many positional arguments, e.g. `validateAccessCertificate(certificate, options)`.
+- Use names that explain themselves, e.g. `timeoutSeconds` instead of `timeout`, which could be seconds or milliseconds.
+
+Don't rename existing exports just to follow these rules: that is a breaking change.
+
 ### Platform Agnostic
 
 This library must work across Node.js, browsers, and React Native:
