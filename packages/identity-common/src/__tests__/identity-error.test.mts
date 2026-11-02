@@ -19,6 +19,10 @@ describe('IdentityError', () => {
   class NestedCustom extends Custom {}
   class NestedCommon extends IdentityCommonError {}
 
+  // Subclasses that leave the name to `IdentityError`, as most error classes in the repository do
+  class Unnamed extends IdentityError {}
+  class NestedUnnamed extends Unnamed {}
+
   it('can be caught as itself and as an Error', () => {
     const error = new IdentityError('something is off')
 
@@ -47,6 +51,25 @@ describe('IdentityError', () => {
     expect(new IdentityError('x').name).toBe('IdentityError')
     expect(new IdentityCommonError('x').name).toBe('IdentityCommonError')
     expect(new Custom('x').name).toBe('Custom')
+  })
+
+  it('names a subclass that does not set a name after that subclass', () => {
+    expect(new Unnamed('x').name).toBe('Unnamed')
+  })
+
+  it('names a subclass of such a subclass after the class that was constructed', () => {
+    expect(new NestedUnnamed('x').name).toBe('NestedUnnamed')
+  })
+
+  it('keeps the name a class sets itself for a subclass of it that sets none', () => {
+    expect(new NestedCustom('x').name).toBe('Custom')
+    expect(new NestedCommon('x').name).toBe('IdentityCommonError')
+  })
+
+  it('reports the name of a subclass that does not set one in the full message', () => {
+    expect(new Unnamed('something is off', { claim: 'iss' }).getFullMessage()).toBe(
+      'Unnamed: something is off - {"claim":"iss"}'
+    )
   })
 
   it('keeps the details and reports them in the full message', () => {

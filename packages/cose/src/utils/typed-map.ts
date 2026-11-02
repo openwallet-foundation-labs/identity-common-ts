@@ -1,3 +1,4 @@
+import { zodErrorMap } from '@owf/identity-common'
 import { z } from 'zod'
 import type zCore from 'zod/v4/core'
 
@@ -346,7 +347,7 @@ export function typedMap<const Entries extends EntriesBase>(
           continue
         }
 
-        const parseResult = valueSchema.safeParse(value)
+        const parseResult = valueSchema.safeParse(value, { error: zodErrorMap })
         if (!parseResult.success) {
           for (const issue of parseResult.error.issues) {
             ctx.addIssue({

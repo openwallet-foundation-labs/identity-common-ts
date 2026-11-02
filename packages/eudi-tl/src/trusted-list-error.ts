@@ -1,17 +1,19 @@
-import { validationErrorMessage } from '@owf/identity-common'
+import { IdentityError, validationErrorMessage } from '@owf/identity-common'
 import type { TrustedListValidationIssue } from './validate'
 
 /**
  * Base error for all trusted-list processing failures.
+ *
+ * Extends `IdentityError`, the base every error in these packages shares.
  */
-export class TrustedListError extends Error {
+export class TrustedListError extends IdentityError {
   // NOTE: declared explicitly rather than passing `{ cause }` to `super`, as the
   // project targets ES2020 and `Error.cause` was only added in ES2022.
   public readonly cause?: unknown
 
   constructor(message: string, options?: { cause?: unknown }) {
     super(message)
-    this.name = 'TrustedListError'
+    this.name = new.target.name
     this.cause = options?.cause
   }
 }

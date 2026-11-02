@@ -17,7 +17,10 @@ export class IdentityError extends Error {
     // The call is only needed when this compiles down to ES5, where `super()` becomes
     // `Error.call(this)` and returns a new object rather than initializing `this`.
     Object.setPrototypeOf(this, new.target.prototype)
-    this.name = 'IdentityError'
+
+    // Named after the class that was constructed for the same reason, so a subclass that does not
+    // set a name is not reported as an `IdentityError`. One that does set it overrides this.
+    this.name = new.target.name
     this.details = details
   }
 

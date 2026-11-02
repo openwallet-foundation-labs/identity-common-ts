@@ -29,7 +29,7 @@ describe('typedMap key labels', () => {
 
   it('names the key an invalid value sits under', () => {
     expect(parse(typedMap(entries, { keyLabels: ClaimKey }), new Map([[4, 'not-a-number']]))).toStrictEqual([
-      'Invalid input: expected number, received string @ ExpirationTime (4)',
+      'expected number, received string @ ExpirationTime (4)',
     ])
   })
 

@@ -29,6 +29,7 @@
     "build": "tsdown src/index.ts --format esm --dts --sourcemap"
   },
   "dependencies": {
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "zod-validation-error": "^5.0.0"
   }
 }

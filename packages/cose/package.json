@@ -31,7 +31,6 @@
   "dependencies": {
     "@owf/identity-common": "workspace:*",
     "cbor-x": "catalog:",
-    "zod": "catalog:",
-    "zod-validation-error": "^5.0.0"
+    "zod": "catalog:"
   }
 }
