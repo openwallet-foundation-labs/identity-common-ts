@@ -372,7 +372,7 @@ const zNoServiceStatus = z.undefined({ error: 'ServiceStatus must not be present
 const withoutServiceStatus = { strict: zNoServiceStatus, compat: zNoServiceStatus }
 
 // ETSI TS 119 602 H
-const pubEAAServiceStatus = serviceStatusOneOf([
+const pubEaaServiceStatus = serviceStatusOneOf([
   'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified',
   'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn',
 ])
@@ -494,8 +494,8 @@ export const profileDefinitions = {
       informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PubEAAProvider/',
       // A withdrawn Pub-EAA provider stays listed: only a notified one is trusted
       serviceStatus: {
-        strict: pubEAAServiceStatus,
-        compat: pubEAAServiceStatus,
+        strict: pubEaaServiceStatus,
+        compat: pubEaaServiceStatus,
       },
     },
   },

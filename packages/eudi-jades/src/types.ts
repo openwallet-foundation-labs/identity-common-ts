@@ -34,7 +34,7 @@ import type {
 } from './schemas'
 
 export type SignAlg = z.infer<typeof zSignAlg>
-export type OId = z.infer<typeof zOid>
+export type Oid = z.infer<typeof zOid>
 export type PkiObject = z.infer<typeof zPkiObject>
 export type TstToken = z.infer<typeof zTstToken>
 export type TstContainer = z.infer<typeof zTstContainer>

@@ -7,6 +7,6 @@ export enum KeyOps {
   UnwrapKey = 6,
   DeriveKey = 7,
   DeriveBits = 8,
-  MACCreate = 9,
-  MACVerify = 10,
+  MacCreate = 9,
+  MacVerify = 10,
 }

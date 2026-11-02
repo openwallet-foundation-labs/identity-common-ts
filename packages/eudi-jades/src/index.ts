@@ -71,7 +71,7 @@ export type {
   EtsiUClearInstance,
   FlattenedJws,
   GeneralJws,
-  OId,
+  Oid,
   PkiObject,
   ProtectedHeader,
   ProtectedHeaderParams,

@@ -65,7 +65,7 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
   //header type
   protected type?: string
 
-  public static readonly DEFAULT_hashAlg = 'sha-256'
+  public static readonly defaultHashAlg = 'sha-256'
 
   protected userConfig: SdJwtConfig<T> = {}
 
@@ -145,7 +145,7 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     this.validateDisclosureFrame<Payload>(disclosureFrame)
 
     const hasher = this.userConfig.hasher
-    const hashAlg = this.userConfig.hashAlg ?? SdJwtInstance.DEFAULT_hashAlg
+    const hashAlg = this.userConfig.hashAlg ?? SdJwtInstance.defaultHashAlg
     const allowedDisclosureHashAlgorithms =
       this.userConfig.allowedDisclosureHashAlgorithms ?? DEFAULT_SECURE_HASH_ALGORITHMS
     if (!allowedDisclosureHashAlgorithms.includes(hashAlg)) {
@@ -532,7 +532,7 @@ export class SdJwtGeneralJsonInstance<ExtendedPayload extends SdJwtPayload> {
   //header type
   protected type?: string
 
-  public static readonly DEFAULT_hashAlg = 'sha-256'
+  public static readonly defaultHashAlg = 'sha-256'
 
   protected userConfig: SdJwtConfig = {}
 
@@ -599,7 +599,7 @@ export class SdJwtGeneralJsonInstance<ExtendedPayload extends SdJwtPayload> {
     this.validateDisclosureFrame<Payload>(disclosureFrame)
 
     const hasher = this.userConfig.hasher
-    const hashAlg = this.userConfig.hashAlg ?? SdJwtInstance.DEFAULT_hashAlg
+    const hashAlg = this.userConfig.hashAlg ?? SdJwtInstance.defaultHashAlg
 
     const { packedClaims, disclosures } = await pack(
       payload,

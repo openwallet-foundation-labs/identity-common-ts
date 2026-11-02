@@ -192,7 +192,7 @@ export const zCertId = z
   .object({ digAlg: zDigestAlgorithm, digVal: zBase64Url, kid: zBase64.optional(), x5u: zUriReference.optional() })
   .strict()
 export const zXRefs = z.array(zCertId).min(1)
-const zCRLReference = z
+const zCrlReference = z
   .object({
     digAlg: zDigestAlgorithm,
     digVal: zBase64Url,
@@ -207,7 +207,7 @@ const zCRLReference = z
       .optional(),
   })
   .strict()
-const zOCSPReference = z
+const zOcspReference = z
   .object({
     ocspId: z
       .object({
@@ -222,8 +222,8 @@ const zOCSPReference = z
   .strict()
 export const zRRefs = z
   .object({
-    crlRefs: z.array(zCRLReference).min(1).optional(),
-    ocspRefs: z.array(zOCSPReference).min(1).optional(),
+    crlRefs: z.array(zCrlReference).min(1).optional(),
+    ocspRefs: z.array(zOcspReference).min(1).optional(),
     otherRefs: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
   })
   .strict()
