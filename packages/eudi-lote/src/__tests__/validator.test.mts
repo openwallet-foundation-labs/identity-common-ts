@@ -1,6 +1,6 @@
 import { decodeJwt } from '@owf/identity-common'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { assertValidLoTE, LoTEException, validateLoTE } from '../index'
+import { assertValidLoTE, getNotifiedTrustedEntities, LoTEException, validateLoTE } from '../index'
 import { LOTE_TYPES } from '../profiles'
 import type { CompatLoTEDocument, LoTEDocument } from '../types'
 import { LoTEProfile, type LoTEProfileDocument, type ValidationResult, validateLoTEProfile } from '../validator'
@@ -793,6 +793,36 @@ describe('LoTE Validator', () => {
       ])
     })
 
+    it('should leave out withdrawn services and the entities without a notified service', () => {
+      const lote = asProfile('PubEAA')
+      const entities = lote.LoTE.TrustedEntitiesList ?? []
+      const withdrawn = 'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn'
+      const [first, second] = entities.map((e) => e.TrustedEntityServices)
+      if (!first?.[0] || !second?.[0]) throw new Error('The PubEAA list has fewer than two services')
+      first[0].ServiceInformation.ServiceStatus = withdrawn
+      second.push({ ...second[0], ServiceInformation: { ...second[0].ServiceInformation, ServiceStatus: withdrawn } })
+
+      const result = validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList)
+      if (!result.valid) throw new Error('A list with withdrawn services is valid')
+      const notified = getNotifiedTrustedEntities(result.lote)
+      expect(result.notifiedTrustedEntities).toEqual(notified)
+
+      expect(notified).toEqual(
+        entities.slice(1).map((e, i) => (i === 0 ? { ...e, TrustedEntityServices: [e.TrustedEntityServices[0]] } : e))
+      )
+      expect(lote.LoTE.TrustedEntitiesList?.[1]?.TrustedEntityServices).toHaveLength(2)
+      expectTypeOf(notified).toEqualTypeOf<
+        NonNullable<LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList>['LoTE']['TrustedEntitiesList']>
+      >()
+    })
+
+    it('should keep every service of a profile without ServiceStatus', () => {
+      const result = validateLoTEProfile(decodeJwt(WRPACProvidersJWT).payload, LoTEProfile.EUWRPACProvidersList)
+      if (!result.valid) throw new Error('The WRPAC list is valid')
+
+      expect(getNotifiedTrustedEntities(result.lote)).toEqual(result.lote.LoTE.TrustedEntitiesList)
+    })
+
     it('should keep requiring a 2-letter country and a digital identity in the EU profiles', () => {
       const { payload: lote } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
       const entity = lote.LoTE.TrustedEntitiesList?.[0]
@@ -933,14 +963,11 @@ describe('LoTE Validator', () => {
     const service = 'LoTE.TrustedEntitiesList.0.TrustedEntityServices.0.ServiceInformation'
 
     it('should reject the German PID list in strict mode', () => {
-      const paths = validateLoTEProfile(germanPid(), LoTEProfile.EUPIDProvidersList, {
-        allowedTerritories: ['DE'],
-      }).errors.map((e) => e.path)
+      const paths = validateLoTEProfile(germanPid(), LoTEProfile.EUPIDProvidersList).errors.map((e) => e.path)
 
-      // The schema rejects the ServiceStatus, so the StatusStartingTime rule doesn't run
+      // The schema rejects the ServiceStatus, so the StatusStartingTime and SchemeTerritory rules don't run
       expect(paths).toContain(`${service}.ServiceStatus`)
       expect(paths).not.toContain(`${service}.StatusStartingTime`)
-      expect(paths).not.toContain('LoTE.ListAndSchemeInformation.SchemeTerritory')
     })
 
     it('should accept the German lists in compat mode with territory DE', () => {
@@ -956,7 +983,7 @@ describe('LoTE Validator', () => {
       })
     })
 
-    it('should only accept the allowed territories, in either mode', () => {
+    it('should only accept the allowed territories, in compat mode only', () => {
       const errors = (lote: LoTEDocument, allowedTerritories?: string[]) =>
         validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList, { mode: 'compat', allowedTerritories }).errors
 
@@ -971,9 +998,18 @@ describe('LoTE Validator', () => {
       expect(errors(germanPid(), ['EU', 'DE'])).toEqual([])
       expect(
         validateLoTEProfile(decodeJwt(EUPIDProvidersJWT).payload, LoTEProfile.EUPIDProvidersList, {
+          mode: 'compat',
           allowedTerritories: ['DE'],
         }).errors.map((e) => e.path)
       ).toEqual(['LoTEType', 'LoTE.ListAndSchemeInformation.SchemeTerritory'])
+
+      // TS 119 602 D to I: SchemeTerritory shall be EU
+      expect(() =>
+        validateLoTEProfile(decodeJwt(EUPIDProvidersJWT).payload, LoTEProfile.EUPIDProvidersList, {
+          // @ts-expect-error allowedTerritories is compat mode only
+          allowedTerritories: ['DE'],
+        })
+      ).toThrow(new LoTEException('allowedTerritories only applies in compat mode'))
     })
 
     it('should only accept the German notified status in compat mode, on a PID list', () => {
@@ -1086,9 +1122,13 @@ describe('LoTE Validator', () => {
         expect(information(result.lote)?.ServiceStatus).toBe(
           'http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified'
         )
+        expectTypeOf(result).not.toHaveProperty('notifiedTrustedEntities')
       } else {
         expectTypeOf(result.loteType).toEqualTypeOf<typeof LOTE_TYPES.EUPubEAAProvidersList>()
         expectTypeOf(result.lote).toEqualTypeOf<LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList, 'compat'>>()
+        expectTypeOf(result.notifiedTrustedEntities).toEqualTypeOf<
+          NonNullable<LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList, 'compat'>['LoTE']['TrustedEntitiesList']>
+        >()
       }
 
       expectTypeOf<LoTEProfileDocument<LoTEProfile.EUPIDProvidersList>>().toExtend<LoTEDocument>()

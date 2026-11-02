@@ -105,4 +105,10 @@ export type {
   ValidationError,
   ValidationResult,
 } from './validator'
-export { assertValidLoTE, LoTEProfile, validateLoTE, validateLoTEProfile } from './validator'
+export {
+  assertValidLoTE,
+  getNotifiedTrustedEntities,
+  LoTEProfile,
+  validateLoTE,
+  validateLoTEProfile,
+} from './validator'

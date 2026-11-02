@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod'
+import { LoTEException } from './lote-exception'
 import {
   type CompatLoTEDocumentSchema,
   CompatPolicyOrLegalNoticeListSchema,
@@ -32,10 +33,10 @@ export interface LoTEProfileValidationOptions<M extends LoTEValidationMode = LoT
   /** Defaults to `strict` */
   mode?: M
   /**
-   * The `SchemeTerritory` values to accept. Defaults to `['EU']`, which the profiles require;
-   * pass e.g. `['DE']` to accept a national list of an EU type.
+   * Compat mode only. The `SchemeTerritory` values to accept. Defaults to `['EU']`, which the
+   * profiles require (TS 119 602 D to I). Pass e.g. `['DE']` to accept a national list of an EU type.
    */
-  allowedTerritories?: readonly string[]
+  allowedTerritories?: M extends 'compat' ? readonly string[] : never
 }
 
 // What the profile refinements read, in strict and in compat mode
@@ -507,6 +508,9 @@ export const createProfileSchema = <const D extends ProfileDefinition, M extends
   { list, entities }: D,
   { mode = 'strict' as M, allowedTerritories }: LoTEProfileValidationOptions<M> = {}
 ) => {
+  if (mode !== 'compat' && allowedTerritories) {
+    throw new LoTEException('allowedTerritories only applies in compat mode')
+  }
   const serviceTypeIdentifiers = entities.serviceTypeIdentifiers as D['entities']['serviceTypeIdentifiers']
   const service = TrustedEntityServiceSchema.extend({
     ServiceInformation: ServiceInformationSchema.extend({

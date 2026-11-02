@@ -113,6 +113,7 @@ export type LoTEProfileDocument<P extends LoTEProfile, M extends LoTEValidationM
 /**
  * Validation result of `validateLoTEProfile`. When valid, `loteType` is the LoTEType of the
  * profile the document matches, and narrows `lote` to the `LoTEProfileDocument` of that profile.
+ * A Pub-EAA Providers List also has `notifiedTrustedEntities` (see `getNotifiedTrustedEntities`).
  */
 export type LoTEProfileValidationResult<P extends LoTEProfile, M extends LoTEValidationMode = 'strict'> =
   | (P extends LoTEProfile
@@ -121,7 +122,9 @@ export type LoTEProfileValidationResult<P extends LoTEProfile, M extends LoTEVal
           errors: ValidationError[]
           loteType: (typeof profileDefinitions)[P]['list']['loTEType']
           lote: LoTEProfileDocument<P, M>
-        }
+        } & (P extends LoTEProfile.EUPubEAAProvidersList
+          ? { notifiedTrustedEntities: NonNullable<LoTEProfileDocument<P, M>['LoTE']['TrustedEntitiesList']> }
+          : unknown)
       : never)
   | { valid: false; errors: ValidationError[] }
 
@@ -149,7 +152,10 @@ function getDocumentLoTEType(loteDocument: unknown): string | undefined {
  *
  * A valid Pub-EAA Providers List can list a service as
  * `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn` (TS 119 602 H): don't trust it.
- * @param options.allowedTerritories - The accepted `SchemeTerritory` values, `['EU']` by default.
+ * The valid result has them left out in `notifiedTrustedEntities`.
+ * @param options.allowedTerritories - Compat mode only. The accepted `SchemeTerritory` values,
+ * `['EU']` by default.
+ * @throws LoTEException if `allowedTerritories` is passed in strict mode
  * @returns Validation result with errors if invalid, or the LoTEType of the profile the document
  * matches and the document typed as the `LoTEProfileDocument` of that profile
  *
@@ -180,6 +186,12 @@ export function validateLoTEProfile<P extends LoTEProfile, M extends LoTEValidat
         errors: [],
         loteType: profileDefinitions[matchedProfile].list.loTEType,
         lote: loteDocument,
+        // Only a Pub-EAA Providers List can list withdrawn services (TS 119 602 H)
+        ...(matchedProfile === LoTEProfile.EUPubEAAProvidersList && {
+          notifiedTrustedEntities: getNotifiedTrustedEntities(
+            loteDocument as LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList>
+          ),
+        }),
       } as unknown as LoTEProfileValidationResult<P, M>
     }
 
@@ -209,4 +221,35 @@ export function validateLoTEProfile<P extends LoTEProfile, M extends LoTEValidat
       })),
     ],
   }
+}
+
+// A service without ServiceStatus is notified: only the PID compat and Pub-EAA profiles define one
+const NOTIFIED_SERVICE_STATUSES: readonly (string | undefined)[] = [
+  undefined,
+  'http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified',
+  'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified',
+]
+
+/**
+ * The trusted entities of a list validated with `validateLoTEProfile`, with only their notified
+ * services. This leaves out the withdrawn services a valid Pub-EAA Providers List can list
+ * (TS 119 602 H), and the entities that have no notified service left.
+ *
+ * @example
+ * ```typescript
+ * const result = validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList);
+ * if (result.valid) {
+ *   const trustedEntities = getNotifiedTrustedEntities(result.lote);
+ * }
+ * ```
+ */
+export function getNotifiedTrustedEntities<D extends LoTEProfileDocument<LoTEProfile, LoTEValidationMode>>(
+  lote: D
+): NonNullable<D['LoTE']['TrustedEntitiesList']> {
+  return (lote.LoTE.TrustedEntitiesList ?? []).flatMap((entity) => {
+    const services = entity.TrustedEntityServices.filter((service) =>
+      NOTIFIED_SERVICE_STATUSES.includes(service.ServiceInformation.ServiceStatus)
+    )
+    return services.length ? [{ ...entity, TrustedEntityServices: services }] : []
+  }) as NonNullable<D['LoTE']['TrustedEntitiesList']>
 }
