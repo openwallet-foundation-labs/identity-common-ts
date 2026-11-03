@@ -47,7 +47,8 @@ jobs:
         id: changesets
         uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          pr-title: "chore(release): new version"
+          # Release branches put their name in the title, e.g. "chore(release): new version (release/0.24.x)"
+          pr-title: "chore(release): new version${{ github.ref_name != 'main' && format(' ({0})', github.ref_name) || '' }}"
           commit-message: "chore(release): new version"
           publish-script: pnpm release
           version-script: pnpm changeset-version
