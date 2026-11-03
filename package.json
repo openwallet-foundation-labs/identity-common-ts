@@ -26,7 +26,7 @@
     "build": "pnpm -r build",
     "test": "vitest",
     "create-package": "node scripts/create-package.mjs",
-    "release": "pnpm packages:check && pnpm types:check && pnpm build && pnpm esm:check && pnpm changeset publish --no-git-tag 2>&1 | tee changeset-publish.log",
+    "release": "pnpm packages:check && pnpm types:check && pnpm build && pnpm esm:check && pnpm changeset publish 2>&1 | tee changeset-publish.log",
     "changeset-version": "pnpm changeset version && pnpm style:fix",
     "prepare": "husky"
   },

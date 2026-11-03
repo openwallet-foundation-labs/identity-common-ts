@@ -53,6 +53,10 @@ jobs:
           publish-script: pnpm release
           version-script: pnpm changeset-version
           push-with-git-cli: true
+          # changeset publish only reports what it published (the published-packages output) when it creates git tags. The
+          # tags stay local, and the steps below create one GitHub release per group instead of one per package.
+          create-github-releases: false
+          push-git-tags: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
