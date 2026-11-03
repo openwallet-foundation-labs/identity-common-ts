@@ -38,7 +38,11 @@ export async function fetchJarRequestObject(options: {
     method,
     body: method === 'post' ? objectToQueryParams(wallet.metadata ?? {}) : undefined,
     headers: {
-      Accept: createAcceptHeader([Oauth2MediaTypes.AuthorizationRequestJwt, CommonMediaTypes.Jwt, 'text/plain']),
+      Accept: createAcceptHeader([
+        Oauth2MediaTypes.AuthorizationRequestJwt,
+        CommonMediaTypes.Jwt,
+        CommonMediaTypes.TextPlain,
+      ]),
       'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
     },
   }).catch(() => {

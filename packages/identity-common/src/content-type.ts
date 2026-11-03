@@ -15,6 +15,7 @@ export const CommonMediaTypes = {
   JwkSet: 'application/jwk-set+json',
   Jwt: 'application/jwt',
   Html: 'text/html',
+  TextPlain: 'text/plain',
 } as const
 
 /**

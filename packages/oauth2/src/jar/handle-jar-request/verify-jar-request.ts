@@ -157,7 +157,11 @@ async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetc
   const response = await createFetcher(fetch)(requestUri, {
     method: 'get',
     headers: {
-      Accept: createAcceptHeader([Oauth2MediaTypes.AuthorizationRequestJwt, CommonMediaTypes.Jwt, 'text/plain']),
+      Accept: createAcceptHeader([
+        Oauth2MediaTypes.AuthorizationRequestJwt,
+        CommonMediaTypes.Jwt,
+        CommonMediaTypes.TextPlain,
+      ]),
       'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
     },
   }).catch(() => {
