@@ -32,6 +32,9 @@ const jwkCoseKeyMap = {
   },
   alg: {
     EdDSA: SignatureAlgorithm.EdDSA,
+    // RFC 9864 § 2.2: JOSE and COSE use the same names for the fully-specified EdDSA algorithms.
+    Ed25519: SignatureAlgorithm.Ed25519,
+    Ed448: SignatureAlgorithm.Ed448,
     ES256: SignatureAlgorithm.ES256,
     ES384: SignatureAlgorithm.ES384,
     ES512: SignatureAlgorithm.ES512,

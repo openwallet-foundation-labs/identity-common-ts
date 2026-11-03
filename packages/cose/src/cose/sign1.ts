@@ -43,25 +43,42 @@ export const sign1DecodedSchema = z.object({
 export type Sign1EncodedStructure = z.infer<typeof sign1EncodedSchema>
 export type Sign1DecodedStructure = z.infer<typeof sign1DecodedSchema>
 
-/** RFC 9864 § 2.1: the curve each fully-specified ECDSA algorithm is defined for. */
-const fullySpecifiedEcdsaCurves = new Map<SignatureAlgorithm, Curve>([
-  [SignatureAlgorithm.ESP256, Curve['P-256']],
-  [SignatureAlgorithm.ESP384, Curve['P-384']],
-  [SignatureAlgorithm.ESP512, Curve['P-521']],
-])
+const ecdsaCurves = [Curve['P-256'], Curve['P-384'], Curve['P-521']]
+const eddsaCurves = [Curve.Ed25519, Curve.Ed448]
 
 /**
- * A fully-specified algorithm fixes the curve of the key, so a key on another curve is rejected
- * rather than left to the context, which may pick the curve from the key alone.
+ * The key type and curves each signature algorithm accepts: RFC 9053 § 2.1 and § 2.2 for the
+ * polymorphic ECDSA and EdDSA algorithms, and RFC 9864 § 2.1 and § 2.2 for the fully-specified
+ * ones, which fix the curve. RSA keys have no `KeyType`, so the RSA algorithms are not listed.
+ */
+const signatureAlgorithmKeys = new Map<SignatureAlgorithm, { keyType: KeyType.Ec | KeyType.Okp; curves: Curve[] }>([
+  [SignatureAlgorithm.ES256, { keyType: KeyType.Ec, curves: ecdsaCurves }],
+  [SignatureAlgorithm.ES384, { keyType: KeyType.Ec, curves: ecdsaCurves }],
+  [SignatureAlgorithm.ES512, { keyType: KeyType.Ec, curves: ecdsaCurves }],
+  [SignatureAlgorithm.ESP256, { keyType: KeyType.Ec, curves: [Curve['P-256']] }],
+  [SignatureAlgorithm.ESP384, { keyType: KeyType.Ec, curves: [Curve['P-384']] }],
+  [SignatureAlgorithm.ESP512, { keyType: KeyType.Ec, curves: [Curve['P-521']] }],
+  [SignatureAlgorithm.EdDSA, { keyType: KeyType.Okp, curves: eddsaCurves }],
+  [SignatureAlgorithm.Ed25519, { keyType: KeyType.Okp, curves: [Curve.Ed25519] }],
+  [SignatureAlgorithm.Ed448, { keyType: KeyType.Okp, curves: [Curve.Ed448] }],
+])
+
+const keyTypeNames = { [KeyType.Ec]: 'EC2', [KeyType.Okp]: 'OKP' }
+
+/**
+ * Rejects a key the algorithm is not defined for, rather than leaving it to the context, which may
+ * pick the curve from the key alone. Only the key type and curve are compared: a key is valid for
+ * every algorithm that accepts them, whatever its own `alg`.
  */
 const assertKeyMatchesAlgorithm = (key: CoseKey, algorithm?: SignatureAlgorithm) => {
   if (algorithm === undefined) return
-  const curve = fullySpecifiedEcdsaCurves.get(algorithm)
-  if (curve === undefined) return
+  const requirement = signatureAlgorithmKeys.get(algorithm)
+  if (!requirement) return
 
-  if (key.keyType !== KeyType.Ec || key.curve !== curve) {
+  const { keyType, curves } = requirement
+  if (key.keyType !== keyType || key.curve === undefined || !curves.includes(key.curve)) {
     throw new CoseInvalidAlgorithmError(
-      `Algorithm ${SignatureAlgorithm[algorithm]} requires an EC key on curve ${Curve[curve]}`
+      `Algorithm ${SignatureAlgorithm[algorithm]} requires an ${keyTypeNames[keyType]} key on curve ${curves.map((curve) => Curve[curve]).join(' or ')}`
     )
   }
 }
