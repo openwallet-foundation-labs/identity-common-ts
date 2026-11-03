@@ -423,6 +423,30 @@ Releases are automated via GitHub Actions:
 2. A "Version Packages" PR is automatically created/updated
 3. Merging the Version PR triggers a release to npm
 
+### Releasing a Single Package
+
+The Version PR releases every package with a changeset. To release one package without the others, for example a fix, release it from a release branch that starts at the last release of the package:
+
+1. Create the branch from the tag of the last release, add the fix, and push the branch:
+
+   ```bash
+   git switch -c release/sd-jwt sd-jwt-v0.24.2
+   git cherry-pick <commit of the fix>
+   git push origin release/sd-jwt
+   ```
+
+   The branch needs the `release-package` job of `release.yml` and `scripts/release-package.mjs`. Cherry-pick them as well if the tag is older.
+
+2. Run the Release workflow on the branch with the name of the package:
+
+   ```bash
+   gh workflow run release.yml --ref release/sd-jwt -f package=@sd-jwt/sd-jwt-vc
+   ```
+
+   It versions the package and the other packages of its fixed group with only their changesets, and leaves the other changesets pending. It then publishes them to npm, pushes the version commit and the tag to the branch, and creates the GitHub release. It stops before publishing when a workspace dependency of the package has a pending changeset, because the package might use changes that aren't on npm, or when versioning also bumps other packages.
+
+3. Open a PR that cherry-picks the version commit onto `main`, so that `main` continues from the released version and doesn't release it again.
+
 ### Publishing New Packages
 
 > **Note:** Only project maintainers with publish access to the `@owf` npm scope can perform the initial package publish. If you're contributing a new package, coordinate with a maintainer to complete this step.
