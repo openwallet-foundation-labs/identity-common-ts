@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - release/*
 
 permissions:
   contents: read
@@ -46,11 +47,16 @@ jobs:
         id: changesets
         uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          pr-title: "chore(release): new version"
+          # Release branches put their name in the title, e.g. "chore(release): new version (release/0.24.x)"
+          pr-title: "chore(release): new version${{ github.ref_name != 'main' && format(' ({0})', github.ref_name) || '' }}"
           commit-message: "chore(release): new version"
           publish-script: pnpm release
           version-script: pnpm changeset-version
           push-with-git-cli: true
+          # changeset publish only reports what it published (the published-packages output) when it creates git tags. The
+          # tags stay local, and the steps below create one GitHub release per group instead of one per package.
+          create-github-releases: false
+          push-git-tags: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -63,45 +69,73 @@ jobs:
           echo "dcql_package_version=$(node -p "require('./packages/dcql/package.json').version")" >> $GITHUB_OUTPUT
           echo "openid4vc_package_version=$(node -p "require('./packages/oauth2/package.json').version")" >> $GITHUB_OUTPUT
 
+      - name: Write release notes
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.published-packages }}
+        run: |
+          node scripts/release-notes.mjs '@owf/*' '!@owf/mdoc' '!@owf/eudi-*' > "$RUNNER_TEMP/identity-common.md"
+          node scripts/release-notes.mjs '@sd-jwt/*' > "$RUNNER_TEMP/sd-jwt.md"
+          node scripts/release-notes.mjs '@owf/mdoc' > "$RUNNER_TEMP/mdoc.md"
+          node scripts/release-notes.mjs 'dcql' > "$RUNNER_TEMP/dcql.md"
+          node scripts/release-notes.mjs '@openid4vc/*' > "$RUNNER_TEMP/openid4vc.md"
+
+      # Each group gets a release only when it was published, so a release branch doesn't touch the other groups' releases
       - name: Create Github Release
-        if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
+        if: "startsWith(github.event.head_commit.message, 'chore(release): new version') && contains(steps.changesets.outputs.published-packages, '\"name\":\"@owf/identity-common\"')"
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          tag_name: v${{ steps.get_version.outputs.current_package_version }}
+          tag_name: identity-common-v${{ steps.get_version.outputs.current_package_version }}
+          target_commitish: ${{ github.sha }}
+          name: Identity Common v${{ steps.get_version.outputs.current_package_version }}
+          body_path: ${{ runner.temp }}/identity-common.md
 
       # @sd-jwt/* packages are versioned separately from @owf/*, so they get their own tag prefix
       - name: Create SD-JWT Github Release
-        if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
+        if: "startsWith(github.event.head_commit.message, 'chore(release): new version') && contains(steps.changesets.outputs.published-packages, '\"name\":\"@sd-jwt/core\"')"
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: sd-jwt-v${{ steps.get_version.outputs.sd_jwt_package_version }}
+          target_commitish: ${{ github.sha }}
+          name: SD-JWT v${{ steps.get_version.outputs.sd_jwt_package_version }}
+          body_path: ${{ runner.temp }}/sd-jwt.md
 
       # @owf/mdoc is versioned separately from the other @owf/* packages, so it gets its own tag prefix
       - name: Create mDOC Github Release
-        if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
+        if: "startsWith(github.event.head_commit.message, 'chore(release): new version') && contains(steps.changesets.outputs.published-packages, '\"name\":\"@owf/mdoc\"')"
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: mdoc-v${{ steps.get_version.outputs.mdoc_package_version }}
+          target_commitish: ${{ github.sha }}
+          name: mDOC v${{ steps.get_version.outputs.mdoc_package_version }}
+          body_path: ${{ runner.temp }}/mdoc.md
 
       # dcql is versioned separately from the other packages, so it gets its own tag prefix
       - name: Create DCQL Github Release
-        if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
+        if: "startsWith(github.event.head_commit.message, 'chore(release): new version') && contains(steps.changesets.outputs.published-packages, '\"name\":\"dcql\"')"
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: dcql-v${{ steps.get_version.outputs.dcql_package_version }}
+          target_commitish: ${{ github.sha }}
+          name: DCQL v${{ steps.get_version.outputs.dcql_package_version }}
+          body_path: ${{ runner.temp }}/dcql.md
 
       # @openid4vc/* packages are versioned separately from the other packages, so they get their own tag prefix
       - name: Create OpenID4VC Github Release
-        if: "startsWith(github.event.head_commit.message, 'chore(release): new version')"
+        if: "startsWith(github.event.head_commit.message, 'chore(release): new version') && contains(steps.changesets.outputs.published-packages, '\"name\":\"@openid4vc/oauth2\"')"
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: openid4vc-v${{ steps.get_version.outputs.openid4vc_package_version }}
+          target_commitish: ${{ github.sha }}
+          name: OpenID4VC v${{ steps.get_version.outputs.openid4vc_package_version }}
+          body_path: ${{ runner.temp }}/openid4vc.md
 
   release-unstable:
     runs-on: ubuntu-24.04
     name: Release Unstable
     needs: release-stable
-    if: always() && github.event_name == 'push' && needs.release-stable.outputs.published == 'false'
+    # Alpha snapshots only come from main, so they don't move the alpha tag to an older line
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-stable.outputs.published == 'false'
     env:
       NPM_CONFIG_PROVENANCE: "true"
     permissions:
@@ -153,9 +187,9 @@ jobs:
           OPENID4VC_PACKAGE_VERSION=$(node -p "require('./packages/oauth2/package.json').version")
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag v$CURRENT_PACKAGE_VERSION
+          git tag identity-common-v$CURRENT_PACKAGE_VERSION
           git tag sd-jwt-v$SD_JWT_PACKAGE_VERSION
           git tag mdoc-v$MDOC_PACKAGE_VERSION
           git tag dcql-v$DCQL_PACKAGE_VERSION
           git tag openid4vc-v$OPENID4VC_PACKAGE_VERSION
-          git push origin v$CURRENT_PACKAGE_VERSION sd-jwt-v$SD_JWT_PACKAGE_VERSION mdoc-v$MDOC_PACKAGE_VERSION dcql-v$DCQL_PACKAGE_VERSION openid4vc-v$OPENID4VC_PACKAGE_VERSION --no-verify
+          git push origin identity-common-v$CURRENT_PACKAGE_VERSION sd-jwt-v$SD_JWT_PACKAGE_VERSION mdoc-v$MDOC_PACKAGE_VERSION dcql-v$DCQL_PACKAGE_VERSION openid4vc-v$OPENID4VC_PACKAGE_VERSION --no-verify
