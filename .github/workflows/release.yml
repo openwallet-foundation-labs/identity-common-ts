@@ -85,7 +85,7 @@ jobs:
         if: "startsWith(github.event.head_commit.message, 'chore(release): new version') && contains(steps.changesets.outputs.published-packages, '\"name\":\"@owf/identity-common\"')"
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          tag_name: v${{ steps.get_version.outputs.current_package_version }}
+          tag_name: identity-common-v${{ steps.get_version.outputs.current_package_version }}
           target_commitish: ${{ github.sha }}
           name: Identity Common v${{ steps.get_version.outputs.current_package_version }}
           body_path: ${{ runner.temp }}/identity-common.md
@@ -187,9 +187,9 @@ jobs:
           OPENID4VC_PACKAGE_VERSION=$(node -p "require('./packages/oauth2/package.json').version")
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag v$CURRENT_PACKAGE_VERSION
+          git tag identity-common-v$CURRENT_PACKAGE_VERSION
           git tag sd-jwt-v$SD_JWT_PACKAGE_VERSION
           git tag mdoc-v$MDOC_PACKAGE_VERSION
           git tag dcql-v$DCQL_PACKAGE_VERSION
           git tag openid4vc-v$OPENID4VC_PACKAGE_VERSION
-          git push origin v$CURRENT_PACKAGE_VERSION sd-jwt-v$SD_JWT_PACKAGE_VERSION mdoc-v$MDOC_PACKAGE_VERSION dcql-v$DCQL_PACKAGE_VERSION openid4vc-v$OPENID4VC_PACKAGE_VERSION --no-verify
+          git push origin identity-common-v$CURRENT_PACKAGE_VERSION sd-jwt-v$SD_JWT_PACKAGE_VERSION mdoc-v$MDOC_PACKAGE_VERSION dcql-v$DCQL_PACKAGE_VERSION openid4vc-v$OPENID4VC_PACKAGE_VERSION --no-verify
