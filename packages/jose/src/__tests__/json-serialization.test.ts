@@ -9,7 +9,7 @@ import { parseJws } from '../jws/parse-jws'
 import { signCompactJws } from '../jws/sign-jws'
 import { verifyJwsSignature } from '../jws/verify-jws'
 import type { FlattenedJws, GeneralJws } from '../jws/z-jws'
-import { createEs256Context } from './context'
+import { createEs256Context, validationIssue } from './context'
 
 /** Matches a thrown error by its class and a part of its message. */
 const joseError = (type: { name: string }, message: string) =>
@@ -65,9 +65,7 @@ describe('the flattened JSON serialization', () => {
     ['a padded signature', { protected: protectedHeader, payload, signature: `${signature}==` }, 'signature'],
     ['a protected header in the standard base64 alphabet', { protected: 'ey+/', payload, signature }, 'protected'],
   ])('rejects %s', (_description, jws, member) => {
-    expect(() => parseJws({ jws })).toThrow(
-      joseError(JoseValidationError, `Expected an unpadded base64url encoded string at "${member}"`)
-    )
+    expect(() => parseJws({ jws })).toThrow(validationIssue([member], 'invalid_format'))
   })
 
   it('rejects a carried payload that is not base64url', () => {

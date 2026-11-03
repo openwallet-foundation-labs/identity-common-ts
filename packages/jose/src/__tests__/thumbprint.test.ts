@@ -1,8 +1,7 @@
-import { base64url, stringToBytes } from '@owf/identity-common'
+import { base64url, type HashAlgorithm, type Hasher, stringToBytes } from '@owf/identity-common'
 import * as referenceJose from 'jose'
 import { describe, expect, it } from 'vitest'
 import { JoseValidationError } from '../error'
-import { HashAlgorithm, type HashCallback } from '../hash'
 import { isJwkInSet } from '../jwk/jwks'
 import { calculateJwkThumbprint, calculateJwkThumbprintUri } from '../jwk/thumbprint'
 import type { Jwk } from '../jwk/z-jwk'
@@ -11,23 +10,19 @@ import type { Jwk } from '../jwk/z-jwk'
 const joseError = (type: { name: string }, message: string) =>
   expect.objectContaining({ name: type.name, message: expect.stringContaining(message) })
 
-const webCryptoHashes: Record<HashAlgorithm, string> = {
-  [HashAlgorithm.Sha256]: 'SHA-256',
-  [HashAlgorithm.Sha384]: 'SHA-384',
-  [HashAlgorithm.Sha512]: 'SHA-512',
-}
-
-const hashCallback: HashCallback = async (data, alg) =>
-  new Uint8Array(await globalThis.crypto.subtle.digest(webCryptoHashes[alg], data as Uint8Array<ArrayBuffer>))
+const hashCallback: Hasher = async (data, alg) =>
+  new Uint8Array(
+    await globalThis.crypto.subtle.digest(alg.toUpperCase(), typeof data === 'string' ? stringToBytes(data) : data)
+  )
 
 /**
  * The thumbprint of the JSON object written out in `canonicalJson`, computed without this package:
  * what the thumbprint of a key has to be when `canonicalJson` is the canonical form RFC 7638 gives it.
  */
-const thumbprintOf = async (canonicalJson: string, hashAlgorithm = HashAlgorithm.Sha256) =>
-  base64url.encode(await hashCallback(stringToBytes(canonicalJson), hashAlgorithm))
+const thumbprintOf = async (canonicalJson: string, hashAlgorithm: HashAlgorithm = 'sha-256') =>
+  base64url.encode(await hashCallback(canonicalJson, hashAlgorithm))
 
-const thumbprint = (jwk: Jwk, hashAlgorithm = HashAlgorithm.Sha256) =>
+const thumbprint = (jwk: Jwk, hashAlgorithm: HashAlgorithm = 'sha-256') =>
   calculateJwkThumbprint({ jwk, hashAlgorithm, hashCallback })
 
 // The key of RFC 7638 section 3.1
@@ -79,14 +74,11 @@ describe('calculateJwkThumbprint', () => {
     expect(await thumbprint(octJwk)).toBe(await thumbprintOf('{"k":"GawgguFyGrWKav7AX4VKUg","kty":"oct"}'))
   })
 
-  it.each([HashAlgorithm.Sha384, HashAlgorithm.Sha512])(
-    'computes the thumbprint with %s when asked to',
-    async (hash) => {
-      expect(await thumbprint(ecJwk, hash)).toBe(
-        await thumbprintOf(`{"crv":"P-256","kty":"EC","x":"${ecX}","y":"${ecY}"}`, hash)
-      )
-    }
-  )
+  it.each(['sha-384', 'sha-512'] as const)('computes the thumbprint with %s when asked to', async (hash) => {
+    expect(await thumbprint(ecJwk, hash)).toBe(
+      await thumbprintOf(`{"crv":"P-256","kty":"EC","x":"${ecX}","y":"${ecY}"}`, hash)
+    )
+  })
 
   it.each([
     ['EC', ecJwk],
@@ -121,10 +113,10 @@ describe('calculateJwkThumbprint', () => {
 
 describe('calculateJwkThumbprintUri', () => {
   it('names the hash algorithm in the URI', async () => {
-    const uri = await calculateJwkThumbprintUri({ jwk: ecJwk, hashAlgorithm: HashAlgorithm.Sha512, hashCallback })
+    const uri = await calculateJwkThumbprintUri({ jwk: ecJwk, hashAlgorithm: 'sha-512', hashCallback })
 
     expect(uri).toBe(
-      `urn:ietf:params:oauth:jwk-thumbprint:sha-512:${await thumbprintOf(`{"crv":"P-256","kty":"EC","x":"${ecX}","y":"${ecY}"}`, HashAlgorithm.Sha512)}`
+      `urn:ietf:params:oauth:jwk-thumbprint:sha-512:${await thumbprintOf(`{"crv":"P-256","kty":"EC","x":"${ecX}","y":"${ecY}"}`, 'sha-512')}`
     )
   })
 })

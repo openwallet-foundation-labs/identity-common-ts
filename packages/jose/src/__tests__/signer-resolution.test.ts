@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { VerifyJwsCallback } from '../callbacks'
-import { JoseSignerError, JoseValidationError } from '../error'
+import { JoseSignerError } from '../error'
 import { extractJwkFromJwkSet } from '../jwk/jwks'
 import { parseJws } from '../jws/parse-jws'
 import { jwsSignerFromHeader } from '../jws/signer'
 import { verifyJwsSignature } from '../jws/verify-jws'
 import { verifyJwt } from '../jwt/verify-jwt'
 import { certificateChain } from './certificates'
-import { unsignedCompactJws } from './context'
+import { unsignedCompactJws, validationIssue } from './context'
 
 /** Matches a thrown error by its class and a part of its message. */
 const joseError = (type: { name: string }, message: string) =>
@@ -209,16 +209,18 @@ describe('a jwk header parameter carrying private key material', () => {
   it('is rejected for a symmetric key', () => {
     const jws = unsignedCompactJws({ alg: 'HS256', jwk: { kty: 'oct', k: 'c2VjcmV0' } }, {})
 
-    expect(() => parseJws({ jws })).toThrow(joseError(JoseValidationError, `contains the private key member(s) 'k'`))
+    expect(() => parseJws({ jws })).toThrow(validationIssue(['jwk', 'k'], 'not_allowed'))
   })
 
   it('is rejected naming every private member of an RSA key', () => {
     const rsaPrivateJwk = { kty: 'RSA', n: 'bg', e: 'AQAB', d: 'ZA', p: 'cA', q: 'cQ', dp: 'ZHA', dq: 'ZHE', qi: 'cWk' }
     const jws = unsignedCompactJws({ alg: 'RS256', jwk: rsaPrivateJwk }, {})
 
-    expect(() => parseJws({ jws })).toThrow(
-      joseError(JoseValidationError, `contains the private key member(s) 'd', 'p', 'q', 'dp', 'dq', 'qi'`)
-    )
+    const verify = () => parseJws({ jws })
+
+    for (const member of ['d', 'p', 'q', 'dp', 'dq', 'qi']) {
+      expect(verify).toThrow(validationIssue(['jwk', member], 'not_allowed'))
+    }
   })
 
   it('never reaches the verification callback', async () => {
@@ -233,7 +235,7 @@ describe('a jwk header parameter carrying private key material', () => {
           return { verified: true, signerJwk: publicJwk }
         },
       })
-    ).rejects.toThrow(joseError(JoseValidationError, `contains the private key member(s) 'd'`))
+    ).rejects.toThrow(validationIssue(['jwk', 'd'], 'not_allowed'))
     expect(callbackCalled).toBe(false)
   })
 })

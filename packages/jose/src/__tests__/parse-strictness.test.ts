@@ -1,11 +1,11 @@
-import { base64, base64url, concatBytes, stringToBytes, ValidationError } from '@owf/identity-common'
+import { base64, base64url, concatBytes, stringToBytes, ValidationError, zTyp } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import z from 'zod'
-import { JoseCriticalHeaderError, JoseParseError, JoseValidationError, JoseVerificationError } from '../error'
+import { JoseError, JoseParseError, JoseValidationError } from '../error'
 import { parseJws } from '../jws/parse-jws'
 import { zJwsProtectedHeader } from '../jws/z-jws'
 import { decodeJwt } from '../jwt/decode-jwt'
-import { zJoseType } from '../utils/z-common'
+import { validationIssue } from './context'
 
 /**
  * What `parseJws` and `decodeJwt` accept, down to the byte: two encodings that decode to the same
@@ -83,7 +83,7 @@ describe('padding', () => {
     expect(header.length % 4).toBe(0)
 
     expect(() => decodeJwt({ jwt: `${header}A.${payload}.${signature}` })).toThrow(
-      joseError(JoseParseError, 'Unable to decode the JWS protected header, it is not valid base64url encoded JSON')
+      joseError(JoseParseError, 'the protected header of a compact JWS must be base64url')
     )
   })
 })
@@ -168,7 +168,9 @@ describe('JSON', () => {
     // do, so it is that one that has to be checked
     const duplicateAlg = encodeText('{"alg":"ES256","alg":"none"}')
 
-    expect(() => decodeJwt({ jwt: `${duplicateAlg}.${payload}.${signature}` })).toThrow(JoseParseError)
+    expect(() => decodeJwt({ jwt: `${duplicateAlg}.${payload}.${signature}` })).toThrow(
+      validationIssue(['alg'], 'invalid_value')
+    )
   })
 
   it('rejects an exp that JSON reads as Infinity', () => {
@@ -255,10 +257,7 @@ describe('crit', () => {
     const jws = `${encodeJson({ alg: 'ES256', crit: [name] })}.${payload}.${signature}`
 
     expect(() => parseJws({ jws, understoodCriticalParameters: [name] })).toThrow(
-      joseError(
-        JoseCriticalHeaderError,
-        `lists '${name}', which is a registered header parameter and must not be listed`
-      )
+      validationIssue(['crit', 0], 'invalid_crit')
     )
   })
 
@@ -276,7 +275,7 @@ describe('crit', () => {
     const jws = `${encodeJson({ alg: 'ES256', crit: ['sigT', 'sigD'], sigT: '2026-09-15T12:00:00Z', sigD: {} })}.${payload}.${signature}`
 
     expect(() => parseJws({ jws, understoodCriticalParameters: ['sigT'] })).toThrow(
-      joseError(JoseCriticalHeaderError, `lists 'sigD', which is not understood`)
+      validationIssue(['crit', 1], 'unsupported_crit')
     )
   })
 
@@ -293,7 +292,7 @@ describe('crit', () => {
     const jws = { payload, signatures: [{ protected: header, header: { crit: ['sigD'], sigD: {} }, signature }] }
 
     expect(() => parseJws({ jws, understoodCriticalParameters: ['sigD'] })).toThrow(
-      joseError(JoseCriticalHeaderError, `The 'crit' header parameter is present in the unprotected header`)
+      validationIssue(['crit'], 'invalid_crit')
     )
   })
 
@@ -344,7 +343,7 @@ describe('the protected and the unprotected header', () => {
   })
 
   it('does not satisfy a protected header schema with a typ that is only in the unprotected header', () => {
-    const protectedHeaderSchema = z.object({ ...zJwsProtectedHeader.shape, typ: zJoseType('example+jwt') }).loose()
+    const protectedHeaderSchema = z.object({ ...zJwsProtectedHeader.shape, typ: zTyp('example+jwt') }).loose()
     const jws = { protected: header, header: { typ: 'example+jwt' }, payload, signature }
 
     expect(() => parseJws({ jws, protectedHeaderSchema })).toThrow(
@@ -366,19 +365,13 @@ describe('the protected and the unprotected header', () => {
 })
 
 describe('typ, compared as a media type', () => {
-  const headerSchemaFor = (expected: string | [string, ...string[]]) =>
-    z.object({ ...zJwsProtectedHeader.shape, typ: zJoseType(expected) }).loose()
+  const headerSchemaFor = (...expected: [string, ...string[]]) =>
+    z.object({ ...zJwsProtectedHeader.shape, typ: zTyp(...expected) }).loose()
   const tokenWithTyp = (typ: string) => `${encodeJson({ alg: 'ES256', typ })}.${payload}.${signature}`
 
   it('accepts the expected typ in another casing', () => {
     expect(() =>
       decodeJwt({ jwt: tokenWithTyp('Example+JWT'), headerSchema: headerSchemaFor('example+jwt') })
-    ).not.toThrow()
-  })
-
-  it('accepts the expected typ with media type parameters', () => {
-    expect(() =>
-      decodeJwt({ jwt: tokenWithTyp('example+jwt; charset=utf-8'), headerSchema: headerSchemaFor('example+jwt') })
     ).not.toThrow()
   })
 
@@ -390,7 +383,7 @@ describe('typ, compared as a media type', () => {
 
   it('accepts any one of several expected types', () => {
     expect(() =>
-      decodeJwt({ jwt: tokenWithTyp('other+jwt'), headerSchema: headerSchemaFor(['example+jwt', 'other+jwt']) })
+      decodeJwt({ jwt: tokenWithTyp('other+jwt'), headerSchema: headerSchemaFor('example+jwt', 'other+jwt') })
     ).not.toThrow()
   })
 
@@ -404,11 +397,12 @@ describe('typ, compared as a media type', () => {
   })
 
   it.each([
-    ['only starts with the expected type', 'example+jwt2'],
-    ['is empty', ''],
-  ])('rejects a typ that %s', (_description, typ) => {
+    ['only starts with the expected type', 'example+jwt2', 'invalid_typ'],
+    ['has media type parameters', 'example+jwt; charset=utf-8', 'invalid_typ'],
+    ['is empty', '', 'too_small'],
+  ] as const)('rejects a typ that %s', (_description, typ, code) => {
     expect(() => decodeJwt({ jwt: tokenWithTyp(typ), headerSchema: headerSchemaFor('example+jwt') })).toThrow(
-      joseError(JoseValidationError, `Expected the media type to be 'example+jwt'`)
+      validationIssue(['typ'], code)
     )
   })
 })
@@ -416,24 +410,27 @@ describe('typ, compared as a media type', () => {
 describe('the errors a malformed token raises', () => {
   const tokenWithNumericAlg = `${encodeJson({ alg: 256 })}.${payload}.${signature}`
 
-  it('carries the issues of the schema as the details of a validation error', () => {
+  it('carries the issues of the schema on a validation error', () => {
     const error = errorThrownBy(() => decodeJwt({ jwt: tokenWithNumericAlg }))
 
-    expect(error).toMatchObject({ details: [expect.objectContaining({ code: 'invalid_type', path: ['alg'] })] })
+    expect(error).toMatchObject({ issues: [expect.objectContaining({ code: 'invalid_type', path: ['alg'] })] })
   })
 
-  it('raises a validation error that is a JoseParseError rather than the ValidationError of identity-common', () => {
+  it('raises a validation error that is the ValidationError of identity-common rather than a JoseError', () => {
     const error = errorThrownBy(() => decodeJwt({ jwt: tokenWithNumericAlg }))
 
-    expect(error).toBeInstanceOf(JoseParseError)
-    expect(error).not.toBeInstanceOf(ValidationError)
+    expect(error).toBeInstanceOf(ValidationError)
+    expect(error).not.toBeInstanceOf(JoseError)
   })
 
-  it('raises a critical parameter that is not understood as a verification error rather than a parse error', () => {
+  it('raises a critical parameter that is not understood as a validation error', () => {
     const jwt = `${encodeJson({ alg: 'ES256', crit: ['sigD'], sigD: {} })}.${payload}.${signature}`
     const error = errorThrownBy(() => decodeJwt({ jwt }))
 
-    expect(error).toBeInstanceOf(JoseVerificationError)
-    expect(error).not.toBeInstanceOf(JoseParseError)
+    expect(error).toBeInstanceOf(JoseValidationError)
+    expect((error as JoseValidationError).findIssue('unsupported_crit')?.context).toEqual({
+      parameter: 'sigD',
+      understood: [],
+    })
   })
 })

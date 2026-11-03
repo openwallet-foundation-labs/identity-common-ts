@@ -1,19 +1,14 @@
 import { base64url, stringToBytes } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import type { SignJwsCallback, VerifyJwsCallback } from '../callbacks'
-import {
-  JoseAlgorithmNotAllowedError,
-  JoseClaimVerificationError,
-  JoseCriticalHeaderError,
-  JoseParseError,
-  JoseSignatureVerificationError,
-} from '../error'
+import { JoseAlgorithmNotAllowedError, JoseParseError, JoseSignatureVerificationError } from '../error'
 import type { Jwk } from '../jwk/z-jwk'
 import { parseJws } from '../jws/parse-jws'
 import { signCompactJws } from '../jws/sign-jws'
 import { verifyJwsSignature } from '../jws/verify-jws'
 import { decodeJwt } from '../jwt/decode-jwt'
 import { verifyJwt } from '../jwt/verify-jwt'
+import { claimIssue, validationIssue } from './context'
 
 /**
  * The examples of the JOSE RFCs, verified with WebCrypto against the keys the RFCs give.
@@ -189,9 +184,7 @@ describe('RFC 7519 section 3.1: example JWT', () => {
         allowSymmetricAlgorithms: true,
         now: new Date('2011-03-22T18:43:31Z'),
       })
-    ).rejects.toThrow(
-      expect.objectContaining({ name: JoseClaimVerificationError.name, claim: 'exp', reason: 'expired' })
-    )
+    ).rejects.toThrow(claimIssue('exp', 'expired'))
   })
 })
 
@@ -260,7 +253,7 @@ describe('RFC 7515 Appendix A.4: ECDSA P-521 SHA-512', () => {
 })
 
 describe('RFC 7515 Appendix A.5: unsecured JWS', () => {
-  // Rejected both for its `alg` of `none` and for its empty signature, either of which is a parse error
+  // Rejected for its empty signature, a parse error, before its `alg` of `none` is looked at
   it('rejects the unsecured example as a JWS', () => {
     expect(() => parseJws({ jws: unsecuredExample })).toThrow(JoseParseError)
   })
@@ -376,7 +369,7 @@ describe('RFC 7797 section 4: the b64 header parameter', () => {
   it('rejects the example with an unencoded payload when the caller does not understand b64', () => {
     expect(() =>
       parseJws({ jws: `${unencodedPayloadHeader}..${unencodedPayloadSignature}`, detachedPayload: '$.02' })
-    ).toThrow(joseError(JoseCriticalHeaderError, `lists 'b64', which is not understood`))
+    ).toThrow(validationIssue(['crit', 0], 'unsupported_crit'))
   })
 })
 

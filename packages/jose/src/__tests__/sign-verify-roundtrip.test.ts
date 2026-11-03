@@ -2,13 +2,14 @@ import { base64url, stringToBytes } from '@owf/identity-common'
 import * as referenceJose from 'jose'
 import { describe, expect, it } from 'vitest'
 import type { SignJwsCallback, SignJwsCallbackContext, VerifyJwsCallback, VerifyJwsCallbackContext } from '../callbacks'
-import { JoseSignatureVerificationError, JoseValidationError } from '../error'
+import { JoseSignatureVerificationError } from '../error'
 import type { Jwk } from '../jwk/z-jwk'
 import { parseJws } from '../jws/parse-jws'
 import { signCompactJws } from '../jws/sign-jws'
 import { verifyJwsSignature } from '../jws/verify-jws'
 import { signJwt } from '../jwt/sign-jwt'
 import { verifyJwt } from '../jwt/verify-jwt'
+import { validationIssue } from './context'
 
 /**
  * Signing and verifying with real keys, through WebCrypto, for each algorithm a deployment is likely
@@ -247,7 +248,7 @@ describe('private key material', () => {
         signer: { method: 'custom', alg: 'ES256' },
         signJwsCallback,
       })
-    ).rejects.toThrow(joseError(JoseValidationError, `contains the private key member(s) 'd'`))
+    ).rejects.toThrow(validationIssue(['jwk', 'd'], 'not_allowed'))
     expect(calls).toEqual([])
   })
 
@@ -261,7 +262,7 @@ describe('private key material', () => {
         signer: { method: 'custom', alg: 'ES256' },
         signJwsCallback,
       })
-    ).rejects.toThrow(joseError(JoseValidationError, `contains the private key member(s) 'd'`))
+    ).rejects.toThrow(validationIssue(['cnf', 'jwk', 'd'], 'not_allowed'))
     expect(calls).toEqual([])
   })
 })
