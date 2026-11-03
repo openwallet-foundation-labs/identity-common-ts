@@ -138,21 +138,22 @@ describe('checkOverAsking', () => {
     expect(checkOverAsking(sdJwtQuery([{ path: ['given_name'] }]), spelledClaims).valid).toBe(true)
   })
 
-  it('reports a query that is not a DCQL query', () => {
+  it('reports the issues of a query that is not a DCQL query', () => {
     expect(codesAndPaths(checkOverAsking({ credential: [] }, registered))).toEqual([
-      { severity: 'error', code: CODES.INVALID_QUERY, path: ['credentials'] },
+      { severity: 'error', code: 'missing', path: ['credentials'] },
     ])
     expect(codesAndPaths(checkOverAsking(sdJwtQuery([{ id: 'no_path' }]), registered))).toEqual([
-      { severity: 'error', code: CODES.INVALID_QUERY, path: ['credentials', 0, 'claims', 0, 'path'] },
+      { severity: 'error', code: 'missing', path: ['credentials', 0, 'claims', 0, 'path'] },
     ])
-    // Checks of DcqlQuery.validate, which only give the member
     const pid = sdJwtQuery([{ path: ['given_name'] }]).credentials[0]
     expect(codesAndPaths(checkOverAsking({ credentials: [pid, pid] }, registered))).toEqual([
-      { severity: 'error', code: CODES.INVALID_QUERY, path: ['credentials'] },
+      { severity: 'error', code: 'duplicate_credential_query_id', path: ['credentials', 1, 'id'] },
     ])
     expect(
       codesAndPaths(checkOverAsking({ credentials: [pid], credential_sets: [{ options: [['other']] }] }, registered))
-    ).toEqual([{ severity: 'error', code: CODES.INVALID_QUERY, path: ['credential_sets'] }])
+    ).toEqual([
+      { severity: 'error', code: 'unknown_credential_query_id', path: ['credential_sets', 0, 'options', 0, 0] },
+    ])
   })
 
   it('reports every credential as not registered without a registration', () => {

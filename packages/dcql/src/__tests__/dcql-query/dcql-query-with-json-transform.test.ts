@@ -276,17 +276,23 @@ describe('DCQL Query With Json Transform', () => {
             },
             meta: {
               success: false,
-              issues: {
-                credential_format: ["Expected credential format to be 'dc+sd-jwt' but received 'mso_mdoc'"],
-                vct: [
-                  "Expected vct to be 'https://credentials.example.com/identity_credential' but received 'undefined'",
-                ],
-              },
-              output: {
-                cryptographic_holder_binding: true,
-                credential_format: 'mso_mdoc',
-                vct: undefined,
-              },
+              issues: [
+                {
+                  severity: 'error',
+                  code: 'credential_format_mismatch',
+                  path: ['credential_format'],
+                  message: "Expected credential format to be 'dc+sd-jwt' but received 'mso_mdoc'",
+                  context: { actual: 'mso_mdoc', expected: 'dc+sd-jwt' },
+                },
+                {
+                  severity: 'error',
+                  code: 'vct_mismatch',
+                  path: ['vct'],
+                  message:
+                    "Expected vct to be 'https://credentials.example.com/identity_credential' but received 'undefined'",
+                  context: { actual: undefined, expected: ['https://credentials.example.com/identity_credential'] },
+                },
+              ],
             },
             claims: {
               success: false,
@@ -294,14 +300,34 @@ describe('DCQL Query With Json Transform', () => {
                 {
                   claim_set_index: undefined,
                   success: false,
-                  issues: {
-                    last_name: ["Expected claim 'last_name' to be defined"],
-                    first_name: ["Expected claim 'first_name' to be defined"],
-                    address: ["Expected claim 'address'.'street_address' to be defined"],
-                    'org.iso.7367.1.vehicle_holder': [
-                      "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be 'Timo Glastra' but received 'Martin Auer'",
-                    ],
-                  },
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'claim_missing',
+                      path: ['last_name'],
+                      message: "Expected claim 'last_name' to be defined",
+                    },
+                    {
+                      severity: 'error',
+                      code: 'claim_missing',
+                      path: ['first_name'],
+                      message: "Expected claim 'first_name' to be defined",
+                    },
+                    {
+                      severity: 'error',
+                      code: 'claim_missing',
+                      path: ['address'],
+                      message: "Expected claim 'address'.'street_address' to be defined",
+                    },
+                    {
+                      severity: 'error',
+                      code: 'claim_value_mismatch',
+                      path: ['org.iso.7367.1', 'vehicle_holder'],
+                      message:
+                        "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be 'Timo Glastra' but received 'Martin Auer'",
+                      context: { actual: 'Martin Auer', expected: ['Timo Glastra'] },
+                    },
+                  ],
                   failed_claim_indexes: [0, 1, 2, 3],
                   valid_claim_indexes: undefined,
                 },
@@ -310,44 +336,56 @@ describe('DCQL Query With Json Transform', () => {
                 {
                   claim_id: undefined,
                   success: false,
-                  issues: {
-                    last_name: ["Expected claim 'last_name' to be defined"],
-                  },
-                  claim_index: 0,
-                  output: {},
-                },
-                {
-                  claim_id: undefined,
-                  success: false,
-                  issues: {
-                    first_name: ["Expected claim 'first_name' to be defined"],
-                  },
-                  claim_index: 1,
-                  output: {},
-                },
-                {
-                  claim_id: undefined,
-                  success: false,
-                  issues: {
-                    address: ["Expected claim 'address'.'street_address' to be defined"],
-                  },
-                  claim_index: 2,
-                  output: {},
-                },
-                {
-                  claim_id: undefined,
-                  success: false,
-                  issues: {
-                    'org.iso.7367.1.vehicle_holder': [
-                      "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be 'Timo Glastra' but received 'Martin Auer'",
-                    ],
-                  },
-                  claim_index: 3,
-                  output: {
-                    'org.iso.7367.1': {
-                      vehicle_holder: 'Martin Auer',
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'claim_missing',
+                      path: ['last_name'],
+                      message: "Expected claim 'last_name' to be defined",
                     },
-                  },
+                  ],
+                  claim_index: 0,
+                },
+                {
+                  claim_id: undefined,
+                  success: false,
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'claim_missing',
+                      path: ['first_name'],
+                      message: "Expected claim 'first_name' to be defined",
+                    },
+                  ],
+                  claim_index: 1,
+                },
+                {
+                  claim_id: undefined,
+                  success: false,
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'claim_missing',
+                      path: ['address'],
+                      message: "Expected claim 'address'.'street_address' to be defined",
+                    },
+                  ],
+                  claim_index: 2,
+                },
+                {
+                  claim_id: undefined,
+                  success: false,
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'claim_value_mismatch',
+                      path: ['org.iso.7367.1', 'vehicle_holder'],
+                      message:
+                        "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be 'Timo Glastra' but received 'Martin Auer'",
+                      context: { actual: 'Martin Auer', expected: ['Timo Glastra'] },
+                    },
+                  ],
+                  claim_index: 3,
                 },
               ],
               valid_claims: undefined,

@@ -1,14 +1,18 @@
-import * as v from 'valibot'
+import { z } from 'zod'
 import { DcqlParseError } from '../dcql-error/e-dcql.js'
-import { DcqlClaimsQuery } from '../dcql-query/m-dcql-claims-query.js'
+import type { DcqlClaimsQuery } from '../dcql-query/m-dcql-claims-query.js'
 import type { DcqlCredentialQuery } from '../dcql-query/m-dcql-credential-query.js'
 import type { DcqlClaimsResult } from '../dcql-query-result/m-claims-result.js'
 import {
+  addDcqlIssue,
   asNonEmptyArrayOrUndefined,
+  DCQL_VALIDATION_CODES,
   DcqlNotDisclosed,
   isNonEmptyArray,
+  isObject,
+  parseDcql,
   type ToNonEmptyArray,
-  type vBaseSchemaAny,
+  zMatch,
 } from '../u-dcql.js'
 import type { DcqlCredential } from '../u-dcql-credential.js'
 import { deepMerge } from '../util/deep-merge.js'
@@ -16,147 +20,133 @@ import { deepMerge } from '../util/deep-merge.js'
 const pathToString = (path: Array<string | null | number>) =>
   path.map((item) => (typeof item === 'string' ? `'${item}'` : `${item}`)).join('.')
 
-const getClaimParser = (path: Array<string | number | null>, values?: DcqlClaimsQuery.ClaimValue[]) => {
-  if (values) {
-    return v.union(
-      values.map((val) =>
-        v.literal(
-          val,
-          (i) =>
-            `Expected claim ${pathToString(path)} to be ${typeof val === 'string' ? `'${val}'` : val} but received ${typeof i.input === 'string' ? `'${i.input}'` : i.input}`
-        )
-      ),
-      (i) =>
-        `Expected claim ${pathToString(path)} to be ${values.map((v) => (typeof v === 'string' ? `'${v}'` : v)).join(' | ')} but received ${typeof i.input === 'string' ? `'${i.input}'` : i.input}`
-    )
-  }
+const formatValue = (value: unknown) => (typeof value === 'string' ? `'${value}'` : `${String(value)}`)
 
-  return v.pipe(
-    v.unknown(),
-    v.check(
-      (value) => value !== undefined && value !== (DcqlNotDisclosed as unknown),
-      `Expected claim '${path.join("'.'")}' to be defined`
-    )
-  )
-}
+// An issue of the parse of a nested value, re-added to the parse of the value it is in
+const nestedIssue = (issue: z.core.$ZodIssue, path: PropertyKey[]) =>
+  ({ ...issue, path: [...path, ...issue.path] }) as z.core.$ZodRawIssue
+
+const claimMissing = (message: string) => () => ({ code: DCQL_VALIDATION_CODES.CLAIM_MISSING, message })
+
+// An object or array along the claims path pointer, which is missing when the value is of another type
+const zClaimObject = (shape: z.core.$ZodShape, message: string) =>
+  zMatch<Record<string, unknown>>(isObject, claimMissing(message)).pipe(z.object(shape))
+const zClaimArray = (message: string) => zMatch<unknown[]>(Array.isArray, claimMissing(message))
+
+const getClaimParser = (path: Array<string | number | null>, values?: DcqlClaimsQuery.ClaimValue[]) =>
+  z.custom().superRefine((value, ctx) => {
+    if (value === undefined || value === DcqlNotDisclosed) {
+      addDcqlIssue(ctx, claimMissing(`Expected claim '${path.join("'.'")}' to be defined`)())
+    } else if (values && !values.includes(value as DcqlClaimsQuery.ClaimValue)) {
+      addDcqlIssue(ctx, {
+        code: DCQL_VALIDATION_CODES.CLAIM_VALUE_MISMATCH,
+        message: `Expected claim ${pathToString(path)} to be ${values.map(formatValue).join(' | ')} but received ${formatValue(value)}`,
+        context: { expected: values, actual: value },
+      })
+    }
+  })
 
 export const getMdocClaimParser = (claimQuery: DcqlClaimsQuery.Mdoc) => {
   // Normalize the query to the latest path syntax
-  const mdocPathQuery: DcqlClaimsQuery.MdocPath = v.is(DcqlClaimsQuery.vMdocNamespace, claimQuery)
-    ? {
-        id: claimQuery.id,
-        path: [claimQuery.namespace, claimQuery.claim_name],
-        values: claimQuery.values,
-      }
-    : claimQuery
+  const mdocPathQuery: DcqlClaimsQuery.MdocPath =
+    'namespace' in claimQuery
+      ? {
+          id: claimQuery.id,
+          path: [claimQuery.namespace, claimQuery.claim_name],
+          values: claimQuery.values,
+        }
+      : claimQuery
 
   const namespace = mdocPathQuery.path[0]
   const field = mdocPathQuery.path[1]
 
-  return v.object(
-    {
-      [namespace]: v.object(
-        {
-          [field]: getClaimParser(mdocPathQuery.path, claimQuery.values),
-        },
-        `Expected claim ${pathToString(mdocPathQuery.path)} to be defined`
-      ),
-    },
-    `Expected claim ${pathToString(mdocPathQuery.path)} to be defined`
+  const message = `Expected claim ${pathToString(mdocPathQuery.path)} to be defined`
+  return zClaimObject(
+    { [namespace]: zClaimObject({ [field]: getClaimParser(mdocPathQuery.path, claimQuery.values) }, message) },
+    message
   )
 }
 
 export const getJsonClaimParser = (
   claimQuery: DcqlClaimsQuery.W3cAndSdJwtVc,
   ctx: { index: number; presentation: boolean }
-): vBaseSchemaAny => {
+): z.ZodType => {
   const { index, presentation } = ctx
   const pathElement = claimQuery.path[index]
   const isLast = index === claimQuery.path.length - 1
 
-  const vClaimParser = getClaimParser(claimQuery.path, claimQuery.values)
+  const claimParser = getClaimParser(claimQuery.path, claimQuery.values)
+  const zArray = zClaimArray(`Expected path ${pathToString(claimQuery.path.slice(0, index + 1))} to be an array`)
 
   if (typeof pathElement === 'number') {
-    const elementParser = isLast ? vClaimParser : getJsonClaimParser(claimQuery, { ...ctx, index: index + 1 })
+    const elementParser = isLast ? claimParser : getJsonClaimParser(claimQuery, { ...ctx, index: index + 1 })
 
     if (presentation) {
-      return v.pipe(
-        v.array(v.any(), `Expected path ${pathToString(claimQuery.path.slice(0, index + 1))} to be an array`),
-        v.rawTransform(({ dataset, addIssue }) => {
-          const issues = []
-          for (const item of dataset.value) {
-            const itemResult = v.safeParse(elementParser, item)
+      return zArray.superRefine((value, ctx) => {
+        const arrayPath = pathToString(claimQuery.path.slice(0, index + 1))
+        const issues = []
+        for (const [itemIndex, item] of value.entries()) {
+          const itemResult = elementParser.safeParse(item, { reportInput: true })
 
-            if (itemResult.success) {
-              return dataset.value
-            }
+          if (itemResult.success) return
 
-            issues.push(itemResult.issues[0])
-          }
-
-          addIssue({
-            ...issues[0],
-            message: isLast
-              ? issues[0].message
-              : `Expected any element in array ${pathToString(claimQuery.path.slice(0, index + 1))} to match sub requirement but none matched: ${issues[0].message}`,
-          })
-
-          return dataset.value
-        })
-      )
-    }
-
-    return v.pipe(
-      v.array(v.any(), `Expected path ${pathToString(claimQuery.path.slice(0, index + 1))} to be an array`),
-      v.rawTransform(({ addIssue, dataset, NEVER }) => {
-        // Validate the specific element
-        const result = v.safeParse(elementParser, dataset.value[pathElement])
-        if (!result.success) {
-          addIssue(result.issues[0])
-          return NEVER
+          issues.push(nestedIssue(itemResult.error.issues[0], [itemIndex]))
         }
 
-        // We need to preserve array ordering, so we add DcqlNotDisclosed elements for all items
-        // before the current pathElement number
-        return [...dataset.value.slice(0, pathElement).map(() => DcqlNotDisclosed), result.output]
+        if (!issues[0]) {
+          addDcqlIssue(
+            ctx,
+            claimMissing(`Expected any element in array ${arrayPath} to match, but the array is empty`)()
+          )
+          return
+        }
+
+        ctx.addIssue({
+          ...issues[0],
+          message: isLast
+            ? issues[0].message
+            : `Expected any element in array ${arrayPath} to match sub requirement but none matched: ${issues[0].message}`,
+        })
       })
-    )
+    }
+
+    return zArray.transform((value, payload) => {
+      // Validate the specific element
+      const result = elementParser.safeParse(value[pathElement], { reportInput: true })
+      if (!result.success) {
+        payload.issues.push(nestedIssue(result.error.issues[0], [pathElement]))
+        return z.NEVER
+      }
+
+      // We need to preserve array ordering, so we add DcqlNotDisclosed elements for all items
+      // before the current pathElement number
+      return [...value.slice(0, pathElement).map(() => DcqlNotDisclosed), result.data]
+    })
   }
 
   if (typeof pathElement === 'string') {
-    return v.object(
-      {
-        [pathElement]: isLast ? vClaimParser : getJsonClaimParser(claimQuery, { ...ctx, index: index + 1 }),
-      },
+    return zClaimObject(
+      { [pathElement]: isLast ? claimParser : getJsonClaimParser(claimQuery, { ...ctx, index: index + 1 }) },
       `Expected claim ${pathToString(claimQuery.path)} to be defined`
     )
   }
 
-  return v.pipe(
-    v.array(v.any(), `Expected path ${pathToString(claimQuery.path.slice(0, index + 1))} to be an array`),
-    v.rawTransform(({ addIssue, dataset, NEVER }) => {
-      const mapped = dataset.value.map((item) => {
-        const parsed = v.safeParse(
-          isLast ? vClaimParser : getJsonClaimParser(claimQuery, { ...ctx, index: index + 1 }),
-          item
-        )
+  const itemParser = isLast ? claimParser : getJsonClaimParser(claimQuery, { ...ctx, index: index + 1 })
+  return zArray.transform((value, payload) => {
+    const mapped = value.map((item) => itemParser.safeParse(item, { reportInput: true }))
 
-        return parsed
-      })
-
-      if (mapped.every((parsed) => !parsed.success)) {
-        for (const parsed of mapped) {
-          for (const issue of parsed.issues) {
-            addIssue(issue)
-          }
+    if (mapped.every((parsed) => !parsed.success)) {
+      for (const [itemIndex, parsed] of mapped.entries()) {
+        for (const issue of parsed.error?.issues ?? []) {
+          payload.issues.push(nestedIssue(issue, [itemIndex]))
         }
-
-        return NEVER
       }
 
-      return mapped.map((parsed) => (parsed.success ? parsed.output : DcqlNotDisclosed))
-    })
-  )
+      return z.NEVER
+    }
+
+    return mapped.map((parsed) => (parsed.success ? parsed.data : DcqlNotDisclosed))
+  })
 }
 
 export const runClaimsQuery = (
@@ -184,16 +174,8 @@ export const runClaimsQuery = (
     }
   }
 
-  const failedClaims: Array<
-    v.InferOutput<typeof DcqlClaimsResult.vClaimsEntryFailureResult> & {
-      parser: vBaseSchemaAny
-    }
-  > = []
-  const validClaims: Array<
-    v.InferOutput<typeof DcqlClaimsResult.vClaimsEntrySuccessResult> & {
-      parser: vBaseSchemaAny
-    }
-  > = []
+  const failedClaims: Array<z.output<typeof DcqlClaimsResult.zClaimsEntryFailureResult>> = []
+  const validClaims: Array<z.output<typeof DcqlClaimsResult.zClaimsEntrySuccessResult>> = []
 
   for (const [claimIndex, claimQuery] of credentialQuery.claims.entries()) {
     const parser =
@@ -204,7 +186,7 @@ export const runClaimsQuery = (
             presentation: ctx.presentation,
           })
 
-    const parseResult = v.safeParse(
+    const parseResult = parseDcql(
       parser,
       ctx.credential.credential_format === 'mso_mdoc' ? ctx.credential.namespaces : ctx.credential.claims
     )
@@ -214,24 +196,20 @@ export const runClaimsQuery = (
         success: true,
         claim_index: claimIndex,
         claim_id: claimQuery.id,
-        output: parseResult.output,
-        parser,
+        output: parseResult.data as DcqlClaimsResult.ClaimsOutput,
       })
     } else {
-      const flattened = v.flatten(parseResult.issues)
       failedClaims.push({
         success: false,
-        issues: flattened.nested ?? flattened,
+        issues: parseResult.issues,
         claim_index: claimIndex,
         claim_id: claimQuery.id,
-        output: parseResult.output,
-        parser,
       })
     }
   }
 
-  const failedClaimSets: v.InferOutput<typeof DcqlClaimsResult.vClaimSetFailureResult>[] = []
-  const validClaimSets: v.InferOutput<typeof DcqlClaimsResult.vClaimSetSuccessResult>[] = []
+  const failedClaimSets: z.output<typeof DcqlClaimsResult.zClaimSetFailureResult>[] = []
+  const validClaimSets: z.output<typeof DcqlClaimsResult.zClaimSetSuccessResult>[] = []
 
   for (const [claimSetIndex, claimSet] of credentialQuery.claim_sets?.entries() ?? [[undefined, undefined]]) {
     const claims = claimSet?.map((id) => {
@@ -255,10 +233,9 @@ export const runClaimsQuery = (
         valid_claim_indexes: asNonEmptyArrayOrUndefined(claims.map((claim) => claim.claim_index)),
       })
     } else {
-      const issues = failedClaims.reduce((merged, claim) => deepMerge(claim.issues, merged), {})
       failedClaimSets.push({
         success: false,
-        issues,
+        issues: claims.flatMap((claim) => (claim.success ? [] : claim.issues)),
         claim_set_index: claimSetIndex,
         failed_claim_indexes: claims.filter((claim) => !claim.success).map((claim) => claim.claim_index) as [
           number,
@@ -276,8 +253,8 @@ export const runClaimsQuery = (
       success: true,
       failed_claim_sets: asNonEmptyArrayOrUndefined(failedClaimSets),
       valid_claim_sets: validClaimSets,
-      valid_claims: asNonEmptyArrayOrUndefined(validClaims.map(({ parser, ...rest }) => rest)),
-      failed_claims: asNonEmptyArrayOrUndefined(failedClaims.map(({ parser, ...rest }) => rest)),
+      valid_claims: asNonEmptyArrayOrUndefined(validClaims),
+      failed_claims: asNonEmptyArrayOrUndefined(failedClaims),
     }
   }
 
@@ -286,7 +263,7 @@ export const runClaimsQuery = (
   return {
     success: false,
     failed_claim_sets: failedClaimSets as ToNonEmptyArray<typeof failedClaimSets>,
-    failed_claims: failedClaims.map(({ parser, ...rest }) => rest) as ToNonEmptyArray<typeof failedClaims>,
-    valid_claims: asNonEmptyArrayOrUndefined(validClaims.map(({ parser, ...rest }) => rest)),
+    failed_claims: failedClaims as ToNonEmptyArray<typeof failedClaims>,
+    valid_claims: asNonEmptyArrayOrUndefined(validClaims),
   }
 }

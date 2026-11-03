@@ -1,3 +1,5 @@
+import { IdentityError } from '@owf/identity-common'
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && !Array.isArray(value) && typeof value === 'object'
 }
@@ -65,7 +67,8 @@ export function getDcqlErrorFromUnknown(cause: unknown): DcqlError {
 
 type DCQL_ERROR_CODE = 'PARSE_ERROR' | 'INTERNAL_SERVER_ERROR' | 'NOT_IMPLEMENTED' | 'BAD_REQUEST'
 
-export class DcqlError extends Error {
+/** The error of the `dcql` package */
+export class DcqlError extends IdentityError {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-expect-error override doesn't work in all environments due to "This member cannot have an 'override' modifier because it is not declared in the base class 'Error'"
   public override readonly cause?: Error
@@ -77,18 +80,12 @@ export class DcqlError extends Error {
     cause?: unknown
   }) {
     const cause = getCauseFromUnknown(opts.cause)
-    const message = opts.message ?? cause?.message ?? opts.code
-
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error https://github.com/tc39/proposal-error-cause
-    super(message, { cause })
+    super(opts.message ?? cause?.message ?? opts.code)
+    // IdentityError sets its own prototype, this restores the one of the subclass
+    Object.setPrototypeOf(this, new.target.prototype)
 
     this.code = opts.code
     this.name = 'DcqlError'
-
-    if (!this.cause) {
-      // < ES2022 / < Node 16.9.0 compatability
-      this.cause = cause
-    }
+    this.cause = cause
   }
 }
