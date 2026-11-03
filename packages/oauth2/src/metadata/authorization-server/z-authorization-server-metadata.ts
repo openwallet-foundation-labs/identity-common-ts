@@ -1,6 +1,7 @@
 import { zHttpsUrl } from '@openid4vc/utils'
+import { addValidationIssue } from '@owf/identity-common'
+import { zJwsAlg } from '@owf/jose'
 import z from 'zod'
-import { zAlgValueNotNone } from '../../common/z-common'
 
 const zKnownClientAuthenticationMethod = z.enum([
   'client_secret_basic',
@@ -24,7 +25,8 @@ export const zAuthorizationServerMetadata = z
     code_challenge_methods_supported: z.optional(z.array(z.string())),
 
     // RFC9449
-    dpop_signing_alg_values_supported: z.optional(z.array(z.string())),
+    // `none` is not allowed for DPoP (RFC 9449 Section 4.2)
+    dpop_signing_alg_values_supported: z.optional(z.array(zJwsAlg)),
 
     // RFC9126
     require_pushed_authorization_requests: z.optional(z.boolean()),
@@ -35,7 +37,7 @@ export const zAuthorizationServerMetadata = z
     introspection_endpoint_auth_methods_supported: z.optional(
       z.array(z.union([zKnownClientAuthenticationMethod, z.string()]))
     ),
-    introspection_endpoint_auth_signing_alg_values_supported: z.optional(z.array(zAlgValueNotNone)),
+    introspection_endpoint_auth_signing_alg_values_supported: z.optional(z.array(zJwsAlg)),
 
     // FiPA (no RFC yet)
     authorization_challenge_endpoint: z.optional(zHttpsUrl),
@@ -48,8 +50,8 @@ export const zAuthorizationServerMetadata = z
     'pre-authorized_grant_anonymous_access_supported': z.optional(z.boolean()),
 
     // OAuth 2.0 Attestation-Based Client Authentication (draft 09)
-    client_attestation_signing_alg_values_supported: z.optional(z.array(zAlgValueNotNone)),
-    client_attestation_pop_signing_alg_values_supported: z.optional(z.array(zAlgValueNotNone)),
+    client_attestation_signing_alg_values_supported: z.optional(z.array(zJwsAlg)),
+    client_attestation_pop_signing_alg_values_supported: z.optional(z.array(zJwsAlg)),
     // Endpoint from which the client can obtain a fresh challenge for the Client Attestation PoP JWT.
     challenge_endpoint: z.optional(zHttpsUrl),
 
@@ -60,23 +62,31 @@ export const zAuthorizationServerMetadata = z
     authorization_response_iss_parameter_supported: z.boolean().optional(),
   })
   .loose()
-  .refine(
-    ({
-      introspection_endpoint_auth_methods_supported: methodsSupported,
-      introspection_endpoint_auth_signing_alg_values_supported: algValuesSupported,
-    }) => {
-      if (!methodsSupported) return true
-      if (!methodsSupported.includes('private_key_jwt') && !methodsSupported.includes('client_secret_jwt')) return true
+  .superRefine((metadata, ctx) => {
+    const methodsSupported = metadata.introspection_endpoint_auth_methods_supported
+    if (
+      (methodsSupported?.includes('private_key_jwt') || methodsSupported?.includes('client_secret_jwt')) &&
+      !metadata.introspection_endpoint_auth_signing_alg_values_supported?.length
+    ) {
+      addValidationIssue(ctx, {
+        code: 'missing_value',
+        path: ['introspection_endpoint_auth_signing_alg_values_supported'],
+        message: `Metadata value 'introspection_endpoint_auth_signing_alg_values_supported' must be defined if metadata 'introspection_endpoint_auth_methods_supported' value contains values 'private_key_jwt' or 'client_secret_jwt'`,
+        context: { expected: 'array' },
+      })
+    }
 
-      return algValuesSupported !== undefined && algValuesSupported.length > 0
-    },
-    `Metadata value 'introspection_endpoint_auth_signing_alg_values_supported' must be defined if metadata 'introspection_endpoint_auth_methods_supported' value contains values 'private_key_jwt' or 'client_secret_jwt'`
-  )
-  .refine(
     // OpenID4VCI 1.1: require_interactive_authorization_request MUST NOT be present if interactive_authorization_endpoint is omitted
-    ({ require_interactive_authorization_request, interactive_authorization_endpoint }) =>
-      !require_interactive_authorization_request || interactive_authorization_endpoint !== undefined,
-    `Metadata value 'require_interactive_authorization_request' MUST NOT be present if 'interactive_authorization_endpoint' is omitted`
-  )
+    if (
+      metadata.require_interactive_authorization_request &&
+      metadata.interactive_authorization_endpoint === undefined
+    ) {
+      addValidationIssue(ctx, {
+        code: 'not_allowed',
+        path: ['require_interactive_authorization_request'],
+        message: `Metadata value 'require_interactive_authorization_request' MUST NOT be present if 'interactive_authorization_endpoint' is omitted`,
+      })
+    }
+  })
 
 export type AuthorizationServerMetadata = z.infer<typeof zAuthorizationServerMetadata>

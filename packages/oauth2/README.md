@@ -39,6 +39,8 @@ import { Oauth2AuthorizationServer, Oauth2Client, Oauth2ResourceServer } from '@
 ## Dependencies
 
 - [@openid4vc/utils](https://www.npmjs.com/package/@openid4vc/utils)
+- [@owf/identity-common](https://www.npmjs.com/package/@owf/identity-common)
+- [@owf/jose](https://www.npmjs.com/package/@owf/jose)
 - [zod](https://www.npmjs.com/package/zod)
 
 ## Platform Support

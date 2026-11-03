@@ -1,7 +1,9 @@
 import { authorizationCodeGrantIdentifier, preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
-import { describe, expect, test } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { setupServer } from 'msw/node'
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { callbacks } from '../../../../oauth2/src/__tests__/util.mjs'
-import { createCredentialOffer } from '../../credential-offer/credential-offer'
+import { createCredentialOffer, resolveCredentialOffer } from '../../credential-offer/credential-offer'
 import type { IssuerMetadataResult } from '../../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../../version'
 
@@ -21,7 +23,13 @@ const issuerMetadata = {
   knownCredentialConfigurations: {},
 } as const satisfies IssuerMetadataResult
 
+const server = setupServer()
+
 describe('Credential Offer', () => {
+  beforeAll(() => server.listen())
+  afterEach(() => server.resetHandlers())
+  afterAll(() => server.close())
+
   test('create credential offer', async () => {
     const { credentialOffer, credentialOfferObject } = await createCredentialOffer({
       credentialConfigurationIds: ['test'],
@@ -192,5 +200,38 @@ describe('Credential Offer', () => {
     ).rejects.toThrow(
       "Credential offer grant contains 'authorization_server' with value 'https://three.com' but credential issuer metadata does not include this authorization server. Available 'authorization_server' values are https://one.com, https://two.com."
     )
+  })
+
+  test('does not put the credential offer, which can carry the pre-authorized code, in the error message', async () => {
+    const offer = (credentialOffer: unknown) =>
+      `openid-credential-offer://?credential_offer=${encodeURIComponent(JSON.stringify(credentialOffer))}`
+    const secret = 'secret-pre-authorized-code'
+
+    const invalid = offer({ grants: { [preAuthorizedCodeGrantIdentifier]: { 'pre-authorized_code': secret } } })
+    await expect(resolveCredentialOffer(invalid)).rejects.toThrow(
+      expect.objectContaining({ issues: expect.any(Array) })
+    )
+    await expect(resolveCredentialOffer(invalid)).rejects.not.toThrow(secret)
+
+    const notJson = `openid-credential-offer://?credential_offer=${secret}`
+    await expect(resolveCredentialOffer(notJson)).rejects.not.toThrow(secret)
+  })
+
+  test('does not put a credential offer fetched from credential_offer_uri in the error message', async () => {
+    const secret = 'secret-pre-authorized-code'
+    const credentialOfferUri = 'https://issuer.example/offers/1'
+    const offerByUri = `openid-credential-offer://?credential_offer_uri=${encodeURIComponent(credentialOfferUri)}`
+    const body = JSON.stringify({ grants: { [preAuthorizedCodeGrantIdentifier]: { 'pre-authorized_code': secret } } })
+
+    for (const response of [
+      HttpResponse.text(body, { headers: { 'Content-Type': 'text/plain' } }),
+      HttpResponse.text(`${body}}`, { headers: { 'Content-Type': 'application/json' } }),
+      HttpResponse.text(body, { headers: { 'Content-Type': 'application/json' } }),
+    ]) {
+      server.use(http.get(credentialOfferUri, () => response, { once: true }))
+      const error = await resolveCredentialOffer(offerByUri).catch((e) => e)
+      expect(error).toBeInstanceOf(Error)
+      expect(error.message).not.toContain(secret)
+    }
   })
 })

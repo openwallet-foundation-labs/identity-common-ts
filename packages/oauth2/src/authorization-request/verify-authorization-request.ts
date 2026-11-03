@@ -1,3 +1,4 @@
+import type { Jwk } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import { type VerifiedClientAttestationJwt, verifyClientAttestation } from '../client-attestation/client-attestation'
 import type { VerifiedClientAttestationPopJwt } from '../client-attestation/client-attestation-pop'
@@ -5,7 +6,6 @@ import {
   oauthClientAttestationHeader,
   oauthClientAttestationPopHeader,
 } from '../client-attestation/z-client-attestation'
-import type { Jwk } from '../common/jwk/z-jwk'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { type DpopVerificationOptions, verifyDpopJwt } from '../dpop/dpop'
@@ -61,9 +61,9 @@ export interface VerifyAuthorizationRequestClientAttestation {
 
   /**
    * Allowed skew time in seconds for validity of the client attestation and client attestation pop
-   * jwts. Used for `exp` and `nbf` verification.
+   * jwts. Used for `exp`, `nbf` and `iat` verification.
    *
-   * @default 0
+   * @default 30
    */
   allowedSkewInSeconds?: number
 }
@@ -109,7 +109,7 @@ export interface VerifyAuthorizationRequestOptions {
    */
   now?: Date
 
-  callbacks: Pick<CallbackContext, 'hash' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'hash' | 'verifyJws'>
 }
 
 // TODO: verify the request against the metadata
@@ -145,7 +145,7 @@ export async function verifyAuthorizationRequest(
 async function verifyAuthorizationRequestClientAttestation(
   options: VerifyAuthorizationRequestClientAttestation,
   authorizationServerMetadata: AuthorizationServerMetadata,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   dpopJwkThumbprint?: string,
   now?: Date,
   requestClientId?: string
@@ -199,7 +199,7 @@ async function verifyAuthorizationRequestClientAttestation(
 async function verifyAuthorizationRequestDpop(
   options: VerifyAuthorizationRequestDpop,
   request: RequestLike,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   now?: Date
 ) {
   if (options.required && !options.jwt && !options.jwkThumbprint) {

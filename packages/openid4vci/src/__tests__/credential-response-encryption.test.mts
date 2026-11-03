@@ -1,11 +1,13 @@
 import crypto from 'node:crypto'
-import type { CallbackContext, Jwk } from '@openid4vc/oauth2'
+import type { CallbackContext } from '@openid4vc/oauth2'
 import { ContentType } from '@openid4vc/utils'
+import type { Jwk } from '@owf/jose'
 import * as jose from 'jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
-import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
+import { getSignJwsCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
+import { retrieveDeferredCredentials } from '../credential-request/retrieve-credentials.js'
 import {
   type CredentialConfigurationSupportedWithFormats,
   type CredentialRequestEncryption,
@@ -63,7 +65,7 @@ const decryptJwe: CallbackContext['decryptJwe'] = async (jwe) => {
 const callbacks = {
   ...partialCallbacks,
   fetch,
-  signJwt: getSignJwtCallback([credentialRequestProofJwk]),
+  signJws: getSignJwsCallback([credentialRequestProofJwk]),
   encryptJwe,
   decryptJwe,
 }
@@ -1104,4 +1106,33 @@ test('does not allow explicitly selecting a signing-only request encryption key'
       credentialRequestEncryption: { kid: 'signing-key' },
     })
   ).rejects.toThrow("Credential request encryption key with kid 'signing-key' is not intended for encryption.")
+})
+
+test('rejects a deferred credential response with another transaction_id as claim_value_mismatch', async () => {
+  server.resetHandlers(
+    http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, () =>
+      HttpResponse.json({ transaction_id: 'txn-other', interval: 5 })
+    )
+  )
+
+  const result = await retrieveDeferredCredentials({
+    callbacks,
+    issuerMetadata,
+    accessToken: 'test-access-token',
+    transactionId: 'txn-plain',
+  })
+
+  expect(result).toMatchObject({
+    ok: false,
+    deferredCredentialResponseResult: {
+      success: false,
+      issues: [
+        {
+          code: 'claim_value_mismatch',
+          path: ['transaction_id'],
+          context: { expected: ['txn-plain'], actual: 'txn-other' },
+        },
+      ],
+    },
+  })
 })

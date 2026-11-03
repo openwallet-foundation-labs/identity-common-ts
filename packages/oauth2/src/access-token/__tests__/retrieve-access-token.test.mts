@@ -1,7 +1,6 @@
+import { decodeJwt, type Jwk } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
-import { callbacks, getSignJwtCallback } from '../../__tests__/util.mjs'
-import type { Jwk } from '../../common/jwk/z-jwk'
-import { decodeJwt } from '../../common/jwt/decode-jwt'
+import { callbacks, getSignJwsCallback } from '../../__tests__/util.mjs'
 import { retrieveAuthorizationCodeAccessToken } from '../retrieve-access-token'
 
 const dpopSignerJwk = {
@@ -59,7 +58,7 @@ describe('retrieveAuthorizationCodeAccessToken', () => {
       callbacks: {
         ...callbacks,
         fetch: fetchMock,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       dpop: {
         signer: {

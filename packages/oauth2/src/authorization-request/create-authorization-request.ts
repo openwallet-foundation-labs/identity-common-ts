@@ -4,10 +4,10 @@ import {
   Headers,
   InvalidFetchResponseError,
   objectToQueryParams,
-  ValidationError,
 } from '@openid4vc/utils'
-import { type CallbackContext, HashAlgorithm } from '../callbacks'
-import { calculateJwkThumbprint } from '../common/jwk/jwk-thumbprint'
+import { ValidationError } from '@owf/identity-common'
+import { calculateJwkThumbprint } from '@owf/jose'
+import type { CallbackContext } from '../callbacks'
 import { zOauth2ErrorResponse } from '../common/z-oauth2-error'
 import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
 import { authorizationServerRequestWithDpopRetry } from '../dpop/dpop-retry'
@@ -25,7 +25,7 @@ export interface CreateAuthorizationRequestUrlOptions {
   /**
    * Callback context mostly for crypto related functionality
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'hash' | 'generateRandom' | 'signJwt' | 'clientAuthentication'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'hash' | 'generateRandom' | 'signJws' | 'clientAuthentication'>
 
   /**
    * Metadata of the authorization server for which to create the authorization request url
@@ -169,7 +169,7 @@ export async function createAuthorizationRequestUrl(options: CreateAuthorization
     // If not using PAR but dpop we include the `dpop_jkt` option
     if (options.dpop) {
       authorizationRequest.dpop_jkt = await calculateJwkThumbprint({
-        hashAlgorithm: HashAlgorithm.Sha256,
+        hashAlgorithm: 'sha-256',
         hashCallback: options.callbacks.hash,
         jwk: options.dpop.signer.publicJwk,
       })
@@ -258,7 +258,7 @@ async function pushAuthorizationRequest(options: PushAuthorizationRequestOptions
   }
 
   if (!result.success) {
-    throw new ValidationError('Error validating pushed authorization response', result.error)
+    throw new ValidationError('Error validating pushed authorization response', result.issues)
   }
 
   const dpopNonce = extractDpopNonceFromHeaders(response.headers)

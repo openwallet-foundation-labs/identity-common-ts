@@ -1,3 +1,4 @@
+import { isMediaType } from '@owf/identity-common'
 import type { FetchResponse } from './globals'
 
 export enum ContentType {
@@ -9,14 +10,13 @@ export enum ContentType {
   Html = 'text/html',
 }
 
+/** Whether `value` has the media type `contentType`, ignoring casing and parameters */
 export function isContentType(contentType: ContentType, value: string) {
-  return value.toLowerCase().includes(contentType)
+  return isMediaType(value, contentType)
 }
 
 export function isResponseContentType(contentType: ContentType | ContentType[], response: FetchResponse) {
   const contentTypeArray = Array.isArray(contentType) ? contentType : [contentType]
 
-  const header = response.headers.get('Content-Type')
-  if (!header) return false
-  return contentTypeArray.some((contentTypeEntry) => isContentType(contentTypeEntry, header))
+  return isMediaType(response.headers.get('Content-Type'), contentTypeArray)
 }

@@ -1,7 +1,6 @@
+import { decodeJwt, verifyJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import { extractJwkFromJwksForJwt } from '../common/jwk/jwks'
-import { decodeJwt } from '../common/jwt/decode-jwt'
-import { verifyJwt } from '../common/jwt/verify-jwt'
 import { Oauth2Error } from '../error/Oauth2Error'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
 import { fetchJwks } from '../metadata/fetch-jwks-uri'
@@ -16,12 +15,19 @@ export interface VerifyIdTokenJwtOptions {
   /**
    * Callbacks used for verifying the id token
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'fetch' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'fetch' | 'getJwks'>
 
   /**
    * If not provided current time will be used
    */
   now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 
   /**
    * Authorization server metadata
@@ -43,11 +49,12 @@ export interface VerifyIdTokenJwtOptions {
  * Verify an ID Token JWT.
  */
 export async function verifyIdTokenJwt(options: VerifyIdTokenJwtOptions) {
-  const { header, payload } = decodeJwt({
+  const decodedJwt = decodeJwt({
     jwt: options.idToken,
     headerSchema: zIdTokenJwtHeader,
     payloadSchema: zIdTokenJwtPayload,
   })
+  const { header, payload } = decodedJwt
 
   const jwksUrl = options.authorizationServer.jwks_uri
   if (!jwksUrl) {
@@ -74,13 +81,12 @@ export async function verifyIdTokenJwt(options: VerifyIdTokenJwtOptions) {
   })
 
   await verifyJwt({
-    compact: options.idToken,
-    header,
-    payload,
+    jwt: decodedJwt,
     signer: { method: 'jwk', publicJwk, alg: header.alg },
-    verifyJwtCallback: options.callbacks.verifyJwt,
+    verifyJwsCallback: options.callbacks.verifyJws,
     errorMessage: 'Error during verification of id token jwt.',
     now: options.now,
+    skewSeconds: options.allowedSkewInSeconds,
     expectedAudience: options.clientId,
     expectedIssuer: options.authorizationServer.issuer,
     expectedNonce: options.expectedNonce,

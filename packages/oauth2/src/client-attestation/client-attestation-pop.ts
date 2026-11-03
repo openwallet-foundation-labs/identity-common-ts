@@ -1,8 +1,6 @@
-import { dateToSeconds, encodeToBase64Url, parseWithErrorHandling } from '@openid4vc/utils'
+import { base64url, dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
+import { decodeJwt, type JwsSignerJwk, signJwt, verifyJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
-import { decodeJwt } from '../common/jwt/decode-jwt'
-import { verifyJwt } from '../common/jwt/verify-jwt'
-import type { JwtSignerJwk } from '../common/jwt/z-jwt'
 import { Oauth2Error } from '../error/Oauth2Error'
 import {
   type ClientAttestationJwtHeader,
@@ -38,7 +36,7 @@ export interface RequestClientAttestationOptions {
    *
    * Will be extracted from the client attestation if not provided.
    */
-  signer?: JwtSignerJwk
+  signer?: JwsSignerJwk
 }
 
 export async function createClientAttestationForRequest(
@@ -103,17 +101,17 @@ export interface VerifyClientAttestationPopJwtOptions {
   now?: Date
 
   /**
-   * Allowed skew time in seconds for validity of token. Used for `exp` and `nbf`
+   * Allowed skew time in seconds for validity of token. Used for `exp`, `nbf` and `iat`
    * verification.
    *
-   * @default 0
+   * @default 30
    */
   allowedSkewInSeconds?: number
 
   /**
    * Callbacks used for verifying client attestation pop jwt.
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'verifyJws'>
 
   /**
    * The parsed and verified client attestation jwt
@@ -126,11 +124,12 @@ export interface VerifyClientAttestationPopJwtOptions {
 
 export type VerifiedClientAttestationPopJwt = Awaited<ReturnType<typeof verifyClientAttestationPopJwt>>
 export async function verifyClientAttestationPopJwt(options: VerifyClientAttestationPopJwtOptions) {
-  const { header, payload } = decodeJwt({
+  const decodedJwt = decodeJwt({
     jwt: options.clientAttestationPopJwt,
     headerSchema: zClientAttestationPopJwtHeader,
     payloadSchema: zClientAttestationPopJwtPayload,
   })
+  const { header, payload } = decodedJwt
 
   // `iss` was removed from the Client Attestation PoP JWT in draft 08. Only validate it against
   // the client attestation `sub` when a legacy (<= draft 07) PoP JWT still includes it.
@@ -153,13 +152,11 @@ export async function verifyClientAttestationPopJwt(options: VerifyClientAttesta
       publicJwk: options.clientAttestation.payload.cnf.jwk,
     },
     now: options.now,
-    header,
-    payload,
+    jwt: decodedJwt,
     expectedAudience: options.expectedAudience ?? options.authorizationServer,
-    compact: options.clientAttestationPopJwt,
-    verifyJwtCallback: options.callbacks.verifyJwt,
+    verifyJwsCallback: options.callbacks.verifyJws,
     errorMessage: 'client attestation pop jwt verification failed',
-    allowedSkewInSeconds: options.allowedSkewInSeconds,
+    skewSeconds: options.allowedSkewInSeconds,
   })
 
   return {
@@ -204,7 +201,7 @@ export interface CreateClientAttestationPopJwtOptions {
   /**
    * Callback used for dpop
    */
-  callbacks: Pick<CallbackContext, 'generateRandom' | 'signJwt'>
+  callbacks: Pick<CallbackContext, 'generateRandom' | 'signJws'>
 
   /**
    * The signer of jwt. Only jwk signer allowed.
@@ -212,7 +209,7 @@ export interface CreateClientAttestationPopJwtOptions {
    * If not provided, the signer will be derived based on the
    * `cnf.jwk` and `alg` in the client attestation.
    */
-  signer?: JwtSignerJwk
+  signer?: JwsSignerJwk
 }
 
 export async function createClientAttestationPopJwt(options: CreateClientAttestationPopJwtOptions) {
@@ -238,15 +235,12 @@ export async function createClientAttestationPopJwt(options: CreateClientAttesta
   const payload = parseWithErrorHandling(zClientAttestationPopJwtPayload, {
     aud: options.authorizationServer,
     iat: dateToSeconds(options.issuedAt ?? new Date()),
-    jti: encodeToBase64Url(await options.callbacks.generateRandom(32)),
+    jti: base64url.encode(await options.callbacks.generateRandom(32)),
     challenge: options.challenge ?? options.nonce,
     ...options.additionalPayload,
   } satisfies ClientAttestationPopJwtPayload)
 
-  const { jwt } = await options.callbacks.signJwt(signer, {
-    header,
-    payload,
-  })
+  const { jwt } = await signJwt({ header, payload, signer: signer, signJwsCallback: options.callbacks.signJws })
 
   return jwt
 }

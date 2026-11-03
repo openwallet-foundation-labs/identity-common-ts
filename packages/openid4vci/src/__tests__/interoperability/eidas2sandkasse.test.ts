@@ -1,4 +1,4 @@
-import { jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray } from '@openid4vc/oauth2'
+import { jwaSignatureAlgorithmsToCoseAlgorithms } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
 import { zCredentialIssuerMetadataWithDraftVersion } from '../../metadata/credential-issuer/z-credential-issuer-metadata'
 import { eidas2sandkasseCredentialIssuerMetadataJson } from './eidas2sandkasse-credential-issuer-metadata-json'
@@ -13,7 +13,7 @@ const eidas2sandkasseCredentialIssuerMetadataJsonFixes = {
         credentialConfiguration.format === 'mso_mdoc'
           ? {
               ...credentialConfiguration,
-              credential_signing_alg_values_supported: jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray(
+              credential_signing_alg_values_supported: jwaSignatureAlgorithmsToCoseAlgorithms(
                 credentialConfiguration.credential_signing_alg_values_supported
               ),
             }

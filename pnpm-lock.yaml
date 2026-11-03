@@ -322,6 +322,12 @@ importers:
       '@openid4vc/utils':
         specifier: workspace:^
         version: link:../openid4vc-utils
+      '@owf/identity-common':
+        specifier: workspace:^
+        version: link:../identity-common
+      '@owf/jose':
+        specifier: workspace:^
+        version: link:../jose
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -340,15 +346,9 @@ importers:
       '@owf/identity-common':
         specifier: workspace:^
         version: link:../identity-common
-      buffer:
-        specifier: ^6.0.3
-        version: 6.0.3
       zod:
         specifier: 'catalog:'
         version: 4.6.7
-      zod-validation-error:
-        specifier: ^5.0.0
-        version: 5.0.0(zod@4.6.7)
 
   packages/openid4vci:
     dependencies:
@@ -361,6 +361,9 @@ importers:
       '@owf/identity-common':
         specifier: workspace:^
         version: link:../identity-common
+      '@owf/jose':
+        specifier: workspace:^
+        version: link:../jose
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -373,6 +376,12 @@ importers:
       '@openid4vc/utils':
         specifier: workspace:^
         version: link:../openid4vc-utils
+      '@owf/identity-common':
+        specifier: workspace:^
+        version: link:../identity-common
+      '@owf/jose':
+        specifier: workspace:^
+        version: link:../jose
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -1537,15 +1546,9 @@ packages:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
 
-  base64-js@1.5.1:
-    resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
-
   braces@3.0.3:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
-
-  buffer@6.0.3:
-    resolution: {integrity: sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==}
 
   bytestreamjs@2.0.1:
     resolution: {integrity: sha512-U1Z/ob71V/bXfVABvNr/Kumf5VyeQRBEm6Txb0PQ6S7V5GpBM3w4Cbqz/xPDicR5tN0uvDifng8C+5qECeGwyQ==}
@@ -1752,9 +1755,6 @@ packages:
     resolution: {integrity: sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA==}
     engines: {node: '>=18'}
     hasBin: true
-
-  ieee754@1.2.1:
-    resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
 
   ignore@7.0.13:
     resolution: {integrity: sha512-2E8Q6rh+1RRSq/YdaGsNfXsEZy9FVqv6BSSrkmZJP7BnaoPnRfKL+YaofPvP+5rzdk144qSm6i4+hvPgUcbV4Q==}
@@ -2497,12 +2497,6 @@ packages:
   yuku-parser@0.19.0:
     resolution: {integrity: sha512-XrBh9ZiQK5mJVRxZBAvD6LwRyAYrK3MFtH3+onyuxFL5hFD44EC3QOmIC1FjTj6H2MMwq46/NAI+NZxLZPZgxg==}
     engines: {node: '>=14.18.0'}
-
-  zod-validation-error@5.0.0:
-    resolution: {integrity: sha512-hmk+pkyKq7Q71PiWVSDUc3VfpzpvcRHZ3QPw9yEMVvmtCekaMeOHnbr3WbxfrgEnQTv6haGP4cmv0Ojmihzsxw==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      zod: ^3.25.0 || ^4.0.0
 
   zod@4.6.7:
     resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
@@ -3351,16 +3345,9 @@ snapshots:
 
   assertion-error@2.0.1: {}
 
-  base64-js@1.5.1: {}
-
   braces@3.0.3:
     dependencies:
       fill-range: 7.1.1
-
-  buffer@6.0.3:
-    dependencies:
-      base64-js: 1.5.1
-      ieee754: 1.2.1
 
   bytestreamjs@2.0.1: {}
 
@@ -3552,8 +3539,6 @@ snapshots:
   human-id@4.2.1: {}
 
   husky@9.1.7: {}
-
-  ieee754@1.2.1: {}
 
   ignore@7.0.13: {}
 
@@ -4372,9 +4357,5 @@ snapshots:
     dependencies:
       '@yuku-toolchain/types': 0.19.0
       yuku-core: 0.19.0
-
-  zod-validation-error@5.0.0(zod@4.6.7):
-    dependencies:
-      zod: 4.6.7
 
   zod@4.6.7: {}

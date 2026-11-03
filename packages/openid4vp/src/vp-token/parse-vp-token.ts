@@ -1,4 +1,5 @@
-import { parseIfJson, parseWithErrorHandling } from '@openid4vc/utils'
+import { parseIfJson } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import { type VpTokenPresentationEntry, zVpTokenDcql, zVpTokenPex } from './z-vp-token'
 
 export function parsePexVpToken(vpToken: unknown): [VpTokenPresentationEntry, ...VpTokenPresentationEntry[]] {

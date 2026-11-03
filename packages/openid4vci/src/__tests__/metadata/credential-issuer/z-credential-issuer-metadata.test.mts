@@ -1,9 +1,12 @@
+import { parseWithSchema, zodErrorMap } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
 import type { $ZodIssueInvalidUnion } from 'zod/v4/core'
 import {
   zCredentialConfigurationSupportedWithFormats,
   zCredentialIssuerMetadata,
   zCredentialIssuerMetadataDraft11ToV1,
+  zCredentialIssuerMetadataDraft14Draft15V1,
+  zCredentialIssuerMetadataWithDraft11,
   zCredentialIssuerMetadataWithDraftVersion,
 } from '../../../metadata/credential-issuer/z-credential-issuer-metadata'
 import { Openid4vciVersion } from '../../../version'
@@ -23,20 +26,28 @@ describe('Credential Issuer Metadata', () => {
       success: true,
     })
 
-    const parseResult = zCredentialConfigurationSupportedWithFormats.safeParse({
+    const parseResult = parseWithSchema(zCredentialConfigurationSupportedWithFormats, {
       format: 'vc+sd-jwt',
       // vct should be required if format is vc+sd-jwt
       // vct: 'SD_JWT_VC_example_in_OpenID4VCI',
     })
 
-    // Incorrect: sd-jwt without vct
+    // Incorrect: sd-jwt without vct. The issues of the format specific schema keep their code.
     expect(parseResult.success).toBe(false)
-    expect((parseResult.error?.issues[0] as $ZodIssueInvalidUnion)?.errors[0][0]).toEqual({
-      code: 'invalid_type',
-      // FIXME(vc+sd-jwt): fix expected to be 'string' when dropping support for legacy vc+sd-jwt format.
-      expected: 'object',
-      path: ['credential_definition'],
-      message: 'expected object, received undefined',
+    expect(parseResult.success ? undefined : parseResult.issues[0].context).toMatchObject({
+      branches: expect.arrayContaining([
+        [
+          {
+            severity: 'error',
+            code: 'missing_value',
+            // FIXME(vc+sd-jwt): fix expected to be 'string' when dropping support for legacy vc+sd-jwt format.
+            context: { expected: 'object' },
+            path: ['credential_definition'],
+            message: 'expected object, received undefined',
+          },
+        ],
+        [expect.objectContaining({ code: 'missing_value', path: ['vct'] })],
+      ]),
     })
 
     // Correct: mso mdoc with doctype
@@ -52,11 +63,14 @@ describe('Credential Issuer Metadata', () => {
     })
 
     // Incorrect: mso mdoc without doctype
-    const parseResultMdoc = zCredentialConfigurationSupportedWithFormats.safeParse({
-      format: 'mso_mdoc',
-      // doctype should be required if format is mso_mdoc
-      // doctype: 'org.iso.18013.5.1.mDL',
-    })
+    const parseResultMdoc = zCredentialConfigurationSupportedWithFormats.safeParse(
+      {
+        format: 'mso_mdoc',
+        // doctype should be required if format is mso_mdoc
+        // doctype: 'org.iso.18013.5.1.mDL',
+      },
+      { error: zodErrorMap }
+    )
     expect(parseResultMdoc.success).toEqual(false)
     expect(parseResultMdoc.error?.issues[0]).toMatchObject({
       code: 'invalid_union',
@@ -370,5 +384,49 @@ describe('Credential Issuer Metadata', () => {
         credential_request_encryption: credentialRequestEncryption,
       }).success
     ).toBe(false)
+  })
+
+  // OpenID4VCI 1.0 Section 12.2.4: every key in credential_request_encryption.jwks MUST have a unique kid
+  test('rejects a duplicate kid in credential request encryption metadata as invalid_value at the second kid', () => {
+    expect(
+      parseWithSchema(zCredentialIssuerMetadataDraft14Draft15V1, {
+        credential_issuer: 'https://credential-issuer.com',
+        credential_endpoint: 'https://credential-issuer.com/credential',
+        credential_configurations_supported: {},
+        credential_request_encryption: {
+          jwks: {
+            keys: [
+              { kty: 'EC', kid: 'request-key', alg: 'ECDH-ES' },
+              { kty: 'EC', kid: 'request-key', alg: 'ECDH-ES' },
+            ],
+          },
+          enc_values_supported: ['A128GCM'],
+          encryption_required: false,
+        },
+      })
+    ).toMatchObject({
+      success: false,
+      issues: [
+        {
+          code: 'invalid_value',
+          path: ['credential_request_encryption', 'jwks', 'keys', 1, 'kid'],
+          message: "Duplicate JWK kid 'request-key'",
+        },
+      ],
+    })
+  })
+
+  // The draft 11 id is the key of the credential configuration, so only an empty id can be missing
+  test('rejects a credential configuration without id in draft 11 metadata as missing_value', () => {
+    expect(
+      parseWithSchema(zCredentialIssuerMetadataWithDraft11, {
+        credential_issuer: 'https://credential-issuer.com',
+        credential_endpoint: 'https://credential-issuer.com/credential',
+        credential_configurations_supported: { '': { format: 'vc+sd-jwt', vct: 'some-vct' } },
+      })
+    ).toMatchObject({
+      success: false,
+      issues: [{ code: 'missing_value', path: ['credentials_supported', 0, 'id'], context: { expected: 'string' } }],
+    })
   })
 })

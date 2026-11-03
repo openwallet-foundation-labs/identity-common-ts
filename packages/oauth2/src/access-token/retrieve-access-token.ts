@@ -4,9 +4,8 @@ import {
   Headers,
   InvalidFetchResponseError,
   objectToQueryParams,
-  parseWithErrorHandling,
-  ValidationError,
 } from '@openid4vc/utils'
+import { parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import {
   authorizationServerRequestWithClientAttestationChallengeRetry,
@@ -53,7 +52,7 @@ interface RetrieveAccessTokenBaseOptions {
   /**
    * Callbacks to use for requesting access token
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJwt' | 'clientAuthentication'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJws' | 'clientAuthentication'>
 
   /**
    * The resource to which access is being requested. This can help the authorization
@@ -309,7 +308,7 @@ async function retrieveAccessToken(options: RetrieveAccessTokenOptions): Promise
           }
 
           if (!result.success) {
-            throw new ValidationError('Error validating access token response', result.error)
+            throw new ValidationError('Error validating access token response', result.issues)
           }
 
           const dpopNonce = extractDpopNonceFromHeaders(response.headers) ?? undefined

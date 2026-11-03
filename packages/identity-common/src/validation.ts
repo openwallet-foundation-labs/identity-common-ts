@@ -109,8 +109,11 @@ export interface ValidationIssueContexts {
   unsupported_crit: { parameter: string; understood: string[] }
   missing_value: { expected: string }
   invalid_type: { expected: string }
-  /** `branches` has the issues of each member of a union that none of them matches */
-  invalid_value: { allowed?: unknown[]; branches?: ValidationIssue[][] }
+  /**
+   * `branches` has the issues of each member of a union that none of them matches, and `labels` the
+   * names of the members when the union has them, see `unionParams`
+   */
+  invalid_value: { allowed?: unknown[]; branches?: ValidationIssue[][]; labels?: string[] }
   invalid_format: { format: string }
   /** `origin` is what is measured: `number`, `string` for its length, `array` for its items, ... */
   too_small: { minimum: number; inclusive: boolean; origin: string }
@@ -207,17 +210,77 @@ export function toValidationResult<Issue extends ValidationIssue>(issues: Issue[
   return { valid: !hasValidationErrors(issues), issues }
 }
 
+/** How many levels of nested unions a validation error message lists the members of */
+const MAX_UNION_DEPTH = 3
+/** How many members of a union, or errors of a member, a validation error message lists */
+const MAX_LISTED = 5
+
 /**
  * The message of an error thrown for a failed validation: the given message, followed by
- * the errors among the issues with their path and code, each on an indented line of its own
+ * the errors among the issues with their path and code, each on an indented line of its own.
+ * A union that no member matches lists its members as numbered options, by their label when
+ * the union has them, each with its errors.
  */
 export function validationErrorMessage(message: string, issues: readonly ValidationIssue[]): string {
-  const errors = issues.filter((issue) => issue.severity === 'error')
-  const lines = errors.map((issue) => {
-    const path = issue.pathLabels ?? issue.path
-    return `${path.length ? `${path.join('.')}: ` : ''}${issue.message} (${issue.code})`
+  const lines = errorsOf(issues).map((issue) => issueLines(issue, '  ', 0))
+  return lines.length ? `${message}\n${lines.join('\n')}` : message
+}
+
+function errorsOf(issues: readonly ValidationIssue[]) {
+  return issues.filter((issue) => issue.severity === 'error')
+}
+
+/** The members of a union issue to list, each with its errors, or `undefined` when it has none to list */
+function unionOf(issue: ValidationIssue) {
+  const context = issue.context as { branches?: ValidationIssue[][]; labels?: string[] } | undefined
+  const branches = context?.branches?.map(errorsOf)
+  if (!branches?.length || branches.some((errors) => !errors.length)) return undefined
+  // The message already names the types when each member only fails on its type, unless the members have labels
+  const typesOnly = branches.every(
+    ([error, ...rest]) => !rest.length && error.code === 'invalid_type' && error.path.length === issue.path.length
+  )
+  return typesOnly && !context?.labels ? undefined : { branches, labels: context?.labels }
+}
+
+function issueLines(issue: ValidationIssue, indent: string, depth: number, label = ''): string {
+  const path = issue.pathLabels ?? issue.path
+  const head = `${indent}- ${label}${path.length ? `${path.join('.')}: ` : ''}${issue.message}`
+  const union = depth < MAX_UNION_DEPTH ? unionOf(issue) : undefined
+  if (!union) return `${head} (${issue.code})`
+  return `${head}, ${optionLines(union, issue.path.length, `${indent}  `, depth + 1)}`
+}
+
+/** The members of a union as numbered options, after the text that introduces them */
+function optionLines(
+  union: { branches: ValidationIssue[][]; labels?: string[] },
+  pathLength: number,
+  indent: string,
+  depth: number
+): string {
+  const options = union.branches.map((errors, index) => {
+    const option = `Option ${index + 1}${union.labels?.[index] ? `, ${union.labels[index]}` : ''}`
+    if (errors.length > 1) {
+      const lines = errors.map((error) => issueLines(error, `${indent}  `, depth))
+      return `${indent}- ${option}, ${errors.length} errors:\n${listed(lines, `${indent}  `, 'error')}`
+    }
+    // A union in a labelled option at the same path is a choice within it: list its options, as the label
+    // already says what its message would
+    const nested =
+      union.labels?.[index] && depth < MAX_UNION_DEPTH && errors[0].path.length === pathLength
+        ? unionOf(errors[0])
+        : undefined
+    return nested
+      ? `${indent}- ${option}, ${optionLines(nested, pathLength, `${indent}  `, depth + 1)}`
+      : issueLines(errors[0], indent, depth, `${option}: `)
   })
-  return lines.length ? `${message}\n${lines.map((line) => `  - ${line}`).join('\n')}` : message
+  return `none of the ${union.branches.length} options matches:\n${listed(options, indent, 'option')}`
+}
+
+function listed(lines: string[], indent: string, noun: 'error' | 'option'): string {
+  const shown = lines.slice(0, MAX_LISTED)
+  const more = lines.length - MAX_LISTED
+  if (more > 0) shown.push(`${indent}- and ${more} more ${noun}${more === 1 ? '' : 's'}`)
+  return shown.join('\n')
 }
 
 /** The issues with their path below the given one, e.g. `payload` for those of a JWT payload */

@@ -1,3 +1,4 @@
+import { zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 import {
   zCredentialConfigurationSupportedClaimsDraft14,
@@ -14,7 +15,7 @@ export type MsoMdocFormatIdentifier = z.infer<typeof zMsoMdocFormatIdentifier>
 
 export const zMsoMdocCredentialIssuerMetadata = zCredentialConfigurationSupportedCommon.extend({
   format: zMsoMdocFormatIdentifier,
-  doctype: z.string(),
+  doctype: zNonEmptyString,
   credential_signing_alg_values_supported: z.array(z.number()).optional(),
   credential_metadata: zCredentialConfigurationSupportedCommonCredentialMetadata
     .extend({
@@ -25,20 +26,20 @@ export const zMsoMdocCredentialIssuerMetadata = zCredentialConfigurationSupporte
 
 export const zMsoMdocCredentialIssuerMetadataDraft15 = zCredentialConfigurationSupportedCommonDraft15.extend({
   format: zMsoMdocFormatIdentifier,
-  doctype: z.string(),
+  doctype: zNonEmptyString,
   claims: z.array(zMsoMdocIssuerMetadataClaimsDescription).optional(),
 })
 
 export const zMsoMdocCredentialIssuerMetadataDraft14 = zCredentialConfigurationSupportedCommonDraft15.extend({
   format: zMsoMdocFormatIdentifier,
-  doctype: z.string(),
+  doctype: zNonEmptyString,
   claims: zCredentialConfigurationSupportedClaimsDraft14.optional(),
   order: z.optional(z.array(z.string())),
 })
 
 export const zMsoMdocCredentialRequestFormatDraft14 = z.object({
   format: zMsoMdocFormatIdentifier,
-  doctype: z.string(),
+  doctype: zNonEmptyString,
   // Format based request is removed in Draft 15, so only old claims syntax supported.
   claims: zCredentialConfigurationSupportedClaimsDraft14.optional(),
 })

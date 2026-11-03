@@ -1,5 +1,6 @@
 import { type Oauth2ErrorCodes, type Oauth2ErrorResponse, zOauth2ErrorResponse } from '@openid4vc/oauth2'
-import { parseWithErrorHandling, type StringWithAutoCompletion } from '@openid4vc/utils'
+import type { StringWithAutoCompletion } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import {
   type InteractiveAuthorizationCodeResponse,
   type InteractiveAuthorizationInteractionRequiredResponse,

@@ -1,13 +1,11 @@
 import { ContentType } from '@openid4vc/utils'
+import { type Jwk, type JwkSet, type JwsSigner, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import type { Jwk, JwkSet } from '../../common/jwk/z-jwk'
-import { jwtHeaderFromJwtSigner } from '../../common/jwt/decode-jwt'
-import type { JwtSigner } from '../../common/jwt/z-jwt'
 import { verifyIdTokenJwt } from '../../id-token/verify-id-token'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
-import { callbacks, getSignJwtCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback } from '../util.mjs'
 
 const server = setupServer()
 
@@ -24,9 +22,9 @@ const signer = {
   method: 'jwk',
   alg: 'ES256',
   publicJwk: signerJwkPublic,
-} satisfies JwtSigner
+} satisfies JwsSigner
 
-const signJwt = getSignJwtCallback([signerJwk])
+const signJws = getSignJwsCallback([signerJwk])
 
 const authorizationServerMetadata = {
   issuer: 'https://authorization-server.com',
@@ -49,7 +47,7 @@ describe('Verify ID Token JWT', () => {
 
   describe(`valid token`, async () => {
     const header = {
-      ...jwtHeaderFromJwtSigner(signer),
+      ...jwsHeaderFromSigner(signer),
       alg: 'ES256',
       typ: 'JWT',
     }
@@ -65,10 +63,7 @@ describe('Verify ID Token JWT', () => {
       website: 'https://example.com',
     }
 
-    const { jwt } = await signJwt(signer, {
-      header,
-      payload,
-    })
+    const { jwt } = await signJwt({ header, payload, signer: signer, signJwsCallback: signJws })
 
     server.resetHandlers(
       http.get(authorizationServerMetadata.jwks_uri, () =>
@@ -84,7 +79,7 @@ describe('Verify ID Token JWT', () => {
           idToken: jwt,
           clientId: 'my-client-id',
           callbacks: {
-            verifyJwt: callbacks.verifyJwt,
+            verifyJws: callbacks.verifyJws,
             fetch,
           },
           authorizationServer: authorizationServerMetadata,
@@ -101,12 +96,12 @@ describe('Verify ID Token JWT', () => {
           idToken: jwt,
           clientId: 'mamma-mia',
           callbacks: {
-            verifyJwt: callbacks.verifyJwt,
+            verifyJws: callbacks.verifyJws,
             fetch,
           },
           authorizationServer: authorizationServerMetadata,
         })
-      ).rejects.toThrow(`jwt 'aud' does not match expected value`)
+      ).rejects.toThrow(`The 'aud' claim 'my-client-id' does not match the expected value 'mamma-mia'`)
     })
   })
 })

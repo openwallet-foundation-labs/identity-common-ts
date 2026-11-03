@@ -1,10 +1,10 @@
+import type { Jwk } from '@owf/jose'
 import * as jose from 'jose'
 import { beforeAll, describe, expect, test } from 'vitest'
 import { verifyPreAuthorizedCodeAccessTokenRequest } from '../../access-token/verify-access-token-request'
 import { verifyPushedAuthorizationRequest } from '../../authorization-request/verify-pushed-authorization-request'
 import { createClientAttestationJwt } from '../../client-attestation/client-attestation'
 import { createClientAttestationPopJwt } from '../../client-attestation/client-attestation-pop'
-import type { Jwk } from '../../common/jwk/z-jwk'
 import type { RequestLike } from '../../common/z-common'
 import { createDpopJwt } from '../../dpop/dpop'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
@@ -14,7 +14,7 @@ import {
   preAuthorizedCodeGrantIdentifier,
   refreshTokenGrantIdentifier,
 } from '../../z-grant-type'
-import { callbacks, getSignJwtCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback } from '../util.mjs'
 
 const authorizationServerMetadata = {
   issuer: 'https://server.com',
@@ -37,16 +37,16 @@ async function generateEs256Key() {
 describe('Client attestation clock skew', () => {
   let attester: Awaited<ReturnType<typeof generateEs256Key>>
   let instance: Awaited<ReturnType<typeof generateEs256Key>>
-  let signJwt: ReturnType<typeof getSignJwtCallback>
+  let signJws: ReturnType<typeof getSignJwsCallback>
   let clientAttestationJwt: string
 
   beforeAll(async () => {
     attester = await generateEs256Key()
     instance = await generateEs256Key()
-    signJwt = getSignJwtCallback([attester.privateJwk, instance.privateJwk])
+    signJws = getSignJwsCallback([attester.privateJwk, instance.privateJwk])
 
     clientAttestationJwt = await createClientAttestationJwt({
-      callbacks: { signJwt },
+      callbacks: { signJws },
       clientId: 'wallet',
       confirmation: { jwk: instance.publicJwk },
       issuedAt: now,
@@ -58,7 +58,7 @@ describe('Client attestation clock skew', () => {
   // A PoP created by a wallet whose clock runs `secondsAhead` seconds ahead of the server.
   const createPopWithNbfAhead = (secondsAhead: number) =>
     createClientAttestationPopJwt({
-      callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+      callbacks: { signJws, generateRandom: callbacks.generateRandom },
       authorizationServer: authorizationServerMetadata.issuer,
       clientAttestation: clientAttestationJwt,
       issuedAt: new Date((nowInSeconds + secondsAhead) * 1000),
@@ -85,8 +85,8 @@ describe('Client attestation clock skew', () => {
 
     test('rejects a PoP with nbf 2 seconds in the future when no skew is allowed', async () => {
       const pop = await createPopWithNbfAhead(2)
-      await expect(verify(pop)).rejects.toMatchObject(invalidClient)
-      await expect(verify(pop)).rejects.toThrow("jwt 'nbf' is in the future")
+      await expect(verify(pop, 0)).rejects.toMatchObject(invalidClient)
+      await expect(verify(pop, 0)).rejects.toThrow(/The 'nbf' claim '.*' is in the future/)
     })
 
     test('accepts a PoP with nbf 2 seconds in the future when 5 seconds of skew are allowed', async () => {
@@ -94,8 +94,47 @@ describe('Client attestation clock skew', () => {
       expect(result.clientAttestation?.clientAttestationPop.payload.nbf).toBe(nowInSeconds + 2)
     })
 
+    test('accepts a PoP with nbf 2 seconds in the future by default, as 30 seconds of skew are allowed', async () => {
+      const result = await verify(await createPopWithNbfAhead(2))
+      expect(result.clientAttestation?.clientAttestationPop.payload.nbf).toBe(nowInSeconds + 2)
+      await expect(verify(await createPopWithNbfAhead(31))).rejects.toMatchObject(invalidClient)
+    })
+
     test('rejects a PoP with nbf 10 seconds in the future when 5 seconds of skew are allowed', async () => {
       await expect(verify(await createPopWithNbfAhead(10), 5)).rejects.toMatchObject(invalidClient)
+    })
+
+    test('applies the top-level skew to the client attestation and the DPoP proof', async () => {
+      const request = { headers: new Headers(), method: 'POST', url: 'https://server.com/par' } as const
+      const verifyWithTopLevelSkew = async (proofs: { dpopAhead?: number; popAhead?: number }) =>
+        verifyPushedAuthorizationRequest({
+          authorizationServerMetadata,
+          authorizationRequest: { client_id: 'wallet' },
+          request,
+          callbacks,
+          now,
+          allowedSkewInSeconds: 0,
+          dpop: {
+            required: true,
+            jwt: await createDpopJwt({
+              callbacks: { ...callbacks, signJws },
+              request,
+              issuedAt: new Date((nowInSeconds + (proofs.dpopAhead ?? 0)) * 1000),
+              signer: { method: 'jwk', alg: 'ES256', publicJwk: instance.publicJwk },
+            }),
+          },
+          clientAttestation: {
+            required: true,
+            clientAttestationJwt,
+            clientAttestationPopJwt: await createPopWithNbfAhead(proofs.popAhead ?? 0),
+          },
+        })
+
+      await expect(verifyWithTopLevelSkew({})).resolves.toBeDefined()
+      await expect(verifyWithTopLevelSkew({ popAhead: 2 })).rejects.toMatchObject(invalidClient)
+      await expect(verifyWithTopLevelSkew({ dpopAhead: 2 })).rejects.toMatchObject({
+        errorResponse: { error: 'invalid_dpop_proof' },
+      })
     })
   })
 
@@ -119,8 +158,8 @@ describe('Client attestation clock skew', () => {
 
     test('rejects a PoP with nbf 2 seconds in the future when no skew is allowed', async () => {
       const pop = await createPopWithNbfAhead(2)
-      await expect(verify(pop)).rejects.toMatchObject(invalidClient)
-      await expect(verify(pop)).rejects.toThrow("jwt 'nbf' is in the future")
+      await expect(verify(pop, 0)).rejects.toMatchObject(invalidClient)
+      await expect(verify(pop, 0)).rejects.toThrow(/The 'nbf' claim '.*' is in the future/)
     })
 
     test('accepts a PoP with nbf 2 seconds in the future when 5 seconds of skew are allowed', async () => {
@@ -138,7 +177,7 @@ describe('Client attestation clock skew', () => {
 
     const verify = async (attestationNbfAhead: number, allowedSkewInSeconds?: number) => {
       const clientAttestationJwt = await createClientAttestationJwt({
-        callbacks: { signJwt },
+        callbacks: { signJws },
         clientId: 'wallet',
         confirmation: { jwk: instance.publicJwk },
         issuedAt: now,
@@ -147,7 +186,7 @@ describe('Client attestation clock skew', () => {
         additionalPayload: { nbf: nowInSeconds + attestationNbfAhead },
       })
       const dpopJwt = await createDpopJwt({
-        callbacks: { ...callbacks, signJwt },
+        callbacks: { ...callbacks, signJws },
         request: tokenRequest,
         issuedAt: now,
         signer: { method: 'jwk', alg: 'ES256', publicJwk: instance.publicJwk },
@@ -167,12 +206,18 @@ describe('Client attestation clock skew', () => {
     }
 
     test('rejects an attestation with nbf 2 seconds in the future when no skew is allowed', async () => {
-      await expect(verify(2)).rejects.toMatchObject(invalidClient)
+      await expect(verify(2, 0)).rejects.toMatchObject(invalidClient)
     })
 
     test('accepts an attestation with nbf 2 seconds in the future when 5 seconds of skew are allowed', async () => {
       const result = await verify(2, 5)
       expect(result.clientAttestation?.clientAttestation.payload.nbf).toBe(nowInSeconds + 2)
+    })
+
+    test('accepts an attestation with nbf 2 seconds in the future by default, as 30 seconds of skew are allowed', async () => {
+      const result = await verify(2)
+      expect(result.clientAttestation?.clientAttestation.payload.nbf).toBe(nowInSeconds + 2)
+      await expect(verify(31)).rejects.toMatchObject(invalidClient)
     })
 
     test('rejects an attestation with nbf 10 seconds in the future when 5 seconds of skew are allowed', async () => {
@@ -183,7 +228,7 @@ describe('Client attestation clock skew', () => {
   describe('Oauth2AuthorizationServer clock skew default', () => {
     const createAuthorizationServer = () =>
       new Oauth2AuthorizationServer({
-        callbacks: { ...callbacks, signJwt },
+        callbacks: { ...callbacks, signJws },
         allowedSkewInSeconds: 5,
       })
 
@@ -267,7 +312,7 @@ describe('Client attestation clock skew', () => {
       const createOptions = async (): Promise<RequestVerificationOptions> => {
         const request = { headers: new Headers(), method: 'POST', url } as const
         const dpopJwt = await createDpopJwt({
-          callbacks: { ...callbacks, signJwt },
+          callbacks: { ...callbacks, signJws },
           request,
           issuedAt: new Date((nowInSeconds + 2) * 1000),
           signer: { method: 'jwk', alg: 'ES256', publicJwk: instance.publicJwk },
@@ -305,6 +350,14 @@ describe('Client attestation clock skew', () => {
           verify({ ...options, clientAttestation: { ...options.clientAttestation, allowedSkewInSeconds: 0 } })
         ).rejects.toMatchObject(invalidClient)
       })
+
+      test('the server default replaces the 30 second default of client attestation verification', async () => {
+        const options = await createOptions()
+        const clientAttestationPopJwt = await createPopWithNbfAhead(10)
+        await expect(
+          verify({ ...options, clientAttestation: { ...options.clientAttestation, clientAttestationPopJwt } })
+        ).rejects.toMatchObject(invalidClient)
+      })
     })
 
     test('applies its default to direct client attestation verification and allows an override', async () => {
@@ -327,10 +380,21 @@ describe('Client attestation clock skew', () => {
       ).rejects.toMatchObject(invalidClient)
     })
 
+    test('its default replaces the 30 second default of direct client attestation verification', async () => {
+      await expect(
+        createAuthorizationServer().verifyClientAttestation({
+          authorizationServer: authorizationServerMetadata.issuer,
+          clientAttestationJwt,
+          clientAttestationPopJwt: await createPopWithNbfAhead(10),
+          now,
+        })
+      ).rejects.toMatchObject(invalidClient)
+    })
+
     test('applies its default to direct DPoP verification and allows an override', async () => {
       const request = { headers: new Headers(), method: 'POST', url: 'https://server.com/token' } as const
       const dpopJwt = await createDpopJwt({
-        callbacks: { ...callbacks, signJwt },
+        callbacks: { ...callbacks, signJws },
         request,
         issuedAt: new Date((nowInSeconds + 2) * 1000),
         signer: { method: 'jwk', alg: 'ES256', publicJwk: instance.publicJwk },

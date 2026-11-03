@@ -1,4 +1,5 @@
-import { parseWithErrorHandling, type StringWithAutoCompletion } from '@openid4vc/utils'
+import type { StringWithAutoCompletion } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import { zAccessTokenErrorResponse } from '../access-token/z-access-token'
 import type { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import {

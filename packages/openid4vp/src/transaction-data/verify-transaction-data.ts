@@ -1,10 +1,6 @@
-import {
-  type CallbackContext,
-  HashAlgorithm,
-  Oauth2ErrorCodes,
-  Oauth2ServerErrorResponseError,
-} from '@openid4vc/oauth2'
-import { decodeUtf8String, encodeToBase64Url, type NonEmptyArray } from '@openid4vc/utils'
+import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
+import type { NonEmptyArray } from '@openid4vc/utils'
+import { base64url, type HashAlgorithm } from '@owf/identity-common'
 import { type ParsedTransactionDataEntry, parseTransactionData } from './parse-transaction-data'
 
 export interface TransactionDataHashesCredentials {
@@ -70,6 +66,8 @@ export interface VerifiedTransactionDataEntry {
   }>
 }
 
+const supportedHashAlgorithms: HashAlgorithm[] = ['sha-256', 'sha-384', 'sha-512']
+
 async function verifyTransactionDataEntry({
   entry,
   credentials,
@@ -80,13 +78,11 @@ async function verifyTransactionDataEntry({
   callbacks: Pick<CallbackContext, 'hash'>
 }): Promise<VerifiedTransactionDataEntry> {
   const allowedAlgs = entry.transactionData.transaction_data_hashes_alg ?? ['sha-256']
-  const supportedAlgs: HashAlgorithm[] = allowedAlgs.filter((alg): alg is HashAlgorithm =>
-    Object.values(HashAlgorithm).includes(alg as HashAlgorithm)
-  )
+  const supportedAlgs = supportedHashAlgorithms.filter((alg) => allowedAlgs.includes(alg))
 
   const hashes: { [key in HashAlgorithm]?: string } = {}
   for (const alg of supportedAlgs) {
-    hashes[alg] = encodeToBase64Url(await callbacks.hash(decodeUtf8String(entry.encoded), alg))
+    hashes[alg] = base64url.encode(await callbacks.hash(entry.encoded, alg))
   }
 
   for (const credentialId of entry.transactionData.credential_ids) {
@@ -111,7 +107,7 @@ async function verifyTransactionDataEntry({
         // This is an error of this library.
         throw new Oauth2ServerErrorResponseError({
           error: Oauth2ErrorCodes.InvalidTransactionData,
-          error_description: `Transaction data entry with index ${entry.transactionDataIndex} for presentation ${credentialId} with index ${presentationIndex} is hashed using unsupported alg '${alg}'. This library only supports verification of transaction data hashes using alg values ${Object.values(HashAlgorithm).join(', ')}. Either verify the hashes outside of this library, or limit the allowed alg values to the ones supported by this library.`,
+          error_description: `Transaction data entry with index ${entry.transactionDataIndex} for presentation ${credentialId} with index ${presentationIndex} is hashed using unsupported alg '${alg}'. This library only supports verification of transaction data hashes using alg values ${supportedHashAlgorithms.join(', ')}. Either verify the hashes outside of this library, or limit the allowed alg values to the ones supported by this library.`,
         })
       }
 

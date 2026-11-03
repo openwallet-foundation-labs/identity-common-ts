@@ -1,6 +1,5 @@
 import {
   type CallbackContext,
-  type JweEncryptor,
   Oauth2Error,
   type RequestDpopOptions,
   type ResourceRequestResponseNotOk,
@@ -8,13 +7,15 @@ import {
   resourceRequest,
   type zOauth2ErrorResponse,
 } from '@openid4vc/oauth2'
+import { ContentType, type FetchResponse, isResponseContentType, stringToJsonWithErrorHandling } from '@openid4vc/utils'
 import {
-  ContentType,
-  type FetchResponse,
-  isResponseContentType,
+  addValidationIssue,
   parseWithErrorHandling,
-  stringToJsonWithErrorHandling,
-} from '@openid4vc/utils'
+  parseWithSchema,
+  type SchemaParseResult,
+  VALIDATION_CODES,
+} from '@owf/identity-common'
+import type { JweEncryptor } from '@owf/jose'
 import type z from 'zod'
 import { Openid4vciError } from '../error/Openid4vciError'
 import { getKnownCredentialConfigurationSupportedById } from '../metadata/credential-issuer/credential-issuer-metadata'
@@ -49,7 +50,7 @@ async function handleCredentialResponse<T, Schema extends z.ZodType<T>>(options:
   credentialResponseEncryption?: CredentialResponseEncryption
   schema: Schema
   responseType: string
-}): Promise<{ ok: true; data: T } | { ok: false; parseResult: ReturnType<Schema['safeParse']> | undefined }> {
+}): Promise<{ ok: true; data: T } | { ok: false; parseResult: SchemaParseResult<T> | undefined }> {
   const { response, decryptJwe, credentialResponseEncryption, schema, responseType } = options
 
   // Check if the response is encrypted (Content-Type: application/jwt)
@@ -65,7 +66,7 @@ async function handleCredentialResponse<T, Schema extends z.ZodType<T>>(options:
       decryptResult.payload,
       `Unable to parse decrypted ${responseType} as JSON`
     )
-    const parseResult = schema.safeParse(jsonPayload) as ReturnType<Schema['safeParse']>
+    const parseResult = parseWithSchema(schema, jsonPayload)
 
     if (!parseResult.success) {
       return { ok: false, parseResult }
@@ -83,9 +84,9 @@ async function handleCredentialResponse<T, Schema extends z.ZodType<T>>(options:
   }
 
   // Try to parse the response (non-encrypted)
-  const parseResult = (
-    isResponseContentType(ContentType.Json, response) ? schema.safeParse(await response.clone().json()) : undefined
-  ) as ReturnType<Schema['safeParse']> | undefined
+  const parseResult = isResponseContentType(ContentType.Json, response)
+    ? parseWithSchema(schema, await response.clone().json())
+    : undefined
 
   if (!parseResult?.success) {
     return { ok: false, parseResult }
@@ -110,7 +111,7 @@ interface RetrieveCredentialsBaseOptions {
   /**
    * Callbacks used in retrieve credentials endpoints.
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJwt' | 'decryptJwe'> &
+  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJws' | 'decryptJwe'> &
     Partial<Pick<CallbackContext, 'encryptJwe'>>
 
   /**
@@ -255,13 +256,13 @@ export interface RetrieveCredentialsResponseNotOk extends ResourceRequestRespons
    * If this is defined it means the response itself was successful but the validation of the
    * credential response data structure failed
    */
-  credentialResponseResult?: ReturnType<typeof zCredentialResponse.safeParse>
+  credentialResponseResult?: SchemaParseResult<z.output<typeof zCredentialResponse>>
 
   /**
    * If this is defined it means the response was JSON and we tried to parse it as
    * a credential error response. It may be successful or it may not be.
    */
-  credentialErrorResponseResult?: ReturnType<typeof zCredentialErrorResponse.safeParse>
+  credentialErrorResponseResult?: SchemaParseResult<z.output<typeof zCredentialErrorResponse>>
 }
 
 /**
@@ -325,7 +326,7 @@ async function retrieveCredentials(
 
   if (!resourceResponse.ok) {
     const credentialErrorResponseResult = isResponseContentType(ContentType.Json, resourceResponse.response)
-      ? zCredentialErrorResponse.safeParse(await resourceResponse.response.clone().json())
+      ? parseWithSchema(zCredentialErrorResponse, await resourceResponse.response.clone().json())
       : undefined
 
     return {
@@ -380,13 +381,13 @@ export interface RetrieveDeferredCredentialsResponseNotOk extends ResourceReques
    * If this is defined it means the response itself was successful but the validation of the
    * credential response data structure failed
    */
-  deferredCredentialResponseResult?: ReturnType<typeof zDeferredCredentialResponse.safeParse>
+  deferredCredentialResponseResult?: SchemaParseResult<z.output<typeof zDeferredCredentialResponse>>
 
   /**
    * If this is defined it means the response was JSON and we tried to parse it as
    * a credential error response. It may be successful or it may not be.
    */
-  deferredCredentialErrorResponseResult?: ReturnType<typeof zOauth2ErrorResponse.safeParse>
+  deferredCredentialErrorResponseResult?: SchemaParseResult<z.output<typeof zOauth2ErrorResponse>>
 }
 
 export async function retrieveDeferredCredentials(
@@ -432,7 +433,7 @@ export async function retrieveDeferredCredentials(
 
   if (!resourceResponse.ok) {
     const deferredCredentialErrorResponseResult = isResponseContentType(ContentType.Json, resourceResponse.response)
-      ? zCredentialErrorResponse.safeParse(await resourceResponse.response.clone().json())
+      ? parseWithSchema(zCredentialErrorResponse, await resourceResponse.response.clone().json())
       : undefined
 
     return {
@@ -441,12 +442,15 @@ export async function retrieveDeferredCredentials(
     }
   }
 
-  const zDeferredResponse = zDeferredCredentialResponse.refine(
-    (response) => response.credentials || response.transaction_id === options.transactionId,
-    {
+  const zDeferredResponse = zDeferredCredentialResponse.superRefine((response, ctx) => {
+    if (response.credentials || response.transaction_id === options.transactionId) return
+    addValidationIssue(ctx, {
+      code: VALIDATION_CODES.CLAIM_VALUE_MISMATCH,
+      path: ['transaction_id'],
       message: `Transaction id in deferred credential response does not match transaction id in deferred credential request '${options.transactionId}'`,
-    }
-  )
+      context: { expected: [options.transactionId], actual: response.transaction_id },
+    })
+  })
 
   const result = await handleCredentialResponse<DeferredCredentialResponse, typeof zDeferredResponse>({
     response: resourceResponse.response,

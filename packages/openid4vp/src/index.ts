@@ -73,6 +73,13 @@ export {
   type GetOpenid4vpClientIdOptions,
   getOpenid4vpClientId,
 } from './client-identifier-prefix/parse-client-identifier-prefix'
+export {
+  type VerifiedVerifierAttestation,
+  type VerifyVerifierAttestationOptions,
+  verifyVerifierAttestation,
+  zVerifierAttestationJwtHeader,
+  zVerifierAttestationJwtPayload,
+} from './client-identifier-prefix/verifier-attestation'
 export { calculateX509HashClientIdPrefixValue } from './client-identifier-prefix/x509-hash'
 export { type ClientIdPrefix, zClientIdPrefix } from './client-identifier-prefix/z-client-id-prefix'
 export {

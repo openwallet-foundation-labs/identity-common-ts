@@ -1,4 +1,4 @@
-import { formatZodError } from '@openid4vc/utils'
+import { validationErrorMessage } from '@owf/identity-common'
 import type { RetrieveCredentialsResponseNotOk } from '../credential-request/retrieve-credentials'
 import { Openid4vciError } from './Openid4vciError'
 
@@ -9,10 +9,10 @@ export class Openid4vciRetrieveCredentialsError extends Openid4vciError {
     responseText: string
   ) {
     const errorData =
-      response.credentialResponseResult?.data ??
-      response.credentialErrorResponseResult?.data ??
-      (response.credentialResponseResult?.error
-        ? formatZodError(response.credentialResponseResult.error)
+      (response.credentialResponseResult?.success ? response.credentialResponseResult.data : undefined) ??
+      (response.credentialErrorResponseResult?.success ? response.credentialErrorResponseResult.data : undefined) ??
+      (response.credentialResponseResult?.success === false
+        ? validationErrorMessage('Invalid credential response', response.credentialResponseResult.issues)
         : undefined) ??
       responseText
 

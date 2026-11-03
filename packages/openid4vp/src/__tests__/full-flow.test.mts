@@ -1,7 +1,7 @@
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
+import { getSignJwsCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
 import { createOpenid4vpAuthorizationRequest } from '../authorization-request/create-authorization-request.js'
 import { parseOpenid4vpAuthorizationResponsePayload } from '../authorization-response/parse-authorization-response-payload.js'
 import {
@@ -44,7 +44,7 @@ const server = setupServer()
 const callbacks = {
   ...partialCallbacks,
   fetch,
-  signJwt: getSignJwtCallback([]),
+  signJws: getSignJwsCallback([]),
   encryptJwe: () => {
     throw new Error('Not implemented')
   },

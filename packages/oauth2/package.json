@@ -40,6 +40,8 @@
   },
   "dependencies": {
     "@openid4vc/utils": "workspace:^",
+    "@owf/identity-common": "workspace:^",
+    "@owf/jose": "workspace:^",
     "zod": "catalog:"
   }
 }

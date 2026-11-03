@@ -3,7 +3,8 @@ import {
   type CreateJarAuthorizationRequestOptions,
   createJarAuthorizationRequest,
 } from '@openid4vc/oauth2'
-import { objectToQueryParams, parseWithErrorHandling, URL, URLSearchParams } from '@openid4vc/utils'
+import { objectToQueryParams, URL, URLSearchParams } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import {
   validateOpenid4vpAuthorizationRequestPayload,
   type WalletVerificationOptions,
@@ -34,10 +35,11 @@ export interface CreateOpenid4vpAuthorizationRequestOptions {
   >
 
   wallet?: WalletVerificationOptions
-  callbacks: Pick<CallbackContext, 'signJwt' | 'encryptJwe'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'encryptJwe'>
 
   /**
-   * Date that should be used as now. If not provided current date will be used.
+   * Date that should be used as now, for the `iat` and `exp` of the request object. If not provided current
+   * date will be used.
    */
   now?: Date
 }
@@ -60,7 +62,7 @@ export interface CreateOpenid4vpAuthorizationRequestOptions {
  * @returns Object containing the authorization request parameters, URI and optional JAR details
  */
 export async function createOpenid4vpAuthorizationRequest(options: CreateOpenid4vpAuthorizationRequestOptions) {
-  const { jar, scheme = 'openid4vp://', wallet, callbacks } = options
+  const { jar, scheme = 'openid4vp://', wallet, callbacks, now } = options
 
   let additionalJwtPayload: Record<string, unknown> | undefined
 
@@ -114,6 +116,7 @@ export async function createOpenid4vpAuthorizationRequest(options: CreateOpenid4
       authorizationRequestPayload,
       additionalJwtPayload,
       callbacks,
+      now,
     })
 
     const url = new URL(scheme)

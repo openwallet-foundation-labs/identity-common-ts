@@ -1,17 +1,16 @@
+import { type FetchHeaders, URL } from '@openid4vc/utils'
+import { base64url, dateToSeconds, IdentityError, type OrPromise, parseWithErrorHandling } from '@owf/identity-common'
 import {
-  dateToSeconds,
-  decodeUtf8String,
-  encodeToBase64Url,
-  type FetchHeaders,
-  type OrPromise,
-  parseWithErrorHandling,
-  URL,
-} from '@openid4vc/utils'
-import { type CallbackContext, HashAlgorithm } from '../callbacks'
-import { calculateJwkThumbprint } from '../common/jwk/jwk-thumbprint'
-import { type DecodeJwtResult, decodeJwt } from '../common/jwt/decode-jwt'
-import { verifyJwt } from '../common/jwt/verify-jwt'
-import { type JwtSignerJwk, zCompactJwt } from '../common/jwt/z-jwt'
+  calculateJwkThumbprint,
+  type DecodeJwtResult,
+  decodeJwt,
+  JoseInvalidArgumentError,
+  type JwsSignerJwk,
+  signJwt,
+  verifyJwt,
+  zCompactJwt,
+} from '@owf/jose'
+import type { CallbackContext } from '../callbacks'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { Oauth2Error } from '../error/Oauth2Error'
@@ -27,7 +26,7 @@ export interface RequestDpopOptions {
   /**
    * The signer of the dpop jwt
    */
-  signer: JwtSignerJwk
+  signer: JwsSignerJwk
 }
 
 export async function createDpopHeadersForRequest(options: CreateDpopJwtOptions) {
@@ -68,19 +67,19 @@ export interface CreateDpopJwtOptions {
   /**
    * Callback used for dpop
    */
-  callbacks: Pick<CallbackContext, 'generateRandom' | 'hash' | 'signJwt'>
+  callbacks: Pick<CallbackContext, 'generateRandom' | 'hash' | 'signJws'>
 
   /**
    * The signer of the dpop jwt. Only jwk signer allowed.
    */
-  signer: JwtSignerJwk
+  signer: JwsSignerJwk
 }
 
 export async function createDpopJwt(options: CreateDpopJwtOptions) {
   // Calculate access token hash
   let ath: string | undefined
   if (options.accessToken) {
-    ath = encodeToBase64Url(await options.callbacks.hash(decodeUtf8String(options.accessToken), HashAlgorithm.Sha256))
+    ath = base64url.encode(await options.callbacks.hash(options.accessToken, 'sha-256'))
   }
 
   const header = parseWithErrorHandling(zDpopJwtHeader, {
@@ -91,18 +90,15 @@ export async function createDpopJwt(options: CreateDpopJwtOptions) {
 
   const payload = parseWithErrorHandling(zDpopJwtPayload, {
     htu: htuFromRequestUrl(options.request.url),
-    iat: dateToSeconds(options.issuedAt),
+    iat: dateToSeconds(options.issuedAt ?? new Date()),
     htm: options.request.method,
-    jti: encodeToBase64Url(await options.callbacks.generateRandom(32)),
+    jti: base64url.encode(await options.callbacks.generateRandom(32)),
     ath,
     nonce: options.nonce,
     ...options.additionalPayload,
   } satisfies DpopJwtPayload)
 
-  const { jwt } = await options.callbacks.signJwt(options.signer, {
-    header,
-    payload,
-  })
+  const { jwt } = await signJwt({ header, payload, signer: options.signer, signJwsCallback: options.callbacks.signJws })
 
   return jwt
 }
@@ -110,7 +106,7 @@ export async function createDpopJwt(options: CreateDpopJwtOptions) {
 export interface DpopVerificationOptions {
   /**
    * Allowed dpop signing alg values. If not provided
-   * any alg values are allowed and it's up to the `verifyJwtCallback`
+   * any alg values are allowed and it's up to the `verifyJwsCallback`
    * to handle the alg.
    */
   allowedSigningAlgs?: string[]
@@ -123,9 +119,10 @@ export interface DpopVerificationOptions {
   maxProofAgeSeconds?: number
 
   /**
-   * Allowed clock skew in seconds used when validating freshness based on `iat`.
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of the proof, including the
+   * `maxProofAgeSeconds` check.
    *
-   * @default 0
+   * @default 30
    */
   allowedSkewInSeconds?: number
 
@@ -170,7 +167,7 @@ export interface VerifyDpopJwtOptions extends DpopVerificationOptions {
   /**
    * Callbacks used for verifying dpop jwt
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>
 
   now?: Date
 }
@@ -197,20 +194,6 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
       )
     }
 
-    if (options.expectedNonce) {
-      if (!payload.nonce) {
-        throw new Oauth2Error(
-          `Dpop jwt does not have a nonce value, but expected nonce value '${options.expectedNonce}'`
-        )
-      }
-
-      if (payload.nonce !== options.expectedNonce) {
-        throw new Oauth2Error(
-          `Dpop jwt contains nonce value '${payload.nonce}', but expected nonce value '${options.expectedNonce}'`
-        )
-      }
-    }
-
     if (options.request.method !== payload.htm) {
       throw new Oauth2Error(
         `Dpop jwt contains htm value '${payload.htm}', but expected htm value '${options.request.method}'`
@@ -223,35 +206,8 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
       throw new Oauth2Error(`Dpop jwt contains htu value '${payload.htu}', but expected htu value '${expectedHtu}'.`)
     }
 
-    const now = options.now ?? new Date()
-    if (options.maxProofAgeSeconds !== undefined) {
-      if (options.maxProofAgeSeconds < 0) {
-        throw new Oauth2Error(
-          `maxProofAgeSeconds must be greater than or equal to 0, received '${options.maxProofAgeSeconds}'.`
-        )
-      }
-
-      const nowInSeconds = dateToSeconds(now)
-      const allowedSkew = options.allowedSkewInSeconds ?? 0
-      const proofAgeInSeconds = nowInSeconds - payload.iat
-
-      if (payload.iat > nowInSeconds + allowedSkew) {
-        throw new Oauth2Error(
-          `Dpop jwt contains iat value '${payload.iat}' that is in the future relative to now '${nowInSeconds}' with allowed skew '${allowedSkew}'.`
-        )
-      }
-
-      if (proofAgeInSeconds > options.maxProofAgeSeconds + allowedSkew) {
-        throw new Oauth2Error(
-          `Dpop jwt is too old. Proof age is '${proofAgeInSeconds}' seconds, but max allowed age is '${options.maxProofAgeSeconds}' seconds with allowed skew '${allowedSkew}'.`
-        )
-      }
-    }
-
     if (options.accessToken) {
-      const expectedAth = encodeToBase64Url(
-        await options.callbacks.hash(decodeUtf8String(options.accessToken), HashAlgorithm.Sha256)
-      )
+      const expectedAth = base64url.encode(await options.callbacks.hash(options.accessToken, 'sha-256'))
 
       if (!payload.ath) {
         throw new Oauth2Error(`Dpop jwt does not have a ath value, but expected ath value '${expectedAth}'.`)
@@ -263,7 +219,7 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
     }
 
     const jwkThumbprint = await calculateJwkThumbprint({
-      hashAlgorithm: HashAlgorithm.Sha256,
+      hashAlgorithm: 'sha-256',
       hashCallback: options.callbacks.hash,
       jwk: header.jwk,
     })
@@ -274,18 +230,6 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
       )
     }
 
-    if (options.assertJtiUniqueness) {
-      const isUnique = await options.assertJtiUniqueness({
-        ...decodedDpopJwt,
-        jwkThumbprint,
-        now,
-      })
-
-      if (!isUnique) {
-        throw new Oauth2Error(`Dpop jwt with jti value '${payload.jti}' has already been used.`)
-      }
-    }
-
     await verifyJwt({
       signer: {
         alg: header.alg,
@@ -293,12 +237,26 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
         publicJwk: header.jwk,
       },
       now: options.now,
-      header,
-      payload,
-      compact: options.dpopJwt,
-      verifyJwtCallback: options.callbacks.verifyJwt,
+      jwt: decodedDpopJwt,
+      verifyJwsCallback: options.callbacks.verifyJws,
       errorMessage: 'dpop jwt verification failed',
+      expectedNonce: options.expectedNonce,
+      maxAgeSeconds: options.maxProofAgeSeconds,
+      skewSeconds: options.allowedSkewInSeconds,
     })
+
+    // The replay check comes after the signature check, so a proof that does not verify can't use up a `jti`
+    if (options.assertJtiUniqueness) {
+      const isUnique = await options.assertJtiUniqueness({
+        ...decodedDpopJwt,
+        jwkThumbprint,
+        now: options.now ?? new Date(),
+      })
+
+      if (!isUnique) {
+        throw new Oauth2Error(`Dpop jwt with jti value '${payload.jti}' has already been used.`)
+      }
+    }
 
     return {
       header,
@@ -306,11 +264,15 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
       jwkThumbprint,
     }
   } catch (error) {
-    if (error instanceof Oauth2Error) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidDpopProof,
-        error_description: error.message,
-      })
+    // A wrong option, such as a negative skew, is a mistake of the server, not of the proof
+    if (error instanceof IdentityError && !(error instanceof JoseInvalidArgumentError)) {
+      throw new Oauth2ServerErrorResponseError(
+        {
+          error: Oauth2ErrorCodes.InvalidDpopProof,
+          error_description: error.message,
+        },
+        { cause: error }
+      )
     }
 
     throw error

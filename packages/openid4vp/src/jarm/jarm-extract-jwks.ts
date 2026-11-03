@@ -1,4 +1,4 @@
-import type { JwkSet } from '@openid4vc/oauth2'
+import type { JwkSet } from '@owf/jose'
 
 export function extractEncryptionJwkFromJwks(
   jwks: JwkSet,
@@ -14,11 +14,12 @@ export function extractEncryptionJwkFromJwks(
     return jwks.keys.find((jwk) => jwk.kid === kid)
   }
 
-  let algFiltered = jwks.keys.filter((key) => key.alg && supportedAlgValues?.includes(key.alg))
-  if (algFiltered.length === 0) algFiltered = jwks.keys
+  // A key that is meant for signatures is never encrypted to, not even when it is the only key
+  const keys = jwks.keys.filter((key) => key.use !== 'sig')
 
-  let encFiltered = algFiltered.filter((key) => key.use === 'enc')
-  if (!encFiltered) encFiltered = algFiltered.filter((key) => key.use !== 'sig')
+  let algFiltered = keys.filter((key) => key.alg && supportedAlgValues?.includes(key.alg))
+  if (algFiltered.length === 0) algFiltered = keys
 
-  return encFiltered.length > 0 ? encFiltered[0] : jwks.keys[0]
+  // Prefer a key that is explicitly meant for encryption over one whose use is not stated
+  return algFiltered.find((key) => key.use === 'enc') ?? algFiltered[0]
 }

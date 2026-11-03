@@ -41,6 +41,7 @@
     "@owf/identity-common": "workspace:^",
     "@openid4vc/oauth2": "workspace:^",
     "@openid4vc/utils": "workspace:^",
+    "@owf/jose": "workspace:^",
     "zod": "catalog:"
   }
 }

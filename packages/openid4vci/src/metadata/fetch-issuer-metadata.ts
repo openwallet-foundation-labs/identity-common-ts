@@ -7,7 +7,7 @@ import {
   zAuthorizationServerMetadata,
 } from '@openid4vc/oauth2'
 
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import type { Openid4vciVersion } from '../version'
 import {
   type CredentialIssuerMetadataSigned,
@@ -38,10 +38,10 @@ export interface ResolveIssuerMetadataOptions {
   allowAuthorizationMetadataFromCredentialIssuerMetadata?: boolean
 
   /**
-   * Callbacks for fetching the credential issuer metadata. The `verifyJwt` callback is
+   * Callbacks for fetching the credential issuer metadata. The `verifyJws` callback is
    * required unless `signedMetadata` is `disallowed`.
    */
-  callbacks: Partial<Pick<CallbackContext, 'fetch' | 'verifyJwt' | 'getAuthorizationServerMetadata'>>
+  callbacks: Partial<Pick<CallbackContext, 'fetch' | 'verifyJws' | 'getAuthorizationServerMetadata'>>
 
   /**
    * Whether the credential issuer metadata must be signed. This is sent as the `Accept` header.
@@ -51,7 +51,7 @@ export interface ResolveIssuerMetadataOptions {
    *   Signed metadata that fails verification results in an error, without falling back to unsigned metadata.
    * - `disallowed`: only accept unsigned metadata
    *
-   * @default 'preferred' if a `verifyJwt` callback is provided, otherwise 'disallowed'
+   * @default 'preferred' if a `verifyJws` callback is provided, otherwise 'disallowed'
    */
   signedMetadata?: FetchCredentialIssuerMetadataOptions['signedMetadata']
 
@@ -60,6 +60,14 @@ export interface ResolveIssuerMetadataOptions {
    * current time will be used
    */
   now?: Date
+
+  /**
+   * Only used for verifying signed issuer metadata. Allowed clock skew in seconds for the `exp`, `nbf`
+   * and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export interface IssuerMetadataResult {
@@ -94,6 +102,7 @@ export async function resolveIssuerMetadata(
     callbacks: options?.callbacks,
     signedMetadata: options?.signedMetadata,
     now: options?.now,
+    allowedSkewInSeconds: options?.allowedSkewInSeconds,
   })
   if (!credentialIssuerMetadataWithDraftVersion) {
     throw new Oauth2Error(`Well known credential issuer metadata for issuer '${credentialIssuer}' not found.`)

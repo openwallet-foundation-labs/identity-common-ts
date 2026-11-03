@@ -9,6 +9,7 @@ import {
   prefixIssuePaths,
   SCHEMA_VALIDATION_CODES,
   toValidationResult,
+  unionParams,
   VALIDATION_CODES,
   ValidationError,
   type ValidationIssue,
@@ -107,6 +108,107 @@ describe('validationErrorMessage', () => {
     )
     expect(validationErrorMessage('Invalid value', [warning])).toBe('Invalid value')
   })
+
+  it('should list the errors of each member of a union below it', () => {
+    const messageOf = (schema: z.ZodType, value: unknown) => {
+      const result = parseWithSchema(schema, value)
+      return result.success ? '' : validationErrorMessage('Invalid', result.issues)
+    }
+    const a = z.object({ a: z.string() })
+    const b = z.object({ b: z.string() })
+
+    expect(messageOf(z.union([a, b], { error: 'Expected a or b' }), {})).toBe(
+      [
+        'Invalid',
+        '  - Expected a or b, none of the 2 options matches:',
+        '    - Option 1: a: expected string, received undefined (missing_value)',
+        '    - Option 2: b: expected string, received undefined (missing_value)',
+      ].join('\n')
+    )
+    // An option with more than one error lists all of them
+    expect(messageOf(z.union([a, b.extend({ c: z.string(), d: z.never().optional() })]), { d: 1 })).toBe(
+      [
+        'Invalid',
+        '  - Invalid input, none of the 2 options matches:',
+        '    - Option 1: a: expected string, received undefined (missing_value)',
+        '    - Option 2, 3 errors:',
+        '      - b: expected string, received undefined (missing_value)',
+        '      - c: expected string, received undefined (missing_value)',
+        '      - d: expected to not be defined, received number (not_allowed)',
+      ].join('\n')
+    )
+    // The message names the types when the members only differ in type
+    expect(messageOf(z.object({ v: z.union([z.string(), z.number()]) }), { v: true })).toBe(
+      'Invalid\n  - v: expected string or number (invalid_value)'
+    )
+  })
+
+  it('should name the options by the labels of unionParams, and merge a union in a labelled option', () => {
+    const messageOf = (schema: z.ZodType, value: unknown) => {
+      const result = parseWithSchema(schema, value)
+      return result.success ? '' : validationErrorMessage('Invalid', result.issues)
+    }
+    const v1 = z.union([z.object({ id: z.string() }), z.object({ name: z.string() })], 'Expected an id or a name')
+    const v0 = z.object({ legacy: z.string() })
+
+    expect(messageOf(z.union([v1, v0], unionParams('Invalid thing', ['version 1', 'version 0'])), {})).toBe(
+      [
+        'Invalid',
+        '  - Invalid thing, none of the 2 options matches:',
+        '    - Option 1, version 1, none of the 2 options matches:',
+        '      - Option 1: id: expected string, received undefined (missing_value)',
+        '      - Option 2: name: expected string, received undefined (missing_value)',
+        '    - Option 2, version 0: legacy: expected string, received undefined (missing_value)',
+      ].join('\n')
+    )
+    // Without a label, the message of the union in the option says what the option is
+    expect(messageOf(z.union([v1, v0]), {})).toContain(
+      '    - Option 1: Expected an id or a name, none of the 2 options matches:'
+    )
+    // A message the union sets is kept when its members only differ in type
+    expect(messageOf(z.union([z.string(), z.number()], 'Expected a string or a number'), true)).toBe(
+      'Invalid\n  - Expected a string or a number (invalid_value)'
+    )
+    // Labelled members that only differ in type are listed, as the message names neither
+    expect(messageOf(z.union([z.string(), z.number()], unionParams('Invalid thing', ['v1', 'v0'])), true)).toBe(
+      [
+        'Invalid',
+        '  - Invalid thing, none of the 2 options matches:',
+        '    - Option 1, v1: expected string, received boolean (invalid_type)',
+        '    - Option 2, v0: expected number, received boolean (invalid_type)',
+      ].join('\n')
+    )
+  })
+
+  it('should list the members of at most three levels of nested unions, and at most five items per list', () => {
+    const messageOf = (schema: z.ZodType, value: unknown) => {
+      const result = parseWithSchema(schema, value)
+      return result.success ? '' : validationErrorMessage('Invalid', result.issues)
+    }
+    const nest = (depth: number): z.ZodType =>
+      depth ? z.union([nest(depth - 1), z.object({ [`l${depth}`]: z.string() })]) : z.object({ l0: z.string() })
+    expect(messageOf(nest(4), {})).toBe(
+      [
+        'Invalid',
+        '  - Invalid input, none of the 2 options matches:',
+        '    - Option 1: Invalid input, none of the 2 options matches:',
+        '      - Option 1: Invalid input, none of the 2 options matches:',
+        '        - Option 1: Invalid input (invalid_value)',
+        '        - Option 2: l2: expected string, received undefined (missing_value)',
+        '      - Option 2: l3: expected string, received undefined (missing_value)',
+        '    - Option 2: l4: expected string, received undefined (missing_value)',
+      ].join('\n')
+    )
+
+    const keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+    const message = messageOf(z.union(keys.map((key) => z.object({ [key]: z.string() }))), {})
+    expect(message).toContain('    - Option 5: e: expected string')
+    expect(message).not.toContain('Option 6')
+    expect(message).toMatch(/\n {4}- and 2 more options$/)
+    expect(messageOf(z.union(keys.slice(0, 6).map((key) => z.object({ [key]: z.string() }))), {})).toMatch(
+      /\n {4}- and 1 more option$/
+    )
+  })
 })
 
 describe('zod', () => {
@@ -176,6 +278,9 @@ describe('zod', () => {
       path: ['v'],
       message: 'expected string or array',
     })
+    // A member that fails below the union, at the first item of an array, does not fail on its type
+    const [item] = issuesOf(z.object({ v: z.union([z.string(), z.array(z.string())]) }), { v: [1] })
+    expect(item).toMatchObject({ code: 'invalid_value', path: ['v'], message: 'Invalid input' })
   })
 
   it('should list the options of a discriminated union whose discriminator matches none', () => {

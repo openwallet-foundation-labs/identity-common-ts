@@ -1,13 +1,7 @@
-import {
-  ContentType,
-  createZodFetcher,
-  type Fetch,
-  InvalidFetchResponseError,
-  parseWithErrorHandling,
-  ValidationError,
-} from '@openid4vc/utils'
+import { ContentType, createZodFetcher, type Fetch, InvalidFetchResponseError } from '@openid4vc/utils'
+import { parseWithErrorHandling, ValidationError } from '@owf/identity-common'
+import { type JwkSet, zJwkSet } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
-import { type JwkSet, zJwkSet } from '../common/jwk/z-jwk'
 
 /**
  * Fetch JWKs from a provided JWKs URI.
@@ -48,7 +42,7 @@ export async function fetchJwks(
   }
 
   if (!result?.success) {
-    throw new ValidationError(`Validation of JWKs from jwks_uri '${jwksUrl}' failed`, result?.error)
+    throw new ValidationError(`Validation of JWKs from jwks_uri '${jwksUrl}' failed`, result?.issues ?? [])
   }
 
   return result.data

@@ -1,4 +1,4 @@
-import type { JweEncryptor } from '@openid4vc/oauth2'
+import type { JweEncryptor } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
 import { createCredentialResponse } from '../credential-request/credential-response'
 import { zCredentialResponseEncryption } from '../credential-request/z-credential-request-common'

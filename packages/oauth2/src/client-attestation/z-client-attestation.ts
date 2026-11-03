@@ -1,7 +1,7 @@
-import { zHttpsUrl, zNumericDate, zTyp } from '@openid4vc/utils'
+import { zHttpsUrl } from '@openid4vc/utils'
+import { zNonEmptyString, zNumericDate, zTyp } from '@owf/identity-common'
+import { zJwk, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
-import { zJwk } from '../common/jwk/z-jwk'
-import { zJwtHeader, zJwtPayload } from '../common/jwt/z-jwt'
 
 export const zOauthClientAttestationHeader = z.literal('OAuth-Client-Attestation')
 export const oauthClientAttestationHeader = zOauthClientAttestationHeader.value
@@ -9,7 +9,7 @@ export const oauthClientAttestationHeader = zOauthClientAttestationHeader.value
 export const zClientAttestationJwtPayload = z
   .object({
     ...zJwtPayload.shape,
-    sub: z.string(),
+    sub: zNonEmptyString,
     exp: zNumericDate,
     cnf: z
       .object({
@@ -41,7 +41,7 @@ export const zOauthClientAttestationChallengeHeader = z.literal('OAuth-Client-At
 export const oauthClientAttestationChallengeHeader = zOauthClientAttestationChallengeHeader.value
 
 // draft 09 §6.1: response body of the authorization server's `challenge_endpoint`.
-export const zClientAttestationChallengeResponse = z.object({ attestation_challenge: z.string() }).loose()
+export const zClientAttestationChallengeResponse = z.object({ attestation_challenge: zNonEmptyString }).loose()
 export type ClientAttestationChallengeResponse = z.infer<typeof zClientAttestationChallengeResponse>
 
 export const zClientAttestationPopJwtPayload = z
@@ -49,12 +49,12 @@ export const zClientAttestationPopJwtPayload = z
     ...zJwtPayload.shape,
     aud: z.union([zHttpsUrl, z.array(zHttpsUrl)]),
 
-    jti: z.string(),
+    jti: zNonEmptyString,
 
     // `challenge` (draft 06+) replaced `nonce`. Both are accepted on verification; `nonce`
     // is retained only for backwards compatibility with <= draft 05 PoP JWTs.
-    challenge: z.optional(z.string()),
-    nonce: z.optional(z.string()),
+    challenge: z.optional(zNonEmptyString),
+    nonce: z.optional(zNonEmptyString),
   })
   .loose()
 export type ClientAttestationPopJwtPayload = z.infer<typeof zClientAttestationPopJwtPayload>
