@@ -1,5 +1,5 @@
 /**
- * WRPRC SDK Types
+ * Registration Certificate SDK Types
  *
  * Based on ETSI TS 119 475 (Wallet-Relying Party Registration Certificates).
  * Document types are derived from Zod schemas in schemas.ts.
@@ -9,7 +9,7 @@
 
 import type { Signer } from '@owf/crypto'
 import type { z } from 'zod'
-import type { WRPRCDialect } from './dialect'
+import type { RegistrationCertificateDialect } from './dialect'
 import type {
   zClaim,
   zCredential,
@@ -18,14 +18,14 @@ import type {
   zMultiLangString,
   zNaturalPersonSubject,
   zProvidedAttestation,
+  zRegistrationCertificateCWT,
+  zRegistrationCertificateCWTHeader,
+  zRegistrationCertificateJWT,
+  zRegistrationCertificateJWTHeader,
+  zRegistrationCertificatePayload,
   zStatus,
   zStatusList,
   zSupervisoryAuthority,
-  zWRPRCCWT,
-  zWRPRCCWTHeader,
-  zWRPRCJWT,
-  zWRPRCJWTHeader,
-  zWRPRCPayload,
 } from './schemas'
 
 // ============================================================================
@@ -54,18 +54,18 @@ export type ProvidedAttestation = z.infer<typeof zProvidedAttestation>
 /** Status list reference for certificate validity */
 export type StatusList = z.infer<typeof zStatusList>
 
-/** Status reference for WRPRC validity */
+/** Status reference for registration certificate validity */
 export type Status = z.infer<typeof zStatus>
 
 /** Intermediary information */
 export type Intermediary = z.infer<typeof zIntermediary>
 
 // ============================================================================
-// WRPRC Document Types
+// Registration Certificate Document Types
 // ============================================================================
 
-/** WRPRC Payload */
-export type WRPRCPayload = z.infer<typeof zWRPRCPayload>
+/** Registration Certificate Payload */
+export type RegistrationCertificatePayload = z.infer<typeof zRegistrationCertificatePayload>
 
 /** Legal person subject payload */
 export type LegalPersonSubject = z.infer<typeof zLegalPersonSubject>
@@ -77,44 +77,44 @@ export type NaturalPersonSubject = z.infer<typeof zNaturalPersonSubject>
 // Header Types
 // ============================================================================
 
-/** JWT Header for WRPRC */
-export type WRPRCJWTHeader = z.infer<typeof zWRPRCJWTHeader>
+/** JWT Header for registration certificate */
+export type RegistrationCertificateJWTHeader = z.infer<typeof zRegistrationCertificateJWTHeader>
 
-/** CWT Header for WRPRC */
-export type WRPRCCWTHeader = z.infer<typeof zWRPRCCWTHeader>
-
-// ============================================================================
-// Complete WRPRC Types
-// ============================================================================
-
-/** Complete JWT WRPRC document */
-export type WRPRCJWT = z.infer<typeof zWRPRCJWT>
-
-/** Complete CWT WRPRC document */
-export type WRPRCCWT = z.infer<typeof zWRPRCCWT>
+/** CWT Header for registration certificate */
+export type RegistrationCertificateCWTHeader = z.infer<typeof zRegistrationCertificateCWTHeader>
 
 // ============================================================================
-// Signed WRPRC Types
+// Complete Registration Certificate Types
 // ============================================================================
 
-/** Signed JWT WRPRC (compact JWS format) */
-export interface SignedWRPRC {
+/** Complete JWT registration certificate document */
+export type RegistrationCertificateJWT = z.infer<typeof zRegistrationCertificateJWT>
+
+/** Complete CWT registration certificate document */
+export type RegistrationCertificateCWT = z.infer<typeof zRegistrationCertificateCWT>
+
+// ============================================================================
+// Signed Registration Certificate Types
+// ============================================================================
+
+/** Signed JWT registration certificate (compact JWS format) */
+export interface SignedRegistrationCertificate {
   /** The compact JWS string */
   jws: string
   /** Decoded header */
-  header: WRPRCJWTHeader
+  header: RegistrationCertificateJWTHeader
   /** Decoded payload */
-  payload: WRPRCPayload
+  payload: RegistrationCertificatePayload
 }
 
-/** Options for signing a WRPRC */
+/** Options for signing a registration certificate */
 export interface SignOptions {
-  /** The WRPRC payload to sign */
-  payload: WRPRCPayload
-  /** Required subject of the access certificate the WRPRC is intended to authorize */
+  /** The registration certificate payload to sign */
+  payload: RegistrationCertificatePayload
+  /** Required subject of the access certificate the registration certificate is intended to authorize */
   accessCertificateSub: string
   /** Algorithm (default: ES256) */
-  algorithm?: WRPRCJWTHeader['alg']
+  algorithm?: RegistrationCertificateJWTHeader['alg']
   /** PEM-encoded certificates for x5c header (each element is a single PEM certificate) */
   certificates: string[]
   /** Key ID (optional) */
@@ -122,7 +122,7 @@ export interface SignOptions {
   /** JAdES claimed signing time; defaults to now */
   signingTime?: number | string | Date
   /** Wire dialect to emit; defaults to ETSI TS 119 475 v1.2.1 as published */
-  dialect?: WRPRCDialect
+  dialect?: RegistrationCertificateDialect
   /** Signer function for signing the JWS */
   signer: Signer
 }
@@ -131,8 +131,8 @@ export interface SignOptions {
 // Builder Input Types
 // ============================================================================
 
-/** Input for creating a legal person WRPRC */
-export interface LegalPersonWRPRCInput {
+/** Input for creating a legal person registration certificate */
+export interface LegalPersonRegistrationCertificateInput {
   /** Trade name (for display) */
   name: string
   /** Legal name of the organization */
@@ -147,8 +147,8 @@ export interface LegalPersonWRPRCInput {
   entitlements: string[]
 }
 
-/** Input for creating a natural person WRPRC */
-export interface NaturalPersonWRPRCInput {
+/** Input for creating a natural person registration certificate */
+export interface NaturalPersonRegistrationCertificateInput {
   /** Trade name (for display) */
   name: string
   /** Given name(s) */

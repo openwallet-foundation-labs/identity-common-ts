@@ -2,7 +2,7 @@
  * Over-asking check
  *
  * Compares the DCQL query of an OpenID4VP request with the credentials and claims a
- * Wallet-Relying Party registered, as listed in the `credentials` of its WRPRC (ETSI TS
+ * Wallet-Relying Party registered, as listed in the `credentials` of its registration certificate (ETSI TS
  * 119 475 Table 9), which follow the shape of a DCQL Credential Query.
  */
 
@@ -47,7 +47,7 @@ export type OverAskingResult = ValidationResult<OverAskingIssue>
 type ClaimPath = (string | number | null)[]
 type ClaimValue = string | number | boolean
 
-/** A registered credential, from the `credentials` of a WRPRC. Either spelling of the claims array is read. */
+/** A registered credential, from the `credentials` of a registration certificate. Either spelling of the claims array is read. */
 export interface RegisteredCredential {
   format: string
   meta: Record<string, unknown>
@@ -104,7 +104,7 @@ const describeMeta = (meta: unknown) => (isRecord(meta) && Object.keys(meta).len
 
 /**
  * Check that an OpenID4VP request asks for no credential or claim beyond what the
- * Wallet-Relying Party registered in its WRPRC.
+ * Wallet-Relying Party registered in its registration certificate.
  *
  * A requested credential needs a registered one of the same format whose `meta` the
  * request stays within. Each requested claim then needs a registered claim of such a
@@ -117,7 +117,7 @@ const describeMeta = (meta: unknown) => (isRecord(meta) && Object.keys(meta).len
  * that the `dcql` library rejects only gets its issues, e.g. `duplicate_credential_query_id`.
  *
  * @param query The DCQL query of the request, e.g. its `dcql_query` parameter, which is parsed and validated with the `dcql` library
- * @param registeredCredentials The `credentials` of the WRPRC payload
+ * @param registeredCredentials The `credentials` of the registration certificate payload
  */
 export function checkOverAsking(
   query: unknown,

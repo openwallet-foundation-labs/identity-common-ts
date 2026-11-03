@@ -1,5 +1,5 @@
 /**
- * WRPRC Zod Schemas
+ * Registration Certificate Zod Schemas
  *
  * Zod schemas for ETSI TS 119 475 (Wallet-Relying Party Registration Certificates).
  * Types are derived from these schemas via z.infer<>.
@@ -82,7 +82,7 @@ export const zStatusList = z.object({
 })
 
 /**
- * Status schema for WRPRC validity
+ * Status schema for registration certificate validity
  */
 export const zStatus = z.object({
   status_list: zStatusList,
@@ -90,27 +90,27 @@ export const zStatus = z.object({
 
 /**
  * Intermediary information when WRP acts through an intermediary (Table 10).
- * The intermediary's semantic identifier comes from its own WRPAC.
+ * The intermediary's semantic identifier comes from its own access certificate.
  *
  * The common name subfield is `sname` per the normative Table 10. The informative
  * Annex C example spells it `name`; see the package README.
  */
 export const zIntermediary = z.object({
-  /** Semantic identifier of the intermediary (from the intermediary's WRPAC) */
+  /** Semantic identifier of the intermediary (from the intermediary's access certificate) */
   sub: z.string().min(1),
   /** Common name of the intermediary */
   sname: z.string().min(1),
 })
 
 // ============================================================================
-// WRPRC Payload Schema
+// Registration Certificate Payload Schema
 // ============================================================================
 
 /**
- * WRPRC Payload schema according to ETSI TS 119 475 clause 5.2.4
+ * Registration Certificate Payload schema according to ETSI TS 119 475 clause 5.2.4
  */
-export const zWRPRCPayload = z.object({
-  /** The subject trade name of the WRPRC (B.2.1 tradeName) */
+export const zRegistrationCertificatePayload = z.object({
+  /** The subject trade name of the registration certificate (B.2.1 tradeName) */
   name: z.string().min(1),
 
   /** Legal name for legal person (B.2.3 legalName) */
@@ -156,17 +156,17 @@ export const zWRPRCPayload = z.object({
   certificate_policy: z.url().optional(),
 
   /**
-   * Unique identifier of this WRPRC (RFC 7519 `jti`).
+   * Unique identifier of this registration certificate (RFC 7519 `jti`).
    *
    * Not listed in ETSI TS 119 475, which leaves the certificate without an identifier
-   * to reference it by. Optional so that WRPRCs issued without one still validate.
+   * to reference it by. Optional so that registration certificates issued without one still validate.
    */
   jti: z.string().min(1).optional(),
 
   /** Issuance time as a Unix timestamp (Table 7) */
   iat: z.number().int().positive(),
 
-  /** Status list for WRPRC validity */
+  /** Status list for registration certificate validity */
   status: zStatus.optional(),
 
   /** Purpose of the intended data processing (localized values) */
@@ -195,14 +195,14 @@ export const zWRPRCPayload = z.object({
 })
 
 // ============================================================================
-// WRPRC Header Schemas
+// Registration Certificate Header Schemas
 // ============================================================================
 
 /**
  * Signature algorithms permitted for JAdES B-B signatures (ETSI TS 119 182-1 clause 5.1.2),
  * referenced by GEN-5.2.1-04.
  */
-export const WRPRC_JWS_ALGORITHMS = [
+export const REGISTRATION_CERTIFICATE_JWS_ALGORITHMS = [
   'ES256',
   'ES384',
   'ES512',
@@ -222,11 +222,11 @@ export const WRPRC_JWS_ALGORITHMS = [
  * requires a JAdES B-B signature, whose protected header carries `iat` as the claimed
  * signing time (ETSI TS 119 182-1 clause 5.1.9). The informative Annex C header omits it.
  */
-export const zWRPRCJWTHeader = z.object({
+export const zRegistrationCertificateJWTHeader = z.object({
   /** Type of the Web Token - must be "rc-wrp+jwt" for JWT */
   typ: zTyp('rc-wrp+jwt'),
   /** Algorithm used to sign the JWT */
-  alg: z.enum(WRPRC_JWS_ALGORITHMS),
+  alg: z.enum(REGISTRATION_CERTIFICATE_JWS_ALGORITHMS),
   /** Certificate chain to verify the JWT */
   x5c: z.array(z.string()).min(1),
   /** Key ID */
@@ -241,35 +241,35 @@ export const zWRPRCJWTHeader = z.object({
  * GEN-5.2.1-05 requires an advanced electronic signature per RFC 9052 and RFC 9360
  * rather than a JAdES profile, so no claimed signing time is imposed here.
  */
-export const zWRPRCCWTHeader = z.object({
+export const zRegistrationCertificateCWTHeader = z.object({
   /** Type of the Web Token - must be "rc-wrp+cwt" for CWT */
   typ: z.literal('rc-wrp+cwt'),
   /** Algorithm used to sign the CWT per RFC 9052 */
   alg: z.number().int(),
   /** Certificate chain to verify the CWT per RFC 9360 */
   x5chain: z.array(z.instanceof(Uint8Array)).min(1),
-  /** Unix timestamp indicating when the WRPRC was issued (payload field, not in Table 6) */
+  /** Unix timestamp indicating when the registration certificate was issued (payload field, not in Table 6) */
   iat: z.number().int().positive().optional(),
 })
 
 // ============================================================================
-// Complete WRPRC Document Schemas
+// Complete Registration Certificate Document Schemas
 // ============================================================================
 
 /**
- * Complete JWT WRPRC schema
+ * Complete JWT registration certificate schema
  */
-export const zWRPRCJWT = z.object({
-  header: zWRPRCJWTHeader,
-  payload: zWRPRCPayload,
+export const zRegistrationCertificateJWT = z.object({
+  header: zRegistrationCertificateJWTHeader,
+  payload: zRegistrationCertificatePayload,
 })
 
 /**
- * Complete CWT WRPRC schema
+ * Complete CWT registration certificate schema
  */
-export const zWRPRCCWT = z.object({
-  header: zWRPRCCWTHeader,
-  payload: zWRPRCPayload,
+export const zRegistrationCertificateCWT = z.object({
+  header: zRegistrationCertificateCWTHeader,
+  payload: zRegistrationCertificatePayload,
 })
 
 // ============================================================================
@@ -277,9 +277,9 @@ export const zWRPRCCWT = z.object({
 // ============================================================================
 
 /**
- * Schema for legal person WRPRC subject
+ * Schema for legal person registration certificate subject
  */
-export const zLegalPersonSubject = zWRPRCPayload
+export const zLegalPersonSubject = zRegistrationCertificatePayload
   .extend({
     sub_ln: z.string().min(1),
   })
@@ -289,9 +289,9 @@ export const zLegalPersonSubject = zWRPRCPayload
   })
 
 /**
- * Schema for natural person WRPRC subject
+ * Schema for natural person registration certificate subject
  */
-export const zNaturalPersonSubject = zWRPRCPayload
+export const zNaturalPersonSubject = zRegistrationCertificatePayload
   .extend({
     sub_gn: z.string().min(1),
     sub_fn: z.string().min(1),

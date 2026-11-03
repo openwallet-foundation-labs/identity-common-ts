@@ -27,7 +27,7 @@ interface ValidationIssueParams {
  * ```typescript
  * addValidationIssue(ctx, { code: 'too_small', message, context: { minimum: 1, inclusive: true, origin: 'string' } })
  * // A code of the package, with its contexts if any
- * addValidationIssue<WRPRCValidationCode>(ctx, { code: 'missing_entitlement', path: ['entitlements'], message })
+ * addValidationIssue<RegistrationCertificateValidationCode>(ctx, { code: 'missing_entitlement', path: ['entitlements'], message })
  * ```
  */
 export function addValidationIssue<

@@ -94,7 +94,7 @@ z.object({ exp: z.number(), iat: z.number() }).superRefine((payload, ctx) => {
 })
 ```
 
-When an assert or parse function finds an error, it throws the validation error of its package, e.g. `WRPRCValidationError`, with the `issues` of the validation. It extends the error of the package, e.g. `WRPRCError`, and `validationErrorMessage` builds its message.
+When an assert or parse function finds an error, it throws the validation error of its package, e.g. `RegistrationCertificateValidationError`, with the `issues` of the validation. It extends the error of the package, e.g. `RegistrationCertificateError`, and `validationErrorMessage` builds its message.
 
 ## Related Packages
 
