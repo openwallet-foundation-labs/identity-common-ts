@@ -1,5 +1,13 @@
 # @owf/eudi-jades
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies [23f227b]
+  - @owf/identity-common@0.7.0
+  - @owf/crypto@0.7.0
+
 ## 0.5.4
 
 ### Patch Changes
