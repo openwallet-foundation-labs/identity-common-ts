@@ -238,7 +238,10 @@ describe('ISO/IEC TS 23220-4 request information', () => {
     })
 
     expect(() => DeviceRequest.decode(encodedDeviceRequest({ deviceRequestInfo: outOfRange }))).toThrow(
-      /^[^✖]*✖ Doc request 5, 6 do not exist, the device request has 2[^✖]*$/
+      expect.objectContaining({
+        message:
+          'Error decoding DeviceRequest\n  - deviceRequestInfo.useCases.0.documentSets: Doc request 5, 6 do not exist, the device request has 2 (invalid_value)',
+      })
     )
   })
 

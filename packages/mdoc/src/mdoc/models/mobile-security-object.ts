@@ -10,7 +10,7 @@ import { ValueDigests, type ValueDigestsStructure } from './value-digests'
 
 // Zod schema for MobileSecurityObject
 // MSO has string keys, so we use z.object and set mapsAsObjects: true
-const mobileSecurityObjectSchema = typedMap([
+const zMobileSecurityObject = typedMap([
   ['version', z.string().regex(supportedVersionRegex)],
   ['digestAlgorithm', z.enum(['SHA-256', 'SHA-384', 'SHA-512'])],
   ['docType', z.string()],
@@ -22,8 +22,8 @@ const mobileSecurityObjectSchema = typedMap([
   ['status', z.instanceof(Status).exactOptional()],
 ])
 
-export type MobileSecurityObjectDecodedStructure = z.output<typeof mobileSecurityObjectSchema>
-export type MobileSecurityObjectEncodedStructure = z.input<typeof mobileSecurityObjectSchema>
+export type MobileSecurityObjectDecodedStructure = z.output<typeof zMobileSecurityObject>
+export type MobileSecurityObjectEncodedStructure = z.input<typeof zMobileSecurityObject>
 
 export type MobileSecurityObjectOptions = {
   version?: '1.0'
@@ -40,7 +40,7 @@ export class MobileSecurityObject extends CborStructure<
   MobileSecurityObjectDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(mobileSecurityObjectSchema.in, mobileSecurityObjectSchema.out, {
+    return z.codec(zMobileSecurityObject.in, zMobileSecurityObject.out, {
       decode: (input) => {
         const map: MobileSecurityObjectDecodedStructure = TypedMap.fromMap(input)
 

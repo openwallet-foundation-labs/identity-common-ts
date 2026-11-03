@@ -11,13 +11,13 @@ enum NfcOptionsKeys {
 //   0 : uint, // Max command data length
 //   1 : uint  // Max response data length
 // }
-const nfcOptionsSchema = typedMap([
+const zNfcOptions = typedMap([
   [NfcOptionsKeys.MaxCommandDataLength, z.number()],
   [NfcOptionsKeys.MaxResponseDataLength, z.number()],
 ] as const)
 
-export type NfcOptionsEncodedStructure = z.input<typeof nfcOptionsSchema>
-export type NfcOptionsDecodedStructure = z.output<typeof nfcOptionsSchema>
+export type NfcOptionsEncodedStructure = z.input<typeof zNfcOptions>
+export type NfcOptionsDecodedStructure = z.output<typeof zNfcOptions>
 
 export type NfcOptionsOptions = {
   maxCommandDataLength: number
@@ -26,7 +26,7 @@ export type NfcOptionsOptions = {
 
 export class NfcOptions extends CborStructure<NfcOptionsEncodedStructure, NfcOptionsDecodedStructure> {
   public static override get encodingSchema() {
-    return nfcOptionsSchema
+    return zNfcOptions
   }
 
   public get maxCommandDataLength() {

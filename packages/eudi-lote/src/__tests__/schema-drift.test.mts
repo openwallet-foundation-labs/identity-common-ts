@@ -3,8 +3,8 @@ import { decodeJwt } from '@owf/identity-common'
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
 import { describe, expect, it } from 'vitest'
-import { validateLoTE } from '../index'
-import type { LoTEDocument } from '../types'
+import { validateLote } from '../index'
+import type { LoteDocument } from '../types'
 import {
   EUPIDProvidersJWT,
   LP26PIDProvidersEmptyJWT,
@@ -14,9 +14,9 @@ import {
 } from './fixtures.mjs'
 
 /**
- * `validateLoTE` against the ETSI TS 119 602 v1.1.1 JSON schema (vendored unchanged in
+ * `validateLote` against the ETSI TS 119 602 v1.1.1 JSON schema (vendored unchanged in
  * ./etsi-ts-119-602), run over the same documents. Both must agree on the documents
- * below, and fail at the same place when they reject one. Where `validateLoTE` knowingly
+ * below, and fail at the same place when they reject one. Where `validateLote` knowingly
  * differs from the schema, looser or stricter, the case is listed with its reason, so a
  * change in either direction shows up here.
  */
@@ -36,9 +36,9 @@ const schemaAccepts = (document: unknown) => {
   return schemaValidate(document) === true
 }
 
-const ecList = (jwt: string) => decodeJwt<Record<string, unknown>, LoTEDocument>(jwt).payload
+const ecList = (jwt: string) => decodeJwt<Record<string, unknown>, LoteDocument>(jwt).payload
 
-const minimal = (): LoTEDocument => ({
+const minimal = (): LoteDocument => ({
   LoTE: {
     ListAndSchemeInformation: {
       LoTEVersionIdentifier: 1,
@@ -138,7 +138,7 @@ const bothAccept: Array<[string, unknown]> = [
 const INFO = 'LoTE.ListAndSchemeInformation'
 const SERVICE = 'LoTE.TrustedEntitiesList.0.TrustedEntityServices.0.ServiceInformation'
 
-// Each case names the path validateLoTE reports; the schema must fail at that path or below it
+// Each case names the path validateLote reports; the schema must fail at that path or below it
 const bothReject: Array<[string, unknown, string]> = [
   ['no ListIssueDateTime', withInfo({ ListIssueDateTime: undefined }), `${INFO}.ListIssueDateTime`],
   [
@@ -200,9 +200,9 @@ const bothReject: Array<[string, unknown, string]> = [
   ],
 ]
 
-// validateLoTE accepts these, the schema does not: kept on purpose, each for its reason
-const looserThanSchema: Array<[string, unknown, string]> = [
-  ['an empty TrustedEntitiesList', withEntities(), 'lists written before createLoTE left the key out'],
+// validateLote accepts these, the schema does not: kept on purpose, each for its reason
+const zLooserThan: Array<[string, unknown, string]> = [
+  ['an empty TrustedEntitiesList', withEntities(), 'lists written before createLote left the key out'],
   [
     'an entity without TEInformationURI',
     withEntities({
@@ -244,8 +244,8 @@ const looserThanSchema: Array<[string, unknown, string]> = [
   ['an unknown property', withInfo({ Unknown: true }), 'zod objects strip unknown keys rather than reject them'],
 ]
 
-// The schema accepts these, validateLoTE does not
-const stricterThanSchema: Array<[string, unknown, string]> = [
+// The schema accepts these, validateLote does not
+const zStricterThan: Array<[string, unknown, string]> = [
   [
     'a URI with a port above 65535',
     withInfo({ LoTEType: 'https://example.com:70000/type' }),
@@ -271,7 +271,7 @@ const stricterThanSchema: Array<[string, unknown, string]> = [
 // The documents go through JSON as a verifier receives them: undefined values drop out
 const asJson = (document: unknown) => JSON.parse(JSON.stringify(document))
 
-// Where ajv failed, as a validateLoTE path: a missing property counts at the property
+// Where ajv failed, as a validateLote path: a missing property counts at the property
 const schemaErrorPaths = () =>
   (schemaValidate?.errors ?? []).map((error) => {
     const missing = error.keyword === 'required' ? `/${error.params.missingProperty}` : ''
@@ -283,7 +283,7 @@ describe('ETSI TS 119 602 v1.1.1 JSON schema drift', () => {
     const json = asJson(document)
 
     expect(schemaAccepts(json)).toBe(true)
-    expect(validateLoTE(json)).toMatchObject({ valid: true, issues: [] })
+    expect(validateLote(json)).toMatchObject({ valid: true, issues: [] })
   })
 
   it.each(bothReject)('both reject %s', (_, document, path) => {
@@ -291,20 +291,20 @@ describe('ETSI TS 119 602 v1.1.1 JSON schema drift', () => {
 
     expect(schemaAccepts(json)).toBe(false)
     expect(schemaErrorPaths().some((p) => p === path || p.startsWith(`${path}.`))).toBe(true)
-    expect(validateLoTE(json).issues.map((issue) => issue.path.join('.'))).toContain(path)
+    expect(validateLote(json).issues.map((issue) => issue.path.join('.'))).toContain(path)
   })
 
-  it.each(looserThanSchema)('only validateLoTE accepts %s (%s)', (_, document) => {
+  it.each(zLooserThan)('only validateLote accepts %s (%s)', (_, document) => {
     const json = asJson(document)
 
     expect(schemaAccepts(json)).toBe(false)
-    expect(validateLoTE(json).valid).toBe(true)
+    expect(validateLote(json).valid).toBe(true)
   })
 
-  it.each(stricterThanSchema)('only the schema accepts %s (%s)', (_, document) => {
+  it.each(zStricterThan)('only the schema accepts %s (%s)', (_, document) => {
     const json = asJson(document)
 
     expect(schemaAccepts(json)).toBe(true)
-    expect(validateLoTE(json).valid).toBe(false)
+    expect(validateLote(json).valid).toBe(false)
   })
 })

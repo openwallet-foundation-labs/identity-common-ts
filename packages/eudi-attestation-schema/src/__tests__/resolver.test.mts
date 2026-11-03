@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { schemaMeta, schemaURI } from '../builders'
+import { schemaMeta, schemaUri } from '../builders'
 import { resolveSchemaReferences } from '../resolver'
 
 function withSri(content: string): string {
@@ -20,8 +20,8 @@ describe('resolveSchemaReferences', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/sd-jwt.json')
           .integrity(withSri(content))
@@ -51,16 +51,16 @@ describe('resolveSchemaReferences', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/sd-jwt.json')
           .integrity(withSri(sdJwtContent))
           .meta({ vct: 'eu.example.1' })
           .build()
       )
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('mso_mdoc')
           .uri('https://example.com/mdoc.json')
           .integrity(withSri(mdocContent))
@@ -89,8 +89,8 @@ describe('resolveSchemaReferences', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/sd-jwt.json')
           .integrity(withSri(content))
@@ -119,8 +119,8 @@ describe('resolveSchemaReferences', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/sd-jwt.json')
           .integrity(withSri('{"different":true}'))

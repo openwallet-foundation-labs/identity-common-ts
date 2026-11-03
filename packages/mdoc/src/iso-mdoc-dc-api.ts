@@ -59,33 +59,30 @@ const minimumNonceLength = 16
 /**
  * Base64url-no-pad, as Annex C encodes every member of the request and response payloads.
  */
-const base64UrlSchema = z.base64url().min(1)
+const zBase64Url = z.base64url().min(1)
 
 /**
  * Request payload exchanged over the DC API (C.2). Both members are base64url-no-pad encoded CBOR.
  */
-export const isoMdocDcApiRequestSchema = z.object({
-  deviceRequest: base64UrlSchema,
-  encryptionInfo: base64UrlSchema,
+export const zIsoMdocDcApiRequest = z.object({
+  deviceRequest: zBase64Url,
+  encryptionInfo: zBase64Url,
 })
-export type IsoMdocDcApiRequest = z.infer<typeof isoMdocDcApiRequestSchema>
+export type IsoMdocDcApiRequest = z.infer<typeof zIsoMdocDcApiRequest>
 
 /**
  * Response payload returned over the DC API (C.3), base64url-no-pad encoded CBOR.
  */
-export const isoMdocDcApiResponseSchema = z.object({
-  response: base64UrlSchema,
+export const zIsoMdocDcApiResponse = z.object({
+  response: zBase64Url,
 })
-export type IsoMdocDcApiResponse = z.infer<typeof isoMdocDcApiResponseSchema>
+export type IsoMdocDcApiResponse = z.infer<typeof zIsoMdocDcApiResponse>
 
 /**
  * The response as it may be handed to {@link IsoMdocDcApi.decryptResponse}, normalized to the
  * base64url `response` string.
  */
-const isoMdocDcApiResponseInputSchema = z.union([
-  base64UrlSchema,
-  isoMdocDcApiResponseSchema.transform(({ response }) => response),
-])
+const zIsoMdocDcApiResponseInput = z.union([zBase64Url, zIsoMdocDcApiResponse.transform(({ response }) => response)])
 
 export type IsoMdocDcApiParsedDocRequest = {
   docRequest: DocRequest
@@ -260,7 +257,7 @@ export class IsoMdocDcApi {
     assertSerializedOrigin(origin)
 
     // The request is handed to us by the platform, so validate its shape before decoding anything.
-    const request = parseOrThrow(isoMdocDcApiRequestSchema, options.request, InvalidDcApiRequestError, 'DC API request')
+    const request = parseOrThrow(zIsoMdocDcApiRequest, options.request, InvalidDcApiRequestError, 'DC API request')
 
     const encryptionInfoBase64Url = request.encryptionInfo
     const encryptionInfo = decodeOrThrow(
@@ -410,7 +407,7 @@ export class IsoMdocDcApi {
 
     // The response comes from the wallet, so validate its shape before decoding anything.
     const response = parseOrThrow(
-      isoMdocDcApiResponseInputSchema,
+      zIsoMdocDcApiResponseInput,
       options.response,
       InvalidDcApiResponseError,
       'DC API response'

@@ -27,5 +27,8 @@
   },
   "scripts": {
     "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+  },
+  "dependencies": {
+    "zod": "catalog:"
   }
 }

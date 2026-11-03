@@ -124,7 +124,7 @@ export async function resolveOpenid4vpAuthorizationRequest(
 
   let payloadValidationError: Oauth2ServerErrorResponseError | undefined
   try {
-    validateOpenId4vpAuthorizationRequestPayload({
+    validateAuthorizationRequestPayloadForResponseMode({
       authorizationRequestPayload,
       wallet,
       jar: jar !== undefined,
@@ -228,7 +228,7 @@ type ExpectedResponseMode =
       type: 'direct_post'
     }
 
-function validateOpenId4vpAuthorizationRequestPayload(options: {
+function validateAuthorizationRequestPayloadForResponseMode(options: {
   authorizationRequestPayload: Openid4vpAuthorizationRequestPayload
   wallet?: WalletVerificationOptions
   jar: boolean

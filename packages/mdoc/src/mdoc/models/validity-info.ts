@@ -4,7 +4,7 @@ import { z } from 'zod'
 // Zod schema for ValidityInfo validation
 // The CBOR date extension (tag 0) handles Date <-> ISO string conversion automatically
 // So we just use z.date() and let CBOR handle the encoding/decoding
-const validityInfoSchema = typedMap([
+const zValidityInfo = typedMap([
   ['signed', z.date()],
   ['validFrom', z.date()],
   ['validUntil', z.date()],
@@ -12,8 +12,8 @@ const validityInfoSchema = typedMap([
 ])
 
 // Infer structure type from Zod schema (this is the output type after decoding)
-export type ValidityInfoEncodedStructure = z.input<typeof validityInfoSchema>
-export type ValidityInfoDecodedStructure = z.output<typeof validityInfoSchema>
+export type ValidityInfoEncodedStructure = z.input<typeof zValidityInfo>
+export type ValidityInfoDecodedStructure = z.output<typeof zValidityInfo>
 
 // Manual options type (user-facing API)
 export type ValidityInfoOptions = {
@@ -25,7 +25,7 @@ export type ValidityInfoOptions = {
 
 export class ValidityInfo extends CborStructure<ValidityInfoEncodedStructure, ValidityInfoDecodedStructure> {
   public static override get encodingSchema() {
-    return validityInfoSchema
+    return zValidityInfo
   }
 
   public get signed() {

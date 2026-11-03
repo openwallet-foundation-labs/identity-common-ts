@@ -8,15 +8,15 @@ import type { Namespace } from './namespace'
  */
 export type ElementReference = [Namespace, DataElementIdentifier]
 
-const elementReferenceSchema = z.tuple([z.string(), z.string()])
+const zElementReference = z.tuple([z.string(), z.string()])
 
-const alternativeDataElementsSetSchema = typedMap([
-  ['requestedElement', elementReferenceSchema],
-  ['alternativeElementSets', z.array(z.array(elementReferenceSchema).min(1)).min(1)],
+const zAlternativeDataElementsSet = typedMap([
+  ['requestedElement', zElementReference],
+  ['alternativeElementSets', z.array(z.array(zElementReference).min(1)).min(1)],
 ] as const)
 
-export type AlternativeDataElementsSetEncodedStructure = z.input<typeof alternativeDataElementsSetSchema>
-export type AlternativeDataElementsSetDecodedStructure = z.output<typeof alternativeDataElementsSetSchema>
+export type AlternativeDataElementsSetEncodedStructure = z.input<typeof zAlternativeDataElementsSet>
+export type AlternativeDataElementsSetDecodedStructure = z.output<typeof zAlternativeDataElementsSet>
 
 export type AlternativeDataElementsSetOptions = {
   requestedElement: ElementReference
@@ -37,7 +37,7 @@ export class AlternativeDataElementsSet extends CborStructure<
   AlternativeDataElementsSetDecodedStructure
 > {
   public static override get encodingSchema() {
-    return alternativeDataElementsSetSchema
+    return zAlternativeDataElementsSet
   }
 
   public get requestedElement(): ElementReference {

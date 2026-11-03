@@ -42,7 +42,7 @@ import {
 import { parseName } from './name'
 import { parseQcStatements } from './qc-statements'
 import type { Certificate, CertificatePolicyInformation } from './types'
-import { X509Exception } from './x509-exception'
+import { X509Error } from './x509-error'
 
 const SIGNATURE_ALGORITHM_BY_OID = new Map<string, SignatureAlgorithm>(
   Object.entries(SIGNATURE_ALGORITHMS).map(([name, { oid }]) => [oid, name as SignatureAlgorithm])
@@ -77,7 +77,7 @@ function toPolicies(policies: CertificatePolicies | undefined): CertificatePolic
  *
  * @param input DER bytes, base64 encoded DER, or PEM
  * @param options Resource limits forwarded to asn1js (`berOptions`)
- * @throws X509Exception when the input is not a well-formed X.509 certificate
+ * @throws X509Error when the input is not a well-formed X.509 certificate
  */
 export function parseCertificate(input: CertificateInput, options?: IAsnParseOptions): Certificate {
   const der = toDer(input, PEM_LABELS.certificate)
@@ -86,10 +86,10 @@ export function parseCertificate(input: CertificateInput, options?: IAsnParseOpt
   try {
     certificate = AsnConvert.parse(toArrayBuffer(der), X509Certificate, options)
   } catch (error) {
-    throw new X509Exception('Invalid X.509 certificate', error)
+    throw new X509Error('Invalid X.509 certificate', error)
   }
   if (!certificate.tbsCertificateRaw) {
-    throw new X509Exception('Unable to extract the TBSCertificate')
+    throw new X509Error('Unable to extract the TBSCertificate')
   }
 
   const tbs = certificate.tbsCertificate

@@ -1,5 +1,5 @@
 /**
- * WRPRC SDK Types
+ * Registration Certificate SDK Types
  *
  * Based on ETSI TS 119 475 (Wallet-Relying Party Registration Certificates).
  * Document types are derived from Zod schemas in schemas.ts.
@@ -9,23 +9,23 @@
 
 import type { Signer } from '@owf/crypto'
 import type { z } from 'zod'
-import type { WRPRCDialect } from './dialect'
+import type { RegistrationCertificateDialect } from './dialect'
 import type {
-  ClaimSchema,
-  CredentialSchema,
-  IntermediarySchema,
-  LegalPersonSubjectSchema,
-  MultiLangStringSchema,
-  NaturalPersonSubjectSchema,
-  ProvidedAttestationSchema,
-  StatusListSchema,
-  StatusSchema,
-  SupervisoryAuthoritySchema,
-  WRPRCCWTHeaderSchema,
-  WRPRCCWTSchema,
-  WRPRCJWTHeaderSchema,
-  WRPRCJWTSchema,
-  WRPRCPayloadSchema,
+  zClaim,
+  zCredential,
+  zIntermediary,
+  zLegalPersonSubject,
+  zMultiLangString,
+  zNaturalPersonSubject,
+  zProvidedAttestation,
+  zRegistrationCertificateCwt,
+  zRegistrationCertificateCwtHeader,
+  zRegistrationCertificateJwt,
+  zRegistrationCertificateJwtHeader,
+  zRegistrationCertificatePayload,
+  zStatus,
+  zStatusList,
+  zSupervisoryAuthority,
 } from './schemas'
 
 // ============================================================================
@@ -33,88 +33,88 @@ import type {
 // ============================================================================
 
 /** Multilingual string with language tag (B.2.6 Class MultiLangString) */
-export type MultiLangString = z.infer<typeof MultiLangStringSchema>
+export type MultiLangString = z.infer<typeof zMultiLangString>
 
 // ============================================================================
 // Identity Types
 // ============================================================================
 
 /** Supervisory Authority (Data Protection Authority) */
-export type SupervisoryAuthority = z.infer<typeof SupervisoryAuthoritySchema>
+export type SupervisoryAuthority = z.infer<typeof zSupervisoryAuthority>
 
 /** Claim specification for credential attributes (B.2.10 Class Claim) */
-export type Claim = z.infer<typeof ClaimSchema>
+export type Claim = z.infer<typeof zClaim>
 
 /** Credential specification for attestations (B.2.9 Class Credential) */
-export type Credential = z.infer<typeof CredentialSchema>
+export type Credential = z.infer<typeof zCredential>
 
 /** Credential issued by the WRP for `provides_attestations` (Table 8) */
-export type ProvidedAttestation = z.infer<typeof ProvidedAttestationSchema>
+export type ProvidedAttestation = z.infer<typeof zProvidedAttestation>
 
 /** Status list reference for certificate validity */
-export type StatusList = z.infer<typeof StatusListSchema>
+export type StatusList = z.infer<typeof zStatusList>
 
-/** Status reference for WRPRC validity */
-export type Status = z.infer<typeof StatusSchema>
+/** Status reference for registration certificate validity */
+export type Status = z.infer<typeof zStatus>
 
 /** Intermediary information */
-export type Intermediary = z.infer<typeof IntermediarySchema>
+export type Intermediary = z.infer<typeof zIntermediary>
 
 // ============================================================================
-// WRPRC Document Types
+// Registration Certificate Document Types
 // ============================================================================
 
-/** WRPRC Payload */
-export type WRPRCPayload = z.infer<typeof WRPRCPayloadSchema>
+/** Registration Certificate Payload */
+export type RegistrationCertificatePayload = z.infer<typeof zRegistrationCertificatePayload>
 
 /** Legal person subject payload */
-export type LegalPersonSubject = z.infer<typeof LegalPersonSubjectSchema>
+export type LegalPersonSubject = z.infer<typeof zLegalPersonSubject>
 
 /** Natural person subject payload */
-export type NaturalPersonSubject = z.infer<typeof NaturalPersonSubjectSchema>
+export type NaturalPersonSubject = z.infer<typeof zNaturalPersonSubject>
 
 // ============================================================================
 // Header Types
 // ============================================================================
 
-/** JWT Header for WRPRC */
-export type WRPRCJWTHeader = z.infer<typeof WRPRCJWTHeaderSchema>
+/** JWT Header for registration certificate */
+export type RegistrationCertificateJwtHeader = z.infer<typeof zRegistrationCertificateJwtHeader>
 
-/** CWT Header for WRPRC */
-export type WRPRCCWTHeader = z.infer<typeof WRPRCCWTHeaderSchema>
-
-// ============================================================================
-// Complete WRPRC Types
-// ============================================================================
-
-/** Complete JWT WRPRC document */
-export type WRPRCJWT = z.infer<typeof WRPRCJWTSchema>
-
-/** Complete CWT WRPRC document */
-export type WRPRCCWT = z.infer<typeof WRPRCCWTSchema>
+/** CWT Header for registration certificate */
+export type RegistrationCertificateCwtHeader = z.infer<typeof zRegistrationCertificateCwtHeader>
 
 // ============================================================================
-// Signed WRPRC Types
+// Complete Registration Certificate Types
 // ============================================================================
 
-/** Signed JWT WRPRC (compact JWS format) */
-export interface SignedWRPRC {
+/** Complete JWT registration certificate document */
+export type RegistrationCertificateJwt = z.infer<typeof zRegistrationCertificateJwt>
+
+/** Complete CWT registration certificate document */
+export type RegistrationCertificateCwt = z.infer<typeof zRegistrationCertificateCwt>
+
+// ============================================================================
+// Signed Registration Certificate Types
+// ============================================================================
+
+/** Signed JWT registration certificate (compact JWS format) */
+export interface SignedRegistrationCertificate {
   /** The compact JWS string */
   jws: string
   /** Decoded header */
-  header: WRPRCJWTHeader
+  header: RegistrationCertificateJwtHeader
   /** Decoded payload */
-  payload: WRPRCPayload
+  payload: RegistrationCertificatePayload
 }
 
-/** Options for signing a WRPRC */
+/** Options for signing a registration certificate */
 export interface SignOptions {
-  /** The WRPRC payload to sign */
-  payload: WRPRCPayload
-  /** Required subject of the access certificate the WRPRC is intended to authorize */
+  /** The registration certificate payload to sign */
+  payload: RegistrationCertificatePayload
+  /** Required subject of the access certificate the registration certificate is intended to authorize */
   accessCertificateSub: string
   /** Algorithm (default: ES256) */
-  algorithm?: WRPRCJWTHeader['alg']
+  algorithm?: RegistrationCertificateJwtHeader['alg']
   /** PEM-encoded certificates for x5c header (each element is a single PEM certificate) */
   certificates: string[]
   /** Key ID (optional) */
@@ -122,7 +122,7 @@ export interface SignOptions {
   /** JAdES claimed signing time; defaults to now */
   signingTime?: number | string | Date
   /** Wire dialect to emit; defaults to ETSI TS 119 475 v1.2.1 as published */
-  dialect?: WRPRCDialect
+  dialect?: RegistrationCertificateDialect
   /** Signer function for signing the JWS */
   signer: Signer
 }
@@ -131,8 +131,8 @@ export interface SignOptions {
 // Builder Input Types
 // ============================================================================
 
-/** Input for creating a legal person WRPRC */
-export interface LegalPersonWRPRCInput {
+/** Input for creating a legal person registration certificate */
+export interface LegalPersonRegistrationCertificateInput {
   /** Trade name (for display) */
   name: string
   /** Legal name of the organization */
@@ -147,8 +147,8 @@ export interface LegalPersonWRPRCInput {
   entitlements: string[]
 }
 
-/** Input for creating a natural person WRPRC */
-export interface NaturalPersonWRPRCInput {
+/** Input for creating a natural person registration certificate */
+export interface NaturalPersonRegistrationCertificateInput {
   /** Trade name (for display) */
   name: string
   /** Given name(s) */

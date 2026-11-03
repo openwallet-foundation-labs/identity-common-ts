@@ -1,4 +1,4 @@
-import { CryptoException } from './crypto-exception'
+import { CryptoError } from './crypto-error'
 
 const BLOCK_SIZE = 16
 
@@ -11,7 +11,7 @@ const BLOCK_SIZE = 16
  */
 export async function getAesBlockEncrypter(key: Uint8Array | CryptoKey) {
   if (!(key instanceof Uint8Array) && (key.algorithm.name !== 'AES-CBC' || !key.usages.includes('encrypt'))) {
-    throw new CryptoException(
+    throw new CryptoError(
       `CryptoKey must be an AES-CBC key with the encrypt usage, got ${key.algorithm.name} with ${key.usages.join(', ') || 'no usages'}`
     )
   }
@@ -24,7 +24,7 @@ export async function getAesBlockEncrypter(key: Uint8Array | CryptoKey) {
 
   return async (block: Uint8Array<ArrayBuffer>): Promise<Uint8Array> => {
     if (block.length !== BLOCK_SIZE) {
-      throw new CryptoException(`AES block must be ${BLOCK_SIZE} bytes, got ${block.length}`)
+      throw new CryptoError(`AES block must be ${BLOCK_SIZE} bytes, got ${block.length}`)
     }
     const encrypted = await globalThis.crypto.subtle.encrypt({ name: 'AES-CBC', iv }, cryptoKey, block)
     return new Uint8Array(encrypted, 0, BLOCK_SIZE)

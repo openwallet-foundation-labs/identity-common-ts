@@ -3,7 +3,7 @@ import type { Openid4vpAuthorizationRequest } from '../authorization-request/z-a
 import type { Openid4vpAuthorizationRequestDcApi } from '../authorization-request/z-authorization-request-dc-api'
 import type { Openid4vpAuthorizationRequestIae } from '../authorization-request/z-authorization-request-iae'
 import { parseDcqlVpToken, parsePexVpToken } from '../vp-token/parse-vp-token'
-import type { ValidateOpenid4VpAuthorizationResponseResult } from './validate-authorization-response-result'
+import type { ValidateOpenid4vpAuthorizationResponseResult } from './validate-authorization-response-result'
 import type { Openid4vpAuthorizationResponse } from './z-authorization-response'
 
 export interface ValidateOpenid4vpAuthorizationResponseOptions {
@@ -23,7 +23,7 @@ export interface ValidateOpenid4vpAuthorizationResponseOptions {
  */
 export function validateOpenid4vpAuthorizationResponsePayload(
   options: ValidateOpenid4vpAuthorizationResponseOptions
-): ValidateOpenid4VpAuthorizationResponseResult {
+): ValidateOpenid4vpAuthorizationResponseResult {
   const { authorizationRequestPayload, authorizationResponsePayload } = options
 
   if (authorizationRequestPayload.state && authorizationRequestPayload.state !== authorizationResponsePayload.state) {

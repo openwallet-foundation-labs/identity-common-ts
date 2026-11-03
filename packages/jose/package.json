@@ -1,0 +1,45 @@
+{
+  "name": "@owf/jose",
+  "version": "0.0.0",
+  "description": "JOSE (JWK, JWA, JWS, JWT and JWE) with strict, schema based parsing and verification",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "exports": "./src/index.ts",
+  "homepage": "https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/jose",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openwallet-foundation-labs/identity-common-ts",
+    "directory": "packages/jose"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.mjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+  },
+  "dependencies": {
+    "@owf/identity-common": "workspace:*",
+    "zod": "catalog:"
+  },
+  "keywords": [
+    "jose",
+    "jwk",
+    "jwa",
+    "jws",
+    "jwt",
+    "jwe",
+    "react-native"
+  ]
+}

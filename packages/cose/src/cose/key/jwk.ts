@@ -63,8 +63,6 @@ const jwkCoseKeyMap = {
     unwrapKey: KeyOps.UnwrapKey,
     deriveKey: KeyOps.DeriveKey,
     deriveBits: KeyOps.DeriveBits,
-    mACCreate: KeyOps.MACCreate,
-    mACVerify: KeyOps.MACVerify,
   },
 }
 
@@ -83,11 +81,15 @@ const coseKeyJwkMap: typeof swappedJwkCoseKeyMap = {
   },
 }
 
+// JWK has no MAC key operations: a MAC key uses sign and verify (RFC 7517 Section 4.3, RFC 9052 Table 5)
+const jwkMacKeyOps: Record<string, KeyOps> = { sign: KeyOps.MacCreate, verify: KeyOps.MacVerify }
+const coseMacKeyOps: Record<number, string> = { [KeyOps.MacCreate]: 'sign', [KeyOps.MacVerify]: 'verify' }
+
 export const jwkCoseOptionsMap: Record<string, keyof CoseKeyOptions> = {
   kty: 'keyType',
   kid: 'keyId',
   alg: 'algorithm',
-  keyOps: 'keyOps',
+  key_ops: 'keyOps',
   baseIv: 'baseIv',
   crv: 'curve',
   x: 'x',
@@ -104,9 +106,14 @@ export const jwkToCoseKey = {
   crv: (crv?: unknown) => jwkCoseKeyMap.crv[crv as keyof (typeof jwkCoseKeyMap)['crv']] ?? crv,
   alg: (alg?: unknown) => jwkCoseKeyMap.alg[alg as keyof (typeof jwkCoseKeyMap)['alg']] ?? alg,
   kid: (kid?: unknown) => kid,
-  keyOps: (keyOps?: unknown) =>
+  key_ops: (keyOps?: unknown, jwk?: Record<string, unknown>) =>
     Array.isArray(keyOps)
-      ? keyOps?.map((ko) => jwkCoseKeyMap.keyOps[ko as keyof (typeof jwkCoseKeyMap)['keyOps']] ?? ko)
+      ? keyOps.map(
+          (ko) =>
+            (jwk?.kty === 'oct' ? jwkMacKeyOps[ko] : undefined) ??
+            jwkCoseKeyMap.keyOps[ko as keyof (typeof jwkCoseKeyMap)['keyOps']] ??
+            ko
+        )
       : undefined,
   x: (s?: unknown) => (s && typeof s === 'string' ? base64url.decode(s) : undefined),
   y: (s?: unknown) => (s && typeof s === 'string' ? base64url.decode(s) : undefined),
@@ -119,7 +126,7 @@ export const coseKeyToJwkClaim = {
   keyId: (keyId: unknown) => keyId,
   algorithm: (algorithm?: SignatureAlgorithm | MacAlgorithm) => (algorithm ? coseKeyJwkMap.alg[algorithm] : undefined),
   keyOps: (keyOps?: unknown) =>
-    keyOps && Array.isArray(keyOps) ? keyOps.map((ko) => coseKeyJwkMap.keyOps[ko]) : undefined,
+    keyOps && Array.isArray(keyOps) ? keyOps.map((ko) => coseMacKeyOps[ko] ?? coseKeyJwkMap.keyOps[ko]) : undefined,
   baseIv: (baseIv?: unknown) => baseIv,
   curve: (curve?: Curve) => (curve ? coseKeyJwkMap.crv[curve] : undefined),
   x: (x?: Uint8Array) => (x ? base64url.encode(x) : undefined),

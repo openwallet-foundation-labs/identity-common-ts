@@ -1,7 +1,7 @@
 import { createFetcher, type FetchRequestInit, type FetchResponse, type HttpMethod } from '@openid4vc/utils'
 import type { CallbackContext } from '../callbacks'
 import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
-import { shouldRetryResourceRequestWithDPoPNonce } from '../dpop/dpop-retry'
+import { shouldRetryResourceRequestWithDpopNonce } from '../dpop/dpop-retry'
 import {
   Oauth2ResourceUnauthorizedError,
   type WwwAuthenticateHeaderChallenge,
@@ -107,7 +107,7 @@ export async function resourceRequest(
 
   const shouldRetryWithNonce = options.dpop?.retryWithNonce ?? true
   const dpopRetry = resourceUnauthorizedError
-    ? shouldRetryResourceRequestWithDPoPNonce({
+    ? shouldRetryResourceRequestWithDpopNonce({
         responseHeaders: response.headers,
         resourceUnauthorizedError: resourceUnauthorizedError,
       })

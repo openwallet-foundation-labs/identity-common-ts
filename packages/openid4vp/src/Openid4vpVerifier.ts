@@ -30,7 +30,7 @@ export interface Openid4vpVerifierOptions {
 export class Openid4vpVerifier {
   public constructor(private options: Openid4vpVerifierOptions) {}
 
-  public async createOpenId4vpAuthorizationRequest(
+  public async createOpenid4vpAuthorizationRequest(
     options: Omit<CreateOpenid4vpAuthorizationRequestOptions, 'callbacks'>
   ) {
     return createOpenid4vpAuthorizationRequest({ ...options, callbacks: this.options.callbacks })

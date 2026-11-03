@@ -1,5 +1,7 @@
 import assert from 'node:assert'
+import { IdentityError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
+import { DcqlParseError } from '../../dcql-error/e-dcql.js'
 import { DcqlPresentationResult } from '../../dcql-presentation/m-dcql-presentation-result.js'
 import { DcqlQuery } from '../../dcql-query/m-dcql-query.js'
 import type { DcqlMdocCredential, DcqlSdJwtVcCredential, DcqlW3cVcCredential } from '../../u-dcql-credential.js'
@@ -308,6 +310,16 @@ const exampleSdJwtVc = {
 } satisfies DcqlW3cVcCredential
 
 describe('dcql-query', () => {
+  it('rejects a meta that is an array', () => {
+    for (const format of ['mso_mdoc', 'dc+sd-jwt'] as const) {
+      expect(() => DcqlQuery.parse({ credentials: [{ id: 'credential', format, meta: [] as never }] })).toThrow(
+        expect.objectContaining({
+          issues: [expect.objectContaining({ code: 'invalid_type', path: ['credentials', 0, 'meta'] })],
+        })
+      )
+    }
+  })
+
   it('mdoc mvrc query fails with invalid mdoc', (_t) => {
     const query = DcqlQuery.parse(mdocMvrcQuery)
     DcqlQuery.validate(query)
@@ -327,29 +339,52 @@ describe('dcql-query', () => {
             trusted_authorities: {
               failed_trusted_authorities: [
                 {
-                  issues: {
-                    values: [
-                      "Expected one of the trusted authority values to be 'one' | 'two' but received 'something'",
-                    ],
-                  },
-                  output: {
-                    type: 'aki',
-                    values: ['something'],
-                  },
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'trusted_authority_mismatch',
+                      path: ['values'],
+                      message:
+                        "Expected one of the trusted authority values to be 'one' | 'two' but received 'something'",
+                      context: {
+                        actual: { type: 'aki', values: ['something'] },
+                        expected: { type: 'aki', values: ['one', 'two'] },
+                      },
+                    },
+                  ],
                   success: false,
                   trusted_authority_index: 0,
                 },
                 {
-                  issues: {
-                    type: ["Expected trusted authority type to be 'openid_federation' but received 'aki'"],
-                    values: [
-                      "Expected one of the trusted authority values to be 'https://federation.com' | 'https://agent.com' but received 'something'",
-                    ],
-                  },
-                  output: {
-                    type: 'aki',
-                    values: ['something'],
-                  },
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'trusted_authority_mismatch',
+                      path: ['type'],
+                      message: "Expected trusted authority type to be 'openid_federation' but received 'aki'",
+                      context: {
+                        actual: { type: 'aki', values: ['something'] },
+                        expected: {
+                          type: 'openid_federation',
+                          values: ['https://federation.com', 'https://agent.com'],
+                        },
+                      },
+                    },
+                    {
+                      severity: 'error',
+                      code: 'trusted_authority_mismatch',
+                      path: ['values'],
+                      message:
+                        "Expected one of the trusted authority values to be 'https://federation.com' | 'https://agent.com' but received 'something'",
+                      context: {
+                        actual: { type: 'aki', values: ['something'] },
+                        expected: {
+                          type: 'openid_federation',
+                          values: ['https://federation.com', 'https://agent.com'],
+                        },
+                      },
+                    },
+                  ],
                   success: false,
                   trusted_authority_index: 1,
                 },
@@ -358,14 +393,15 @@ describe('dcql-query', () => {
             },
             meta: {
               success: false,
-              issues: {
-                doctype: ["Expected doctype to be 'org.iso.7367.1.mVRC' but received 'example_doctype'"],
-              },
-              output: {
-                cryptographic_holder_binding: true,
-                credential_format: 'mso_mdoc',
-                doctype: 'example_doctype',
-              },
+              issues: [
+                {
+                  severity: 'error',
+                  code: 'doctype_mismatch',
+                  path: ['doctype'],
+                  message: "Expected doctype to be 'org.iso.7367.1.mVRC' but received 'example_doctype'",
+                  context: { actual: 'example_doctype', expected: 'org.iso.7367.1.mVRC' },
+                },
+              ],
             },
             claims: {
               success: false,
@@ -375,30 +411,48 @@ describe('dcql-query', () => {
                   success: false,
                   failed_claim_indexes: [0, 1],
                   valid_claim_indexes: undefined,
-                  issues: {
-                    'org.iso.18013.5.1': ["Expected claim 'org.iso.18013.5.1'.'first_name' to be defined"],
-                    'org.iso.7367.1': ["Expected claim 'org.iso.7367.1'.'vehicle_holder' to be defined"],
-                  },
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'claims_path_not_found',
+                      path: ['org.iso.7367.1'],
+                      message: "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be defined",
+                    },
+                    {
+                      severity: 'error',
+                      code: 'claims_path_not_found',
+                      path: ['org.iso.18013.5.1'],
+                      message: "Expected claim 'org.iso.18013.5.1'.'first_name' to be defined",
+                    },
+                  ],
                 },
               ],
               failed_claims: [
                 {
                   success: false,
                   claim_id: undefined,
-                  issues: {
-                    'org.iso.7367.1': ["Expected claim 'org.iso.7367.1'.'vehicle_holder' to be defined"],
-                  },
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'claims_path_not_found',
+                      path: ['org.iso.7367.1'],
+                      message: "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be defined",
+                    },
+                  ],
                   claim_index: 0,
-                  output: {},
                 },
                 {
                   success: false,
                   claim_id: undefined,
-                  issues: {
-                    'org.iso.18013.5.1': ["Expected claim 'org.iso.18013.5.1'.'first_name' to be defined"],
-                  },
+                  issues: [
+                    {
+                      severity: 'error',
+                      code: 'claims_path_not_found',
+                      path: ['org.iso.18013.5.1'],
+                      message: "Expected claim 'org.iso.18013.5.1'.'first_name' to be defined",
+                    },
+                  ],
                   claim_index: 1,
-                  output: {},
                 },
               ],
               valid_claims: undefined,
@@ -704,19 +758,28 @@ describe('dcql-query', () => {
             },
             meta: {
               success: false,
-              issues: {
-                type: [
-                  'Expected type to include all values from one of the following subsets: [https://example.org/examples#AlumniCredential, https://example.org/examples#BachelorDegree] | [https://www.w3.org/2018/credentials#VerifiableCredential, https://example.org/examples#UniversityDegreeCredential]',
-                ],
-              },
-              output: {
-                credential_format: 'ldp_vc',
-                cryptographic_holder_binding: false,
-                type: [
-                  'https://www.w3.org/2018/credentials#VerifiableCredential',
-                  'https://example.org/examples#AlumniCredential',
-                ],
-              },
+              issues: [
+                {
+                  severity: 'error',
+                  code: 'type_mismatch',
+                  path: ['type'],
+                  message:
+                    'Expected type to include all values from one of the following subsets: [https://example.org/examples#AlumniCredential, https://example.org/examples#BachelorDegree] | [https://www.w3.org/2018/credentials#VerifiableCredential, https://example.org/examples#UniversityDegreeCredential]',
+                  context: {
+                    actual: [
+                      'https://www.w3.org/2018/credentials#VerifiableCredential',
+                      'https://example.org/examples#AlumniCredential',
+                    ],
+                    expected: [
+                      ['https://example.org/examples#AlumniCredential', 'https://example.org/examples#BachelorDegree'],
+                      [
+                        'https://www.w3.org/2018/credentials#VerifiableCredential',
+                        'https://example.org/examples#UniversityDegreeCredential',
+                      ],
+                    ],
+                  },
+                },
+              ],
             },
             claims: {
               success: true,
@@ -1109,5 +1172,204 @@ describe('dcql-query', () => {
       { dcqlQuery: query }
     )
     expect(presentationQueryResult.can_be_satisfied).toBe(false)
+  })
+
+  it('throws a DcqlParseError with the issues of an invalid query', (_t) => {
+    const parse = () =>
+      DcqlQuery.parse({
+        credentials: [
+          {
+            id: 'my credential',
+            format: 'dc+sd-jwt',
+            claims: [{ path: ['nationalities', -1] }],
+            trusted_authorities: [{ type: 'aki', values: ['a+b'] }],
+          },
+          { format: 'mso_mdoc', claims: [{ path: ['org.iso.18013.5.1'] }] },
+          { id: 'mvrc', format: 'mso_vc', claim_sets: [] },
+        ],
+      } as never)
+
+    expect(parse).toThrow(DcqlParseError)
+    expect(parse).toThrow(IdentityError)
+    expect(parse).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'invalid_format',
+            path: ['credentials', 0, 'id'],
+            message: 'Expected a non-empty string of alphanumeric, underscore (_) or hyphen (-) characters',
+            context: { format: 'regex' },
+          },
+          {
+            severity: 'error',
+            code: 'invalid_format',
+            path: ['credentials', 0, 'trusted_authorities', 0, 'values', 0],
+            message: 'aki trusted authority value must be base64url',
+            context: { format: 'regex' },
+          },
+          {
+            severity: 'error',
+            code: 'invalid_type',
+            path: ['credentials', 0, 'claims', 0, 'path', 1],
+            message: 'Expected a string, a non-negative integer or null',
+            context: { expected: 'a string, a non-negative integer or null' },
+          },
+          {
+            severity: 'error',
+            code: 'missing_value',
+            path: ['credentials', 1, 'id'],
+            message: 'expected string, received undefined',
+            context: { expected: 'string' },
+          },
+          {
+            severity: 'error',
+            code: 'invalid_type',
+            path: ['credentials', 1, 'claims', 0, 'path'],
+            message: 'Expected an array of two strings, a namespace and a data element identifier',
+            context: { expected: 'an array of two strings, a namespace and a data element identifier' },
+          },
+          {
+            severity: 'error',
+            code: 'invalid_value',
+            path: ['credentials', 2, 'format'],
+            message: "Expected format to be one of 'mso_mdoc', 'dc+sd-jwt', 'vc+sd-jwt', 'jwt_vc_json' or 'ldp_vc'",
+            context: { allowed: ['mso_mdoc', 'jwt_vc_json', 'ldp_vc', 'dc+sd-jwt', 'vc+sd-jwt'] },
+          },
+        ],
+      })
+    )
+  })
+
+  it('reports an empty array that must not be empty', (_t) => {
+    expect(() => DcqlQuery.parse({ credentials: [{ id: 'pid', format: 'dc+sd-jwt', claims: [] as never }] })).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'empty_array',
+            path: ['credentials', 0, 'claims'],
+            message: 'Array must be non-empty and have length of at least 1',
+          },
+        ],
+      })
+    )
+  })
+
+  it('reports duplicate and unknown ids with their location', (_t) => {
+    const parse = () =>
+      DcqlQuery.parse({
+        credentials: [
+          { id: 'pid', format: 'dc+sd-jwt' },
+          {
+            id: 'mdl',
+            format: 'mso_mdoc',
+            claims: [{ id: 'given_name', path: ['org.iso.18013.5.1', 'given_name'] }],
+            claim_sets: [['given_name'], ['given_name', 'family_name']],
+          },
+          { id: 'pid', format: 'dc+sd-jwt' },
+        ],
+        credential_sets: [{ options: [['pid'], ['mdl', 'photo_id']] }],
+      })
+
+    expect(parse).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'unknown_claim_id',
+            path: ['credentials', 1, 'claim_sets', 1, 1],
+            message: "Claim set 1 refers to the claim id 'family_name', which is not in claims",
+          },
+          {
+            severity: 'error',
+            code: 'duplicate_credential_query_id',
+            path: ['credentials', 2, 'id'],
+            message: "The credential query id 'pid' is present more than once",
+          },
+          {
+            severity: 'error',
+            code: 'unknown_credential_query_id',
+            path: ['credential_sets', 0, 'options', 1, 1],
+            message: "Credential set 0 refers to the credential query id 'photo_id', which is not in credentials",
+          },
+        ],
+      })
+    )
+  })
+
+  it('validate reports the issues of a query that was not parsed', (_t) => {
+    expect(() =>
+      DcqlQuery.validate({
+        credentials: [
+          { id: 'pid', format: 'dc+sd-jwt', multiple: false, require_cryptographic_holder_binding: true },
+          { id: 'pid', format: 'dc+sd-jwt', multiple: false, require_cryptographic_holder_binding: true },
+        ],
+      })
+    ).toThrow(
+      expect.objectContaining({
+        issues: [expect.objectContaining({ code: 'duplicate_credential_query_id', path: ['credentials', 1, 'id'] })],
+      })
+    )
+  })
+
+  it('reports duplicate claim ids, and claims without id when there are claim sets', (_t) => {
+    const parse = () =>
+      DcqlQuery.parse({
+        credentials: [
+          {
+            id: 'pid',
+            format: 'dc+sd-jwt',
+            claims: [
+              { id: 'name', path: ['given_name'] },
+              { id: 'name', path: ['family_name'] },
+              { path: ['birthdate'] },
+            ],
+            claim_sets: [['name']],
+          },
+        ],
+      })
+
+    expect(parse).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'duplicate_claim_id',
+            path: ['credentials', 0, 'claims', 1, 'id'],
+            message: "The claim id 'name' is present more than once in claims",
+          },
+          {
+            severity: 'error',
+            code: 'missing_value',
+            path: ['credentials', 0, 'claims', 2, 'id'],
+            message: 'A claim needs an id when the credential query has claim_sets',
+            context: { expected: 'string' },
+          },
+        ],
+      })
+    )
+
+    // Without claim sets, a claim id is optional
+    expect(() =>
+      DcqlQuery.parse({ credentials: [{ id: 'pid', format: 'dc+sd-jwt', claims: [{ path: ['birthdate'] }] }] })
+    ).not.toThrow()
+  })
+
+  it('rejects an empty vct_values, which OpenID4VP 1.0 Appendix B.3.5 does not allow', (_t) => {
+    expect(() =>
+      DcqlQuery.parse({ credentials: [{ id: 'pid', format: 'dc+sd-jwt', meta: { vct_values: [] as never } }] })
+    ).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'empty_array',
+            path: ['credentials', 0, 'meta', 'vct_values'],
+            message: 'Array must be non-empty and have length of at least 1',
+          },
+        ],
+      })
+    )
   })
 })

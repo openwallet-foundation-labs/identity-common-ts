@@ -3,7 +3,7 @@ import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
-import { parseOpenid4VpAuthorizationResponsePayload } from '../authorization-response/parse-authorization-response-payload.js'
+import { parseOpenid4vpAuthorizationResponsePayload } from '../authorization-response/parse-authorization-response-payload.js'
 import {
   createOpenid4vpAuthorizationResponse,
   isOpenid4vpAuthorizationRequestDcApi,
@@ -182,7 +182,7 @@ describe('authorization error responses', () => {
     })
 
     expect(receivedPayload).toEqual({ error: 'access_denied', state: 'state' })
-    expect(() => parseOpenid4VpAuthorizationResponsePayload(receivedPayload ?? {})).toThrow(
+    expect(() => parseOpenid4vpAuthorizationResponsePayload(receivedPayload ?? {})).toThrow(
       Openid4vpAuthorizationResponseError
     )
     expect(await submissionResponse.json()).toEqual({ redirect_uri: 'https://example.com/cb' })

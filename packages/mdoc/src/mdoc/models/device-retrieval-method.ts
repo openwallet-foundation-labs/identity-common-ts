@@ -11,13 +11,13 @@ export enum DeviceRetrievalMethodType {
   WifiAware = 3,
 }
 
-const deviceRetrievalMethodEncodedSchema = z.tuple([
+const zDeviceRetrievalMethodEncoded = z.tuple([
   z.enum(DeviceRetrievalMethodType).or(z.number()),
   z.number(),
   z.map(z.unknown(), z.unknown()),
 ])
 
-const deviceRetrievalMethodDecodedSchema = z.object({
+const zDeviceRetrievalMethodDecoded = z.object({
   // Parsing should not fail if one unknown device retrieval method is included
   type: z.enum(DeviceRetrievalMethodType).or(z.number()),
   version: z.number(),
@@ -30,8 +30,8 @@ const deviceRetrievalMethodDecodedSchema = z.object({
   ]),
 })
 
-export type DeviceRetrievalMethodEncodedStructure = z.infer<typeof deviceRetrievalMethodEncodedSchema>
-export type DeviceRetrievalMethodDecodedStructure = z.infer<typeof deviceRetrievalMethodDecodedSchema>
+export type DeviceRetrievalMethodEncodedStructure = z.infer<typeof zDeviceRetrievalMethodEncoded>
+export type DeviceRetrievalMethodDecodedStructure = z.infer<typeof zDeviceRetrievalMethodDecoded>
 
 export type DeviceRetrievalMethodOptions = {
   type: DeviceRetrievalMethodType | number
@@ -44,7 +44,7 @@ export class DeviceRetrievalMethod extends CborStructure<
   DeviceRetrievalMethodDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(deviceRetrievalMethodEncodedSchema, deviceRetrievalMethodDecodedSchema, {
+    return z.codec(zDeviceRetrievalMethodEncoded, zDeviceRetrievalMethodDecoded, {
       decode: ([type, version, retrievalOptions]) => {
         let options: RetrievalOptions | Map<unknown, unknown>
 

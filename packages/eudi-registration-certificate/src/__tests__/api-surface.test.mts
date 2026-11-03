@@ -4,22 +4,24 @@
  */
 
 import { ES256 } from '@owf/crypto'
-import { base64urlEncode } from '@owf/identity-common'
+import { base64urlEncode, ValidationError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
-  assertValidWRPRC,
-  createServiceProviderWRPRC,
+  assertValidRegistrationCertificate,
+  createServiceProviderRegistrationCertificate,
   credential,
-  decodeWRPRC,
+  decodeRegistrationCertificate,
   getIdentifierPrefix,
   IDENTIFIER_TYPES,
-  parseWRPRC,
-  signWRPRC,
-  validateWRPRCPayload,
+  parseRegistrationCertificate,
+  REGISTRATION_CERTIFICATE_VALIDATION_CODES,
+  RegistrationCertificateError,
+  RegistrationCertificateValidationError,
+  registrationCertificate,
+  signRegistrationCertificate,
+  validateRegistrationCertificate,
+  validateRegistrationCertificatePayload,
   WRP_ENTITLEMENTS,
-  WRPRC_VALIDATION_CODES,
-  WRPRCException,
-  wrprc,
 } from '../index'
 
 const TEST_CERT = `-----BEGIN CERTIFICATE-----
@@ -34,7 +36,7 @@ s2WfHbwCIAQKqu6+GHkzWH8H0zMPKedvxJp34whrGoIarukWZjjp
 -----END CERTIFICATE-----`
 
 const base = () =>
-  wrprc()
+  registrationCertificate()
     .name('Example')
     .legalName('Example N.V.')
     .identifier('LEINL-529900T8BM49AURSDO55')
@@ -70,48 +72,51 @@ describe('semantic identifier initial characters', () => {
   })
 
   it('warns about initial characters outside Tables 2 and 4 without failing', () => {
-    const result = validateWRPRCPayload(base().identifier('ZZZNL-12345').build(), 'ZZZNL-12345')
+    const result = validateRegistrationCertificatePayload(base().identifier('ZZZNL-12345').build(), 'ZZZNL-12345')
 
     expect(result.valid).toBe(true)
     expect(result.issues.filter((issue) => issue.severity === 'warning').map((issue) => issue.code)).toContain(
-      WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX
+      REGISTRATION_CERTIFICATE_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX
     )
   })
 
   it('does not warn for the corrected Table 2 and Table 4 characters', () => {
     for (const sub of ['EORNL-1', 'LEIXG-1', 'NTRNL-1', 'VATNL-1', 'EXCNL-1', 'TINIT-1', 'PASDE-1', 'IDCIT-1']) {
-      const result = validateWRPRCPayload(base().identifier(sub).build(), sub)
+      const result = validateRegistrationCertificatePayload(base().identifier(sub).build(), sub)
       const codes = result.issues.filter((issue) => issue.severity === 'warning').map((issue) => issue.code)
-      expect(codes, sub).not.toContain(WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
+      expect(codes, sub).not.toContain(REGISTRATION_CERTIFICATE_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
     }
   })
 
   it('accepts a national scheme (two letters and a colon) as initial characters', () => {
     for (const sub of ['HR:DE-HRA-6445', 'EI:SE-5567971433']) {
-      const result = validateWRPRCPayload(base().identifier(sub).build(), sub)
+      const result = validateRegistrationCertificatePayload(base().identifier(sub).build(), sub)
 
       expect(result.valid, sub).toBe(true)
       expect(
         result.issues.filter((issue) => issue.severity === 'warning').map((issue) => issue.code),
         sub
-      ).toContain(WRPRC_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
+      ).toContain(REGISTRATION_CERTIFICATE_VALIDATION_CODES.UNKNOWN_IDENTIFIER_PREFIX)
     }
   })
 
   it('rejects a colon in a three-character initial', () => {
-    const result = validateWRPRCPayload(base().identifier('HRN:DE-1').build(), 'HRN:DE-1')
+    const result = validateRegistrationCertificatePayload(base().identifier('HRN:DE-1').build(), 'HRN:DE-1')
 
     expect(result.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code)).toContain(
-      WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER
+      REGISTRATION_CERTIFICATE_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER
     )
   })
 
   it('rejects an identifier that does not follow the semantic format', () => {
-    const result = validateWRPRCPayload(base().identifier('not-a-semantic-id').build(), 'not-a-semantic-id')
+    const result = validateRegistrationCertificatePayload(
+      base().identifier('not-a-semantic-id').build(),
+      'not-a-semantic-id'
+    )
 
     expect(result.valid).toBe(false)
     expect(result.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code)).toContain(
-      WRPRC_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER
+      REGISTRATION_CERTIFICATE_VALIDATION_CODES.INVALID_SEMANTIC_IDENTIFIER
     )
   })
 })
@@ -120,21 +125,21 @@ describe('semantic identifier initial characters', () => {
 // Signer error paths
 // ============================================================================
 
-describe('signWRPRC error paths', () => {
+describe('signRegistrationCertificate error paths', () => {
   it('requires at least one certificate', async () => {
     await expect(
-      signWRPRC({
+      signRegistrationCertificate({
         payload: base().build(),
         accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
         certificates: [],
         signer: await signerFor(),
       })
-    ).rejects.toThrow(WRPRCException)
+    ).rejects.toThrow(RegistrationCertificateError)
   })
 
   it('rejects a malformed PEM certificate', async () => {
     await expect(
-      signWRPRC({
+      signRegistrationCertificate({
         payload: base().build(),
         accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
         certificates: ['not a pem'],
@@ -144,7 +149,7 @@ describe('signWRPRC error paths', () => {
   })
 
   it('honours an explicit signing time and key id', async () => {
-    const signed = await signWRPRC({
+    const signed = await signRegistrationCertificate({
       payload: base().build(),
       accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
       certificates: [TEST_CERT],
@@ -162,27 +167,27 @@ describe('signWRPRC error paths', () => {
 // Decoding and parsing
 // ============================================================================
 
-describe('decodeWRPRC and parseWRPRC', () => {
+describe('decodeRegistrationCertificate and parseRegistrationCertificate', () => {
   const compact = (header: object, payload: object) =>
     `${base64urlEncode(JSON.stringify(header))}.${base64urlEncode(JSON.stringify(payload))}.AAAA`
 
   it('rejects a token whose typ is not rc-wrp+jwt', () => {
     const jws = compact({ typ: 'JWT', alg: 'ES256', x5c: ['MIIBkDCB'], iat: 1_780_000_000 }, base().build())
 
-    expect(() => decodeWRPRC(jws, 'LEINL-529900T8BM49AURSDO55')).toThrow(/rc-wrp\+jwt/)
+    expect(() => decodeRegistrationCertificate(jws, 'LEINL-529900T8BM49AURSDO55')).toThrow(/rc-wrp\+jwt/)
   })
 
   it('parses header and payload without validating them', () => {
-    const payload = { not: 'a wrprc' }
+    const payload = { not: 'a registration certificate' }
     const jws = compact({ typ: 'JWT', alg: 'ES256', x5c: ['MIIBkDCB'], iat: 1_780_000_000 }, payload)
-    const parsed = parseWRPRC(jws)
+    const parsed = parseRegistrationCertificate(jws)
 
     expect(parsed.payload).toEqual(payload)
     expect(parsed.signature).toBe('AAAA')
   })
 
   it('rejects a compact JWS that does not have three parts', () => {
-    expect(() => parseWRPRC('only.two')).toThrow(/3 parts/)
+    expect(() => parseRegistrationCertificate('only.two')).toThrow(/3 parts/)
   })
 })
 
@@ -190,18 +195,37 @@ describe('decodeWRPRC and parseWRPRC', () => {
 // Assertions
 // ============================================================================
 
-describe('assertValidWRPRC', () => {
+describe('assertValidRegistrationCertificate', () => {
   const header = { typ: 'rc-wrp+jwt' as const, alg: 'ES256' as const, x5c: ['MIIBkDCB'], iat: 1_780_000_000 }
 
   it('passes for a valid header and payload', () => {
-    expect(() => assertValidWRPRC(header, base().build(), 'LEINL-529900T8BM49AURSDO55')).not.toThrow()
+    expect(() => assertValidRegistrationCertificate(header, base().build(), 'LEINL-529900T8BM49AURSDO55')).not.toThrow()
   })
 
   it('reports the offending side in the message', () => {
-    expect(() => assertValidWRPRC({ ...header, typ: 'JWT' }, base().build(), 'LEINL-529900T8BM49AURSDO55')).toThrow(
-      /header/
+    expect(() =>
+      assertValidRegistrationCertificate({ ...header, typ: 'JWT' }, base().build(), 'LEINL-529900T8BM49AURSDO55')
+    ).toThrow(/header/)
+    expect(() =>
+      assertValidRegistrationCertificate(header, { name: 'incomplete' }, 'LEINL-529900T8BM49AURSDO55')
+    ).toThrow(/payload/)
+  })
+
+  it('throws a RegistrationCertificateValidationError with the issues of the validation', () => {
+    const payload = base().build()
+    const invalidHeader = { ...header, typ: 'JWT' }
+    expect(() => assertValidRegistrationCertificate(invalidHeader, payload, 'LEINL-529900T8BM49AURSDO55')).toThrow(
+      RegistrationCertificateValidationError
     )
-    expect(() => assertValidWRPRC(header, { name: 'incomplete' }, 'LEINL-529900T8BM49AURSDO55')).toThrow(/payload/)
+    try {
+      assertValidRegistrationCertificate(invalidHeader, payload, 'LEINL-529900T8BM49AURSDO55')
+    } catch (error) {
+      expect(error).toBeInstanceOf(RegistrationCertificateValidationError)
+      expect(error).toBeInstanceOf(ValidationError)
+      expect((error as RegistrationCertificateValidationError).issues).toEqual(
+        validateRegistrationCertificate(invalidHeader, payload, 'LEINL-529900T8BM49AURSDO55').issues
+      )
+    }
   })
 })
 
@@ -251,7 +275,7 @@ describe('builder setters', () => {
 
   it('defaults iat to now when not set', () => {
     const before = Math.floor(Date.now() / 1000)
-    const payload = wrprc()
+    const payload = registrationCertificate()
       .name('Example')
       .legalName('Example N.V.')
       .identifier('LEINL-1')
@@ -280,7 +304,7 @@ describe('builder setters', () => {
   })
 
   it('creates a service provider payload from the factory', () => {
-    const payload = createServiceProviderWRPRC(
+    const payload = createServiceProviderRegistrationCertificate(
       'Example',
       'Example N.V.',
       'LEINL-529900T8BM49AURSDO55',

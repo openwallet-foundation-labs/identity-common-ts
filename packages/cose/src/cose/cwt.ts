@@ -284,7 +284,8 @@ export class Cwt<
    * @throws CwtDetachedPayloadError if the token carries a detached (null) payload.
    * @throws CwtPayloadDecodeError if the payload is not a valid claims set for this CWT type. The
    *   underlying error is available on the `cause` property.
-   * @throws ZodValidationError if a header map is not valid for this CWT type's header structures.
+   * @throws CoseValidationError if a header map is not valid for this CWT
+   *   type's header structures.
    */
   public static fromToken<T extends AnyCwt>(
     this: CwtStaticThis<T>,

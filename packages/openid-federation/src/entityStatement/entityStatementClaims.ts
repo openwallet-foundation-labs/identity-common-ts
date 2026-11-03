@@ -1,26 +1,26 @@
 import { z } from 'zod'
-import { constraintSchema } from '../constraints'
-import { jsonWebKeySetSchema } from '../jsonWeb'
-import { metadataPolicySchema, metadataSchema } from '../metadata'
-import { trustMarkIssuerSchema, trustMarkOwnerSchema, trustMarkSchema } from '../trustMark'
-import { dateSchema } from '../utils'
+import { zConstraint } from '../constraints'
+import { zJsonWebKeySet } from '../jsonWeb'
+import { zMetadata, zMetadataPolicy } from '../metadata'
+import { zTrustMark, zTrustMarkIssuer, zTrustMarkOwner } from '../trustMark'
+import { zDate } from '../utils'
 
-export const entityStatementClaimsSchema = z
+export const zEntityStatementClaims = z
   .object({
     iss: z.string(),
     sub: z.string(),
-    iat: dateSchema,
-    exp: dateSchema,
-    jwks: jsonWebKeySetSchema,
+    iat: zDate,
+    exp: zDate,
+    jwks: zJsonWebKeySet,
     authority_hints: z.array(z.url()).optional(),
-    metadata: metadataSchema.optional(),
-    metadata_policy: z.record(z.string(), z.record(z.string(), metadataPolicySchema.optional())).optional(),
-    constraints: constraintSchema.optional(),
+    metadata: zMetadata.optional(),
+    metadata_policy: z.record(z.string(), z.record(z.string(), zMetadataPolicy.optional())).optional(),
+    constraints: zConstraint.optional(),
     crit: z.array(z.string()).optional(),
     metadata_policy_crit: z.array(z.string()).optional(),
-    trust_marks: z.array(trustMarkSchema).optional(),
-    trust_mark_issuers: trustMarkIssuerSchema.optional(),
-    trust_mark_owners: trustMarkOwnerSchema.optional(),
+    trust_marks: z.array(zTrustMark).optional(),
+    trust_mark_issuers: zTrustMarkIssuer.optional(),
+    trust_mark_owners: zTrustMarkOwner.optional(),
     source_endpoint: z.url().optional(),
   })
   .superRefine((data, ctx) => {
@@ -34,8 +34,8 @@ export const entityStatementClaimsSchema = z
     }
   })
 
-export type EntityStatementClaimsOptions = z.input<typeof entityStatementClaimsSchema>
+export type EntityStatementClaimsOptions = z.input<typeof zEntityStatementClaims>
 
-export type EntityStatementClaims = z.output<typeof entityStatementClaimsSchema>
+export type EntityStatementClaims = z.output<typeof zEntityStatementClaims>
 
 export type EntityStatementChain = Array<EntityStatementClaims>

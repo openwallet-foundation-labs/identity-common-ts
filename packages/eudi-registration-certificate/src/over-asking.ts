@@ -2,15 +2,23 @@
  * Over-asking check
  *
  * Compares the DCQL query of an OpenID4VP request with the credentials and claims a
- * Wallet-Relying Party registered, as listed in the `credentials` of its WRPRC (ETSI TS
+ * Wallet-Relying Party registered, as listed in the `credentials` of its registration certificate (ETSI TS
  * 119 475 Table 9), which follow the shape of a DCQL Credential Query.
  */
 
-import { toValidationResult, type ValidationIssue, type ValidationResult } from '@owf/identity-common'
+import {
+  parseWithSchema,
+  type SchemaValidationCode,
+  toValidationResult,
+  type ValidationIssueOf,
+  ValidationIssues,
+  type ValidationResult,
+} from '@owf/identity-common'
+import { DCQL_VALIDATION_CODES, DcqlQuery, type DcqlValidationCode, type DcqlValidationContexts } from 'dcql'
 
 /** Codes of the issues of {@link checkOverAsking} */
 export const OVER_ASKING_CODES = {
-  /** The query is not a DCQL query with a `credentials` array */
+  /** A claims query has the `namespace` and `claim_name` form of earlier drafts instead of a `path` */
   INVALID_QUERY: 'invalid_query',
   /** No registered credential has the requested format and covers the requested `meta` */
   CREDENTIAL_NOT_REGISTERED: 'credential_not_registered',
@@ -24,8 +32,14 @@ export const OVER_ASKING_CODES = {
 
 export type OverAskingCode = (typeof OVER_ASKING_CODES)[keyof typeof OVER_ASKING_CODES]
 
-/** An issue of {@link checkOverAsking}, with a path into the DCQL query, e.g. `['credentials', 0, 'claims', 2]` */
-export type OverAskingIssue = ValidationIssue<OverAskingCode>
+/**
+ * An issue of {@link checkOverAsking}, with a path into the DCQL query, e.g. `['credentials', 0, 'claims', 2]`.
+ * A query the `dcql` library rejects has its issues, with a code of `DCQL_VALIDATION_CODES` or a schema code.
+ */
+export type OverAskingIssue = ValidationIssueOf<
+  OverAskingCode | DcqlValidationCode | SchemaValidationCode,
+  DcqlValidationContexts
+>
 
 /** `valid` when the request asks for nothing beyond the registration */
 export type OverAskingResult = ValidationResult<OverAskingIssue>
@@ -33,15 +47,7 @@ export type OverAskingResult = ValidationResult<OverAskingIssue>
 type ClaimPath = (string | number | null)[]
 type ClaimValue = string | number | boolean
 
-/** A claims query, as a claims path pointer or in the mdoc `namespace`/`claim_name` form of earlier drafts */
-interface RequestedClaim {
-  path?: ClaimPath
-  namespace?: string
-  claim_name?: string
-  values?: ClaimValue[]
-}
-
-/** A registered credential, from the `credentials` of a WRPRC. Either spelling of the claims array is read. */
+/** A registered credential, from the `credentials` of a registration certificate. Either spelling of the claims array is read. */
 export interface RegisteredCredential {
   format: string
   meta: Record<string, unknown>
@@ -94,19 +100,11 @@ function pathCovered(requested: ClaimPath, registered: ClaimPath): boolean {
   )
 }
 
-function claimPath(claim: RequestedClaim): ClaimPath | undefined {
-  if (Array.isArray(claim.path)) return claim.path
-  if (typeof claim.namespace === 'string' && typeof claim.claim_name === 'string') {
-    return [claim.namespace, claim.claim_name]
-  }
-  return undefined
-}
-
 const describeMeta = (meta: unknown) => (isRecord(meta) && Object.keys(meta).length > 0 ? JSON.stringify(meta) : '{}')
 
 /**
  * Check that an OpenID4VP request asks for no credential or claim beyond what the
- * Wallet-Relying Party registered in its WRPRC.
+ * Wallet-Relying Party registered in its registration certificate.
  *
  * A requested credential needs a registered one of the same format whose `meta` the
  * request stays within. Each requested claim then needs a registered claim of such a
@@ -115,46 +113,32 @@ const describeMeta = (meta: unknown) => (isRecord(meta) && Object.keys(meta).len
  * no selectively disclosable claims, so only the credential is checked.
  *
  * A registered credential without claims is reported as a warning for each credential
- * query with claims, as the registration does not say which claims are allowed.
+ * query with claims, as the registration does not say which claims are allowed. A query
+ * that the `dcql` library rejects only gets its issues, e.g. `duplicate_credential_query_id`.
  *
- * @param query The DCQL query of the request, e.g. its `dcql_query` parameter or a parsed `DcqlQuery`
- * @param registeredCredentials The `credentials` of the WRPRC payload
+ * @param query The DCQL query of the request, e.g. its `dcql_query` parameter, which is parsed and validated with the `dcql` library
+ * @param registeredCredentials The `credentials` of the registration certificate payload
  */
 export function checkOverAsking(
   query: unknown,
   registeredCredentials: readonly RegisteredCredential[] = []
 ): OverAskingResult {
-  const issues: OverAskingIssue[] = []
-  const result = (): OverAskingResult => toValidationResult(issues)
+  const parsed = parseWithSchema<typeof DcqlQuery.zModel, DcqlValidationCode, DcqlValidationContexts>(
+    DcqlQuery.zModel,
+    query,
+    { codes: DCQL_VALIDATION_CODES }
+  )
+  if (!parsed.success) return toValidationResult<OverAskingIssue>(parsed.issues)
 
-  if (!isRecord(query) || !Array.isArray(query.credentials)) {
-    issues.push({
-      severity: 'error',
-      code: OVER_ASKING_CODES.INVALID_QUERY,
-      path: ['credentials'],
-      message: 'The query is not a DCQL query: credentials must be an array of credential queries',
-    })
-    return result()
-  }
+  const issues = new ValidationIssues<OverAskingCode>()
 
-  query.credentials.forEach((credential: unknown, credentialIndex: number) => {
+  parsed.data.credentials.forEach((credential, credentialIndex) => {
     const credentialPath = ['credentials', credentialIndex]
-    if (!isRecord(credential) || typeof credential.format !== 'string') {
-      issues.push({
-        severity: 'error',
-        code: OVER_ASKING_CODES.INVALID_QUERY,
-        path: credentialPath,
-        message: 'A credential query must be an object with a format',
-      })
-      return
-    }
-
-    const label = typeof credential.id === 'string' ? `Credential query ${credential.id}` : 'The credential query'
+    const label = `Credential query ${credential.id}`
     const sameFormat = registeredCredentials.filter((registered) => registered.format === credential.format)
     const matching = sameFormat.filter((registered) => metaCovered(credential.meta ?? {}, registered.meta))
     if (matching.length === 0) {
-      issues.push({
-        severity: 'error',
+      issues.add({
         code: OVER_ASKING_CODES.CREDENTIAL_NOT_REGISTERED,
         path: sameFormat.length === 0 ? [...credentialPath, 'format'] : [...credentialPath, 'meta'],
         message:
@@ -165,36 +149,35 @@ export function checkOverAsking(
       return
     }
 
-    if (!Array.isArray(credential.claims)) return
+    if (!credential.claims) return
 
     const registeredClaims = matching.flatMap((registered) => registered.claim ?? registered.claims ?? [])
     if (matching.some((registered) => !(registered.claim ?? registered.claims))) {
-      issues.push({
+      issues.add({
         severity: 'warning',
         code: OVER_ASKING_CODES.CLAIMS_NOT_LISTED,
         path: [...credentialPath, 'claims'],
-        message: `The registered ${credential.format} credential lists no claims, so the claims of ${label.toLowerCase()} cannot be confirmed`,
+        message: `The registered ${credential.format} credential lists no claims, so the claims of ${label} cannot be confirmed`,
       })
       return
     }
 
-    credential.claims.forEach((claim: unknown, claimIndex: number) => {
-      const path = isRecord(claim) ? claimPath(claim as RequestedClaim) : undefined
+    credential.claims.forEach((claim, claimIndex) => {
       const queryPath = [...credentialPath, 'claims', claimIndex]
-      if (!path) {
-        issues.push({
-          severity: 'error',
+      // OpenID4VP 1.0 section 6.3 has only `path`; the DCQL library still parses the mdoc namespace form of earlier drafts
+      if (!('path' in claim)) {
+        issues.add({
           code: OVER_ASKING_CODES.INVALID_QUERY,
           path: queryPath,
-          message: 'A claims query must have a path, or a namespace and a claim_name',
+          message: 'A claims query must have a path, the namespace and claim_name form is not supported',
         })
         return
       }
+      const { path } = claim
 
       const covering = registeredClaims.filter((registered) => pathCovered(path, registered.path))
       if (covering.length === 0) {
-        issues.push({
-          severity: 'error',
+        issues.add({
           code: OVER_ASKING_CODES.CLAIM_NOT_REGISTERED,
           path: queryPath,
           message: `${label} asks for the claim ${JSON.stringify(path)}, which is not registered`,
@@ -203,14 +186,13 @@ export function checkOverAsking(
       }
 
       // A registered claim without values allows any value
-      const requestedValues = (claim as RequestedClaim).values
+      const requestedValues = claim.values
       const allowed = covering.some(
         (registered) => !registered.values || requestedValues?.every((value) => registered.values?.includes(value))
       )
       if (!allowed) {
         const registeredValues = covering.flatMap((registered) => registered.values ?? [])
-        issues.push({
-          severity: 'error',
+        issues.add({
           code: OVER_ASKING_CODES.CLAIM_VALUES_NOT_REGISTERED,
           path: [...queryPath, 'values'],
           message: `${label} asks for the claim ${JSON.stringify(path)} with ${
@@ -221,5 +203,5 @@ export function checkOverAsking(
     })
   })
 
-  return result()
+  return issues.result()
 }

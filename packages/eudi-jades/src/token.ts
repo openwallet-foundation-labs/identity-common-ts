@@ -1,29 +1,24 @@
 /** JAdES signature builder for ETSI TS 119 182-1 V1.2.1. */
 import { bytesToString, stringToBytes, uint8ArrayToBase64Url } from '@owf/identity-common'
 import { CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS } from './constants'
-import { JAdESException } from './jades-exception'
-import {
-  ProtectedHeaderForSigningSchema,
-  ProtectedHeaderParamsSchema,
-  SigDSchema,
-  UnprotectedHeaderSchema,
-} from './schemas'
+import { JadesError } from './jades-error'
+import { zProtectedHeaderForSigning, zProtectedHeaderParams, zSigD, zUnprotectedHeader } from './schemas'
 import type {
-  FlattenedJWS,
-  GeneralJWS,
+  FlattenedJws,
+  GeneralJws,
   ProtectedHeaderParams,
   SigD,
   TokenContext,
   UnprotectedHeaderParams,
   X5tO,
 } from './types'
-import { encodeJSON, getSigningTime } from './utils'
+import { encodeJson, getSigningTime } from './utils'
 
 function serializePayload(payload: unknown): { bytes: Uint8Array; text: string } {
   if (payload instanceof Uint8Array) return { bytes: payload, text: bytesToString(payload) }
   if (typeof payload === 'string') return { bytes: stringToBytes(payload), text: payload }
   const serialized = JSON.stringify(payload)
-  if (serialized === undefined) throw new JAdESException('Payload is not JSON serializable')
+  if (serialized === undefined) throw new JadesError('Payload is not JSON serializable')
   return { bytes: stringToBytes(serialized), text: serialized }
 }
 
@@ -49,9 +44,9 @@ export class Token<T = unknown> {
 
   setProtectedHeader(header: ProtectedHeaderParams): this {
     const merged = { ...this.protectedHeader, ...header }
-    const result = ProtectedHeaderParamsSchema.safeParse(merged)
+    const result = zProtectedHeaderParams.safeParse(merged)
     if (!result.success) {
-      throw new JAdESException(`Invalid protected header: ${formatIssues(result.error.issues)}`, result.error)
+      throw new JadesError(`Invalid protected header: ${formatIssues(result.error.issues)}`, result.error)
     }
     this.protectedHeader = result.data
     this.signature = undefined
@@ -59,9 +54,9 @@ export class Token<T = unknown> {
   }
 
   setUnprotectedHeader(header: UnprotectedHeaderParams): this {
-    const result = UnprotectedHeaderSchema.safeParse(header)
+    const result = zUnprotectedHeader.safeParse(header)
     if (!result.success) {
-      throw new JAdESException(`Invalid unprotected header: ${formatIssues(result.error.issues)}`, result.error)
+      throw new JadesError(`Invalid unprotected header: ${formatIssues(result.error.issues)}`, result.error)
     }
     this.unprotectedHeader = result.data
     return this
@@ -89,7 +84,7 @@ export class Token<T = unknown> {
     if (typeof time === 'number') seconds = time
     else if (typeof time === 'string' || time instanceof Date) seconds = Math.floor(new Date(time).getTime() / 1000)
     else seconds = getSigningTime()
-    if (!Number.isInteger(seconds)) throw new JAdESException('Signing time must resolve to integer Unix seconds')
+    if (!Number.isInteger(seconds)) throw new JadesError('Signing time must resolve to integer Unix seconds')
     const header = { ...this.protectedHeader, iat: seconds }
     delete header.sigT
     return this.setProtectedHeader(header)
@@ -137,8 +132,8 @@ export class Token<T = unknown> {
    * constructed JWS Payload. ObjectIdByURIHash always contributes an empty payload.
    */
   setDetached(sigD: SigD, payload?: T | string | Uint8Array): this {
-    const result = SigDSchema.safeParse(sigD)
-    if (!result.success) throw new JAdESException(`Invalid sigD: ${formatIssues(result.error.issues)}`, result.error)
+    const result = zSigD.safeParse(sigD)
+    if (!result.success) throw new JadesError(`Invalid sigD: ${formatIssues(result.error.issues)}`, result.error)
     this.detached = true
     this.signature = undefined
     this.protectedHeader.sigD = result.data
@@ -171,7 +166,7 @@ export class Token<T = unknown> {
 
   setSignature(signature: string): this {
     this.validateBeforeSign()
-    if (!/^[A-Za-z0-9_-]+$/.test(signature)) throw new JAdESException('Signature must be unpadded base64url')
+    if (!/^[A-Za-z0-9_-]+$/.test(signature)) throw new JadesError('Signature must be unpadded base64url')
     this.signature = signature
     return this
   }
@@ -183,15 +178,15 @@ export class Token<T = unknown> {
 
   toString(): string {
     const signature = this.getSignature()
-    if (this.unprotectedHeader) throw new JAdESException('Compact JWS cannot carry the etsiU unprotected header')
+    if (this.unprotectedHeader) throw new JadesError('Compact JWS cannot carry the etsiU unprotected header')
     const payload = this.detached ? '' : this.getAttachedPayloadSegment()
     if (this.protectedHeader.b64 === false && payload.includes('.')) {
-      throw new JAdESException('An unencoded compact JWS payload must not contain a period')
+      throw new JadesError('An unencoded compact JWS payload must not contain a period')
     }
     return `${this.getEncodedProtectedHeader()}.${payload}.${signature}`
   }
 
-  toJSON(): GeneralJWS {
+  toJSON(): GeneralJws {
     const signature = this.getSignature()
     return {
       ...(this.detached ? {} : { payload: this.getAttachedPayloadSegment() }),
@@ -205,7 +200,7 @@ export class Token<T = unknown> {
     }
   }
 
-  toFlattenedJSON(): FlattenedJWS {
+  toFlattenedJson(): FlattenedJws {
     const signature = this.getSignature()
     return {
       protected: this.getEncodedProtectedHeader(),
@@ -237,7 +232,7 @@ export class Token<T = unknown> {
   }
 
   private getEncodedProtectedHeader(): string {
-    return encodeJSON(this.buildFinalHeader())
+    return encodeJson(this.buildFinalHeader())
   }
 
   private buildFinalHeader(): ProtectedHeaderParams {
@@ -250,27 +245,24 @@ export class Token<T = unknown> {
 
   private validateBeforeSign(): void {
     const header = this.buildFinalHeader()
-    const result = ProtectedHeaderForSigningSchema.safeParse(header)
+    const result = zProtectedHeaderForSigning.safeParse(header)
     if (!result.success) {
-      throw new JAdESException(
-        `Invalid protected header for signing: ${formatIssues(result.error.issues)}`,
-        result.error
-      )
+      throw new JadesError(`Invalid protected header for signing: ${formatIssues(result.error.issues)}`, result.error)
     }
-    if (header.sigD && !this.detached) throw new JAdESException('sigD is only allowed with a detached payload')
+    if (header.sigD && !this.detached) throw new JadesError('sigD is only allowed with a detached payload')
     if (header.sigD && header.sigD.mId !== DETACHED_MECHANISM_IDS.objectByUriHash && this.payload === undefined) {
-      throw new JAdESException('The constructed detached JWS Payload is required for this sigD mechanism')
+      throw new JadesError('The constructed detached JWS Payload is required for this sigD mechanism')
     }
   }
 
   private getSignature(): string {
-    if (!this.signature) throw new JAdESException('Token not signed yet')
+    if (!this.signature) throw new JadesError('Token not signed yet')
     return this.signature
   }
 
   private getHashAlgorithm(): string {
     const match = this.protectedHeader.alg?.match(/(?:256|384|512)$/)?.[0]
-    if (!match) throw new JAdESException(`Cannot infer hash algorithm from ${this.protectedHeader.alg}`)
+    if (!match) throw new JadesError(`Cannot infer hash algorithm from ${this.protectedHeader.alg}`)
     return `SHA-${match}`
   }
 }

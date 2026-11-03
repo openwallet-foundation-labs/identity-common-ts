@@ -1,24 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createLegalPersonWRPRC,
-  createNaturalPersonWRPRC,
-  createWRPRCPayload,
+  createLegalPersonRegistrationCertificate,
+  createNaturalPersonRegistrationCertificate,
+  createRegistrationCertificatePayload,
   credential,
   hasAttestationProviderEntitlement,
-  isLegalPersonWRPRC,
-  isNaturalPersonWRPRC,
-  isPSPSubEntitlement,
+  isLegalPersonRegistrationCertificate,
+  isNaturalPersonRegistrationCertificate,
+  isPspSubEntitlement,
   isValidEntitlement,
   PSP_SUB_ENTITLEMENTS,
-  validateLegalPersonWRPRC,
-  validateNaturalPersonWRPRC,
-  validateWRPRC,
-  validateWRPRCJWTHeader,
-  validateWRPRCPayload,
+  RegistrationCertificateError,
+  RegistrationCertificateValidationError,
+  registrationCertificate,
+  validateLegalPersonRegistrationCertificate,
+  validateNaturalPersonRegistrationCertificate,
+  validateRegistrationCertificate,
+  validateRegistrationCertificateJwtHeader,
+  validateRegistrationCertificatePayload,
   WRP_ENTITLEMENTS,
-  WRPRCException,
-  WRPRCPayloadSchema,
-  wrprc,
+  zRegistrationCertificatePayload,
 } from '../index'
 
 // ============================================================================
@@ -57,31 +58,31 @@ const validJWTHeader = {
 // Schema Tests
 // ============================================================================
 
-describe('WRPRCPayloadSchema', () => {
+describe('zRegistrationCertificatePayload', () => {
   it('should validate a legal person payload', () => {
-    const result = WRPRCPayloadSchema.safeParse(validLegalPersonPayload)
+    const result = zRegistrationCertificatePayload.safeParse(validLegalPersonPayload)
     expect(result.success).toBe(true)
   })
 
   it('should validate a natural person payload', () => {
-    const result = WRPRCPayloadSchema.safeParse(validNaturalPersonPayload)
+    const result = zRegistrationCertificatePayload.safeParse(validNaturalPersonPayload)
     expect(result.success).toBe(true)
   })
 
   it('should reject payload without required fields', () => {
-    const result = WRPRCPayloadSchema.safeParse({})
+    const result = zRegistrationCertificatePayload.safeParse({})
     expect(result.success).toBe(false)
   })
 
   it('should reject payload with empty entitlements', () => {
     const payload = { ...validLegalPersonPayload, entitlements: [] }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zRegistrationCertificatePayload.safeParse(payload)
     expect(result.success).toBe(false)
   })
 
   it('should reject payload with invalid country code', () => {
     const payload = { ...validLegalPersonPayload, country: 'GERMANY' }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zRegistrationCertificatePayload.safeParse(payload)
     expect(result.success).toBe(false)
   })
 
@@ -92,21 +93,21 @@ describe('WRPRCPayloadSchema', () => {
       info_uri: 'https://example.com',
       support_uri: 'https://example.com/support',
     }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zRegistrationCertificatePayload.safeParse(payload)
     expect(result.success).toBe(true)
   })
 
   it('should accept a payload with a jti', () => {
     const jti_uuid = '0c1f7a2e-3d4b-4c5a-8e9f-1a2b3c4d5e6f'
     const payload = { ...validLegalPersonPayload, jti: jti_uuid }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zRegistrationCertificatePayload.safeParse(payload)
 
     expect(result.success).toBe(true)
     expect(result.data?.jti).toBe(jti_uuid)
   })
 
   it('should accept a payload without a jti', () => {
-    const result = WRPRCPayloadSchema.safeParse(validLegalPersonPayload)
+    const result = zRegistrationCertificatePayload.safeParse(validLegalPersonPayload)
 
     expect(result.success).toBe(true)
     expect(result.data?.jti).toBeUndefined()
@@ -114,7 +115,7 @@ describe('WRPRCPayloadSchema', () => {
 
   it('should reject an empty jti', () => {
     const payload = { ...validLegalPersonPayload, jti: '' }
-    const result = WRPRCPayloadSchema.safeParse(payload)
+    const result = zRegistrationCertificatePayload.safeParse(payload)
     expect(result.success).toBe(false)
   })
 })
@@ -146,13 +147,13 @@ describe('Entitlements', () => {
     })
   })
 
-  describe('isPSPSubEntitlement', () => {
+  describe('isPspSubEntitlement', () => {
     it('should return true for PSP sub-entitlements', () => {
-      expect(isPSPSubEntitlement(PSP_SUB_ENTITLEMENTS.PAYMENT_INITIATION)).toBe(true)
+      expect(isPspSubEntitlement(PSP_SUB_ENTITLEMENTS.PAYMENT_INITIATION)).toBe(true)
     })
 
     it('should return false for non-PSP entitlements', () => {
-      expect(isPSPSubEntitlement(WRP_ENTITLEMENTS.SERVICE_PROVIDER)).toBe(false)
+      expect(isPspSubEntitlement(WRP_ENTITLEMENTS.SERVICE_PROVIDER)).toBe(false)
     })
   })
 
@@ -173,15 +174,15 @@ describe('Entitlements', () => {
 // ============================================================================
 
 describe('Validators', () => {
-  describe('validateWRPRCPayload', () => {
+  describe('validateRegistrationCertificatePayload', () => {
     it('should validate valid payload', () => {
-      const result = validateWRPRCPayload(validLegalPersonPayload, validLegalPersonPayload.sub)
+      const result = validateRegistrationCertificatePayload(validLegalPersonPayload, validLegalPersonPayload.sub)
       expect(result.valid).toBe(true)
       expect(result.issues.filter((issue) => issue.severity === 'error')).toHaveLength(0)
     })
 
     it('should return errors for invalid payload', () => {
-      const result = validateWRPRCPayload({}, 'LEIXG-529900T8BM49AURSDO55')
+      const result = validateRegistrationCertificatePayload({}, 'LEIXG-529900T8BM49AURSDO55')
       expect(result.valid).toBe(false)
       expect(result.issues.some((issue) => issue.severity === 'error')).toBe(true)
     })
@@ -191,7 +192,7 @@ describe('Validators', () => {
         ...validLegalPersonPayload,
         entitlements: ['https://custom.example.com/entitlement'],
       }
-      const result = validateWRPRCPayload(payload, payload.sub)
+      const result = validateRegistrationCertificatePayload(payload, payload.sub)
       expect(result.issues.some((issue) => issue.severity === 'warning' && issue.code === 'unknown_entitlement')).toBe(
         true
       )
@@ -202,7 +203,7 @@ describe('Validators', () => {
         ...validLegalPersonPayload,
         entitlements: [PSP_SUB_ENTITLEMENTS.PAYMENT_INITIATION],
       }
-      const result = validateWRPRCPayload(payload, payload.sub)
+      const result = validateRegistrationCertificatePayload(payload, payload.sub)
       expect(result.valid).toBe(false)
       expect(
         result.issues.some((issue) => issue.severity === 'error' && issue.code === 'missing_base_entitlement')
@@ -214,62 +215,66 @@ describe('Validators', () => {
         ...validLegalPersonPayload,
         entitlements: [WRP_ENTITLEMENTS.SERVICE_PROVIDER, PSP_SUB_ENTITLEMENTS.PAYMENT_INITIATION],
       }
-      const result = validateWRPRCPayload(payload, payload.sub)
+      const result = validateRegistrationCertificatePayload(payload, payload.sub)
       expect(
         result.issues.some((issue) => issue.severity === 'error' && issue.code === 'missing_base_entitlement')
       ).toBe(false)
     })
   })
 
-  describe('validateWRPRCJWTHeader', () => {
+  describe('validateRegistrationCertificateJwtHeader', () => {
     it('should validate valid header', () => {
-      const result = validateWRPRCJWTHeader(validJWTHeader)
+      const result = validateRegistrationCertificateJwtHeader(validJWTHeader)
       expect(result.valid).toBe(true)
     })
 
     it('should reject invalid typ', () => {
-      const result = validateWRPRCJWTHeader({ ...validJWTHeader, typ: 'jwt' })
+      const result = validateRegistrationCertificateJwtHeader({ ...validJWTHeader, typ: 'jwt' })
       expect(result.valid).toBe(false)
     })
   })
 
-  describe('validateWRPRC', () => {
-    it('should validate complete WRPRC', () => {
-      const result = validateWRPRC(validJWTHeader, validLegalPersonPayload, validLegalPersonPayload.sub)
+  describe('validateRegistrationCertificate', () => {
+    it('should validate complete registration certificate', () => {
+      const result = validateRegistrationCertificate(
+        validJWTHeader,
+        validLegalPersonPayload,
+        validLegalPersonPayload.sub
+      )
       expect(result.valid).toBe(true)
     })
   })
 
-  describe('isLegalPersonWRPRC', () => {
+  describe('isLegalPersonRegistrationCertificate', () => {
     it('should return true for legal person', () => {
-      expect(isLegalPersonWRPRC(validLegalPersonPayload)).toBe(true)
+      expect(isLegalPersonRegistrationCertificate(validLegalPersonPayload)).toBe(true)
     })
 
     it('should return false for natural person', () => {
-      expect(isLegalPersonWRPRC(validNaturalPersonPayload)).toBe(false)
+      expect(isLegalPersonRegistrationCertificate(validNaturalPersonPayload)).toBe(false)
     })
   })
 
-  describe('isNaturalPersonWRPRC', () => {
+  describe('isNaturalPersonRegistrationCertificate', () => {
     it('should return true for natural person', () => {
-      expect(isNaturalPersonWRPRC(validNaturalPersonPayload)).toBe(true)
+      expect(isNaturalPersonRegistrationCertificate(validNaturalPersonPayload)).toBe(true)
     })
 
     it('should return false for legal person', () => {
-      expect(isNaturalPersonWRPRC(validLegalPersonPayload)).toBe(false)
+      expect(isNaturalPersonRegistrationCertificate(validLegalPersonPayload)).toBe(false)
     })
   })
 
-  describe('validateLegalPersonWRPRC', () => {
+  describe('validateLegalPersonRegistrationCertificate', () => {
     it('should validate legal person payload', () => {
-      const result = validateLegalPersonWRPRC(validLegalPersonPayload)
+      const result = validateLegalPersonRegistrationCertificate(validLegalPersonPayload)
       expect(result.valid).toBe(true)
     })
   })
 
-  describe('validateNaturalPersonWRPRC', () => {
+  describe('validateNaturalPersonRegistrationCertificate', () => {
     it('should validate natural person payload', () => {
-      const result = validateNaturalPersonWRPRC(validNaturalPersonPayload)
+      const result = validateNaturalPersonRegistrationCertificate(validNaturalPersonPayload)
       expect(result.valid).toBe(true)
     })
   })
@@ -279,9 +284,9 @@ describe('Validators', () => {
 // Builder Tests
 // ============================================================================
 
-describe('WRPRCBuilder', () => {
+describe('RegistrationCertificateBuilder', () => {
   it('should build a legal person payload', () => {
-    const payload = wrprc()
+    const payload = registrationCertificate()
       .name('Test Service')
       .legalName('Test Inc.')
       .identifier('LEIXG-529900T8BM49AURSDO55')
@@ -298,7 +303,7 @@ describe('WRPRCBuilder', () => {
   })
 
   it('should build a natural person payload', () => {
-    const payload = wrprc()
+    const payload = registrationCertificate()
       .name('Consultant')
       .givenName('Maria')
       .familyName('Rossi')
@@ -313,7 +318,7 @@ describe('WRPRCBuilder', () => {
   })
 
   it('should omit jti when no certificate id is set', () => {
-    const payload = wrprc()
+    const payload = registrationCertificate()
       .name('Test Service')
       .legalName('Test Inc.')
       .identifier('LEIXG-529900T8BM49AURSDO55')
@@ -327,7 +332,7 @@ describe('WRPRCBuilder', () => {
 
   it('should preserve an explicitly set certificate id', () => {
     const jti_uuid = 'urn:uuid:0c1f7a2e-3d4b-4c5a-8e9f-1a2b3c4d5e6f'
-    const payload = wrprc()
+    const payload = registrationCertificate()
       .name('Test Service')
       .legalName('Test Inc.')
       .identifier('LEIXG-529900T8BM49AURSDO55')
@@ -341,7 +346,7 @@ describe('WRPRCBuilder', () => {
   })
 
   it('should add multiple entitlements', () => {
-    const payload = wrprc()
+    const payload = registrationCertificate()
       .name('Test')
       .legalName('Test Inc.')
       .identifier('LEIXG-123')
@@ -356,7 +361,7 @@ describe('WRPRCBuilder', () => {
   })
 
   it('should not duplicate entitlements', () => {
-    const payload = wrprc()
+    const payload = registrationCertificate()
       .name('Test')
       .legalName('Test Inc.')
       .identifier('LEIXG-123')
@@ -371,7 +376,7 @@ describe('WRPRCBuilder', () => {
   })
 
   it('should add optional fields', () => {
-    const payload = wrprc()
+    const payload = registrationCertificate()
       .name('Test')
       .legalName('Test Inc.')
       .identifier('LEIXG-123')
@@ -389,7 +394,7 @@ describe('WRPRCBuilder', () => {
   })
 
   it('should add credentials', () => {
-    const payload = wrprc()
+    const payload = registrationCertificate()
       .name('Test')
       .legalName('Test Inc.')
       .identifier('LEIXG-123')
@@ -408,8 +413,8 @@ describe('WRPRCBuilder', () => {
 
   it('should throw on invalid payload', () => {
     expect(() => {
-      wrprc().name('Test').build()
-    }).toThrow(WRPRCException)
+      registrationCertificate().name('Test').build()
+    }).toThrow(RegistrationCertificateValidationError)
   })
 })
 
@@ -443,9 +448,9 @@ describe('CredentialBuilder', () => {
 // ============================================================================
 
 describe('Factory Functions', () => {
-  describe('createLegalPersonWRPRC', () => {
-    it('should create a legal person WRPRC', () => {
-      const payload = createLegalPersonWRPRC({
+  describe('createLegalPersonRegistrationCertificate', () => {
+    it('should create a legal person registration certificate', () => {
+      const payload = createLegalPersonRegistrationCertificate({
         name: 'Test Service',
         legalName: 'Test Inc.',
         identifier: 'LEIXG-123',
@@ -459,9 +464,9 @@ describe('Factory Functions', () => {
     })
   })
 
-  describe('createNaturalPersonWRPRC', () => {
-    it('should create a natural person WRPRC', () => {
-      const payload = createNaturalPersonWRPRC({
+  describe('createNaturalPersonRegistrationCertificate', () => {
+    it('should create a natural person registration certificate', () => {
+      const payload = createNaturalPersonRegistrationCertificate({
         name: 'Consultant',
         givenName: 'Maria',
         familyName: 'Rossi',
@@ -476,10 +481,10 @@ describe('Factory Functions', () => {
     })
   })
 
-  describe('createWRPRCPayload', () => {
+  describe('createRegistrationCertificatePayload', () => {
     it('should carry a provided jti through', () => {
       const jti_uuid = 'urn:uuid:0c1f7a2e-3d4b-4c5a-8e9f-1a2b3c4d5e6f'
-      const payload = createWRPRCPayload(
+      const payload = createRegistrationCertificatePayload(
         {
           ...validLegalPersonPayload,
           jti: jti_uuid,
@@ -493,18 +498,18 @@ describe('Factory Functions', () => {
 })
 
 // ============================================================================
-// Exception Tests
+// Error Tests
 // ============================================================================
 
-describe('WRPRCException', () => {
-  it('should create exception with message', () => {
-    const error = new WRPRCException('Test error')
+describe('RegistrationCertificateError', () => {
+  it('should create an error with message', () => {
+    const error = new RegistrationCertificateError('Test error')
     expect(error.message).toBe('Test error')
-    expect(error.name).toBe('WRPRCException')
+    expect(error.name).toBe('RegistrationCertificateError')
   })
 
   it('should be instanceof Error', () => {
-    const error = new WRPRCException('Test')
+    const error = new RegistrationCertificateError('Test')
     expect(error).toBeInstanceOf(Error)
   })
 })

@@ -1,4 +1,4 @@
-import { IdentityCommonException } from './identity-common-exception'
+import { IdentityCommonError } from './identity-common-error'
 
 /**
  * Encoding helpers, built in layers on top of each other:
@@ -49,7 +49,7 @@ const encodeBase64 = (bytes: Uint8Array, alphabet: Base64Alphabet): string => {
 
 const decodeBase64 = (input: string, alphabet: Base64Alphabet): Uint8Array => {
   if (!VALID_INPUT[alphabet].test(input)) {
-    throw new IdentityCommonException(`Invalid ${alphabet} string: contains invalid characters`)
+    throw new IdentityCommonError(`Invalid ${alphabet} string: contains invalid characters`)
   }
 
   const chars = ALPHABETS[alphabet]
@@ -61,7 +61,7 @@ const decodeBase64 = (input: string, alphabet: Base64Alphabet): Uint8Array => {
   }
   // A single trailing character can never encode a full byte
   if (unpadded.length % 4 === 1) {
-    throw new IdentityCommonException(`Invalid ${alphabet} string: invalid length`)
+    throw new IdentityCommonError(`Invalid ${alphabet} string: invalid length`)
   }
 
   const bytes = new Uint8Array((unpadded.length * 3) >> 2)
@@ -98,7 +98,7 @@ export const base64UrlToUint8Array = base64url.decode
 
 export type BytesToStringOptions = {
   /**
-   * Throw an `IdentityCommonException` when the bytes are not valid UTF-8, instead of replacing
+   * Throw an `IdentityCommonError` when the bytes are not valid UTF-8, instead of replacing
    * invalid sequences with U+FFFD. Use this whenever the decoded string is processed further,
    * e.g. parsed as JSON, so different byte sequences can't decode to the same string.
    *
@@ -115,7 +115,7 @@ export const bytesToString = (bytes: Uint8Array, options?: BytesToStringOptions)
   try {
     return decoder.decode(bytes)
   } catch {
-    throw new IdentityCommonException('Invalid UTF-8 byte sequence')
+    throw new IdentityCommonError('Invalid UTF-8 byte sequence')
   }
 }
 
@@ -149,12 +149,12 @@ export const base64urlDecode = (input: string, options?: BytesToStringOptions): 
  *
  * Bytes that are not valid UTF-8 are rejected instead of being decoded to a different string, and
  * every failure (invalid base64url, invalid UTF-8 or invalid JSON) throws the same
- * `IdentityCommonException` without exposing details of the input.
+ * `IdentityCommonError` without exposing details of the input.
  */
 export const base64urlDecodeJson = <T = unknown>(input: string): T => {
   try {
     return JSON.parse(base64urlDecode(input, { fatal: true })) as T
   } catch {
-    throw new IdentityCommonException('Invalid base64url encoded JSON')
+    throw new IdentityCommonError('Invalid base64url encoded JSON')
   }
 }

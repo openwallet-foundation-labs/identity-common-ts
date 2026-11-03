@@ -56,7 +56,54 @@ describe('CwtPayload.verifyClaims', () => {
 
   test('requires nothing by default, since the cwt type decides what a token must carry', () => {
     expect(() => CwtPayload.create().verifyClaims()).not.toThrow()
-    expect(() => CwtPayload.create().verifyClaims({ now, expectedIssuer: 'https://issuer.example' })).not.toThrow()
+    expect(() => CwtPayload.create().verifyClaims({ now })).not.toThrow()
+  })
+
+  test('rejects a token that does not carry a claim the caller expects a value for', () => {
+    // An absent claim does not hold the expected value, so it is a mismatch rather than a claim to
+    // skip: a token that does not say who issued it is not a token issued by the expected issuer
+    expect(() => CwtPayload.create().verifyClaims({ now, expectedIssuer: 'https://issuer.example' })).toThrow(
+      "The token has no 'Issuer (1)' claim, which is required to match the expected value 'https://issuer.example'"
+    )
+    expect(() => CwtPayload.create().verifyClaims({ now, expectedAudience: 'https://verifier.example' })).toThrow(
+      "The token has no 'Audience (3)' claim, which is required to match the expected value 'https://verifier.example'"
+    )
+  })
+
+  test('rejects a token without a sub when a subject is expected', () => {
+    expect(() => payload({ subject: undefined }).verifyClaims({ now, expectedSubject: 'https://s.example' })).toThrow(
+      "The token has no 'Subject (2)' claim, which is required to match the expected value 'https://s.example'"
+    )
+  })
+
+  test('names every expected value when an absent claim was expected to hold one of them', () => {
+    expect(() =>
+      CwtPayload.create().verifyClaims({ now, expectedIssuer: ['https://a.example', 'https://b.example'] })
+    ).toThrow(
+      "The token has no 'Issuer (1)' claim, which is required to match the expected value 'https://a.example', 'https://b.example'"
+    )
+  })
+
+  test('accepts an iss that is one of several expected issuers', () => {
+    expect(() =>
+      payload().verifyClaims({ now, expectedIssuer: ['https://other.example', 'https://issuer.example'] })
+    ).not.toThrow()
+  })
+
+  test.each([
+    ['iss', { expectedIssuer: [] }],
+    ['sub', { expectedSubject: [] }],
+    ['aud', { expectedAudience: [] }],
+  ])('rejects a token that carries an %s when the list of expected values is empty', (_, options) => {
+    expect(() => payload().verifyClaims({ now, ...options })).toThrow(CwtClaimVerificationError)
+  })
+
+  test.each([
+    ['iss', { expectedIssuer: [] }],
+    ['sub', { expectedSubject: [] }],
+    ['aud', { expectedAudience: [] }],
+  ])('rejects a token without an %s when the list of expected values is empty', (_, options) => {
+    expect(() => CwtPayload.create().verifyClaims({ now, ...options })).toThrow(CwtClaimVerificationError)
   })
 
   test('rejects a required claim that is absent, naming it', () => {
@@ -117,6 +164,26 @@ describe('CwtPayload.verifyClaims', () => {
 
     expect(() => payload({ expirationTime }).verifyClaims(atExpiration(0))).toThrow('is in the past')
     expect(() => payload({ expirationTime }).verifyClaims(atExpiration(-1))).not.toThrow()
+  })
+
+  // `nbf` and `iat` are the first instant the token is valid, so the token is accepted from that
+  // instant on
+  test.each([
+    ['nbf', 'notBefore'],
+    ['iat', 'issuedAt'],
+  ] as const)('accepts a token at exactly its %s when there is no skew', (_, claim) => {
+    expect(() => payload({ [claim]: now }).verifyClaims({ now, skewSeconds: 0 })).not.toThrow()
+  })
+
+  test.each([
+    ['nbf', 'notBefore', "'NotBefore (5)'"],
+    ['iat', 'issuedAt', "'IssuedAt (6)'"],
+  ] as const)('rejects a token a millisecond before its %s when there is no skew', (_, claim, label) => {
+    const justBefore = new Date(now.getTime() - 1)
+
+    expect(() => payload({ [claim]: now }).verifyClaims({ now: justBefore, skewSeconds: 0 })).toThrow(
+      `The ${label} claim '${now.toISOString()}' is in the future`
+    )
   })
 
   test.each([

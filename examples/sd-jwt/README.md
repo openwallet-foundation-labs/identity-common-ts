@@ -19,7 +19,7 @@ pnpm tsx examples/sd-jwt/sd-jwt-vc/basic.ts
 | [`sdjwt-object.ts`](./core/sdjwt-object.ts) | Working with the decoded SD-JWT object |
 | [`decoy.ts`](./core/decoy.ts) | Adding decoy digests |
 | [`kb.ts`](./core/kb.ts) | Key binding |
-| [`decode.ts`](./core/decode.ts) | Decoding an SD-JWT with `SDJwtInstance` |
+| [`decode.ts`](./core/decode.ts) | Decoding an SD-JWT with `SdJwtInstance` |
 | [`decode-functions.ts`](./core/decode-functions.ts) | Decoding an SD-JWT with the standalone decode functions |
 | [`present-functions.ts`](./core/present-functions.ts) | Presenting an SD-JWT with the standalone present functions |
 | [`flatten-json.ts`](./core/flatten-json.ts) | Flattened JWS JSON serialization |

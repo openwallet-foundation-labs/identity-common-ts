@@ -1,13 +1,13 @@
 import { CborStructure, TypedMap, typedMap, zUint8Array } from '@owf/cose'
 import type { z } from 'zod'
 
-const encryptedResponseDataSchema = typedMap([
+const zEncryptedResponseData = typedMap([
   ['enc', zUint8Array],
   ['cipherText', zUint8Array],
 ] as const)
 
-export type EncryptedResponseDataDecodedStructure = z.output<typeof encryptedResponseDataSchema>
-export type EncryptedResponseDataEncodedStructure = z.input<typeof encryptedResponseDataSchema>
+export type EncryptedResponseDataDecodedStructure = z.output<typeof zEncryptedResponseData>
+export type EncryptedResponseDataEncodedStructure = z.input<typeof zEncryptedResponseData>
 
 export type EncryptedResponseDataOptions = {
   /**
@@ -28,7 +28,7 @@ export class EncryptedResponseData extends CborStructure<
   EncryptedResponseDataDecodedStructure
 > {
   public static override get encodingSchema() {
-    return encryptedResponseDataSchema
+    return zEncryptedResponseData
   }
 
   public get enc() {

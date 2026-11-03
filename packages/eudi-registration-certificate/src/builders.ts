@@ -1,44 +1,45 @@
 /**
- * WRPRC Builders
+ * Registration Certificate Builders
  *
  * Fluent builders for creating ETSI TS 119 475 Wallet-Relying Party Registration Certificates.
  *
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
-import { dateToSeconds, nowInSeconds } from '@owf/identity-common'
+import { dateToSeconds, nowInSeconds, parseWithSchema } from '@owf/identity-common'
 import type { z } from 'zod'
 import { ENTITLEMENT_SERVICE_PROVIDER, type WRP_ENTITLEMENTS } from './entitlements'
-import { WRPRCPayloadSchema } from './schemas'
+import { RegistrationCertificateError, RegistrationCertificateValidationError } from './registration-certificate-error'
+import { zRegistrationCertificatePayload } from './schemas'
 import type {
   Claim,
   Credential,
   Intermediary,
-  LegalPersonWRPRCInput,
+  LegalPersonRegistrationCertificateInput,
   MultiLangString,
-  NaturalPersonWRPRCInput,
+  NaturalPersonRegistrationCertificateInput,
   ProvidedAttestation,
+  RegistrationCertificatePayload,
   Status,
   SupervisoryAuthority,
-  WRPRCPayload,
 } from './types'
-import { WRPRCException } from './wrprc-exception'
+import { REGISTRATION_CERTIFICATE_VALIDATION_CODES } from './validator'
 
 // ============================================================================
 // Partial Payload Type
 // ============================================================================
 
-type PartialWRPRCPayload = Partial<z.input<typeof WRPRCPayloadSchema>>
+type PartialRegistrationCertificatePayload = Partial<z.input<typeof zRegistrationCertificatePayload>>
 
 // ============================================================================
-// WRPRC Payload Builder
+// Registration Certificate Payload Builder
 // ============================================================================
 
 /**
- * Builder for creating WRPRC payloads with a fluent API
+ * Builder for creating registration certificate payloads with a fluent API
  */
-export class WRPRCBuilder {
-  private payload: PartialWRPRCPayload = {}
+export class RegistrationCertificateBuilder {
+  private payload: PartialRegistrationCertificatePayload = {}
 
   /**
    * Set the trade name (display name) of the WRP
@@ -293,21 +294,22 @@ export class WRPRCBuilder {
   }
 
   /**
-   * Build the WRPRC payload
+   * Build the registration certificate payload
    *
-   * @throws WRPRCException if the payload is invalid
+   * @throws RegistrationCertificateError if the payload is invalid
    */
-  build(): WRPRCPayload {
+  build(): RegistrationCertificatePayload {
     // Set default iat if not provided
     if (!this.payload.iat) {
       this.payload.iat = nowInSeconds()
     }
 
-    const result = WRPRCPayloadSchema.safeParse(this.payload)
+    const result = parseWithSchema(zRegistrationCertificatePayload, this.payload, {
+      codes: REGISTRATION_CERTIFICATE_VALIDATION_CODES,
+    })
 
     if (!result.success) {
-      const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-      throw new WRPRCException(`Invalid WRPRC payload:\n${messages}`, result.error.issues)
+      throw new RegistrationCertificateValidationError('Invalid registration certificate payload', result.issues)
     }
 
     return result.data
@@ -386,10 +388,10 @@ export class CredentialBuilder {
    */
   build(): Credential {
     if (!this.credential.format) {
-      throw new WRPRCException('Credential format is required')
+      throw new RegistrationCertificateError('Credential format is required')
     }
     if (!this.credential.meta) {
-      throw new WRPRCException('Credential meta is required')
+      throw new RegistrationCertificateError('Credential meta is required')
     }
     return this.credential as Credential
   }
@@ -400,10 +402,10 @@ export class CredentialBuilder {
 // ============================================================================
 
 /**
- * Create a new WRPRCBuilder
+ * Create a new RegistrationCertificateBuilder
  */
-export function wrprc(): WRPRCBuilder {
-  return new WRPRCBuilder()
+export function registrationCertificate(): RegistrationCertificateBuilder {
+  return new RegistrationCertificateBuilder()
 }
 
 /**
@@ -414,10 +416,12 @@ export function credential(): CredentialBuilder {
 }
 
 /**
- * Create a WRPRC payload for a legal person
+ * Create a registration certificate payload for a legal person
  */
-export function createLegalPersonWRPRC(input: LegalPersonWRPRCInput): WRPRCPayload {
-  return wrprc()
+export function createLegalPersonRegistrationCertificate(
+  input: LegalPersonRegistrationCertificateInput
+): RegistrationCertificatePayload {
+  return registrationCertificate()
     .name(input.name)
     .legalName(input.legalName)
     .identifier(input.identifier)
@@ -428,10 +432,12 @@ export function createLegalPersonWRPRC(input: LegalPersonWRPRCInput): WRPRCPaylo
 }
 
 /**
- * Create a WRPRC payload for a natural person
+ * Create a registration certificate payload for a natural person
  */
-export function createNaturalPersonWRPRC(input: NaturalPersonWRPRCInput): WRPRCPayload {
-  return wrprc()
+export function createNaturalPersonRegistrationCertificate(
+  input: NaturalPersonRegistrationCertificateInput
+): RegistrationCertificatePayload {
+  return registrationCertificate()
     .name(input.name)
     .givenName(input.givenName)
     .familyName(input.familyName)
@@ -443,16 +449,16 @@ export function createNaturalPersonWRPRC(input: NaturalPersonWRPRCInput): WRPRCP
 }
 
 /**
- * Create a simple service provider WRPRC
+ * Create a simple service provider registration certificate
  */
-export function createServiceProviderWRPRC(
+export function createServiceProviderRegistrationCertificate(
   name: string,
   legalName: string,
   identifier: string,
   country: string,
   registryUri: string
-): WRPRCPayload {
-  return wrprc()
+): RegistrationCertificatePayload {
+  return registrationCertificate()
     .name(name)
     .legalName(legalName)
     .identifier(identifier)

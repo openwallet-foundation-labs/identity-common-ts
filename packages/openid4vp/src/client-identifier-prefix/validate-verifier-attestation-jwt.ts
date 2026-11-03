@@ -48,7 +48,7 @@ export interface VerifyAttestationJwtOptions {
   allowedSkewInSeconds?: number
   callbacks: Pick<CallbackContext, 'verifyJwt'>
 }
-export async function verifyAttestationJWT(options: VerifyAttestationJwtOptions) {
+export async function verifyAttestationJwt(options: VerifyAttestationJwtOptions) {
   const errors = []
 
   const { header, payload } = decodeJwt({

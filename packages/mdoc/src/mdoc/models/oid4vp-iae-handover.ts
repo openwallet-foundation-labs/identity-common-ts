@@ -4,11 +4,11 @@ import type { MdocContext } from '../../context'
 import { Handover } from './handover'
 import type { Oid4vpIaeHandoverInfo } from './oid4vp-iae-handover-info'
 
-const oid4vpIaeHandoverEncodedSchema = z.tuple([z.literal('OpenID4VCIIAEHandover'), zUint8Array])
-const oid4vpIaeHandoverDecodedSchema = zUint8Array
+const zOid4vpIaeHandoverEncoded = z.tuple([z.literal('OpenID4VCIIAEHandover'), zUint8Array])
+const zOid4vpIaeHandoverDecoded = zUint8Array
 
-export type Oid4vpIaeHandoverEncodedStructure = z.infer<typeof oid4vpIaeHandoverEncodedSchema>
-export type Oid4vpIaeHandoverDecodedStructure = z.infer<typeof oid4vpIaeHandoverDecodedSchema>
+export type Oid4vpIaeHandoverEncodedStructure = z.infer<typeof zOid4vpIaeHandoverEncoded>
+export type Oid4vpIaeHandoverDecodedStructure = z.infer<typeof zOid4vpIaeHandoverDecoded>
 
 export type Oid4vpIaeHandoverOptions = {
   oid4vpIaeHandoverInfo: Oid4vpIaeHandoverInfo
@@ -16,7 +16,7 @@ export type Oid4vpIaeHandoverOptions = {
 
 export class Oid4vpIaeHandover extends Handover<Oid4vpIaeHandoverEncodedStructure, Oid4vpIaeHandoverDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(oid4vpIaeHandoverEncodedSchema, oid4vpIaeHandoverDecodedSchema, {
+    return z.codec(zOid4vpIaeHandoverEncoded, zOid4vpIaeHandoverDecoded, {
       encode: (handoverInfoHash) =>
         ['OpenID4VCIIAEHandover', handoverInfoHash] satisfies Oid4vpIaeHandoverEncodedStructure,
       decode: ([, handoverInfoHash]) => handoverInfoHash,

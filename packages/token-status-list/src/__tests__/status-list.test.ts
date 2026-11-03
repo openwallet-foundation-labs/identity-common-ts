@@ -1,6 +1,6 @@
 import { describe, expect, it, test } from 'vitest'
 import { StatusList } from '../status-list'
-import { SLException } from '../status-list-exception'
+import { StatusListError } from '../status-list-error'
 import type { BitsPerStatus } from '../types'
 import { StatusType } from '../types'
 
@@ -169,15 +169,15 @@ describe('StatusList', () => {
     }
   )
 
-  describe('SLException', () => {
-    it('should create exception with message', () => {
-      const err = new SLException('test error')
+  describe('StatusListError', () => {
+    it('should create error with message', () => {
+      const err = new StatusListError('test error')
       expect(err.message).toBe('test error')
-      expect(err.name).toBe('SLException')
+      expect(err.name).toBe('StatusListError')
     })
 
-    it('should create exception with details', () => {
-      const err = new SLException('test error', { code: 42 })
+    it('should create error with details', () => {
+      const err = new StatusListError('test error', { code: 42 })
       expect(err.details).toEqual({ code: 42 })
       expect(err.getFullMessage()).toContain('42')
     })

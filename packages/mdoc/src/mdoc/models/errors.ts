@@ -1,13 +1,13 @@
 import { CborStructure } from '@owf/cose'
 import z from 'zod'
-import { ErrorItems, errorItemsSchema } from './error-items'
+import { ErrorItems, zErrorItems } from './error-items'
 import type { Namespace } from './namespace'
 
-const errorsEncodedSchema = z.map(z.string(), errorItemsSchema)
-const errorsDecodedSchema = z.map(z.string(), z.instanceof(ErrorItems))
+const zErrorsEncoded = z.map(z.string(), zErrorItems)
+const zErrorsDecoded = z.map(z.string(), z.instanceof(ErrorItems))
 
-export type ErrorsEncodedStructure = z.infer<typeof errorsEncodedSchema>
-export type ErrorsDecodedStructure = z.infer<typeof errorsDecodedSchema>
+export type ErrorsEncodedStructure = z.infer<typeof zErrorsEncoded>
+export type ErrorsDecodedStructure = z.infer<typeof zErrorsDecoded>
 
 export type ErrorsOptions = {
   errors: ErrorsDecodedStructure
@@ -15,7 +15,7 @@ export type ErrorsOptions = {
 
 export class Errors extends CborStructure<ErrorsEncodedStructure, ErrorsDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(errorsEncodedSchema, errorsDecodedSchema, {
+    return z.codec(zErrorsEncoded, zErrorsDecoded, {
       encode: (decoded) => {
         const errorsDecoded: ErrorsEncodedStructure = new Map()
 

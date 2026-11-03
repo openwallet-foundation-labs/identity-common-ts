@@ -12,14 +12,14 @@ import { z } from 'zod'
  * id in the identifier list at `uri`. Absence from the list means the credential
  * is valid.
  */
-const identifierListInfoSchema = typedMap([
+const zIdentifierListInfo = typedMap([
   ['id', zUint8Array],
   ['uri', z.string()],
   ['certificate', zUint8Array.exactOptional()],
 ])
 
-export type IdentifierListInfoDecodedStructure = z.output<typeof identifierListInfoSchema>
-export type IdentifierListInfoEncodedStructure = z.input<typeof identifierListInfoSchema>
+export type IdentifierListInfoDecodedStructure = z.output<typeof zIdentifierListInfo>
+export type IdentifierListInfoEncodedStructure = z.input<typeof zIdentifierListInfo>
 
 export type IdentifierListInfoOptions = {
   id: Uint8Array
@@ -32,7 +32,7 @@ export class IdentifierListInfo extends CborStructure<
   IdentifierListInfoDecodedStructure
 > {
   public static override get encodingSchema() {
-    return identifierListInfoSchema
+    return zIdentifierListInfo
   }
 
   public get id() {

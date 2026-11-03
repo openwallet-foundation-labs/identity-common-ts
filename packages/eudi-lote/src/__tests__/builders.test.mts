@@ -62,7 +62,7 @@ describe('ServiceBuilder', () => {
 
   it('should add X.509 SKIs', () => {
     const ski = 'base64encodedSKI=='
-    const svc = service().name('Test Service').addX509SKI(ski).build()
+    const svc = service().name('Test Service').addX509Ski(ski).build()
 
     expect(svc.ServiceInformation.ServiceDigitalIdentity.X509SKIs).toHaveLength(1)
     expect(svc.ServiceInformation.ServiceDigitalIdentity.X509SKIs?.[0]).toBe(ski)

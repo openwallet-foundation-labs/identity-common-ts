@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { schemaMeta, schemaURI } from '../builders'
+import { schemaMeta, schemaUri } from '../builders'
 import { buildDcqlFromSchemaMeta } from '../dcql'
 import { resolveSchemaReferences } from '../resolver'
-import { mergeTypeMetadata, TypeMetadataSchema } from '../type-metadata'
+import { mergeTypeMetadata, zTypeMetadata } from '../type-metadata'
 
 const RULEBOOK_INTEGRITY = 'sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw='
 const VCT = 'https://example.com/credentials/education'
@@ -21,7 +21,7 @@ function buildMeta(uri: string, integrity: string, vct = VCT) {
     .rulebookIntegrity(RULEBOOK_INTEGRITY)
     .attestationLoS('iso_18045_basic')
     .bindingType('key')
-    .addSchemaURI(schemaURI().format('dc+sd-jwt').uri(uri).integrity(integrity).meta({ vct }).build())
+    .addSchemaUri(schemaUri().format('dc+sd-jwt').uri(uri).integrity(integrity).meta({ vct }).build())
     .build()
 }
 
@@ -35,9 +35,9 @@ function documentServer(documents: Record<string, string>) {
   }
 }
 
-describe('TypeMetadataSchema', () => {
+describe('zTypeMetadata', () => {
   it('accepts the SD-JWT VC Type Metadata format', () => {
-    const result = TypeMetadataSchema.safeParse({
+    const result = zTypeMetadata.safeParse({
       vct: VCT,
       claims: [{ path: ['given_name'], sd: 'allowed' }],
       display: [{ locale: 'en', name: 'Education Credential' }],
@@ -47,7 +47,7 @@ describe('TypeMetadataSchema', () => {
   })
 
   it('preserves unknown members', () => {
-    const result = TypeMetadataSchema.parse({ vct: VCT, 'x-vendor': 'value' })
+    const result = zTypeMetadata.parse({ vct: VCT, 'x-vendor': 'value' })
     expect(result['x-vendor']).toBe('value')
   })
 })

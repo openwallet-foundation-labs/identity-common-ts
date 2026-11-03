@@ -45,7 +45,7 @@ export {
   type ParseOpenid4vpAuthorizationResponseOptions,
   parseOpenid4vpAuthorizationResponse,
 } from './authorization-response/parse-authorization-response'
-export { parseOpenid4VpAuthorizationResponsePayload } from './authorization-response/parse-authorization-response-payload'
+export { parseOpenid4vpAuthorizationResponsePayload } from './authorization-response/parse-authorization-response-payload'
 export {
   type ParseJarmAuthorizationResponseOptions,
   parseJarmAuthorizationResponse,
@@ -59,9 +59,9 @@ export {
   validateOpenid4vpAuthorizationResponsePayload,
 } from './authorization-response/validate-authorization-response'
 export type {
-  ValidateOpenid4VpAuthorizationResponseResult,
-  ValidateOpenid4VpDcqlAuthorizationResponseResult,
-  ValidateOpenid4VpPexAuthorizationResponseResult,
+  ValidateOpenid4vpAuthorizationResponseResult,
+  ValidateOpenid4vpDcqlAuthorizationResponseResult,
+  ValidateOpenid4vpPexAuthorizationResponseResult,
 } from './authorization-response/validate-authorization-response-result'
 export {
   type Openid4vpAuthorizationErrorResponse,

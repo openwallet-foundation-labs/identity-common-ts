@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addTrustedEntity, createLoTE, removeTrustedEntity, service, trustedEntity, updateLoTEVersion } from '../index'
+import { addTrustedEntity, createLote, removeTrustedEntity, service, trustedEntity, updateLoteVersion } from '../index'
 import type { TrustedEntity } from '../types'
 
 describe('LoTE Creation', () => {
@@ -26,7 +26,7 @@ describe('LoTE Creation', () => {
   }
 
   it('should create a minimal LoTE document with only required fields', () => {
-    const lote = createLoTE(minimalSchemeInfo)
+    const lote = createLote(minimalSchemeInfo)
 
     expect(lote.LoTE).toBeDefined()
     expect(lote.LoTE.ListAndSchemeInformation).toBeDefined()
@@ -38,7 +38,7 @@ describe('LoTE Creation', () => {
   })
 
   it('should create a LoTE document with full scheme info', () => {
-    const lote = createLoTE(fullSchemeInfo)
+    const lote = createLote(fullSchemeInfo)
 
     expect(lote.LoTE.ListAndSchemeInformation.SchemeName).toEqual([{ lang: 'en', value: 'Test Scheme' }])
     expect(lote.LoTE.ListAndSchemeInformation.SchemeTerritory).toBe('DE')
@@ -47,7 +47,7 @@ describe('LoTE Creation', () => {
 
   it('should auto-generate ListIssueDateTime and NextUpdate with 6-month default per ETSI spec', () => {
     const beforeCreate = new Date()
-    const lote = createLoTE(minimalSchemeInfo)
+    const lote = createLote(minimalSchemeInfo)
     const issueDate = new Date(lote.LoTE.ListAndSchemeInformation.ListIssueDateTime)
     const nextUpdate = new Date(lote.LoTE.ListAndSchemeInformation.NextUpdate)
 
@@ -64,7 +64,7 @@ describe('LoTE Creation', () => {
     const customDate = '2024-01-01T00:00:00.000Z'
     const customNextUpdate = '2025-01-01T00:00:00.000Z'
 
-    const lote = createLoTE({
+    const lote = createLote({
       ...minimalSchemeInfo,
       ListIssueDateTime: customDate,
       NextUpdate: customNextUpdate,
@@ -97,7 +97,7 @@ describe('LoTE Creation', () => {
       )
       .build()
 
-    const lote = createLoTE(minimalSchemeInfo, [entity])
+    const lote = createLote(minimalSchemeInfo, [entity])
 
     expect(lote.LoTE.TrustedEntitiesList).toHaveLength(1)
     expect(lote.LoTE.TrustedEntitiesList?.[0].TrustedEntityInformation.TEName[0].value).toBe('Test Entity')
@@ -106,52 +106,52 @@ describe('LoTE Creation', () => {
 
 describe('LoTE Version Management', () => {
   it('should increment sequence number', () => {
-    const lote = createLoTE({
+    const lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
       LoTESequenceNumber: 5,
     })
 
-    const updated = updateLoTEVersion(lote)
+    const updated = updateLoteVersion(lote)
 
     expect(updated.LoTE.ListAndSchemeInformation.LoTESequenceNumber).toBe(6)
   })
 
   it('should update timestamps when incrementing version', () => {
     const oldDate = '2020-01-01T00:00:00.000Z'
-    const lote = createLoTE({
+    const lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
       ListIssueDateTime: oldDate,
       NextUpdate: oldDate,
     })
 
-    const updated = updateLoTEVersion(lote)
+    const updated = updateLoteVersion(lote)
 
     expect(updated.LoTE.ListAndSchemeInformation.ListIssueDateTime).not.toBe(oldDate)
     expect(updated.LoTE.ListAndSchemeInformation.NextUpdate).not.toBe(oldDate)
   })
 
   it('should preserve other fields when updating version', () => {
-    const lote = createLoTE({
+    const lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
       SchemeName: [{ lang: 'en', value: 'My Scheme' }],
       SchemeTerritory: 'DE',
     })
 
-    const updated = updateLoTEVersion(lote)
+    const updated = updateLoteVersion(lote)
 
     expect(updated.LoTE.ListAndSchemeInformation.SchemeName).toEqual([{ lang: 'en', value: 'My Scheme' }])
     expect(updated.LoTE.ListAndSchemeInformation.SchemeTerritory).toBe('DE')
   })
 
   it('should accept custom listIssueDateTime and nextUpdate', () => {
-    const lote = createLoTE({
+    const lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
     })
 
     const customIssueDate = new Date('2025-06-01T00:00:00.000Z')
     const customNextUpdate = new Date('2025-12-01T00:00:00.000Z')
 
-    const updated = updateLoTEVersion(lote, {
+    const updated = updateLoteVersion(lote, {
       listIssueDateTime: customIssueDate,
       nextUpdate: customNextUpdate,
     })
@@ -161,11 +161,11 @@ describe('LoTE Version Management', () => {
   })
 
   it('should accept string dates for listIssueDateTime and nextUpdate', () => {
-    const lote = createLoTE({
+    const lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
     })
 
-    const updated = updateLoTEVersion(lote, {
+    const updated = updateLoteVersion(lote, {
       listIssueDateTime: '2025-06-01T00:00:00.000Z',
       nextUpdate: '2025-12-01T00:00:00.000Z',
     })
@@ -175,13 +175,13 @@ describe('LoTE Version Management', () => {
   })
 
   it('should default NextUpdate to 6 months from listIssueDateTime', () => {
-    const lote = createLoTE({
+    const lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
     })
 
     const customIssueDate = new Date('2025-01-15T12:00:00.000Z')
 
-    const updated = updateLoTEVersion(lote, {
+    const updated = updateLoteVersion(lote, {
       listIssueDateTime: customIssueDate,
     })
 
@@ -210,7 +210,7 @@ describe('LoTE Entity Management', () => {
       .build()
 
   it('should add a trusted entity', () => {
-    let lote = createLoTE({
+    let lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
     })
 
@@ -222,7 +222,7 @@ describe('LoTE Entity Management', () => {
   })
 
   it('should add multiple entities', () => {
-    let lote = createLoTE({
+    let lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
     })
 
@@ -234,7 +234,7 @@ describe('LoTE Entity Management', () => {
   })
 
   it('should remove a trusted entity by name', () => {
-    let lote = createLoTE({
+    let lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
     })
 
@@ -251,7 +251,7 @@ describe('LoTE Entity Management', () => {
   })
 
   it('should add a trusted entity to a list without TrustedEntitiesList', () => {
-    const { LoTE } = createLoTE({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] })
+    const { LoTE } = createLote({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] })
     const { TrustedEntitiesList: _, ...withoutEntities } = LoTE
 
     const lote = addTrustedEntity({ LoTE: withoutEntities }, createTestEntity('New Entity'))
@@ -260,7 +260,7 @@ describe('LoTE Entity Management', () => {
   })
 
   it('should leave a list without TrustedEntitiesList as is when removing an entity', () => {
-    const { LoTE } = createLoTE({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] })
+    const { LoTE } = createLote({ SchemeOperatorName: [{ lang: 'en', value: 'Test' }] })
     const { TrustedEntitiesList: _, ...withoutEntities } = LoTE
 
     const lote = removeTrustedEntity({ LoTE: withoutEntities }, 'Entity A')
@@ -269,7 +269,7 @@ describe('LoTE Entity Management', () => {
   })
 
   it('should not modify list when removing non-existent entity', () => {
-    let lote = createLoTE({
+    let lote = createLote({
       SchemeOperatorName: [{ lang: 'en', value: 'Test' }],
     })
 

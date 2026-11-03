@@ -5,7 +5,7 @@ import { asn1ToString, parseDer } from './der'
 import { toArrayBuffer } from './encoding'
 import { parseName } from './name'
 import type { SubjectAlternativeNames, X509Extension } from './types'
-import { X509Exception } from './x509-exception'
+import { X509Error } from './x509-error'
 
 /** Convert ASN.1 extensions, rejecting duplicates (RFC 5280 clause 4.2). */
 export function toExtensions(extensions: Extension[] | undefined): X509Extension[] {
@@ -16,7 +16,7 @@ export function toExtensions(extensions: Extension[] | undefined): X509Extension
   }))
   const seen = new Set<string>()
   for (const { oid } of result) {
-    if (seen.has(oid)) throw new X509Exception(`Duplicate extension ${oid}`)
+    if (seen.has(oid)) throw new X509Error(`Duplicate extension ${oid}`)
     seen.add(oid)
   }
   return result
@@ -34,7 +34,7 @@ export function decodeExtension<T>(
   try {
     return AsnConvert.parse(toArrayBuffer(extension.value), type)
   } catch (error) {
-    throw new X509Exception(`Invalid ${name} extension`, error)
+    throw new X509Error(`Invalid ${name} extension`, error)
   }
 }
 

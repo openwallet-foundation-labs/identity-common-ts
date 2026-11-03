@@ -8,6 +8,7 @@ import {
 } from '@owf/x509'
 import { describe, expect, it } from 'vitest'
 import {
+  AccessCertificateValidationError,
   assembleAccessCertificate,
   type CreateAccessCertificateOptions,
   createAccessCertificate,
@@ -207,6 +208,28 @@ describe('createAccessCertificate', () => {
       await expect(
         createAccessCertificate({ ...options, subject: { ...options.subject, organizationIdentifier: 'VATGR-123' } })
       ).rejects.toThrow(/"EL" for Greece/)
+    })
+
+    it('reports every invalid option as an issue with a path into the options', async () => {
+      const options = await legalPersonOptions()
+      const error = await createAccessCertificate({
+        ...options,
+        cpsUri: '',
+        contact: {},
+        subject: { ...options.subject, countryName: 'Germany' },
+      }).catch((error) => error)
+      expect(error).toBeInstanceOf(AccessCertificateValidationError)
+      expect(
+        (error as AccessCertificateValidationError).issues.map(({ code, path, requirement }) => ({
+          code,
+          path,
+          requirement,
+        }))
+      ).toEqual([
+        { code: 'missing_cps_uri', path: ['cpsUri'], requirement: 'GEN-6.6.1-06' },
+        { code: 'missing_contact', path: ['contact'], requirement: 'GEN-6.6.1-07' },
+        { code: 'invalid_country_name', path: ['subject', 'countryName'], requirement: undefined },
+      ])
     })
 
     it('requires an ISO 3166-1 country code', async () => {

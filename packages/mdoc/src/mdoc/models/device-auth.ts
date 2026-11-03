@@ -18,20 +18,20 @@ import { DeviceSignature, type DeviceSignatureEncodedStructure } from './device-
 import type { Document } from './document'
 import type { SessionTranscript } from './session-transcript'
 
-const deviceAuthSchema = typedMap([
+const zDeviceAuth = typedMap([
   ['deviceSignature', z.instanceof(DeviceSignature).exactOptional()],
   ['deviceMac', z.instanceof(DeviceMac).exactOptional()],
 ] as const)
 
 // ISO/IEC 18013-5 9.1.3.4: DeviceAuth = { "deviceSignature" : DeviceSignature // "deviceMac" : DeviceMac }
 // The refinement is applied to the decoded schema, as both decoding and `fromDecodedStructure` validate against it.
-const deviceAuthDecodedSchema = deviceAuthSchema.out.refine(
+const zDeviceAuthDecoded = zDeviceAuth.out.refine(
   (map) => [map.get('deviceMac'), map.get('deviceSignature')].filter((i) => i !== undefined).length === 1,
   { error: () => 'deviceAuth must contain either a deviceMac or deviceSignature, but not both or neither' }
 )
 
-export type DeviceAuthDecodedStructure = z.output<typeof deviceAuthSchema>
-export type DeviceAuthEncodedStructure = z.input<typeof deviceAuthSchema>
+export type DeviceAuthDecodedStructure = z.output<typeof zDeviceAuth>
+export type DeviceAuthEncodedStructure = z.input<typeof zDeviceAuth>
 
 export type DeviceAuthOptions = {
   deviceSignature?: DeviceSignature
@@ -40,7 +40,7 @@ export type DeviceAuthOptions = {
 
 export class DeviceAuth extends CborStructure<DeviceAuthEncodedStructure, DeviceAuthDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(deviceAuthSchema.in, deviceAuthDecodedSchema, {
+    return z.codec(zDeviceAuth.in, zDeviceAuthDecoded, {
       decode: (input) => {
         const map: DeviceAuthDecodedStructure = TypedMap.fromMap(input)
 

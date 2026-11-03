@@ -1,12 +1,12 @@
 import { z } from 'zod'
-import { jsonWebKeySetSchema } from '../jsonWeb'
+import { zJsonWebKeySet } from '../jsonWeb'
 
-export const trustMarkOwnerSchema = z.record(
+export const zTrustMarkOwner = z.record(
   z.string(),
   z.object({
     sub: z.string(),
-    jwks: jsonWebKeySetSchema,
+    jwks: zJsonWebKeySet,
   })
 )
 
-export type TrustMarkOwner = z.input<typeof trustMarkOwnerSchema>
+export type TrustMarkOwner = z.input<typeof zTrustMarkOwner>

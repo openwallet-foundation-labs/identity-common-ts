@@ -179,7 +179,7 @@ them. Callers that need the original logical length must preserve it separately.
 ### JWT transport — issue and read a Status List Token
 
 ```typescript
-import { StatusList, createHeaderAndPayload, getListFromStatusListJWT } from '@owf/token-status-list'
+import { StatusList, createHeaderAndPayload, getListFromStatusListJwt } from '@owf/token-status-list'
 
 const list = new StatusList(new Array(100_000).fill(0), 1)
 list.setStatus(42, 1)
@@ -192,16 +192,16 @@ const { header, payload } = createHeaderAndPayload(
 )
 
 // Later — decode the list back from a JWT string
-const decoded = getListFromStatusListJWT(jwt)
+const decoded = getListFromStatusListJwt(jwt)
 decoded.getStatus(42) // 1
 ```
 
 ### JWT transport — read a referenced token's status entry
 
 ```typescript
-import { getStatusListFromJWT } from '@owf/token-status-list'
+import { getStatusListFromJwt } from '@owf/token-status-list'
 
-const entry = getStatusListFromJWT(referencedTokenJWT)
+const entry = getStatusListFromJwt(referencedTokenJWT)
 // entry.idx  — index into the status list
 // entry.uri  — URI of the Status List Token
 ```
@@ -261,7 +261,7 @@ const decoded = decodeCWTStatusClaim(encoded)
 | `FeistelStatusListIndexAllocator` | FF1 allocator class with async `next()`, `remaining()`, and `getState()` |
 | `FeistelStatusListIndexAllocatorState` | Restorable FF1 allocator state type |
 | `EncryptBlock` | Type of the `encryptBlock` callback: AES on one 16-byte block |
-| `SLException` | Error class thrown by status-list operations |
+| `StatusListError` | Error class thrown by status-list operations |
 | `StatusTypes` | Constants: `VALID`, `INVALID`, `SUSPENDED`, etc. |
 | `MediaTypes` | MIME types for JWT and CWT status list tokens |
 | `BitsPerStatus` | Type: `1 \| 2 \| 4 \| 8` |
@@ -272,10 +272,10 @@ const decoded = decodeCWTStatusClaim(encoded)
 | Export | Description |
 |--------|-------------|
 | `createHeaderAndPayload` | Build JWT header + payload from a `StatusList` |
-| `getListFromStatusListJWT` | Decode a `StatusList` from a JWT string |
-| `getStatusListFromJWT` | Extract `StatusListEntry` from a referenced token JWT |
+| `getListFromStatusListJwt` | Decode a `StatusList` from a JWT string |
+| `getStatusListFromJwt` | Extract `StatusListEntry` from a referenced token JWT |
 | `JWT_STATUS_LIST_TYPE` | `"statuslist+jwt"` |
-| `JWTClaimNames` | Claim name constants |
+| `JwtClaimNames` | Claim name constants |
 
 ### CWT Transport
 

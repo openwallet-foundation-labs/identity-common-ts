@@ -1,6 +1,6 @@
 import { sha256 as nobleSha256, sha384 as nobleSha384, sha512 as nobleSha512 } from '@noble/hashes/sha2.js'
 import { base64, stringToBytes } from '@owf/identity-common'
-import { CryptoException } from './crypto-exception'
+import { CryptoError } from './crypto-error'
 
 export const sha256 = (text: string | ArrayBuffer): Uint8Array => {
   const uint8Array = typeof text === 'string' ? stringToBytes(text) : new Uint8Array(text)
@@ -34,7 +34,7 @@ export const hasher = (data: string | ArrayBuffer, algorithm: HasherAlgorithm = 
     case 'sha512':
       return sha512(data)
     default:
-      throw new CryptoException(`Unsupported algorithm: ${algorithm}`)
+      throw new CryptoError(`Unsupported algorithm: ${algorithm}`)
   }
 }
 

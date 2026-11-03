@@ -7,7 +7,7 @@
  */
 
 /** Standard `TSLType` values (TS 119 612 clause 5.3.3). */
-export const TSLType = {
+export const TslType = {
   EUgeneric: 'http://uri.etsi.org/TrstSvc/TrustedList/TSLType/EUgeneric',
   EUlistofthelists: 'http://uri.etsi.org/TrstSvc/TrustedList/TSLType/EUlistofthelists',
 } as const

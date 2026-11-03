@@ -57,7 +57,7 @@ identity-common-ts/
 ├── packages/                    # All publishable packages
 │   ├── identity-common/         # Core identity utilities (base package)
 │   ├── crypto/                  # Crypto implementation based on Web Crypto (@owf/crypto)
-│   ├── jose/                    # JOSE/JWT implementation (planned)
+│   ├── jose/                    # JOSE: JWK, JWA, JWS, JWT and JWE (@owf/jose)
 │   ├── cose/                    # COSE/CWT implementation (@owf/cose)
 │   ├── x509/                    # X.509 certificate utilities (@owf/x509)
 │   ├── token-status-list/       # JWT/CWT Token Status List (@owf/token-status-list)
@@ -305,7 +305,8 @@ pnpm test
 
 - Function names are camelCase.
 - Object property names are camelCase, unless the object reflects a specification. Then the specification's syntax is leading, e.g. the snake_case of OpenID4VC.
-- Don't abbreviate, unless the abbreviation is the common term. Write abbreviations as words in camelCase to avoid ambiguity: `getJwtToken` and `useApiKey`, not `getJWTToken` and `useAPIKey`.
+- Don't abbreviate, unless the abbreviation is the common term. Write abbreviations and names as words in camelCase to avoid ambiguity: `getJwtToken` and `useApiKey`, not `getJWTToken` and `useAPIKey`.
+- Start from how the specification writes a term in prose. Spaces, hyphens and dots separate words. In each word only the first letter is a capital, whatever the term's own spelling: `SD-JWT` → `SdJwt`, `EU PID Providers List` → `EuPidProvidersList`, `OAuth 2.0` → `Oauth2`, `OpenID4VCI` → `Openid4vci`, `OpenID Federation` → `OpenidFederation`, `LoTE` → `Lote`, `JAdES` → `Jades`, `mDL` → `Mdl`.
 - Prefer an options object over many positional arguments, e.g. `validateAccessCertificate(certificate, options)`.
 - Use names that explain themselves, e.g. `timeoutSeconds` instead of `timeout`, which could be seconds or milliseconds.
 

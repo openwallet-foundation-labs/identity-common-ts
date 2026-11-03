@@ -4,9 +4,9 @@ import type { DataElementIdentifier } from './data-element-identifier'
 import type { DataElementValue } from './data-element-value'
 
 // Zod schema for DeviceSignedItems
-export const deviceSignedItemsSchema = z.map(z.string(), z.unknown())
+export const zDeviceSignedItems = z.map(z.string(), z.unknown())
 
-export type DeviceSignedItemsStructure = z.infer<typeof deviceSignedItemsSchema>
+export type DeviceSignedItemsStructure = z.infer<typeof zDeviceSignedItems>
 
 export type DeviceSignedItemsOptions = {
   deviceSignedItems: Map<DataElementIdentifier, DataElementValue>
@@ -14,7 +14,7 @@ export type DeviceSignedItemsOptions = {
 
 export class DeviceSignedItems extends CborStructure<DeviceSignedItemsStructure> {
   public static override get encodingSchema() {
-    return deviceSignedItemsSchema
+    return zDeviceSignedItems
   }
 
   public get deviceSignedItems() {

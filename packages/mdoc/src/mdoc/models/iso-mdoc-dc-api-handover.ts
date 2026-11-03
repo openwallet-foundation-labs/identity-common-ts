@@ -3,11 +3,11 @@ import z from 'zod'
 import type { MdocContext } from '../../context'
 import { Handover } from './handover'
 
-const isoMdocDcApiHandoverEncodedSchema = z.tuple([z.literal('dcapi'), zUint8Array])
-const isoMdocDcApiHandoverDecodedSchema = zUint8Array
+const zIsoMdocDcApiHandoverEncoded = z.tuple([z.literal('dcapi'), zUint8Array])
+const zIsoMdocDcApiHandoverDecoded = zUint8Array
 
-export type IsoMdocDcApiHandoverEncodedStructure = z.infer<typeof isoMdocDcApiHandoverEncodedSchema>
-export type IsoMdocDcApiHandoverDecodedStructure = z.infer<typeof isoMdocDcApiHandoverDecodedSchema>
+export type IsoMdocDcApiHandoverEncodedStructure = z.infer<typeof zIsoMdocDcApiHandoverEncoded>
+export type IsoMdocDcApiHandoverDecodedStructure = z.infer<typeof zIsoMdocDcApiHandoverDecoded>
 
 export type IsoMdocDcApiHandoverOptions = {
   encryptionInfoBase64Url: string
@@ -24,7 +24,7 @@ export class IsoMdocDcApiHandover extends Handover<
   IsoMdocDcApiHandoverDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(isoMdocDcApiHandoverEncodedSchema, isoMdocDcApiHandoverDecodedSchema, {
+    return z.codec(zIsoMdocDcApiHandoverEncoded, zIsoMdocDcApiHandoverDecoded, {
       encode: (handoverInfoHash) => ['dcapi', handoverInfoHash] satisfies IsoMdocDcApiHandoverEncodedStructure,
       decode: ([, handoverInfoHash]) => handoverInfoHash,
     })

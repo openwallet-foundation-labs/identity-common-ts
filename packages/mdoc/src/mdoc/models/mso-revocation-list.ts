@@ -8,13 +8,13 @@ import {
 import { base64, base64url, decodeJwt, stringToBytes } from '@owf/identity-common'
 import {
   fetchStatusList,
-  getListFromStatusListJWT,
-  SLException,
+  getListFromStatusListJwt,
   type StatusList,
   StatusListCwt,
-  StatusListEntryNotValidException,
+  StatusListError,
   type StatusListInfo,
-  type StatusListJWTPayload,
+  type StatusListJwtPayload,
+  StatusListEntryNotValidError as TokenStatusListEntryNotValidError,
   verifyStatus,
   verifyStatusListJwtHeader,
 } from '@owf/token-status-list'
@@ -50,7 +50,7 @@ async function asMdlRevocationListError<T>(
   } catch (error) {
     if (error instanceof CoseInvalidSignatureError) throw new invalidSignatureError(error.message)
     if (error instanceof CoseX5ChainNotBoundError) throw new UnprotectedX5ChainNotBoundError(error.message)
-    if (error instanceof SLException) throw new InvalidRevocationListError(error.message)
+    if (error instanceof StatusListError) throw new InvalidRevocationListError(error.message)
     throw error
   }
 }
@@ -153,11 +153,11 @@ async function verifyStatusListJwt(
   ctx: Pick<MdocContext, 'x509' | 'cose'>
 ) {
   let header: Record<string, unknown>
-  let payload: StatusListJWTPayload
+  let payload: StatusListJwtPayload
   let signature: Uint8Array
   try {
     let encodedSignature: string
-    ;({ header, payload, signature: encodedSignature } = decodeJwt<Record<string, unknown>, StatusListJWTPayload>(jwt))
+    ;({ header, payload, signature: encodedSignature } = decodeJwt<Record<string, unknown>, StatusListJwtPayload>(jwt))
     if (!isJsonObject(header) || !isJsonObject(payload)) throw new Error('The header and payload must be objects')
     signature = base64url.decode(encodedSignature)
   } catch {
@@ -230,14 +230,14 @@ async function verifyStatusListJwt(
     try {
       verifyStatus({ token: jwt, idx, uri, now, skewSeconds, checkFreshness, requireExpirationTime: true })
     } catch (error) {
-      if (error instanceof StatusListEntryNotValidException) {
+      if (error instanceof TokenStatusListEntryNotValidError) {
         throw new StatusListEntryNotValidError(error.message, { uri, idx, status: error.status })
       }
       throw error
     }
   }, InvalidSignatureError)
 
-  return { statusListJwt: { header, payload, statusList: getListFromStatusListJWT(jwt) }, chain }
+  return { statusListJwt: { header, payload, statusList: getListFromStatusListJwt(jwt) }, chain }
 }
 
 export type VerifyStatusListTokenOptions = {
@@ -259,7 +259,7 @@ export type VerifyStatusListTokenOptions = {
 /** A status list served in JWT format, once verified. */
 export type VerifiedStatusListJwt = {
   header: Record<string, unknown>
-  payload: StatusListJWTPayload
+  payload: StatusListJwtPayload
   statusList: StatusList
 }
 
@@ -380,7 +380,7 @@ export async function verifyStatusListToken(
   try {
     statusListCwt.verifyStatus(idx)
   } catch (error) {
-    if (error instanceof SLException) {
+    if (error instanceof StatusListError) {
       throw new StatusListEntryNotValidError(error.message, {
         uri,
         idx,

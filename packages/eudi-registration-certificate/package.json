@@ -43,6 +43,7 @@
     "@owf/crypto": "workspace:^",
     "@owf/eudi-jades": "workspace:*",
     "@owf/identity-common": "workspace:^",
+    "dcql": "workspace:^",
     "zod": "catalog:"
   }
 }

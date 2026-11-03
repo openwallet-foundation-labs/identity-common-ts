@@ -82,7 +82,7 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
    * Decodes an identifier list CWT from a tagged COSE_Sign1 (tag 18) or COSE_Mac0 (tag 17) token.
    *
    * @throws CwtPayloadDecodeError if the payload is not a valid identifier list claims set.
-   * @throws ZodValidationError if the protected headers do not carry the identifier list `typ`.
+   * @throws CoseValidationError (from `@owf/cose`) if the protected headers do not carry the identifier list `typ`.
    */
   public static override fromToken<T extends AnyCwt>(this: CwtStaticThis<T>, token: Uint8Array): T {
     // NOTE: `super.fromToken`, not `Cwt.fromToken`: the base implementation constructs `this`, so a

@@ -21,6 +21,7 @@ Fixes #
 
 - [ ] `@owf/identity-common`
 - [ ] `@owf/crypto`
+- [ ] `@owf/jose`
 - [ ] `@owf/cose`
 - [ ] `@owf/x509`
 - [ ] `@owf/token-status-list`

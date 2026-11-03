@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { constraintSchema } from '../constraints'
-import { entityConfigurationClaimsSchema } from '../entityConfiguration'
-import { entityStatementClaimsSchema } from '../entityStatement'
-import { federationEntityMetadata, openIdProviderEntityMetadata } from '../metadata'
-import { metadataPolicySchema } from '../metadata/metadataPolicy'
-import { trustMarkClaimsSchema, trustMarkIssuerSchema, trustMarkOwnerSchema } from '../trustMark'
+import { zConstraint } from '../constraints'
+import { zEntityConfigurationClaims } from '../entityConfiguration'
+import { zEntityStatementClaims } from '../entityStatement'
+import { federationEntityMetadata, openidProviderEntityMetadata } from '../metadata'
+import { zMetadataPolicy } from '../metadata/metadataPolicy'
+import { zTrustMarkClaims, zTrustMarkIssuer, zTrustMarkOwner } from '../trustMark'
 import { validate } from '../utils/validate'
 import { constraintsFigure17 } from './fixtures/constraintsFigure17'
 import { entityConfigurationFigure8 } from './fixtures/entityConfigurationFigure8'
@@ -40,20 +40,20 @@ describe('zod validation schemas', () => {
     it('should validate figure 2  -- entity statement', () => {
       expect(() =>
         validate({
-          schema: entityStatementClaimsSchema,
+          schema: zEntityStatementClaims,
           data: entityStatementFigure2,
         })
       ).not.toThrow()
     })
 
     it('should validate figure 3  -- trust mark owners', () => {
-      expect(() => validate({ schema: trustMarkOwnerSchema, data: trustMarkOwnersFigure3 })).not.toThrow()
+      expect(() => validate({ schema: zTrustMarkOwner, data: trustMarkOwnersFigure3 })).not.toThrow()
     })
 
     it('should validate figure 4  -- trust mark issuers', () => {
       expect(() =>
         validate({
-          schema: trustMarkIssuerSchema,
+          schema: zTrustMarkIssuer,
           data: trustMarkIssuersFigure4,
         })
       ).not.toThrow()
@@ -71,7 +71,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 8  -- entity configuration', () => {
       expect(() =>
         validate({
-          schema: entityConfigurationClaimsSchema,
+          schema: zEntityConfigurationClaims,
           data: entityConfigurationFigure8,
         })
       ).not.toThrow()
@@ -80,24 +80,24 @@ describe('zod validation schemas', () => {
     it('should validate figure 9  -- entity configuration', () => {
       expect(() =>
         validate({
-          schema: entityConfigurationClaimsSchema,
+          schema: zEntityConfigurationClaims,
           data: entityConfigurationFigure9,
         })
       ).not.toThrow()
     })
 
     it('should validate figure 12 -- metadata policy', () => {
-      expect(() => validate({ schema: metadataPolicySchema, data: metadataPolicyFigure12 })).not.toThrow()
+      expect(() => validate({ schema: zMetadataPolicy, data: metadataPolicyFigure12 })).not.toThrow()
     })
 
     it('should validate figure 17 -- constraints', () => {
-      expect(() => validate({ schema: constraintSchema, data: constraintsFigure17 })).not.toThrow()
+      expect(() => validate({ schema: zConstraint, data: constraintsFigure17 })).not.toThrow()
     })
 
     it('should validate figure 18 -- entity configuration', () => {
       expect(() =>
         validate({
-          schema: entityConfigurationClaimsSchema,
+          schema: zEntityConfigurationClaims,
           data: entityConfigurationFigure18,
         })
       ).not.toThrow()
@@ -106,7 +106,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 19 -- trust mark claims', () => {
       expect(() =>
         validate({
-          schema: trustMarkClaimsSchema,
+          schema: zTrustMarkClaims,
           data: trustMarkClaimsFigure19,
         })
       ).not.toThrow()
@@ -115,7 +115,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 20 -- trust mark claims', () => {
       expect(() =>
         validate({
-          schema: trustMarkClaimsSchema,
+          schema: zTrustMarkClaims,
           data: trustMarkClaimsFigure20,
         })
       ).not.toThrow()
@@ -124,7 +124,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 21 -- trust mark claims', () => {
       expect(() =>
         validate({
-          schema: trustMarkClaimsSchema,
+          schema: zTrustMarkClaims,
           data: trustMarkClaimsFigure21,
         })
       ).not.toThrow()
@@ -133,7 +133,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 22 -- trust mark claims', () => {
       expect(() =>
         validate({
-          schema: trustMarkClaimsSchema,
+          schema: zTrustMarkClaims,
           data: trustMarkClaimsFigure22,
         })
       ).not.toThrow()
@@ -142,7 +142,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 23 -- trust mark claims', () => {
       expect(() =>
         validate({
-          schema: trustMarkClaimsSchema,
+          schema: zTrustMarkClaims,
           data: trustMarkClaimsFigure23,
         })
       ).not.toThrow()
@@ -151,7 +151,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 24 -- trust mark claims', () => {
       expect(() =>
         validate({
-          schema: trustMarkClaimsSchema,
+          schema: zTrustMarkClaims,
           data: trustMarkClaimsFigure24,
         })
       ).not.toThrow()
@@ -160,7 +160,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 26 -- entity statement', () => {
       expect(() =>
         validate({
-          schema: entityStatementClaimsSchema,
+          schema: zEntityStatementClaims,
           data: entityStatementFigure26,
         })
       ).not.toThrow()
@@ -169,7 +169,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 43 -- entity configuration', () => {
       expect(() =>
         validate({
-          schema: entityConfigurationClaimsSchema,
+          schema: zEntityConfigurationClaims,
           data: entityConfigurationFigure43,
         })
       ).not.toThrow()
@@ -178,7 +178,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 50 -- entity configuration', () => {
       expect(() =>
         validate({
-          schema: entityConfigurationClaimsSchema,
+          schema: zEntityConfigurationClaims,
           data: entityConfigurationFigure50,
         })
       ).not.toThrow()
@@ -187,7 +187,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 52 -- entity configuration', () => {
       expect(() =>
         validate({
-          schema: entityConfigurationClaimsSchema,
+          schema: zEntityConfigurationClaims,
           data: entityConfigurationFigure52,
         })
       ).not.toThrow()
@@ -196,7 +196,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 54 -- entity statement', () => {
       expect(() =>
         validate({
-          schema: entityStatementClaimsSchema,
+          schema: zEntityStatementClaims,
           data: entityStatementFigure54,
         })
       ).not.toThrow()
@@ -205,7 +205,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 56 -- entity configuration', () => {
       expect(() =>
         validate({
-          schema: entityConfigurationClaimsSchema,
+          schema: zEntityConfigurationClaims,
           data: entityConfigurationFigure56,
         })
       ).not.toThrow()
@@ -214,7 +214,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 58 -- entity statement', () => {
       expect(() =>
         validate({
-          schema: entityStatementClaimsSchema,
+          schema: zEntityStatementClaims,
           data: entityStatementFigure58,
         })
       ).not.toThrow()
@@ -223,7 +223,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 60 -- entity configutation', () => {
       expect(() =>
         validate({
-          schema: entityConfigurationClaimsSchema,
+          schema: zEntityConfigurationClaims,
           data: entityConfigurationFigure60,
         })
       ).not.toThrow()
@@ -232,20 +232,20 @@ describe('zod validation schemas', () => {
     it('should validate figure 62 -- entity statement', () => {
       expect(() =>
         validate({
-          schema: entityStatementClaimsSchema,
+          schema: zEntityStatementClaims,
           data: entityStatementFigure62,
         })
       ).not.toThrow()
     })
 
     it('should validate figure 63 -- metadata', () => {
-      expect(() => validate({ schema: openIdProviderEntityMetadata.schema, data: metadataFigure63 })).not.toThrow()
+      expect(() => validate({ schema: openidProviderEntityMetadata.schema, data: metadataFigure63 })).not.toThrow()
     })
 
     it('should validate figure 69 -- entity configuration', () => {
       expect(() =>
         validate({
-          schema: entityConfigurationClaimsSchema,
+          schema: zEntityConfigurationClaims,
           data: entityConfigurationFigure69,
         })
       ).not.toThrow()
@@ -254,7 +254,7 @@ describe('zod validation schemas', () => {
     it('should validate figure 70 -- entity statement', () => {
       expect(() =>
         validate({
-          schema: entityStatementClaimsSchema,
+          schema: zEntityStatementClaims,
           data: entityStatementFigure70,
         })
       ).not.toThrow()

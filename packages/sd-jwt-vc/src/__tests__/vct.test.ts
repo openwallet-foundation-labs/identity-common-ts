@@ -4,7 +4,7 @@ import type { DisclosureFrame, Signer, Verifier } from '@sd-jwt/core'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test, vitest } from 'vitest'
-import { SDJwtVcInstance } from '..'
+import { SdJwtVcInstance } from '..'
 import type { SdJwtVcPayload } from '../sd-jwt-vc-payload'
 import type { TypeMetadataFormat } from '../sd-jwt-vc-type-metadata-format'
 
@@ -257,7 +257,7 @@ const createSignerVerifier = () => {
 describe('App', () => {
   const { signer, verifier } = createSignerVerifier()
 
-  const sdjwt = new SDJwtVcInstance({
+  const sdjwt = new SdJwtVcInstance({
     signer,
     signAlg: 'EdDSA',
     verifier,
@@ -546,7 +546,7 @@ describe('App', () => {
   })
 
   test('VCT with max depth exceeded should throw error', async () => {
-    const sdjwtWithShallowDepth = new SDJwtVcInstance({
+    const sdjwtWithShallowDepth = new SdJwtVcInstance({
       signer,
       signAlg: 'EdDSA',
       verifier,

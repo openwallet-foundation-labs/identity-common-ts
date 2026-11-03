@@ -5,31 +5,36 @@
  * @see https://acceptance.eidas.ec.europa.eu/efda/wallet/lists-of-trusted-entities/mdl-providers
  */
 
+import { addValidationIssue } from '@owf/identity-common'
 import { z } from 'zod'
-import { LoTEException } from './lote-exception'
+import { LoteError } from './lote-error'
 import {
-  type CompatLoTEDocumentSchema,
-  CompatPolicyOrLegalNoticeListSchema,
   hasDigitalIdentity,
-  ListAndSchemeInformationSchema,
-  LoTEDocumentSchema,
-  LoTESchema,
-  PolicyOrLegalNoticeListSchema,
   rfc3339DateTimeToMs,
-  ServiceInformationSchema,
-  TrustedEntitySchema,
-  TrustedEntityServiceSchema,
+  type zCompatLoteDocument,
+  zCompatPolicyOrLegalNoticeList,
+  zListAndSchemeInformation,
+  zLote,
+  zLoteDocument,
+  zPolicyOrLegalNoticeList,
+  zServiceInformation,
+  zTrustedEntity,
+  zTrustedEntityService,
 } from './schemas'
 import type { PostalAddress, ServiceDigitalIdentity } from './types'
+import type { LoteValidationCode } from './validator'
+
+/** The context of an empty string where the profile needs a value */
+const NON_EMPTY_STRING = { minimum: 1, inclusive: true, origin: 'string' }
 
 /**
  * `strict` validates a list exactly as ETSI TS 119 602 defines it. `compat` also accepts the
- * deviations of lists in use that don't change who is trusted (see `validateLoTEProfile`).
+ * deviations of lists in use that don't change who is trusted (see `validateLoteProfile`).
  */
-export type LoTEValidationMode = 'strict' | 'compat'
+export type LoteValidationMode = 'strict' | 'compat'
 
-/** Options of `validateLoTEProfile` */
-export interface LoTEProfileValidationOptions<M extends LoTEValidationMode = LoTEValidationMode> {
+/** Options of `validateLoteProfile` */
+export interface LoteProfileValidationOptions<M extends LoteValidationMode = LoteValidationMode> {
   /** Defaults to `strict` */
   mode?: M
   /**
@@ -40,7 +45,7 @@ export interface LoTEProfileValidationOptions<M extends LoTEValidationMode = LoT
 }
 
 // What the profile refinements read, in strict and in compat mode
-type LoTEDocument = z.output<typeof CompatLoTEDocumentSchema>
+type LoteDocument = z.output<typeof zCompatLoteDocument>
 
 const SIX_MONTHS_IN_MS = 6 * 31 * 24 * 60 * 60 * 1000
 
@@ -54,14 +59,15 @@ const SIX_MONTHS_IN_MS = 6 * 31 * 24 * 60 * 60 * 1000
 function checkCountries(
   addresses: PostalAddress[] | undefined,
   path: (string | number)[],
-  ctx: z.RefinementCtx<LoTEDocument>
+  ctx: z.RefinementCtx<LoteDocument>
 ) {
   addresses?.forEach((address, index) => {
     if (address.Country.length !== 2) {
-      ctx.addIssue({
-        code: 'custom',
+      addValidationIssue(ctx, {
+        code: 'invalid_format',
         message: 'Country must be a 2-letter country code',
         path: [...path, index.toString(), 'Country'],
+        context: { format: 'ISO 3166-1 alpha-2' },
       })
     }
   })
@@ -78,19 +84,25 @@ const X509_SPEC_REF = 'RFC5280'
 function checkDigitalIdentity(
   identity: ServiceDigitalIdentity,
   path: (string | number)[],
-  ctx: z.RefinementCtx<LoTEDocument>
+  ctx: z.RefinementCtx<LoteDocument>
 ) {
   if (!hasDigitalIdentity(identity)) {
-    ctx.addIssue({
-      code: 'custom',
+    addValidationIssue(ctx, {
+      code: 'missing_value',
       message: 'At least one digital identity type must be provided',
       path,
+      context: { expected: 'X509Certificates, X509SubjectNames, PublicKeyValues, X509SKIs or OtherIds' },
     })
   }
   identity.X509Certificates?.forEach((certificate, index) => {
     const certificatePath = [...path, 'X509Certificates', index.toString()]
     if (certificate.val === '') {
-      ctx.addIssue({ code: 'custom', message: 'A certificate must have a value', path: [...certificatePath, 'val'] })
+      addValidationIssue(ctx, {
+        code: 'too_small',
+        message: 'A certificate must have a value',
+        path: [...certificatePath, 'val'],
+        context: NON_EMPTY_STRING,
+      })
     }
     if (certificate.encoding !== undefined && certificate.encoding !== X509_ENCODING) {
       ctx.addIssue({
@@ -111,8 +123,9 @@ function checkDigitalIdentity(
   })
   identity.PublicKeyValues?.forEach((key, index) => {
     if (key.kty === 'oct') {
-      ctx.addIssue({
-        code: 'custom',
+      addValidationIssue(ctx, {
+        code: 'invalid_value',
+        context: {},
         message: 'A public key cannot be a symmetric (oct) key',
         path: [...path, 'PublicKeyValues', index.toString(), 'kty'],
       })
@@ -121,7 +134,7 @@ function checkDigitalIdentity(
 }
 
 /** Every localized string or URI has a language, and a localized string a value. */
-function checkLocalizedValues(node: unknown, path: (string | number)[], ctx: z.RefinementCtx<LoTEDocument>) {
+function checkLocalizedValues(node: unknown, path: (string | number)[], ctx: z.RefinementCtx<LoteDocument>) {
   if (Array.isArray(node)) {
     node.forEach((item, index) => {
       checkLocalizedValues(item, [...path, index.toString()], ctx)
@@ -131,9 +144,21 @@ function checkLocalizedValues(node: unknown, path: (string | number)[], ctx: z.R
   if (node === null || typeof node !== 'object') return
   const record = node as Record<string, unknown>
   if (typeof record.lang === 'string') {
-    if (record.lang === '') ctx.addIssue({ code: 'custom', message: 'lang must not be empty', path: [...path, 'lang'] })
+    if (record.lang === '') {
+      addValidationIssue(ctx, {
+        code: 'too_small',
+        message: 'lang must not be empty',
+        path: [...path, 'lang'],
+        context: NON_EMPTY_STRING,
+      })
+    }
     if (record.value === '') {
-      ctx.addIssue({ code: 'custom', message: 'value must not be empty', path: [...path, 'value'] })
+      addValidationIssue(ctx, {
+        code: 'too_small',
+        message: 'value must not be empty',
+        path: [...path, 'value'],
+        context: NON_EMPTY_STRING,
+      })
     }
   }
   for (const [key, value] of Object.entries(record)) {
@@ -143,24 +168,24 @@ function checkLocalizedValues(node: unknown, path: (string | number)[], ctx: z.R
 }
 
 export const LOTE_TYPES = {
-  EUPIDProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUPIDProvidersList',
-  EUWalletProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUWalletProvidersList',
-  EUWRPACProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUWRPACProvidersList',
-  EUWRPRCProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUWRPRCProvidersList',
-  EUEAAProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUEAAProvidersList',
-  EUPubEAAProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUPubEAAProvidersList',
-  mDLProvidersList: 'http://trust.ec.europa.eu/lists/mDL/mDLProvidersListType',
+  EuPidProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUPIDProvidersList',
+  EuWalletProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUWalletProvidersList',
+  EuWrpacProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUWRPACProvidersList',
+  EuWrprcProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUWRPRCProvidersList',
+  EuEaaProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUEAAProvidersList',
+  EuPubEaaProvidersList: 'http://uri.etsi.org/19602/LoTEType/EUPubEAAProvidersList',
+  MdlProvidersList: 'http://trust.ec.europa.eu/lists/mDL/mDLProvidersListType',
 } as const
 
 type ListAndSchemeInformationRefinementOptions = {
-  loTEType: string
-  loTEVersionIdentifier: number
+  loteType: string
+  loteVersionIdentifier: number
   statusDeterminationApproach: string
   allowedTerritories?: readonly string[]
   schemeTypeCommunityRulesUri: string
   historicalInformationPeriod?: number
   requireNoHistoricalInformationPeriod?: boolean
-  requireNoPointersToOtherLoTE?: boolean
+  requireNoPointersToOtherLote?: boolean
 }
 
 const listAndSchemeInformationRefinement =
@@ -169,9 +194,9 @@ const listAndSchemeInformationRefinement =
     schemeTypeCommunityRulesUri,
     historicalInformationPeriod,
     requireNoHistoricalInformationPeriod,
-    requireNoPointersToOtherLoTE,
+    requireNoPointersToOtherLote,
   }: ListAndSchemeInformationRefinementOptions) =>
-  ({ LoTE }: LoTEDocument, ctx: z.RefinementCtx<LoTEDocument>) => {
+  ({ LoTE }: LoteDocument, ctx: z.RefinementCtx<LoteDocument>) => {
     const info = LoTE.ListAndSchemeInformation
     const path = ['LoTE', 'ListAndSchemeInformation']
 
@@ -188,8 +213,9 @@ const listAndSchemeInformationRefinement =
       info.SchemeTypeCommunityRules?.length !== 1 ||
       info.SchemeTypeCommunityRules[0].uriValue !== schemeTypeCommunityRulesUri
     ) {
-      ctx.addIssue({
-        code: 'custom',
+      addValidationIssue(ctx, {
+        code: 'invalid_value',
+        context: {},
         message: `SchemeTypeCommunityRules must contain a single element with uriValue of ${schemeTypeCommunityRulesUri}`,
         path: [...path, 'SchemeTypeCommunityRules'],
       })
@@ -213,7 +239,7 @@ const listAndSchemeInformationRefinement =
       })
     }
 
-    if (requireNoPointersToOtherLoTE && typeof info.PointersToOtherLoTE !== 'undefined') {
+    if (requireNoPointersToOtherLote && typeof info.PointersToOtherLoTE !== 'undefined') {
       ctx.addIssue({
         code: 'invalid_type',
         expected: 'undefined',
@@ -235,8 +261,9 @@ const listAndSchemeInformationRefinement =
       })
       pointer.LoTEQualifiers.forEach((qualifier, qualifierIndex) => {
         if (qualifier.MimeType === '') {
-          ctx.addIssue({
-            code: 'custom',
+          addValidationIssue(ctx, {
+            code: 'too_small',
+            context: NON_EMPTY_STRING,
             message: 'MimeType must not be empty',
             path: [...pointerPath, 'LoTEQualifiers', qualifierIndex.toString(), 'MimeType'],
           })
@@ -249,8 +276,8 @@ const listAndSchemeInformationRefinement =
     const nextUpdate = rfc3339DateTimeToMs(info.NextUpdate)
 
     if (nextUpdate - listIssueDateTime > SIX_MONTHS_IN_MS) {
-      ctx.addIssue({
-        code: 'custom',
+      addValidationIssue<LoteValidationCode>(ctx, {
+        code: 'next_update_too_late',
         message: 'NextUpdate must be within 6 months of ListIssueDateTime',
         path: [...path, 'NextUpdate'],
       })
@@ -261,12 +288,12 @@ type TrustedEntitiesListRefinementOptions = {
   serviceTypeIdentifiers: readonly [string, ...string[]]
   informationUriPrefix?: string
   /** The ServiceStatus schema of the profile in each mode */
-  serviceStatus: Record<LoTEValidationMode, z.ZodType<string | undefined>>
+  serviceStatus: Record<LoteValidationMode, z.ZodType<string | undefined>>
 }
 
 const trustedEntitiesListRefinement =
   ({ informationUriPrefix }: TrustedEntitiesListRefinementOptions) =>
-  ({ LoTE }: LoTEDocument, ctx: z.RefinementCtx<LoTEDocument>) => {
+  ({ LoTE }: LoteDocument, ctx: z.RefinementCtx<LoteDocument>) => {
     LoTE.TrustedEntitiesList?.forEach((entity, index) => {
       const trustedEntityPath = ['LoTE', 'TrustedEntitiesList', index.toString()]
 
@@ -283,16 +310,18 @@ const trustedEntitiesListRefinement =
         )
 
         if (!uri) {
-          ctx.addIssue({
-            code: 'custom',
+          addValidationIssue(ctx, {
+            code: 'missing_value',
             message: `Each TrustedEntityInformation.TEInformationURI must contain at least one URI starting with ${informationUriPrefix}`,
             path: [...trustedEntityPath, 'TrustedEntityInformation', 'TEInformationURI'],
+            context: { expected: `a URI starting with ${informationUriPrefix}` },
           })
         } else {
           const rest = uri.uriValue.substring(informationUriPrefix.length)
           if (rest.length !== 2) {
-            ctx.addIssue({
-              code: 'custom',
+            addValidationIssue(ctx, {
+              code: 'invalid_format',
+              context: { format: `${informationUriPrefix} followed by an ISO 3166-1 alpha-2 country code` },
               message: `URI starting with ${informationUriPrefix} must be followed by a 2-letter country code`,
               path: [...trustedEntityPath, 'TrustedEntityInformation', 'TEInformationURI'],
             })
@@ -345,21 +374,21 @@ const serviceStatusOneOf = <const T extends readonly [string, ...string[]]>(stat
         : `ServiceStatus must be one of the following: ${statuses.join(', ')}`,
   })
 
-const noServiceStatus = z.undefined({ error: 'ServiceStatus must not be present' }).optional()
-const withoutServiceStatus = { strict: noServiceStatus, compat: noServiceStatus }
+const zNoServiceStatus = z.undefined({ error: 'ServiceStatus must not be present' }).optional()
+const withoutServiceStatus = { strict: zNoServiceStatus, compat: zNoServiceStatus }
 
 // ETSI TS 119 602 H
-const pubEAAServiceStatus = serviceStatusOneOf([
+const pubEaaServiceStatus = serviceStatusOneOf([
   'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified',
   'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn',
 ])
 
 export const profileDefinitions = {
   // ETSI TS 119 602 D
-  EUPIDProvidersList: {
+  EuPidProvidersList: {
     list: {
-      loTEType: LOTE_TYPES.EUPIDProvidersList,
-      loTEVersionIdentifier: 1,
+      loteType: LOTE_TYPES.EuPidProvidersList,
+      loteVersionIdentifier: 1,
       statusDeterminationApproach: 'http://uri.etsi.org/19602/PIDProvidersList/StatusDetn/EU',
       schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/PIDProviders/schemerules/EU',
       requireNoHistoricalInformationPeriod: true,
@@ -371,7 +400,7 @@ export const profileDefinitions = {
       ],
       informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PIDProvider/',
       serviceStatus: {
-        strict: noServiceStatus,
+        strict: zNoServiceStatus,
         // The German PID Providers List sets this status, which no profile defines
         compat: serviceStatusOneOf(['http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified']).optional(),
       },
@@ -379,10 +408,10 @@ export const profileDefinitions = {
   },
 
   // ETSI TS 119 602 E
-  EUWalletProvidersList: {
+  EuWalletProvidersList: {
     list: {
-      loTEType: LOTE_TYPES.EUWalletProvidersList,
-      loTEVersionIdentifier: 1,
+      loteType: LOTE_TYPES.EuWalletProvidersList,
+      loteVersionIdentifier: 1,
       statusDeterminationApproach: 'http://uri.etsi.org/19602/WalletProvidersList/StatusDetn/EU',
       schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/WalletProvidersList/schemerules/EU',
       requireNoHistoricalInformationPeriod: true,
@@ -398,10 +427,10 @@ export const profileDefinitions = {
   },
 
   // ETSI TS 119 602 F
-  EUWRPACProvidersList: {
+  EuWrpacProvidersList: {
     list: {
-      loTEType: LOTE_TYPES.EUWRPACProvidersList,
-      loTEVersionIdentifier: 1,
+      loteType: LOTE_TYPES.EuWrpacProvidersList,
+      loteVersionIdentifier: 1,
       statusDeterminationApproach: 'http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
       schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/WRPACProvidersList/schemerules/EU',
       requireNoHistoricalInformationPeriod: true,
@@ -417,10 +446,10 @@ export const profileDefinitions = {
   },
 
   // ETSI TS 119 602 G
-  EUWRPRCProvidersList: {
+  EuWrprcProvidersList: {
     list: {
-      loTEType: LOTE_TYPES.EUWRPRCProvidersList,
-      loTEVersionIdentifier: 1,
+      loteType: LOTE_TYPES.EuWrprcProvidersList,
+      loteVersionIdentifier: 1,
       statusDeterminationApproach: 'http://uri.etsi.org/19602/WRPRCrovidersList/StatusDetn/EU',
       schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/WRPRCProvidersList/schemerules/EU',
       requireNoHistoricalInformationPeriod: true,
@@ -435,13 +464,13 @@ export const profileDefinitions = {
     },
   },
 
-  EUEAAProvidersList: {
+  EuEaaProvidersList: {
     list: {
-      loTEType: LOTE_TYPES.EUEAAProvidersList,
-      loTEVersionIdentifier: 1,
+      loteType: LOTE_TYPES.EuEaaProvidersList,
+      loteVersionIdentifier: 1,
       statusDeterminationApproach: 'http://uri.etsi.org/19602/EAAProvidersList/StatusDetn/EU',
       schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/EAAProvidersList/schemerules/EU',
-      requireNoPointersToOtherLoTE: true,
+      requireNoPointersToOtherLote: true,
     },
     entities: {
       serviceTypeIdentifiers: [
@@ -454,13 +483,13 @@ export const profileDefinitions = {
   },
 
   // ETSI TS 119 602 H
-  EUPubEAAProvidersList: {
+  EuPubEaaProvidersList: {
     list: {
-      loTEType: LOTE_TYPES.EUPubEAAProvidersList,
-      loTEVersionIdentifier: 1,
+      loteType: LOTE_TYPES.EuPubEaaProvidersList,
+      loteVersionIdentifier: 1,
       statusDeterminationApproach: 'http://uri.etsi.org/19602/PubEAAProvidersList/StatusDetn/EU',
       schemeTypeCommunityRulesUri: 'http://uri.etsi.org/19602/PubEAAProvidersList/schemerules/EU',
-      requireNoPointersToOtherLoTE: true,
+      requireNoPointersToOtherLote: true,
       historicalInformationPeriod: 65535,
     },
     entities: {
@@ -471,17 +500,17 @@ export const profileDefinitions = {
       informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PubEAAProvider/',
       // A withdrawn Pub-EAA provider stays listed: only a notified one is trusted
       serviceStatus: {
-        strict: pubEAAServiceStatus,
-        compat: pubEAAServiceStatus,
+        strict: pubEaaServiceStatus,
+        compat: pubEaaServiceStatus,
       },
     },
   },
 
   // mDL Providers List
-  mDLProvidersList: {
+  MdlProvidersList: {
     list: {
-      loTEType: LOTE_TYPES.mDLProvidersList,
-      loTEVersionIdentifier: 1,
+      loteType: LOTE_TYPES.MdlProvidersList,
+      loteVersionIdentifier: 1,
       statusDeterminationApproach: 'http://trust.ec.europa.eu/lists/mDL/mDLProvidersListStatusDetn',
       schemeTypeCommunityRulesUri: 'http://trust.ec.europa.eu/lists/mDL/schemerules',
     },
@@ -496,24 +525,24 @@ export const profileDefinitions = {
 } as const satisfies Record<keyof typeof LOTE_TYPES, ProfileDefinition>
 
 const policyOrLegalNoticeSchemas = {
-  strict: PolicyOrLegalNoticeListSchema.optional(),
-  compat: CompatPolicyOrLegalNoticeListSchema.optional(),
+  strict: zPolicyOrLegalNoticeList.optional(),
+  compat: zCompatPolicyOrLegalNoticeList.optional(),
 }
 
 /**
  * The schema of a profile in a mode. The rules that narrow a type (LoTEType, ServiceTypeIdentifier,
  * ServiceStatus, and so on) are part of the shape, so the output type of the schema has them.
  */
-export const createProfileSchema = <const D extends ProfileDefinition, M extends LoTEValidationMode = 'strict'>(
+export const createProfileSchema = <const D extends ProfileDefinition, M extends LoteValidationMode = 'strict'>(
   { list, entities }: D,
-  { mode = 'strict' as M, allowedTerritories }: LoTEProfileValidationOptions<M> = {}
+  { mode = 'strict' as M, allowedTerritories }: LoteProfileValidationOptions<M> = {}
 ) => {
   if (mode !== 'compat' && allowedTerritories) {
-    throw new LoTEException('allowedTerritories only applies in compat mode')
+    throw new LoteError('allowedTerritories only applies in compat mode')
   }
   const serviceTypeIdentifiers = entities.serviceTypeIdentifiers as D['entities']['serviceTypeIdentifiers']
-  const service = TrustedEntityServiceSchema.extend({
-    ServiceInformation: ServiceInformationSchema.extend({
+  const service = zTrustedEntityService.extend({
+    ServiceInformation: zServiceInformation.extend({
       ServiceTypeIdentifier: z.enum(serviceTypeIdentifiers, {
         error: `ServiceTypeIdentifier must be one of the following: ${serviceTypeIdentifiers.join(', ')}`,
       }),
@@ -521,32 +550,33 @@ export const createProfileSchema = <const D extends ProfileDefinition, M extends
     }),
   })
 
-  return LoTEDocumentSchema.extend({
-    LoTE: LoTESchema.extend({
-      ListAndSchemeInformation: ListAndSchemeInformationSchema.extend({
-        LoTEType: z.literal(list.loTEType as D['list']['loTEType'], { error: `LoTEType must be ${list.loTEType}` }),
-        LoTEVersionIdentifier: z.literal(list.loTEVersionIdentifier as D['list']['loTEVersionIdentifier'], {
-          error: `LoTEVersionIdentifier must be ${list.loTEVersionIdentifier}`,
+  return zLoteDocument
+    .extend({
+      LoTE: zLote.extend({
+        ListAndSchemeInformation: zListAndSchemeInformation.extend({
+          LoTEType: z.literal(list.loteType as D['list']['loteType'], { error: `LoTEType must be ${list.loteType}` }),
+          LoTEVersionIdentifier: z.literal(list.loteVersionIdentifier as D['list']['loteVersionIdentifier'], {
+            error: `LoTEVersionIdentifier must be ${list.loteVersionIdentifier}`,
+          }),
+          StatusDeterminationApproach: z.literal(
+            list.statusDeterminationApproach as D['list']['statusDeterminationApproach'],
+            { error: `StatusDeterminationApproach must be ${list.statusDeterminationApproach}` }
+          ),
+          PolicyOrLegalNotice: policyOrLegalNoticeSchemas[mode],
         }),
-        StatusDeterminationApproach: z.literal(
-          list.statusDeterminationApproach as D['list']['statusDeterminationApproach'],
-          { error: `StatusDeterminationApproach must be ${list.statusDeterminationApproach}` }
-        ),
-        PolicyOrLegalNotice: policyOrLegalNoticeSchemas[mode],
+        TrustedEntitiesList: z
+          .array(zTrustedEntity.extend({ TrustedEntityServices: z.array(service).min(1) }))
+          .optional(),
       }),
-      TrustedEntitiesList: z
-        .array(TrustedEntitySchema.extend({ TrustedEntityServices: z.array(service).min(1) }))
-        .optional(),
-    }),
-  })
+    })
     .superRefine(listAndSchemeInformationRefinement({ ...list, allowedTerritories }))
     .superRefine(trustedEntitiesListRefinement(entities))
 }
 
-export const EUPIDProvidersListSchema = createProfileSchema(profileDefinitions.EUPIDProvidersList)
-export const EUWalletProvidersListSchema = createProfileSchema(profileDefinitions.EUWalletProvidersList)
-export const EUWRPACProvidersListSchema = createProfileSchema(profileDefinitions.EUWRPACProvidersList)
-export const EUWRPRCProvidersListSchema = createProfileSchema(profileDefinitions.EUWRPRCProvidersList)
-export const EUEAAProvidersListSchema = createProfileSchema(profileDefinitions.EUEAAProvidersList)
-export const EUPubEAAProvidersListSchema = createProfileSchema(profileDefinitions.EUPubEAAProvidersList)
-export const mDLProvidersListSchema = createProfileSchema(profileDefinitions.mDLProvidersList)
+export const zEuPidProvidersList = createProfileSchema(profileDefinitions.EuPidProvidersList)
+export const zEuWalletProvidersList = createProfileSchema(profileDefinitions.EuWalletProvidersList)
+export const zEuWrpacProvidersList = createProfileSchema(profileDefinitions.EuWrpacProvidersList)
+export const zEuWrprcProvidersList = createProfileSchema(profileDefinitions.EuWrprcProvidersList)
+export const zEuEaaProvidersList = createProfileSchema(profileDefinitions.EuEaaProvidersList)
+export const zEuPubEaaProvidersList = createProfileSchema(profileDefinitions.EuPubEaaProvidersList)
+export const zMdlProvidersList = createProfileSchema(profileDefinitions.MdlProvidersList)

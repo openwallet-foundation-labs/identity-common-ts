@@ -38,7 +38,7 @@ await token.sign(await ES256.getSigner(privateKey))
 
 const compact = token.toString()
 const general = token.toJSON()
-const flattened = token.toFlattenedJSON()
+const flattened = token.toFlattenedJson()
 ```
 
 The signer receives the exact JWS Signing Input and returns an unpadded base64url signature.
@@ -109,10 +109,10 @@ signature computation. For `HttpHeaders`, `b64` is set to `false`; `hashM`, `has
 ## Baseline Profiles
 
 ```typescript
-import { decode, JAdESProfile, validateProfile } from '@owf/eudi-jades'
+import { decode, JadesProfile, validateProfile } from '@owf/eudi-jades'
 
 const decoded = decode(jws)
-const result = validateProfile(decoded.header, JAdESProfile.B_T, decoded.unprotectedHeader)
+const result = validateProfile(decoded.header, JadesProfile.B_T, decoded.unprotectedHeader)
 ```
 
 `validateProfile` checks component structure, placement, cardinality, prohibited reference components at B-LT/B-LTA,
@@ -123,7 +123,7 @@ a trust policy and PKI/time-stamp validation engine supplied by the application.
 When validation material is embedded inside an opaque token, pass the corresponding evidence explicitly:
 
 ```typescript
-validateProfile(header, JAdESProfile.B_LT, unprotectedHeader, {
+validateProfile(header, JadesProfile.B_LT, unprotectedHeader, {
   signatureValidationDataAvailable: true,
   timestampValidationDataAvailable: true,
 })

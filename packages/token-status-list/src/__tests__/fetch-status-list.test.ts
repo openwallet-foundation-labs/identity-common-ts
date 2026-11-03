@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fetchStatusList } from '../fetch-status-list'
-import { SLException } from '../status-list-exception'
+import { StatusListError } from '../status-list-error'
 import { MediaTypes } from '../types'
 
 const fetcherWithContentType = (contentType: string, body: BodyInit = 'a.b.c'): typeof fetch =>
@@ -58,6 +58,6 @@ describe('fetchStatusList', () => {
         uri: 'https://example.org/statuslists/1',
         customFetcher: fetcherWithContentType('application/json'),
       })
-    ).rejects.toThrow(SLException)
+    ).rejects.toThrow(StatusListError)
   })
 })

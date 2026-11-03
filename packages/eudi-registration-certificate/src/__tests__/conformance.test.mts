@@ -9,22 +9,22 @@ import { ES256 } from '@owf/crypto'
 import { base64urlDecode, base64urlEncode, VALIDATION_CODES } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
-  decodeWRPRC,
-  parseWRPRCPayload,
-  signWRPRC,
-  toWRPRCDialect,
-  validateWRPRC,
-  validateWRPRCJWTHeader,
-  validateWRPRCPayload,
+  decodeRegistrationCertificate,
+  parseRegistrationCertificatePayload,
+  REGISTRATION_CERTIFICATE_DIALECTS,
+  REGISTRATION_CERTIFICATE_VALIDATION_CODES,
+  registrationCertificate,
+  signRegistrationCertificate,
+  toRegistrationCertificateDialect,
+  validateRegistrationCertificate,
+  validateRegistrationCertificateJwtHeader,
+  validateRegistrationCertificatePayload,
   WRP_ENTITLEMENTS,
-  WRPRC_DIALECTS,
-  WRPRC_VALIDATION_CODES,
-  WRPRCPayloadSchema,
-  wrprc,
+  zRegistrationCertificatePayload,
 } from '../index'
 
 const base = () =>
-  wrprc()
+  registrationCertificate()
     .name('Example')
     .legalName('Example N.V.')
     .identifier('LEINL-529900T8BM49AURSDO55')
@@ -56,7 +56,7 @@ describe('localized values serialize as { lang, value }', () => {
 describe('entitlements accept OID form', () => {
   it('validates an entitlement given as an OID', () => {
     const payload = base().entitlements(['0.4.0.19475.1.1']).build()
-    expect(validateWRPRCPayload(payload, payload.sub).valid).toBe(true)
+    expect(validateRegistrationCertificatePayload(payload, payload.sub).valid).toBe(true)
   })
 })
 
@@ -65,29 +65,30 @@ describe('Table 10 fields', () => {
     const payload = base()
       .expiresAt(1_700_000_000 + 200 * 24 * 3600)
       .build()
-    expect(validateWRPRCPayload(payload, payload.sub).valid).toBe(true)
+    expect(validateRegistrationCertificatePayload(payload, payload.sub).valid).toBe(true)
   })
 
   it('rejects exp more than 12 months after iat', () => {
     const payload = base()
       .expiresAt(1_700_000_000 + 400 * 24 * 3600)
       .build()
-    const result = validateWRPRCPayload(payload, payload.sub)
+    const result = validateRegistrationCertificatePayload(payload, payload.sub)
     expect(result.valid).toBe(false)
     expect(result.issues.some((issue) => issue.severity === 'error' && issue.code === 'exp_too_late')).toBe(true)
   })
 
   it('checks intermediary.sub against the access certificate subject', () => {
     const ok = base().intermediary({ sub: 'LEINL-INTERMEDIARY', sname: 'Intermediary BV' }).build()
-    expect(validateWRPRCPayload(ok, 'LEINL-INTERMEDIARY').valid).toBe(true)
+    expect(validateRegistrationCertificatePayload(ok, 'LEINL-INTERMEDIARY').valid).toBe(true)
 
     const mismatch = base().intermediary({ sub: 'LEINL-INTERMEDIARY', sname: 'Intermediary BV' }).build()
-    const result = validateWRPRCPayload(mismatch, 'LEINL-OTHER')
+    const result = validateRegistrationCertificatePayload(mismatch, 'LEINL-OTHER')
     expect(result.valid).toBe(false)
     expect(
       result.issues.some(
         (issue) =>
-          issue.severity === 'error' && issue.code === WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH
+          issue.severity === 'error' &&
+          issue.code === REGISTRATION_CERTIFICATE_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH
       )
     ).toBe(true)
   })
@@ -95,15 +96,15 @@ describe('Table 10 fields', () => {
   it('checks sub against the access certificate subject when there is no intermediary', () => {
     const payload = base().build()
 
-    expect(validateWRPRCPayload(payload, payload.sub).valid).toBe(true)
+    expect(validateRegistrationCertificatePayload(payload, payload.sub).valid).toBe(true)
 
-    const result = validateWRPRCPayload(payload, 'LEINL-OTHER')
+    const result = validateRegistrationCertificatePayload(payload, 'LEINL-OTHER')
     expect(result.valid).toBe(false)
     expect(result.issues).toContainEqual(
       expect.objectContaining({
         severity: 'error',
         path: ['sub'],
-        code: WRPRC_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
+        code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
       })
     )
   })
@@ -120,10 +121,10 @@ describe('validation codes', () => {
     const payload = base()
       .expiresAt(1_700_000_000 + 400 * 24 * 3600)
       .build()
-    const result = validateWRPRCPayload(payload, payload.sub)
+    const result = validateRegistrationCertificatePayload(payload, payload.sub)
 
     expect(result.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code)).toContain(
-      WRPRC_VALIDATION_CODES.EXP_TOO_LATE
+      REGISTRATION_CERTIFICATE_VALIDATION_CODES.EXP_TOO_LATE
     )
   })
 })
@@ -140,29 +141,32 @@ describe('wire dialects', () => {
       .build()
 
   it('accepts the anticipated claims and intermediary.name spellings when parsing', () => {
-    const draft = toWRPRCDialect(withNested(), WRPRC_DIALECTS.DRAFT) as Record<string, any>
+    const draft = toRegistrationCertificateDialect(withNested(), REGISTRATION_CERTIFICATE_DIALECTS.DRAFT) as Record<
+      string,
+      any
+    >
 
     expect(draft.credentials[0]).toHaveProperty('claims')
     expect(draft.credentials[0]).not.toHaveProperty('claim')
     expect(draft.intermediary).toEqual({ sub: 'LEINL-INTERMEDIARY', name: 'Intermediary BV' })
 
-    expect(validateWRPRCPayload(draft, 'LEINL-INTERMEDIARY').valid).toBe(true)
-    expect(parseWRPRCPayload(draft, 'LEINL-INTERMEDIARY')).toEqual(withNested())
+    expect(validateRegistrationCertificatePayload(draft, 'LEINL-INTERMEDIARY').valid).toBe(true)
+    expect(parseRegistrationCertificatePayload(draft, 'LEINL-INTERMEDIARY')).toEqual(withNested())
   })
 
   it('emits the published spelling by default', () => {
     const payload = withNested()
-    expect(toWRPRCDialect(payload, WRPRC_DIALECTS.CURRENT)).toBe(payload)
+    expect(toRegistrationCertificateDialect(payload, REGISTRATION_CERTIFICATE_DIALECTS.CURRENT)).toBe(payload)
   })
 
   it('signs in the requested dialect while reporting the canonical payload', async () => {
     const { privateKey } = await ES256.generateKeyPair()
-    const signed = await signWRPRC({
+    const signed = await signRegistrationCertificate({
       payload: withNested(),
       accessCertificateSub: 'LEINL-INTERMEDIARY',
       certificates: [TEST_CERT],
       signer: await ES256.getSigner(privateKey),
-      dialect: WRPRC_DIALECTS.DRAFT,
+      dialect: REGISTRATION_CERTIFICATE_DIALECTS.DRAFT,
     })
 
     const onTheWire = JSON.parse(base64urlDecode(signed.jws.split('.')[1]))
@@ -170,7 +174,7 @@ describe('wire dialects', () => {
     expect(onTheWire.intermediary).toHaveProperty('name')
 
     // decoding maps back to the canonical v1.2.1 shape
-    expect(decodeWRPRC(signed.jws, 'LEINL-INTERMEDIARY').payload).toEqual(withNested())
+    expect(decodeRegistrationCertificate(signed.jws, 'LEINL-INTERMEDIARY').payload).toEqual(withNested())
   })
 
   it('rejects provides_attestations as scheme URLs', () => {
@@ -179,7 +183,7 @@ describe('wire dialects', () => {
       provides_attestations: ['https://catalogue.test/schemes/age-over-18'],
     }
 
-    expect(validateWRPRCPayload(payload, payload.sub).valid).toBe(false)
+    expect(validateRegistrationCertificatePayload(payload, payload.sub).valid).toBe(false)
   })
 
   it('rejects claim queries inside provides_attestations', () => {
@@ -192,15 +196,15 @@ describe('wire dialects', () => {
       provides_attestations: [{ format: 'dc+sd-jwt', meta: {}, claims: [{ path: ['given_name'] }] }],
     }
 
-    expect(validateWRPRCPayload(withClaim, withClaim.sub).valid).toBe(false)
-    expect(validateWRPRCPayload(withDraftClaims, withDraftClaims.sub).valid).toBe(false)
+    expect(validateRegistrationCertificatePayload(withClaim, withClaim.sub).valid).toBe(false)
+    expect(validateRegistrationCertificatePayload(withDraftClaims, withDraftClaims.sub).valid).toBe(false)
   })
 })
 
 describe('GEN-5.2.1-04 JAdES B-B signature', () => {
   it('signs with a B-B protected header and decodes it back', async () => {
     const { privateKey } = await ES256.generateKeyPair()
-    const signed = await signWRPRC({
+    const signed = await signRegistrationCertificate({
       payload: base().build(),
       accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
       certificates: [TEST_CERT],
@@ -211,21 +215,23 @@ describe('GEN-5.2.1-04 JAdES B-B signature', () => {
     expect(signed.header.iat).toBeTypeOf('number')
     expect(signed.header.typ).toBe('rc-wrp+jwt')
     expect(signed.header.x5c).toHaveLength(1)
-    expect(validateWRPRCJWTHeader(signed.header).valid).toBe(true)
+    expect(validateRegistrationCertificateJwtHeader(signed.header).valid).toBe(true)
 
-    expect(decodeWRPRC(signed.jws, 'LEINL-529900T8BM49AURSDO55').payload).toEqual(signed.payload)
+    expect(decodeRegistrationCertificate(signed.jws, 'LEINL-529900T8BM49AURSDO55').payload).toEqual(signed.payload)
   })
 
-  it('rejects a WRPRC whose header has no claimed signing time', () => {
+  it('rejects a registration certificate whose header has no claimed signing time', () => {
     const header = base64urlEncode(JSON.stringify({ typ: 'rc-wrp+jwt', alg: 'ES256', x5c: ['MIIBkDCB'] }))
     const payload = base64urlEncode(JSON.stringify(base().build()))
 
-    expect(() => decodeWRPRC(`${header}.${payload}.AAAA`, 'LEINL-529900T8BM49AURSDO55')).toThrow(/B-B/)
+    expect(() => decodeRegistrationCertificate(`${header}.${payload}.AAAA`, 'LEINL-529900T8BM49AURSDO55')).toThrow(
+      /B-B/
+    )
   })
 })
 
 describe('Annex C example', () => {
-  it('parses the decoded WRPRC payload from the specification', () => {
+  it('parses the decoded registration certificate payload from the specification', () => {
     const annexC = {
       name: 'Example Company',
       sub_ln: 'Example Company GmbH',
@@ -277,8 +283,8 @@ describe('Annex C example', () => {
       intermediary: { sub: 'LEIXG-INTERMEDIARY-1234567890', sname: 'Intermediary Services Ltd.' },
     }
 
-    expect(WRPRCPayloadSchema.safeParse(annexC).success).toBe(true)
-    expect(validateWRPRCPayload(annexC, annexC.intermediary.sub).valid).toBe(true)
+    expect(zRegistrationCertificatePayload.safeParse(annexC).success).toBe(true)
+    expect(validateRegistrationCertificatePayload(annexC, annexC.intermediary.sub).valid).toBe(true)
   })
 })
 
@@ -287,11 +293,11 @@ describe('issues', () => {
     const payload = base()
       .expiresAt(1_700_000_000 + 400 * 24 * 3600)
       .build()
-    const result = validateWRPRCPayload(payload, payload.sub)
+    const result = validateRegistrationCertificatePayload(payload, payload.sub)
 
     expect(result.issues).toContainEqual({
       severity: 'error',
-      code: WRPRC_VALIDATION_CODES.EXP_TOO_LATE,
+      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.EXP_TOO_LATE,
       path: ['exp'],
       message: 'exp must be at most 12 months after iat (GEN-5.2.4-08)',
       requirement: 'GEN-5.2.4-08',
@@ -301,7 +307,7 @@ describe('issues', () => {
 
   it('reports exp before iat with the common code and the times as context', () => {
     const payload = base().expiresAt(1_600_000_000).build()
-    const result = validateWRPRCPayload(payload, payload.sub)
+    const result = validateRegistrationCertificatePayload(payload, payload.sub)
 
     expect(result.issues).toContainEqual({
       severity: 'error',
@@ -313,7 +319,12 @@ describe('issues', () => {
   })
 
   it('reports a wrong typ with the common code and the expected and actual typ', () => {
-    const result = validateWRPRCJWTHeader({ typ: 'JWT', alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 })
+    const result = validateRegistrationCertificateJwtHeader({
+      typ: 'JWT',
+      alg: 'ES256',
+      x5c: ['MII'],
+      iat: 1_700_000_000,
+    })
 
     expect(result).toEqual({
       valid: false,
@@ -328,16 +339,19 @@ describe('issues', () => {
       ],
     })
     expect(
-      validateWRPRCJWTHeader({ alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 }).issues.map((issue) => issue.message)
+      validateRegistrationCertificateJwtHeader({ alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 }).issues.map(
+        (issue) => issue.message
+      )
     ).toEqual(['typ is missing, it must be rc-wrp+jwt'])
-    expect(validateWRPRCJWTHeader({ typ: 'rc-wrp+jwt', alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 }).valid).toBe(
-      true
-    )
+    expect(
+      validateRegistrationCertificateJwtHeader({ typ: 'rc-wrp+jwt', alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 })
+        .valid
+    ).toBe(true)
   })
 
   it('prefixes header and payload issues and keeps array indices as numbers', () => {
     const payload = { ...base().build(), entitlements: [42] }
-    const result = validateWRPRC({ alg: 'ES256' }, payload, 'LEINL-529900T8BM49AURSDO55')
+    const result = validateRegistrationCertificate({ alg: 'ES256' }, payload, 'LEINL-529900T8BM49AURSDO55')
 
     expect(result.valid).toBe(false)
     expect(result.issues.some((issue) => issue.path[0] === 'header')).toBe(true)

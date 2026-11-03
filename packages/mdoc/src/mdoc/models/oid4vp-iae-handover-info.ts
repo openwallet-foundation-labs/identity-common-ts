@@ -1,15 +1,15 @@
 import { CborStructure, zUint8Array } from '@owf/cose'
 import z from 'zod'
 
-const oid4vpIaeHandoverInfoEncodedSchema = z.tuple([z.string(), z.string(), zUint8Array.nullable()])
-const oid4vpIaeHandoverInfoDecodedSchema = z.object({
+const zOid4vpIaeHandoverInfoEncoded = z.tuple([z.string(), z.string(), zUint8Array.nullable()])
+const zOid4vpIaeHandoverInfoDecoded = z.object({
   interactiveAuthorizationEndpoint: z.string(),
   nonce: z.string(),
   jwkThumbprint: zUint8Array.nullable(),
 })
 
-export type Oid4vpIaeHandoverInfoEncodedStructure = z.infer<typeof oid4vpIaeHandoverInfoEncodedSchema>
-export type Oid4vpIaeHandoverInfoDecodedStructure = z.infer<typeof oid4vpIaeHandoverInfoDecodedSchema>
+export type Oid4vpIaeHandoverInfoEncodedStructure = z.infer<typeof zOid4vpIaeHandoverInfoEncoded>
+export type Oid4vpIaeHandoverInfoDecodedStructure = z.infer<typeof zOid4vpIaeHandoverInfoDecoded>
 
 export type Oid4vpIaeHandoverInfoOptions = {
   interactiveAuthorizationEndpoint: string
@@ -22,7 +22,7 @@ export class Oid4vpIaeHandoverInfo extends CborStructure<
   Oid4vpIaeHandoverInfoDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(oid4vpIaeHandoverInfoEncodedSchema, oid4vpIaeHandoverInfoDecodedSchema, {
+    return z.codec(zOid4vpIaeHandoverInfoEncoded, zOid4vpIaeHandoverInfoDecoded, {
       encode: ({ interactiveAuthorizationEndpoint, nonce, jwkThumbprint }) =>
         [interactiveAuthorizationEndpoint, nonce, jwkThumbprint] satisfies Oid4vpIaeHandoverInfoEncodedStructure,
       decode: ([interactiveAuthorizationEndpoint, nonce, jwkThumbprint]) => ({

@@ -1,8 +1,9 @@
-import { VALIDATION_CODES, type ValidationSeverity } from '@owf/identity-common'
-import { parseCertificate, verifyCertificateSignature, X509Exception } from '@owf/x509'
+import { VALIDATION_CODES, ValidationError, type ValidationSeverity } from '@owf/identity-common'
+import { parseCertificate, verifyCertificateSignature, X509Error } from '@owf/x509'
 import { describe, expect, it } from 'vitest'
 import {
   type AccessCertificate,
+  AccessCertificateValidationError,
   type AccessCertificateValidationResult,
   ACCESS_CERTIFICATE_VALIDATION_CODES as CODES,
   getAccessCertificateSubjectIdentifier,
@@ -65,7 +66,7 @@ describe('parseAccessCertificate', () => {
   })
 
   it('rejects malformed input', () => {
-    expect(() => parseAccessCertificate('not a certificate!')).toThrow(X509Exception)
+    expect(() => parseAccessCertificate('not a certificate!')).toThrow(X509Error)
   })
 })
 
@@ -176,6 +177,18 @@ describe('validateAccessCertificate', () => {
   it('throws from parseAndValidateAccessCertificate', () => {
     expect(() => parseAndValidateAccessCertificate(CA_CERTIFICATE_PEM, { now: NOW })).toThrow(
       /Invalid access certificate/
+    )
+    const error = (() => {
+      try {
+        parseAndValidateAccessCertificate(CA_CERTIFICATE_PEM, { now: NOW })
+      } catch (error) {
+        return error
+      }
+    })()
+    expect(error).toBeInstanceOf(AccessCertificateValidationError)
+    expect(error).toBeInstanceOf(ValidationError)
+    expect((error as AccessCertificateValidationError).issues).toEqual(
+      validateAccessCertificate(parseAccessCertificate(CA_CERTIFICATE_PEM), { now: NOW }).issues
     )
     expect(parseAndValidateAccessCertificate(OPENSSL_QCP_L_ACCESS_CERTIFICATE_PEM, { now: NOW }).subjectType).toBe(
       'legal'

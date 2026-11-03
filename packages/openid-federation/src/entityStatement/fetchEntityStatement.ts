@@ -1,10 +1,10 @@
 import { type EntityConfigurationClaims, fetchEntityConfiguration } from '../entityConfiguration'
-import { OpenIdFederationError } from '../error/OpenIdFederationError'
+import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
 import { type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
 import { validate } from '../utils/validate'
-import { entityStatementJwtSchema } from './entityStatementJwt'
+import { zEntityStatementJwt } from './entityStatementJwt'
 
 export type FetchEntityStatementOptions = {
   iss: string
@@ -55,13 +55,13 @@ export const fetchEntityStatement = async ({
 
   // Parse the JWT into its claims and header claims
   const { claims } = validate({
-    schema: entityStatementJwtSchema,
+    schema: zEntityStatementJwt,
     data: entityStatementJwt,
     errorMessage: 'fetched entity statement JWT is invalid',
   })
 
   if (!isSameEntityId(claims.iss, iss) || !isSameEntityId(claims.sub, sub)) {
-    throw new OpenIdFederationError(
+    throw new OpenidFederationError(
       PolicyErrorStage.Validation,
       `entity statement fetched for issuer '${iss}' and subject '${sub}' has issuer '${claims.iss}' and subject '${claims.sub}'`
     )

@@ -42,15 +42,15 @@ If you already have a parsed certificate from `@owf/x509`, use `toAccessCertific
 
 ### Relation to registration certificates
 
-A registration certificate (ETSI TS 119 475, see [`@owf/eudi-wrprc`](../eudi-wrprc)) is bound to the access certificate
+A registration certificate (ETSI TS 119 475, see [`@owf/eudi-registration-certificate`](../eudi-registration-certificate)) is bound to the access certificate
 through its `sub` claim. `getAccessCertificateSubjectIdentifier(ac)` returns the value to compare it with: the
 `organizationIdentifier` for legal persons, or the `serialNumber` for natural persons.
 
 ```typescript
 import { getAccessCertificateSubjectIdentifier } from '@owf/eudi-access-certificate'
-import { validateWRPRC } from '@owf/eudi-wrprc'
+import { validateRegistrationCertificate } from '@owf/eudi-registration-certificate'
 
-const result = validateWRPRC(header, payload, getAccessCertificateSubjectIdentifier(ac) ?? '')
+const result = validateRegistrationCertificate(header, payload, getAccessCertificateSubjectIdentifier(ac) ?? '')
 ```
 
 ## Validation
@@ -86,7 +86,7 @@ for (const issue of issues) {
   console.log(issue.severity, issue.code, issue.path.join('.'), issue.requirement ?? '')
 }
 
-// Or throw an AccessCertificateException on errors
+// Or throw an AccessCertificateValidationError, a ValidationError of @owf/identity-common, with these issues when one is an error
 const checked = parseAndValidateAccessCertificate(pem)
 ```
 

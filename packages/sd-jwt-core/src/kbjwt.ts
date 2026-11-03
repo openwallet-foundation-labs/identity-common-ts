@@ -1,28 +1,28 @@
 import { nowInSeconds } from '@owf/identity-common'
 import { getJwtTimeValidationOptions, Jwt, type VerifierOptions, validateJwtPayload } from './jwt'
-import { timeClaimException } from './time-claim-error'
-import { KB_JWT_TYP, type KbVerifier, type kbHeader, type kbPayload } from './types'
-import { SDJWTException } from './utils'
+import { timeClaimError } from './time-claim-error'
+import { KB_JWT_TYP, type KbJwtHeader, type KbJwtPayload, type KbVerifier } from './types'
+import { SdJwtError } from './utils'
 
-export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload = kbPayload> extends Jwt<
+export class KbJwt<Header extends KbJwtHeader = KbJwtHeader, Payload extends KbJwtPayload = KbJwtPayload> extends Jwt<
   Header,
   Payload
 > {
   // Checking the validity of the key binding jwt
   // the type unknown is not good, but we don't know at this point how to get the public key of the signer, this is defined in the kbVerifier
-  public async verifyKB(values: {
+  public async verifyKb(values: {
     verifier: KbVerifier
     payload: Record<string, unknown>
     nonce: string
     /**
      * Full verification options. The SD-JWT verifier validates issuer-signed
-     * claims and the issuer algorithm before calling verifyKB; key-binding-specific
+     * claims and the issuer algorithm before calling verifyKb; key-binding-specific
      * constraints are checked here. Only time-validation options reach Jwt.verify.
      */
     options?: VerifierOptions
   }) {
     if (!this.header || !this.payload || !this.signature) {
-      throw new SDJWTException('Verify Error: Invalid JWT')
+      throw new SdJwtError('Verify Error: Invalid JWT')
     }
 
     if (
@@ -36,23 +36,23 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
       typeof this.payload.sd_hash !== 'string' ||
       this.payload.sd_hash.length === 0
     ) {
-      throw new SDJWTException('Invalid Key Binding Jwt')
+      throw new SdJwtError('Invalid Key Binding Jwt')
     }
 
     if (
       values.options?.allowedKeyBindingAlgorithms &&
       !values.options.allowedKeyBindingAlgorithms.includes(this.header.alg)
     ) {
-      throw new SDJWTException(`Verify Error: Disallowed Key Binding alg ${this.header.alg}`)
+      throw new SdJwtError(`Verify Error: Disallowed Key Binding alg ${this.header.alg}`)
     }
 
     // RFC 7515 Section 4.1.11, checked here so the failure names the Key Binding JWT
     if ('crit' in this.header) {
-      throw new SDJWTException('Verify Error: unsupported critical header parameters in Key Binding JWT')
+      throw new SdJwtError('Verify Error: unsupported critical header parameters in Key Binding JWT')
     }
 
     if (this.payload.nonce !== values.nonce) {
-      throw new SDJWTException('Verify Error: Invalid Nonce')
+      throw new SdJwtError('Verify Error: Invalid Nonce')
     }
 
     if (values.options?.expectedKeyBindingAudience !== undefined) {
@@ -60,7 +60,7 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
         ? values.options.expectedKeyBindingAudience
         : [values.options.expectedKeyBindingAudience]
       if (!expectedAudiences.includes(this.payload.aud)) {
-        throw new SDJWTException('Verify Error: Invalid Key Binding audience')
+        throw new SdJwtError('Verify Error: Invalid Key Binding audience')
       }
     }
 
@@ -68,7 +68,7 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
       const currentDate = values.options.currentDate ?? nowInSeconds()
       const skew = values.options.skewSeconds ?? 0
       if (this.payload.iat + values.options.keyBindingMaxAgeSeconds + skew < currentDate) {
-        throw timeClaimException('key-binding-jwt', 'tooOld', {
+        throw timeClaimError('key-binding-jwt', 'tooOld', {
           claim: 'iat',
           value: this.payload.iat,
           currentDate,
@@ -91,13 +91,13 @@ export class KBJwt<Header extends kbHeader = kbHeader, Payload extends kbPayload
     return { payload: this.payload, header: this.header }
   }
 
-  // This function is for creating KBJwt object for verify properly
-  public static fromKBEncode<Header extends kbHeader = kbHeader, Payload extends kbPayload = kbPayload>(
+  // This function is for creating KbJwt object for verify properly
+  public static fromKbEncode<Header extends KbJwtHeader = KbJwtHeader, Payload extends KbJwtPayload = KbJwtPayload>(
     encodedJwt: string
-  ): KBJwt<Header, Payload> {
-    const { header, payload, signature } = Jwt.decodeJWT<Header, Payload>(encodedJwt)
+  ): KbJwt<Header, Payload> {
+    const { header, payload, signature } = Jwt.decodeJwt<Header, Payload>(encodedJwt)
 
-    const jwt = new KBJwt<Header, Payload>({
+    const jwt = new KbJwt<Header, Payload>({
       header,
       payload,
       signature,

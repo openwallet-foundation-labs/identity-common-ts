@@ -24,7 +24,8 @@ CI installs with `--frozen-lockfile`, so commit `pnpm-lock.yaml` with every depe
 ## Schemas and errors
 
 - zod schemas are named `zFoo`.
-- Thrown errors are a package exception class that extends `IdentityException`.
+- A string is `zNonEmptyString` of `@owf/identity-common`, unless the specification allows it to be empty.
+- Thrown errors are a package error class (`FooError`) that extends `IdentityError`.
 
 ## Writing code
 

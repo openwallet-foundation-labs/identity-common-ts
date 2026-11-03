@@ -13,10 +13,10 @@ import type { Claim, TypeMetadataFormat } from '@sd-jwt/sd-jwt-vc'
 export const ClaimSelectiveDisclosureValues = ['always', 'allowed', 'never'] as const
 
 export {
-  ClaimPathSchema as ClaimsPathSchema,
-  ClaimSchema as TypeMetadataClaimSchema,
-  ClaimSelectiveDisclosureSchema,
-  TypeMetadataFormatSchema as TypeMetadataSchema,
+  zClaim as zTypeMetadataClaim,
+  zClaimPath as zClaimsPath,
+  zClaimSelectiveDisclosure,
+  zTypeMetadataFormat as zTypeMetadata,
 } from '@sd-jwt/sd-jwt-vc'
 
 export type TypeMetadataClaim = Claim

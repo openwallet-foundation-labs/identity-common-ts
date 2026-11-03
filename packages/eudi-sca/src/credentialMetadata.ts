@@ -22,7 +22,7 @@ const valueTypeValues = Object.values(ValueType).join('|')
 const valueTypeRegex = new RegExp(`^template:(${valueTypeValues})$`)
 const urnRegex = /^urn:eudi:sca:[^:]+:[^:]+(:[^:]+)*:[^:]+$/
 
-const CredentialMetadataDisplaySchema = z
+const zCredentialMetadataDisplay = z
   .array(
     z.object({
       locale: z.string().optional(),
@@ -32,16 +32,16 @@ const CredentialMetadataDisplaySchema = z
   )
   .min(1)
 
-export type CredentialMetadataDisplay = z.infer<typeof CredentialMetadataDisplaySchema>
+export type CredentialMetadataDisplay = z.infer<typeof zCredentialMetadataDisplay>
 
-export const CredentialMetadataClaimsDataTypeSchema = z
+export const zCredentialMetadataClaimsDataType = z
   .object({
     claims: z.array(
       z
         .object({
           path: z.array(z.union([z.string(), z.null()])),
           mandatory: z.boolean().optional(),
-          display: CredentialMetadataDisplaySchema.optional(),
+          display: zCredentialMetadataDisplay.optional(),
           value_type: z.union([z.enum(ValueType), z.string()]).optional(),
         })
         .superRefine((val, ctx) => {
@@ -58,16 +58,16 @@ export const CredentialMetadataClaimsDataTypeSchema = z
   })
   .catchall(z.unknown())
 
-export type CredentialMetadataClaimsDataType = z.infer<typeof CredentialMetadataClaimsDataTypeSchema>
+export type CredentialMetadataClaimsDataType = z.infer<typeof zCredentialMetadataClaimsDataType>
 
-const CredentialMetadataSchema = z.object({
-  transaction_data_types: z.record(z.string().regex(urnRegex), CredentialMetadataClaimsDataTypeSchema),
+const zCredentialMetadata = z.object({
+  transaction_data_types: z.record(z.string().regex(urnRegex), zCredentialMetadataClaimsDataType),
 })
 
-export type CredentialMetadata = z.infer<typeof CredentialMetadataSchema>
+export type CredentialMetadata = z.infer<typeof zCredentialMetadata>
 
 export const parseCredentialMetadata = (credentialMetadata: Record<string, unknown>) => {
-  const cm = CredentialMetadataSchema.parse(credentialMetadata)
+  const cm = zCredentialMetadata.parse(credentialMetadata)
   return cm
 }
 
@@ -94,7 +94,7 @@ export async function fetchCredentialMetadata(
 
   const payload = await validateJwt(await response.text(), uri, verifier)
 
-  return CredentialMetadataSchema.extend(zCredentialIssuerMetadataSchema.shape).parse(payload.credential_metadata)
+  return zCredentialMetadata.extend(zCredentialIssuerMetadataSchema.shape).parse(payload.credential_metadata)
 }
 
 /**

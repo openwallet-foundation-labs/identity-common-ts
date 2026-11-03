@@ -1,21 +1,21 @@
 import { CborStructure, DataItem } from '@owf/cose'
 import { z } from 'zod'
 import { ItemsRequest, type ItemsRequestEncodedStructure } from './items-request'
-import { SessionTranscript, sessionTranscriptEncodedSchema } from './session-transcript'
+import { SessionTranscript, zSessionTranscriptEncoded } from './session-transcript'
 
-const readerAuthenticationEncodedSchema = z.tuple([
+const zReaderAuthenticationEncoded = z.tuple([
   z.literal('ReaderAuthentication'),
-  sessionTranscriptEncodedSchema,
+  zSessionTranscriptEncoded,
   z.instanceof<typeof DataItem<ItemsRequestEncodedStructure>>(DataItem),
 ])
 
-const readerAuthenticationDecodedSchema = z.object({
+const zReaderAuthenticationDecoded = z.object({
   sessionTranscript: z.instanceof(SessionTranscript),
   itemsRequest: z.instanceof(ItemsRequest),
 })
 
-export type ReaderAuthenticationDecodedStructure = z.infer<typeof readerAuthenticationDecodedSchema>
-export type ReaderAuthenticationEncodedStructure = z.infer<typeof readerAuthenticationEncodedSchema>
+export type ReaderAuthenticationDecodedStructure = z.infer<typeof zReaderAuthenticationDecoded>
+export type ReaderAuthenticationEncodedStructure = z.infer<typeof zReaderAuthenticationEncoded>
 
 export type ReaderAuthenticationOptions = {
   sessionTranscript: SessionTranscript
@@ -27,7 +27,7 @@ export class ReaderAuthentication extends CborStructure<
   ReaderAuthenticationDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(readerAuthenticationEncodedSchema, readerAuthenticationDecodedSchema, {
+    return z.codec(zReaderAuthenticationEncoded, zReaderAuthenticationDecoded, {
       decode: ([, sessionTranscript, itemsRequestDataItem]) => ({
         sessionTranscript: SessionTranscript.fromEncodedStructure(sessionTranscript),
         itemsRequest: ItemsRequest.fromDataItem(itemsRequestDataItem),

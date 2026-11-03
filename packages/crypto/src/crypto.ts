@@ -36,14 +36,14 @@ type VerifyAlgorithm = AlgorithmIdentifier | RsaPssParams | EcdsaParams
 export async function generateKeyPair(keyAlgorithm: GenerateKeyAlgorithm) {
   const keyPair = await globalThis.crypto.subtle.generateKey(keyAlgorithm, true, ['sign', 'verify'])
 
-  const publicKeyJWK = await globalThis.crypto.subtle.exportKey('jwk', keyPair.publicKey)
-  const privateKeyJWK = await globalThis.crypto.subtle.exportKey('jwk', keyPair.privateKey)
+  const publicKeyJwk = await globalThis.crypto.subtle.exportKey('jwk', keyPair.publicKey)
+  const privateKeyJwk = await globalThis.crypto.subtle.exportKey('jwk', keyPair.privateKey)
 
-  return { publicKey: publicKeyJWK, privateKey: privateKeyJWK }
+  return { publicKey: publicKeyJwk, privateKey: privateKeyJwk }
 }
 
-export async function getSigner(privateKeyJWK: object, keyAlgorithm: ImportKeyAlgorithm, signAlgorithm: SignAlgorithm) {
-  const privateKey = await globalThis.crypto.subtle.importKey('jwk', privateKeyJWK, keyAlgorithm, true, ['sign'])
+export async function getSigner(privateKeyJwk: object, keyAlgorithm: ImportKeyAlgorithm, signAlgorithm: SignAlgorithm) {
+  const privateKey = await globalThis.crypto.subtle.importKey('jwk', privateKeyJwk, keyAlgorithm, true, ['sign'])
 
   return async (data: string) => {
     const signature = await globalThis.crypto.subtle.sign(signAlgorithm, privateKey, stringToBytes(data))
@@ -53,11 +53,11 @@ export async function getSigner(privateKeyJWK: object, keyAlgorithm: ImportKeyAl
 }
 
 export async function getVerifier(
-  publicKeyJWK: object,
+  publicKeyJwk: object,
   keyAlgorithm: ImportKeyAlgorithm,
   verifyAlgorithm: VerifyAlgorithm
 ) {
-  const publicKey = await globalThis.crypto.subtle.importKey('jwk', publicKeyJWK, keyAlgorithm, true, ['verify'])
+  const publicKey = await globalThis.crypto.subtle.importKey('jwk', publicKeyJwk, keyAlgorithm, true, ['verify'])
 
   return async (data: string, signatureBase64url: string) => {
     const signature = base64UrlToUint8Array(signatureBase64url)
@@ -89,12 +89,12 @@ export const ES256 = {
     return await generateKeyPair(ES256._keyAlgorithm)
   },
 
-  async getSigner(privateKeyJWK: object) {
-    return await getSigner(privateKeyJWK, ES256._keyAlgorithm, ES256._hashAlgorithm)
+  async getSigner(privateKeyJwk: object) {
+    return await getSigner(privateKeyJwk, ES256._keyAlgorithm, ES256._hashAlgorithm)
   },
 
-  async getVerifier(publicKeyJWK: object) {
-    return await getVerifier(publicKeyJWK, ES256._keyAlgorithm, ES256._hashAlgorithm)
+  async getVerifier(publicKeyJwk: object) {
+    return await getVerifier(publicKeyJwk, ES256._keyAlgorithm, ES256._hashAlgorithm)
   },
 }
 
@@ -115,12 +115,12 @@ export const ES384 = {
     return await generateKeyPair(ES384._keyAlgorithm)
   },
 
-  async getSigner(privateKeyJWK: object) {
-    return await getSigner(privateKeyJWK, ES384._keyAlgorithm, ES384._hashAlgorithm)
+  async getSigner(privateKeyJwk: object) {
+    return await getSigner(privateKeyJwk, ES384._keyAlgorithm, ES384._hashAlgorithm)
   },
 
-  async getVerifier(publicKeyJWK: object) {
-    return await getVerifier(publicKeyJWK, ES384._keyAlgorithm, ES384._hashAlgorithm)
+  async getVerifier(publicKeyJwk: object) {
+    return await getVerifier(publicKeyJwk, ES384._keyAlgorithm, ES384._hashAlgorithm)
   },
 }
 
@@ -141,11 +141,11 @@ export const ES512 = {
     return await generateKeyPair(ES512._keyAlgorithm)
   },
 
-  async getSigner(privateKeyJWK: object) {
-    return await getSigner(privateKeyJWK, ES512._keyAlgorithm, ES512._hashAlgorithm)
+  async getSigner(privateKeyJwk: object) {
+    return await getSigner(privateKeyJwk, ES512._keyAlgorithm, ES512._hashAlgorithm)
   },
 
-  async getVerifier(publicKeyJWK: object) {
-    return await getVerifier(publicKeyJWK, ES512._keyAlgorithm, ES512._hashAlgorithm)
+  async getVerifier(publicKeyJwk: object) {
+    return await getVerifier(publicKeyJwk, ES512._keyAlgorithm, ES512._hashAlgorithm)
   },
 }

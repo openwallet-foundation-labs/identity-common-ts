@@ -106,7 +106,7 @@ a release of this package:
 
    ```typescript
    const current = getPointerSigningCertificates(lotl, {
-     tslType: TSLType.EUlistofthelists,
+     tslType: TslType.EUlistofthelists,
    });
    ```
 
@@ -215,10 +215,12 @@ CAs. Narrow further with your own `ProfileRule` when you need to.
 
 ## Error Handling
 
-All failures throw a subclass of `TrustedListException`:
+All failures throw a subclass of `TrustedListError`:
 
-- `TrustedListParseException` — the XML is not a well-formed TS 119 612 list
-- `TrustedListSignatureException` — the signature is missing, invalid, or not
+- `TrustedListParseError` — the XML is not a well-formed TS 119 612 list
+- `TrustedListValidationError` — a `ValidationError` of `@owf/identity-common` for a list that does
+  not conform to the schema or a profile, with the `issues` of the validation
+- `TrustedListSignatureError` — the signature is missing, invalid, or not
   signed by a pinned trust anchor. Treat this as fail-closed.
 
 When a failure wraps an underlying error (e.g. a crypto error during
