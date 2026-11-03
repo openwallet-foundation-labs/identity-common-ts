@@ -110,7 +110,7 @@ console.log(credentialMatch.success) // True if the query is fulfillable
 
 ## Issues
 
-`DcqlQuery.parse` throws a `DcqlParseError` when the input is not a DCQL query. Its `issues` are `ValidationIssue`s of `@owf/identity-common`, with the `path` into the query. The failed claims, claim sets, meta and trusted authorities of a result carry their `issues` the same way, with the `path` into the credential and a code of `DCQL_VALIDATION_CODES`, such as `claim_missing` or `doctype_mismatch`. A mismatch has the `expected` and the `actual` value as `context`.
+`DcqlQuery.parse` throws a `DcqlParseError` when the input is not a DCQL query. Its `issues` are `ValidationIssue`s of `@owf/identity-common`, with the `path` into the query. The failed claims, claim sets, meta and trusted authorities of a result carry their `issues` the same way, with the `path` into the credential and a code of `DCQL_VALIDATION_CODES`, such as `claims_path_not_found` or `doctype_mismatch`. A mismatch has the `expected` and the `actual` value as `context`.
 
 ```ts
 try {

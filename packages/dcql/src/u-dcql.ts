@@ -60,9 +60,9 @@ export const DCQL_VALIDATION_CODES = {
   /** An array that must not be empty is, e.g. `claims` */
   EMPTY_ARRAY: 'empty_array',
   /** The claims path pointer does not point to a value in the credential */
-  CLAIM_MISSING: 'claim_missing',
+  CLAIMS_PATH_NOT_FOUND: 'claims_path_not_found',
   /** The claim is not one of the `values` of the claims query */
-  CLAIM_VALUE_MISMATCH: 'claim_value_mismatch',
+  CLAIM_VALUES_MISMATCH: 'claim_values_mismatch',
   /** The credential format is not the `format` of the credential query */
   CREDENTIAL_FORMAT_MISMATCH: 'credential_format_mismatch',
   /** The doctype is not the `doctype_value` of the credential query */
@@ -82,7 +82,7 @@ export type DcqlValidationCode = (typeof DCQL_VALIDATION_CODES)[keyof typeof DCQ
 
 /** The context of the issues with a code of {@link DCQL_VALIDATION_CODES}, the codes not listed have none */
 export interface DcqlValidationContexts {
-  claim_value_mismatch: { expected: (string | number | boolean)[]; actual: unknown }
+  claim_values_mismatch: { expected: (string | number | boolean)[]; actual: unknown }
   credential_format_mismatch: { expected: string; actual: unknown }
   doctype_mismatch: { expected: string; actual: unknown }
   vct_mismatch: { expected: string[]; actual: unknown }

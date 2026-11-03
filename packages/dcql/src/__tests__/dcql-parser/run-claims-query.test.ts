@@ -69,7 +69,7 @@ describe('Run Claims Query', () => {
         issues: [
           {
             severity: 'error',
-            code: 'claim_value_mismatch',
+            code: 'claim_values_mismatch',
             path: ['name'],
             message: "Expected claim 'name' to be 'Ford Prefect' but received 'Arthur Dent'",
             context: { actual: 'Arthur Dent', expected: ['Ford Prefect'] },
@@ -84,7 +84,7 @@ describe('Run Claims Query', () => {
         issues: [
           {
             severity: 'error',
-            code: 'claim_missing',
+            code: 'claims_path_not_found',
             path: ['birthdate'],
             message: "Expected claim 'birthdate' to be defined",
           },
@@ -219,7 +219,7 @@ describe('Run Claims Query', () => {
           issues: [
             {
               severity: 'error',
-              code: 'claim_value_mismatch',
+              code: 'claim_values_mismatch',
               path: ['org.iso.18013.5.1', 'family_name'],
               message: "Expected claim 'org.iso.18013.5.1'.'family_name' to be 'Shakira' but received 'Dent'",
               context: { actual: 'Dent', expected: ['Shakira'] },
@@ -245,7 +245,7 @@ describe('Run Claims Query', () => {
           issues: [
             {
               severity: 'error',
-              code: 'claim_value_mismatch',
+              code: 'claim_values_mismatch',
               path: ['org.iso.18013.5.1', 'family_name'],
               message: "Expected claim 'org.iso.18013.5.1'.'family_name' to be 'Shakira' but received 'Dent'",
               context: { actual: 'Dent', expected: ['Shakira'] },
@@ -474,7 +474,7 @@ describe('Run Claims Query', () => {
           issues: [
             {
               severity: 'error',
-              code: 'claim_value_mismatch',
+              code: 'claim_values_mismatch',
               path: ['degrees', 1, 'type'],
               message: "Expected claim 'degrees'.1.'type' to be 'RandomType' but received 'Master of Science'",
               context: { actual: 'Master of Science', expected: ['RandomType'] },
@@ -565,7 +565,7 @@ describe('Run Claims Query', () => {
           issues: [
             {
               severity: 'error',
-              code: 'claim_value_mismatch',
+              code: 'claim_values_mismatch',
               path: ['degrees', 1, 'type'],
               message: "Expected claim 'degrees'.1.'type' to be 'RandomType' but received 'Master of Science'",
               context: { actual: 'Master of Science', expected: ['RandomType'] },
