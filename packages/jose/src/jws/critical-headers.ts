@@ -4,12 +4,8 @@ import { hasOwn } from '../utils/object'
 import type { JwsProtectedHeader, JwsUnprotectedHeader } from './z-jws'
 
 /**
- * The header parameter names registered by RFC 7515, RFC 7516 and RFC 7518.
- *
- * A producer must not list any of these in `crit`: `crit` exists to mark extensions, and marking a
- * parameter that every implementation already has to understand makes the list meaningless.
- *
- * `b64` (RFC 7797) is deliberately absent, as RFC 7797 requires it to be listed in `crit`.
+ * The header parameters of RFC 7515, RFC 7516 and RFC 7518, which `crit` must not list. `b64` is not
+ * one of them: RFC 7797 requires it in `crit`.
  *
  * @see https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
  */
@@ -37,25 +33,13 @@ const registeredHeaderParameters = new Set([
 ])
 
 export interface AssertCriticalHeaderParametersOptions {
-  /**
-   * The protected header, validated against {@link zJwsProtectedHeader}, which is the only place
-   * `crit` may appear.
-   *
-   * Taking a validated header rather than the raw JSON is what keeps the shape rules — a non-empty
-   * array of non-empty strings, a boolean `b64` — in the schema, where they are expressed once and
-   * where a reader looks for them, instead of being restated here.
-   */
+  /** The protected header, validated against {@link zJwsProtectedHeader}, so the shape of `crit` is checked. */
   protectedHeader: JwsProtectedHeader
 
   /** The unprotected header, if the serialization has one. */
   unprotectedHeader?: JwsUnprotectedHeader
 
-  /**
-   * The extension header parameters the caller understands and processes.
-   *
-   * A JWS that marks a parameter critical is rejected unless it is named here, because accepting it
-   * would mean ignoring something the producer said must not be ignored.
-   */
+  /** The extension header parameters the caller processes. A JWS that marks another one critical is rejected. */
   understoodCriticalParameters?: ReadonlyArray<string>
 }
 
@@ -73,8 +57,7 @@ export function assertCriticalHeaderParameters({
 }: AssertCriticalHeaderParametersOptions): void {
   const issues = new ValidationIssues<JoseValidationIssue['code']>()
 
-  // `crit` says which parameters must not be ignored, so it must not itself be something an
-  // attacker can add or remove: it is only meaningful when it is integrity protected.
+  // `crit` is only meaningful when it is integrity protected
   if (unprotectedHeader && hasOwn(unprotectedHeader, 'crit')) {
     issues.add({
       code: 'invalid_crit',
@@ -95,8 +78,7 @@ export function assertCriticalHeaderParameters({
         context: { parameter: name },
       })
     }
-    // A parameter can be marked critical in the protected header while being carried in the
-    // unprotected one, so both are looked at.
+    // A parameter marked critical can be carried in the unprotected header
     else if (!hasOwn(protectedHeader, name) && !(unprotectedHeader && hasOwn(unprotectedHeader, name))) {
       issues.add({
         code: 'invalid_crit',
@@ -118,11 +100,8 @@ export function assertCriticalHeaderParameters({
 }
 
 /**
- * Whether the payload of a JWS is base64url encoded in the serialization, per the `b64` header
- * parameter.
- *
- * RFC 7797 requires `b64` to be listed in `crit` whenever it is used, so that an implementation that
- * does not know about unencoded payloads rejects the JWS rather than verifying the wrong bytes.
+ * Whether the payload of a JWS is base64url encoded, per `b64`. RFC 7797 requires `b64` to be listed
+ * in `crit`.
  *
  * @throws JoseValidationError with an `invalid_crit` issue if `b64` is used without being marked critical.
  * @see https://www.rfc-editor.org/rfc/rfc7797#section-6

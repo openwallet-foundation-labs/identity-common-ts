@@ -1,8 +1,6 @@
 /**
- * Transformations between JWA algorithm identifiers and COSE algorithm identifiers.
- *
- * This lives in the JOSE package rather than in `@owf/cose` because the COSE identifiers are plain
- * integers, so neither package has to depend on the other to map between them.
+ * Mapping between JWA and COSE algorithm identifiers. COSE identifiers are integers, so no dependency
+ * on `@owf/cose` is needed.
  *
  * @see https://www.rfc-editor.org/rfc/rfc9864 Fully-Specified Algorithms for JOSE and COSE
  */
@@ -12,11 +10,8 @@ import { hasOwn } from '../utils/object'
 import { JwaSignatureAlgorithm } from './algorithms'
 
 /**
- * JWA signature algorithm identifiers mapped to fully-specified COSE algorithm identifiers.
- *
- * The JOSE ECDSA algorithms are already fully specified, while the COSE algorithms of the same name
- * are polymorphic and deprecated, so `ES256` maps to `ESP256` (-9) rather than to the COSE `ES256`
- * (-7).
+ * JWA signature algorithms to fully-specified COSE algorithms. The JOSE `ES256` is fully specified, so
+ * it maps to `ESP256` (-9), not to the polymorphic COSE `ES256` (-7).
  */
 const JWA_SIGNATURE_TO_COSE_ALGORITHM_MAP = {
   // EdDSA - RFC 9864 Section 2.2
@@ -47,12 +42,7 @@ const JWA_SIGNATURE_TO_COSE_ALGORITHM_MAP = {
   [JwaSignatureAlgorithm.HS512]: 7,
 } as const
 
-/**
- * COSE algorithm identifiers mapped to JWA signature algorithm identifiers.
- *
- * The inverse of {@link JWA_SIGNATURE_TO_COSE_ALGORITHM_MAP}, with the deprecated polymorphic COSE
- * algorithms added so that a token using one can still be mapped.
- */
+/** The inverse of {@link JWA_SIGNATURE_TO_COSE_ALGORITHM_MAP}, plus the deprecated polymorphic COSE algorithms. */
 const COSE_TO_JWA_SIGNATURE_ALGORITHM_MAP = {
   // EdDSA - RFC 9864 Section 2.2
   [-19]: JwaSignatureAlgorithm.Ed25519,
@@ -99,8 +89,7 @@ export type JwaSignatureAlgorithmIdentifier = `${JwaSignatureAlgorithm}`
  * ```
  */
 export function jwaSignatureAlgorithmToCoseAlgorithm(jwaAlg: string): CoseAlgorithmIdentifier | undefined {
-  // An own property only: the identifier is often taken from metadata, and `constructor` would
-  // otherwise resolve to a member of `Object.prototype`.
+  // An own property only, so `constructor` from metadata does not resolve to `Object.prototype`
   return hasOwn(JWA_SIGNATURE_TO_COSE_ALGORITHM_MAP, jwaAlg)
     ? JWA_SIGNATURE_TO_COSE_ALGORITHM_MAP[jwaAlg as JwaSignatureAlgorithm]
     : undefined

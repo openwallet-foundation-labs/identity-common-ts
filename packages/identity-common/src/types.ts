@@ -40,11 +40,8 @@ export type Base64urlString = string
 export type OrPromise<T> = T | Promise<T>
 
 /**
- * `T` with the keys in `K` made optional, leaving every other key as it was.
- *
- * Written as two mapped types over `keyof T` rather than as `Omit<T, K> & Partial<Pick<T, K>>`,
- * because `Omit` reduces a type carrying an index signature — which every `.loose()` schema does — to
- * that index signature alone, dropping the declared members and their types along with it.
+ * `T` with the keys in `K` made optional. Not `Omit<T, K> & Partial<Pick<T, K>>`, as `Omit` reduces a
+ * type with an index signature, such as a `.loose()` schema, to only that signature.
  */
 export type MarkOptional<T, K extends PropertyKey> = {
   [P in keyof T as P extends K ? never : P]: T[P]

@@ -8,45 +8,21 @@ import {
   signatureAlgorithmKeyTypes,
 } from './algorithms'
 
-/**
- * The algorithms RFC 9864 defines in place of the polymorphic `EdDSA`: the same signature algorithm,
- * with the curve fixed.
- *
- * @see https://www.rfc-editor.org/rfc/rfc9864#section-2.2
- */
+/** `EdDSA` with the curve fixed (RFC 9864 section 2.2). */
 const fullySpecifiedEdDsaAlgorithms: ReadonlyArray<string> = [
   JwaSignatureAlgorithm.Ed25519,
   JwaSignatureAlgorithm.Ed448,
 ]
 
-/**
- * The curves `EdDSA` is defined for. It is polymorphic, so it does not fix one of them, but an `OKP`
- * key on `X25519` or `X448` is a key agreement key rather than a signing key.
- *
- * @see https://www.rfc-editor.org/rfc/rfc8037#section-3.1
- */
+/** The curves of `EdDSA` (RFC 8037 section 3.1). `X25519` and `X448` are for key agreement. */
 const edDsaCurves: ReadonlyArray<string> = ['Ed25519', 'Ed448']
 
 /**
- * Checks that a key can be used with a signature algorithm, and that the key does not say it is for
- * something else.
- *
- * Three things are checked, all of them for the same reason — the `alg` of a token is chosen by
- * whoever wrote the token, and the key is not:
- *
- * 1. The key type matches the algorithm family, which is what rules out key confusion: a token
- *    signed with `HS256` over a public RSA key is a valid MAC to anybody who has that public key.
- * 2. The curve matches, for the algorithms that fully specify one. `EdDSA` does not, but still
- *    requires one of the curves it is defined for.
- * 3. The `alg` and `use` the key itself declares are not contradicted. `EdDSA` and its fully
- *    specified forms `Ed25519` and `Ed448` (RFC 9864) do not contradict each other: a key declaring
- *    one of them can be used for a token declaring the other, on the curve the fully specified name
- *    requires.
- *
- * An unregistered algorithm is not rejected: the JWA registry is open, and an algorithm this package
- * does not know about is a matter for the verification callback. It only means there is nothing to
- * check here. A registered algorithm in a different casing (`hs256`) is rejected, as nothing could be
- * checked for what it would be taken for downstream.
+ * Checks that a key can be used with a signature algorithm, as the token chooses its `alg` but not the
+ * key: the key type (no key confusion), the curve where the algorithm fixes one, and the `alg`, `use`
+ * and `key_ops` the key declares. `EdDSA` and `Ed25519`/`Ed448` (RFC 9864) count as the same `alg`.
+ * An unregistered algorithm is left to the verification callback, but one that differs from a
+ * registered algorithm only in casing is rejected.
  *
  * @throws JoseAlgorithmNotAllowedError when the key cannot be used with the algorithm.
  */

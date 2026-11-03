@@ -1,17 +1,5 @@
 /**
- * @owf/jose
- *
  * JOSE (JWK, JWA and JWS) with strict, schema based parsing and verification.
- *
- * Everything is built on two ideas:
- *
- * 1. Encoding is handled in one place. Every base64url, UTF-8 and JSON decode goes through
- *    `@owf/identity-common`, which rejects anything that is not exactly what it claims to be instead
- *    of decoding it into something close.
- * 2. A token type is expressed as a schema, not as a class. Compose the schemas exported here to say
- *    what a token must look like, and everything that follows from the token alone is then checked
- *    when it is parsed. What cannot be checked that way — which algorithms and signers to accept —
- *    is passed to the verification functions.
  *
  * @packageDocumentation
  */

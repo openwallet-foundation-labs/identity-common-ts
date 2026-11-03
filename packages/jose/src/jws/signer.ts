@@ -8,10 +8,7 @@ export type JwsSignerDid = {
   didUrl: string
   alg: string
 
-  /**
-   * The key id that should be used for signing. You need to make sure the kid actually matches with
-   * the key associated with the didUrl.
-   */
+  /** The key id to sign with. It must match the key of `didUrl`. */
   kid?: string
 }
 
@@ -21,13 +18,7 @@ export type JwsSignerJwk = {
   publicJwk: Jwk
   alg: string
 
-  /**
-   * The key id that should be used for signing. You need to make sure the kid actually matches with
-   * the key associated with the jwk.
-   *
-   * If not provided the kid can also be extracted from the `publicJwk`. Providing it here means the
-   * `kid` won't be included in the JWS header.
-   */
+  /** The key id to sign with. It must match `publicJwk`, and is not added to the header. */
   kid?: string
 }
 
@@ -37,10 +28,7 @@ export type JwsSignerX5c = {
   x5c: string[]
   alg: string
 
-  /**
-   * The key id that should be used for signing. You need to make sure the kid actually matches with
-   * the key associated with the leaf certificate.
-   */
+  /** The key id to sign with. It must match the key of the leaf certificate. */
   kid?: string
 }
 
@@ -50,17 +38,11 @@ export type JwsSignerFederation = {
   trustChain?: [string, ...string[]]
   alg: string
 
-  /**
-   * The key id that should be used for signing. You need to make sure the kid actually matches with
-   * a key present in the federation.
-   */
+  /** The key id to sign with. It must match a key in the federation. */
   kid: string
 }
 
-/**
- * The signer is established out of band. Only its `kid` is added to the header, when it has one: it
- * is all a verifier has to find the key with.
- */
+/** The signer is established out of band. */
 export type JwsSignerCustom = {
   method: 'custom'
   alg: string
@@ -103,7 +85,6 @@ export function jwsHeaderFromSigner(signer: JwsSigner) {
     return { alg: signer.alg, x5c: signer.x5c } as const
   }
 
-  // A custom signer is established out of band, so its key id is the only thing that identifies it
   return signer.kid !== undefined ? ({ alg: signer.alg, kid: signer.kid } as const) : ({ alg: signer.alg } as const)
 }
 
@@ -111,38 +92,24 @@ export interface JwsSignerFromHeaderOptions {
   /** The protected header of the JWS. */
   header: JwsProtectedHeader
 
-  /**
-   * The `iss` claim of the payload, when the JWS is a JWT.
-   *
-   * A DID signer can be expressed as a DID in `iss` with a fragment in `kid`, so establishing one
-   * needs the claim as well as the header.
-   */
+  /** The `iss` of a JWT, as a DID signer can be a DID in `iss` with a fragment in `kid`. */
   issuer?: string
 
-  /**
-   * The signer methods the caller accepts. A method that is not listed is never returned, even when
-   * the header identifies the signer that way.
-   */
+  /** The signer methods the caller accepts. */
   allowedSignerMethods?: ReadonlyArray<JwsSignerMethod>
 
   /**
-   * Whether to accept a header that identifies the signer in more than one way, taking the first of
-   * `x5c`, `trust_chain`, `did` and `jwk` that is allowed.
-   *
-   * Off by default: which key a signature is verified against would then depend on a precedence
-   * order rather than on the token, and a token that pairs a trusted `x5c` with an attacker's `jwk`
-   * is exactly the kind of thing that should be looked at rather than resolved silently.
+   * Whether to accept a header that identifies the signer in more than one way, taking the first allowed
+   * of `x5c`, `trust_chain`, `did` and `jwk`. Off by default, so a trusted `x5c` next to an attacker's
+   * `jwk` is rejected rather than resolved by precedence.
    *
    * @default false
    */
   allowMultipleSignerMethods?: boolean
 
   /**
-   * Whether a DID in `kid` may be a different DID than the one in `iss`. Without it, the DID of the
-   * `kid` — the DID URL up to its path, query or fragment — has to be exactly the `iss`.
-   *
-   * Special-cased for `openid4vci-proof+jwt`, where `iss` is the client id rather than the DID, so a
-   * `kid` whose DID is not `iss` is not a mismatch.
+   * Whether the DID in `kid` may differ from `iss`, as in `openid4vci-proof+jwt`, where `iss` is the
+   * client id.
    *
    * @default false
    */
@@ -164,10 +131,8 @@ const didOfDidUrl = (didUrl: string): string => {
 }
 
 /**
- * Establishes how the signer of a JWS is identified, from the header parameters it carries.
- *
- * This says how to find the key, not that the key is to be trusted: whether a certificate chain
- * chains to a trusted root, or a DID is one the caller accepts, is for the verification callback.
+ * Establishes the signer of a JWS from its header. Whether the key is trusted is for the verification
+ * callback.
  *
  * @throws JoseSignerError if the signer cannot be established, or is identified in more than one way.
  */
@@ -205,8 +170,7 @@ export function jwsSignerFromHeader({
   }
 
   if (header.kid?.startsWith('did:') || issuer?.startsWith('did:')) {
-    // The DID of the `kid` has to be the `iss` itself. A prefix match is not enough: the DID
-    // `did:web:example.com.evil.org` starts with `did:web:example.com`, but belongs to somebody else.
+    // An exact match: `did:web:example.com.evil.org` starts with `did:web:example.com`
     if (issuer && header.kid?.startsWith('did:') && didOfDidUrl(header.kid) !== issuer && !allowDidKidIssuerMismatch) {
       found.push({
         method: 'did',

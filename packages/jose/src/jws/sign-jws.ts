@@ -8,15 +8,10 @@ import type { JwsSigner } from './signer'
 import { zJwsProtectedHeader } from './z-jws'
 
 export interface SignCompactJwsOptions {
-  /**
-   * The protected header. Validated against {@link zJwsProtectedHeader}, so a JWS with `alg: none`
-   * or a malformed `crit` cannot be produced. Its `alg` must be the `alg` of the signer.
-   */
+  /** The protected header, validated against {@link zJwsProtectedHeader}. Its `alg` must be the signer's. */
   protectedHeader: Record<string, unknown>
 
-  /**
-   * The payload. An object is serialized as JSON; a string is encoded as UTF-8.
-   */
+  /** The payload. An object is serialized as JSON, a string is encoded as UTF-8. */
   payload: Record<string, unknown> | string | Uint8Array
 
   /** The signer, which the callback resolves into a key. */
@@ -26,8 +21,7 @@ export interface SignCompactJwsOptions {
   signJwsCallback: SignJwsCallback
 
   /**
-   * Whether to leave the payload out of the returned compact serialization, so that it is carried
-   * out of band.
+   * Whether to leave the payload out of the compact serialization, to carry it out of band.
    *
    * @default false
    */
@@ -41,10 +35,7 @@ export interface SignCompactJwsResult {
   /** The signature, base64url encoded. */
   signature: string
 
-  /**
-   * The bytes that were signed, as a string. ASCII, except for a detached unencoded payload
-   * (`b64` false), which is in it as it is.
-   */
+  /** The bytes that were signed, as a string. */
   signingInput: string
 
   /** The public key the JWS was signed with, as reported by the callback. */
@@ -52,10 +43,7 @@ export interface SignCompactJwsResult {
 }
 
 /**
- * Signs a JWS in compact serialization.
- *
- * The header and payload are serialized here and handed to the callback as the exact bytes to sign,
- * so that what is signed is what ends up in the token.
+ * Signs a JWS in compact serialization. The callback signs the exact bytes that end up in the token.
  *
  * @throws JoseValidationError if the protected header is not a valid JWS header.
  * @throws JoseValidationError with an `invalid_crit` issue if `crit` is invalid.
@@ -73,12 +61,9 @@ export async function signCompactJws(options: SignCompactJwsOptions): Promise<Si
     JoseValidationError
   )
 
-  // A producer understands the parameters it marks critical itself, so only the structural rules
-  // apply here — the 'is it understood' check is a rule for the recipient.
+  // A producer understands what it marks critical
   assertCriticalHeaderParameters({ protectedHeader, understoodCriticalParameters: protectedHeader.crit ?? [] })
 
-  // The callback signs with the algorithm of the signer, so a header naming another one would produce
-  // a token that claims a signature it does not have.
   if (options.signer.alg !== protectedHeader.alg) {
     throw new JoseInvalidArgumentError(
       `Unable to sign the JWS, the header says alg '${protectedHeader.alg}' but the signer signs with alg '${options.signer.alg}'.`
@@ -94,13 +79,11 @@ export async function signCompactJws(options: SignCompactJwsOptions): Promise<Si
 
   const isBase64UrlEncoded = isPayloadBase64UrlEncoded(protectedHeader)
 
-  // The validated header is what gets serialized, so that what is signed is what was checked.
   const encodedProtectedHeader = encodeBase64UrlJson(protectedHeader)
   const encodedPayload = isBase64UrlEncoded ? base64url.encode(payload) : decodeUnencodedPayload(payload)
   const signingInput = `${encodedProtectedHeader}.${encodedPayload}`
 
-  // RFC 7797 section 5.2: a compact serialization only carries an unencoded payload of printable ASCII
-  // other than '.', which is what separates the parts.
+  // RFC 7797 section 5.2
   const compactPayloadIssue =
     !isBase64UrlEncoded && !options.detachPayload ? unencodedCompactPayloadIssue(encodedPayload) : undefined
   if (compactPayloadIssue) {

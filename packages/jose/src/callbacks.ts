@@ -4,21 +4,13 @@ import type { JwsSigner } from './jws/signer'
 import type { JwsProtectedHeader, JwsUnprotectedHeader } from './jws/z-jws'
 
 /**
- * What a signing or verification callback is given, besides the signer.
- *
- * The callbacks are low level: they sign and verify the bytes this package computed, rather than
- * producing or consuming a token of their own. That keeps the serialization — which is what the
- * signature is over — in one place, so a token can never be validated in one form and signed or
- * verified in another.
+ * What a signing or verification callback is given besides the signer. The callbacks sign and verify
+ * the bytes this package computed, so a token is never validated in one form and signed in another.
  */
 export interface JwsCallbackContext {
   /**
-   * The exact bytes the signature is computed over, as a string:
-   * `BASE64URL(protected) || '.' || payload`.
-   *
-   * ASCII, unless the payload is unencoded (RFC 7797, `b64` false) and detached or in a JSON
-   * serialization: the payload is then included without encoding, and {@link signingInputBytes}
-   * holds the UTF-8 encoding of the whole signing input.
+   * The exact bytes the signature is over: `BASE64URL(protected) || '.' || payload`. ASCII, unless the
+   * payload is unencoded (RFC 7797) and detached or in a JSON serialization.
    *
    * @see https://www.rfc-editor.org/rfc/rfc7515#section-5.1
    * @see https://www.rfc-editor.org/rfc/rfc7797#section-3
@@ -37,12 +29,7 @@ export interface JwsCallbackContext {
   /** The payload bytes. */
   payload: Uint8Array
 
-  /**
-   * The payload as a JSON object, when the JWS is a JWT.
-   *
-   * Provided so that a callback can take the claims into account — which trust anchors apply to an
-   * issuer, for instance — without having to decode the payload a second time.
-   */
+  /** The payload as a JSON object, when the JWS is a JWT, so a callback can use the claims. */
   jwtPayload?: Record<string, unknown>
 }
 
@@ -52,21 +39,13 @@ export interface VerifyJwsCallbackContext extends JwsCallbackContext {
   /** The signature to verify, base64url encoded. */
   signature: string
 
-  /**
-   * The compact serialization, when the JWS was received in that form and carries its payload.
-   *
-   * Not given for a detached payload: the compact serialization then has an empty payload part, so
-   * verifying it as a whole would verify a different message than {@link signingInput}.
-   */
+  /** The compact serialization, when the JWS was received that way and its payload is not detached. */
   compact?: string
 }
 
 /**
- * Signs the signing input of a JWS.
- *
- * The callback resolves the key from `signer` — a DID URL, a certificate chain, a public JWK, or a
- * key id — signs `signingInputBytes` with it, and returns the signature base64url encoded together
- * with the public key it signed with.
+ * Signs `signingInputBytes` with the key of `signer`, and returns the base64url signature and the
+ * public key it signed with.
  *
  * @example
  * ```ts
@@ -84,21 +63,13 @@ export type SignJwsCallback = (
   /** The signature, base64url encoded. */
   signature: string
 
-  /**
-   * The public key the signature was created with.
-   */
+  /** The public key the signature was created with. */
   signerJwk: Jwk
 }>
 
 /**
- * Verifies the signature over the signing input of a JWS.
- *
- * Besides checking the signature, this is where the caller decides whether the key is one it trusts:
- * whether a certificate chain chains to a trusted root, whether a DID is acceptable, and so on. The
- * library establishes which key signed, never whether that key should be believed.
- *
- * Returning `verified: false` and throwing are both treated as a failed verification, so a callback
- * can do either.
+ * Verifies the signature, and decides whether the key is trusted (a certificate chain, a DID, ...):
+ * the library only establishes which key signed. Returning `verified: false` and throwing both fail.
  */
 export type VerifyJwsCallback = (
   signer: JwsSigner,

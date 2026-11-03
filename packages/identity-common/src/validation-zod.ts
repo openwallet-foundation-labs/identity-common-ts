@@ -271,11 +271,8 @@ export function parseWithErrorHandling<Schema extends z.ZodType>(
 }
 
 /**
- * A `typ` header that is one of the expected media types, compared as JOSE media types: casing
- * and an `application/` prefix on either side are ignored, see {@link isJwtTyp}.
- * Any other value gives an `invalid_typ` issue with the expected and the actual value as context.
- *
- * The value is not normalized, so a header keeps the `typ` as it was received.
+ * A `typ` header that is one of the expected media types, compared with {@link isJwtTyp} and kept as
+ * received. Any other value gives an `invalid_typ` issue with the expected and the actual value as context.
  *
  * @see https://www.rfc-editor.org/rfc/rfc8725#section-3.11
  */

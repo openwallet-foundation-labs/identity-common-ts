@@ -10,12 +10,7 @@ import { JoseValidationError } from '../error'
 import type { Jwk } from './z-jwk'
 
 /**
- * The members that make up the thumbprint of a JWK, per key type, in the lexicographic order
- * RFC 7638 requires.
- *
- * The thumbprint is computed over exactly these members and nothing else, so that two JWKs
- * representing the same key — regardless of which optional members they carry, or in what order —
- * hash to the same value.
+ * The required members of a JWK per key type, in the lexicographic order RFC 7638 requires.
  *
  * @see https://www.rfc-editor.org/rfc/rfc7638#section-3.2
  */
@@ -43,8 +38,6 @@ export const zJwkThumbprintComponents = z
     }),
   ])
   .transform((jwk) => {
-    // The members are written out per key type rather than sorted generically, so the order is
-    // visible here and cannot drift from the order RFC 7638 prescribes.
     if (jwk.kty === 'EC') return { crv: jwk.crv, kty: jwk.kty, x: jwk.x, y: jwk.y }
     if (jwk.kty === 'OKP') return { crv: jwk.crv, kty: jwk.kty, x: jwk.x }
     if (jwk.kty === 'RSA') return { e: jwk.e, kty: jwk.kty, n: jwk.n }

@@ -3,22 +3,15 @@ import z from 'zod'
 import { zX5c } from './z-x5c'
 
 /**
- * The JWK members that hold private or symmetric key material.
- *
- * `k` is included because an `oct` key is symmetric: the whole key is secret, so a JWK carrying one
- * is never a public key.
+ * The JWK members that hold private or symmetric key material. `k` is the whole secret of an `oct` key.
  *
  * @see https://www.rfc-editor.org/rfc/rfc7518#section-6
  */
 export const jwkPrivateMembers = ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth', 'k'] as const
 
 /**
- * A JSON Web Key.
- *
- * Only `kty` is required, as that is all RFC 7517 requires: which other members are present, and
- * what they mean, follows from the key type. The schema is deliberately loose, so that a JWK is
- * carried through with the members it was received with — a JWK is often re-serialized (into a
- * thumbprint, a `cnf` claim, a `jwk` header) and dropping unknown members would change it.
+ * A JSON Web Key. Only `kty` is required, as in RFC 7517. Loose, so unknown members survive when the
+ * JWK is serialized again, e.g. into a `cnf` claim or a `jwk` header.
  *
  * @see https://www.rfc-editor.org/rfc/rfc7517#section-4
  */
@@ -71,11 +64,8 @@ export const zJwk = z
 export type Jwk = z.infer<typeof zJwk>
 
 /**
- * A JWK that must not carry private or symmetric key material.
- *
- * Use this wherever a key is read from a place an attacker can write — the `jwk` header parameter of
- * a JWS, a `cnf` claim, a fetched JWK Set — so that a private key can never be accepted where a
- * public key is expected, and so that a private key is never accidentally serialized into a token.
+ * A JWK without private or symmetric key material. Use it for keys from untrusted input, such as a
+ * `jwk` header, a `cnf` claim or a fetched JWK Set.
  */
 export const zPublicJwk = zJwk.superRefine((jwk, ctx) => {
   for (const member of jwkPrivateMembers) {

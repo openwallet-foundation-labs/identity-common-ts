@@ -25,29 +25,16 @@ export interface ParseJwsOptions<
   ProtectedHeaderSchema extends BaseSchema | undefined,
   UnprotectedHeaderSchema extends BaseSchema | undefined,
 > {
-  /**
-   * The JWS to parse: a compact serialization, or a flattened or general JSON serialization.
-   *
-   * A string is always read as a compact serialization. A JSON serialized JWS has to be passed as a
-   * value, so that what a token is never depends on what it happens to look like.
-   */
+  /** The JWS. A string is always read as a compact serialization, a JSON serialization is passed as an object. */
   jws: string | FlattenedJws | GeneralJws
 
-  /**
-   * Schema for the protected header. The header is always validated against
-   * {@link zJwsProtectedHeader} as well, so that `alg`, `crit` and `b64` are checked even when the
-   * schema given here does not describe them.
-   */
+  /** Schema for the protected header. The header is always validated against {@link zJwsProtectedHeader} too. */
   protectedHeaderSchema?: ProtectedHeaderSchema
 
   /** Schema for the unprotected header of a JSON serialized JWS. */
   unprotectedHeaderSchema?: UnprotectedHeaderSchema
 
-  /**
-   * The payload, for a JWS that does not carry one. Required when the serialization has no payload,
-   * and rejected when it does — a detached payload that disagrees with the carried one would mean
-   * verifying different bytes than the ones that are returned.
-   */
+  /** The payload of a JWS that does not carry one. Rejected when the JWS does carry one. */
   detachedPayload?: string | Uint8Array
 
   /**
@@ -71,19 +58,12 @@ export interface ParsedJws<
   protectedHeader: InferSchemaOrDefaultOutput<ProtectedHeaderSchema, typeof zJwsProtectedHeader>
 
   /**
-   * The protected header as validated against {@link zJwsProtectedHeader} alone, whatever schema was
-   * given.
-   *
-   * This is what the checks of this package are made on — the algorithm, the signer, `crit` and
-   * `b64` — as a schema of the caller's can drop or change the parameters they depend on.
+   * The protected header validated against {@link zJwsProtectedHeader} alone. The checks use it, as the
+   * caller's schema can change the parameters they depend on.
    */
   registeredProtectedHeader: JwsProtectedHeader
 
-  /**
-   * The validated unprotected header, when the serialization has one.
-   *
-   * Not covered by the signature, so nothing read from here is trustworthy.
-   */
+  /** The validated unprotected header, when there is one. Not covered by the signature. */
   unprotectedHeader?: InferSchemaOrDefaultOutput<UnprotectedHeaderSchema, typeof zJwsUnprotectedHeader>
 
   /** The protected header as it was received, base64url encoded. */
@@ -102,22 +82,14 @@ export interface ParsedJws<
   signature: string
 
   /**
-   * The exact bytes covered by the signature, as a string. ASCII, unless the payload is unencoded
-   * (`b64` false) and detached or in a JSON serialization: the payload is then included without
-   * encoding.
-   *
-   * Taken from the token as received rather than rebuilt from the parsed header, so that what is
-   * verified is what was sent, down to the byte. Re-encoding a parsed header would produce different
-   * bytes for the same header whenever member order or string escaping differs.
+   * The bytes covered by the signature, as a string. Taken from the token as received, as re-encoding
+   * the parsed header can change them.
    *
    * @see https://www.rfc-editor.org/rfc/rfc7515#section-5.2
    */
   signingInput: string
 
-  /**
-   * The compact serialization, when that is what was parsed and it carries its payload. Not set for a
-   * detached payload, as the compact serialization then does not contain what was signed.
-   */
+  /** The compact serialization, when that was parsed and the payload is not detached. */
   compact?: string
 }
 
@@ -132,11 +104,7 @@ interface JwsParts {
   compact?: string
 }
 
-/**
- * Whether the encoded protected header of a compact JWS sets `b64` to false, for reporting a JWS of
- * more than three parts: such a JWS carries its payload as it is, so a '.' in the payload is what
- * split it into more parts.
- */
+/** Whether a compact JWS header sets `b64` to false, as then a '.' in the payload split it into more parts. */
 const isUnencodedPayloadHeader = (encodedProtectedHeader: string): boolean => {
   try {
     return decodeBase64UrlJsonObject(encodedProtectedHeader, 'JWS protected header').b64 === false
@@ -156,14 +124,8 @@ function compactJwsParts(jws: string): JwsParts {
     throw new JoseParseError('Unable to parse the JWS, a compact JWS must consist of exactly three parts')
   }
 
-  // The parts are checked here rather than only where they are decoded, so that a string that is not
-  // a compact JWS is rejected as one, and so that the signature — which this package hands to a
-  // callback without decoding it — cannot carry anything but base64url either.
-  //
-  // The payload is exempt: with `b64` set to false (RFC 7797) it is the payload itself rather than
-  // base64url of it, and `resolvePayload` decodes it according to the header. An empty header is
-  // reported by the caller, and an empty payload is how a detached payload is serialized, so its
-  // emptiness is not rejected here.
+  // The signature goes to the callback undecoded, so it is checked here. The payload is not: with
+  // `b64` false it is not base64url.
   if (!zBase64Url.safeParse(parts[0]).success) {
     throw new JoseParseError('Unable to parse the JWS, the protected header of a compact JWS must be base64url')
   }
@@ -171,16 +133,12 @@ function compactJwsParts(jws: string): JwsParts {
     throw new JoseParseError('Unable to parse the JWS, the signature of a compact JWS must be base64url')
   }
 
-  // An empty signature is how an unsecured JWS is serialized. `alg: none` is never accepted, so there
-  // is nothing a verification callback could check it against.
   if (parts[2] === '') {
     throw new JoseParseError(
       'Unable to parse the JWS, it does not have a signature. An unsecured JWS is not supported.'
     )
   }
 
-  // An empty payload part means the payload is detached, and then the compact serialization does not
-  // contain what was signed: verifying it as a whole would verify an empty payload instead.
   const isPayloadDetached = parts[1] === ''
 
   return {
@@ -194,8 +152,7 @@ function compactJwsParts(jws: string): JwsParts {
 }
 
 function jsonJwsParts(jws: FlattenedJws | GeneralJws, signatureIndex: number): JwsParts {
-  // Checked before anything is read from it: a JSON serialized JWS is often what `JSON.parse` returned
-  // for an untrusted body, which can be any JSON value.
+  // Often what `JSON.parse` returned for an untrusted body, which can be any JSON value
   if (typeof jws !== 'object' || jws === null || Array.isArray(jws)) {
     throw new JoseParseError('Unable to parse the JWS, a JSON serialized JWS must be an object')
   }
@@ -241,18 +198,8 @@ function jsonJwsParts(jws: FlattenedJws | GeneralJws, signatureIndex: number): J
 }
 
 /**
- * Parses and validates a JWS, without verifying the signature over it.
- *
- * The header is validated against {@link zJwsProtectedHeader} and, when given, the caller's own
- * schema. The signing input is taken from the token as received, so it can be handed to a
- * verification callback unchanged.
- *
- * What is deliberately not supported:
- *
- * - A JWS without a protected header. RFC 7515 allows one in the JSON serializations, but then `alg`
- *   is not integrity protected and the JWS says nothing about who signed it.
- * - Header parameters that appear in both the protected and the unprotected header, which RFC 7515
- *   forbids and which would make it ambiguous which of the two values applies.
+ * Parses and validates a JWS, without verifying the signature. A JWS without a protected header, so
+ * without an integrity protected `alg`, is not supported.
  *
  * @throws JoseParseError if the JWS is not well-formed, which includes a compact JWS that carries an
  *   unencoded payload (`b64` is false) with a '.' or a character outside printable ASCII.
@@ -289,10 +236,7 @@ export function parseJws<
     }
   }
 
-  // Always validated against the registered JWS header parameters, and only then against the
-  // caller's schema: a schema that describes a profile's own parameters must not be able to leave
-  // `alg` or `crit` unchecked. What it returns is returned, but every check is made on the registered
-  // header, which a schema that drops or changes members cannot affect.
+  // The checks use the registered header, so the caller's schema cannot leave `alg` or `crit` unchecked
   const registeredHeader = parseWithErrorHandling(
     zJwsProtectedHeader,
     protectedHeaderJson,
@@ -315,8 +259,6 @@ export function parseJws<
       )
     : undefined
 
-  // Checked against the registered header rather than the raw JSON, so that `crit` and `b64` are
-  // already known to have the shape RFC 7515 gives them.
   assertCriticalHeaderParameters({
     protectedHeader: registeredHeader,
     unprotectedHeader: parts.unprotectedHeader,

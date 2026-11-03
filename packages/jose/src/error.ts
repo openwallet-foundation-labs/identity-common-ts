@@ -7,11 +7,8 @@ import {
 } from '@owf/identity-common'
 
 /**
- * Base error class for `@owf/jose`.
- *
- * Extends `IdentityError` so that a caller can catch every error raised by the identity-common
- * packages in one place, and carries an optional `cause` — declared explicitly rather than passed
- * to `super`, as the project targets ES2020 and `Error.cause` was only added in ES2022.
+ * Base error class for `@owf/jose`. `cause` is declared here, as `Error.cause` is ES2022 and the
+ * project targets ES2020.
  */
 export class JoseError extends IdentityError {
   public readonly cause?: unknown
@@ -24,11 +21,8 @@ export class JoseError extends IdentityError {
 }
 
 /**
- * A token is not well-formed: the serialization does not have the expected structure, or a part of
- * it is not valid base64url, UTF-8 or JSON.
- *
- * The message deliberately does not include the offending input, so that a token is not echoed into
- * logs by accident.
+ * A token is not well-formed: a wrong structure, or a part that is not valid base64url, UTF-8 or
+ * JSON. The message never includes the input, so a token is not logged by accident.
  */
 export class JoseParseError extends JoseError {}
 
@@ -36,21 +30,14 @@ export class JoseParseError extends JoseError {}
 export type JoseValidationIssue = ValidationIssueOf<CommonValidationCode | SchemaValidationCode>
 
 /**
- * A structure is well-formed, but does not validate, with the `issues` of the validation: it does
- * not match the schema it was parsed with, its `crit` is invalid (`invalid_crit`, `unsupported_crit`),
- * or a claim does not verify (e.g. `expired`, `claim_value_mismatch`). Like the validation errors of
- * the other packages, it extends the `ValidationError` of `@owf/identity-common`, not {@link JoseError}.
+ * A structure is well-formed but does not validate: its schema, `crit` or claims. Like the validation
+ * errors of the other packages, it extends `ValidationError`, not {@link JoseError}.
  */
 export class JoseValidationError extends ValidationError<JoseValidationIssue> {}
 
 /**
- * A token is well-formed, but does not verify: its signature, the key that made it, or the algorithm
- * it uses. Claims that do not verify throw a {@link JoseValidationError} with the `issues` of the
- * claims.
- *
- * The subclasses say which of those it was. Catch this one to treat every way a token can fail
- * verification alike, which is what a verifier usually wants — a token that does not verify is not
- * to be acted on, whichever part of it was wrong.
+ * A token is well-formed but does not verify: its signature, signer or algorithm. The subclasses say
+ * which. Claims that do not verify throw a {@link JoseValidationError}.
  */
 export class JoseVerificationError extends JoseError {}
 
@@ -67,13 +54,7 @@ export class JoseSignerError extends JoseVerificationError {}
 export class JoseNotSupportedError extends JoseError {}
 
 /**
- * The calling code passed something this library cannot act on: an option outside the values it can
- * take, options that contradict each other, or a signing callback result that does not satisfy the
- * contract of the callback. A verification callback that reports success without a usable key fails
- * verification instead, with a {@link JoseSignatureVerificationError}.
- *
- * Unlike the other errors, this one says nothing about a token: it is a mistake in the calling code.
- * It is thrown rather than letting a check pass that cannot be made — with a clock skew of `NaN`,
- * every comparison against the current time would.
+ * A mistake in the calling code, not in a token: an invalid or contradicting option, or a signing
+ * callback result that breaks the contract of the callback.
  */
 export class JoseInvalidArgumentError extends JoseError {}

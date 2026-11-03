@@ -1,9 +1,4 @@
-/**
- * Whether `object` has `key` as an own property, rather than through its prototype.
- *
- * `in` and plain indexing also see what every object inherits from `Object.prototype`, so a header
- * parameter, claim or algorithm named `constructor` or `toString` would be present everywhere.
- */
+/** Whether `key` is an own property of `object`, so `constructor` or `toString` are not found everywhere. */
 export const hasOwn = (object: object, key: PropertyKey): boolean =>
   // biome-ignore lint/suspicious/noPrototypeBuiltins: `Object.hasOwn` is not in the ES2020 lib this package targets
   Object.prototype.hasOwnProperty.call(object, key)
