@@ -27,7 +27,10 @@ export interface VerifyJwsSignatureOptions {
   /** Callback that verifies the signature and decides whether the key is trusted. */
   verifyJwsCallback: VerifyJwsCallback
 
-  /** The signer to verify against. Established from the header when not provided, see {@link jwsSignerFromHeader}. */
+  /**
+   * The signer to verify against. Its `alg` must be the `alg` of the JWS. Established from the header
+   * when not provided, see {@link jwsSignerFromHeader}.
+   */
   signer?: JwsSigner
 
   /** The signer methods the caller accepts, used when the signer is established from the header. */
@@ -131,7 +134,8 @@ export interface VerifyJwsSignatureResult {
  * Verifies the signature over a parsed JWS: the algorithm policy before the callback, and the key the
  * callback returns against the algorithm after it.
  *
- * @throws JoseAlgorithmNotAllowedError if the algorithm is not accepted, or does not match the key.
+ * @throws JoseAlgorithmNotAllowedError if the algorithm is not accepted, or does not match the key or
+ *   the `alg` of the given `signer`.
  * @throws JoseSignatureVerificationError if the signature does not verify.
  * @throws JoseSignerError if the signer cannot be established from the header.
  * @throws JoseValidationError if the JWS has no `registeredProtectedHeader`, and its `protectedHeader`
@@ -157,6 +161,13 @@ export async function verifyJwsSignature(options: VerifyJwsSignatureOptions): Pr
     allowSymmetricAlgorithms: options.allowSymmetricAlgorithms,
     errorMessage,
   })
+
+  // The callback verifies with `signer.alg`, so it must be the alg the policy was applied to
+  if (options.signer && options.signer.alg !== alg) {
+    throw new JoseAlgorithmNotAllowedError(
+      `${errorMessage} The JWS uses alg '${alg}', but the signer to verify against uses alg '${options.signer.alg}'.`
+    )
+  }
 
   const signer =
     options.signer ??

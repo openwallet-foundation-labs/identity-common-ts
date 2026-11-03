@@ -90,6 +90,21 @@ describe('a crit header parameter that does not verify', () => {
       { code: 'unsupported_crit', path: ['crit', 2], context: { parameter: 'ext', understood: ['b64'] } },
     ])
   })
+
+  // RFC 7797 unencoded payloads are opt-in
+  it('says how to accept b64 when it is not understood', () => {
+    const error = errorOf(() =>
+      assertCriticalHeaderParameters({ protectedHeader: { alg: 'ES256', b64: false, crit: ['b64'] } })
+    ) as JoseValidationError
+
+    expect(error.issues).toMatchObject([
+      {
+        code: 'unsupported_crit',
+        path: ['crit', 0],
+        message: expect.stringContaining(`only accepted when 'b64' is in 'understoodCriticalParameters'`),
+      },
+    ])
+  })
 })
 
 describe('zCompactJws', () => {

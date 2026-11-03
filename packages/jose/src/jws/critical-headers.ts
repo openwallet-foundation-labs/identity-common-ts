@@ -90,7 +90,10 @@ export function assertCriticalHeaderParameters({
       issues.add({
         code: 'unsupported_crit',
         path,
-        message: `The 'crit' header parameter lists '${name}', which is not understood. A JWS that marks a header parameter as critical can only be accepted when that parameter is processed.`,
+        message:
+          name === 'b64'
+            ? `The 'crit' header parameter lists 'b64' (RFC 7797), which is only accepted when 'b64' is in 'understoodCriticalParameters'`
+            : `The 'crit' header parameter lists '${name}', which is not understood. A JWS that marks a header parameter as critical can only be accepted when that parameter is processed.`,
         context: { parameter: name, understood: [...understood] },
       })
     }

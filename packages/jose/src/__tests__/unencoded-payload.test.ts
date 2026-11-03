@@ -1,6 +1,6 @@
 import { base64url, stringToBytes } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
-import { JoseNotSupportedError, JoseParseError } from '../error'
+import { JoseInvalidArgumentError, JoseNotSupportedError, JoseParseError } from '../error'
 import { parseJws } from '../jws/parse-jws'
 import { signCompactJws } from '../jws/sign-jws'
 import { verifyJwsSignature } from '../jws/verify-jws'
@@ -112,7 +112,9 @@ describe('signing and verifying an unencoded payload', () => {
         signer: { method: 'jwk', alg: 'ES256', publicJwk },
         signJwsCallback: signJws,
       })
-    ).rejects.toThrow(joseError(JoseParseError, `The payload is unencoded ('b64' is false) and contains a '.'`))
+    ).rejects.toThrow(
+      joseError(JoseInvalidArgumentError, `The payload is unencoded ('b64' is false) and contains a '.'`)
+    )
   })
 })
 
@@ -149,11 +151,11 @@ describe('the characters of an unencoded payload in a compact JWS', () => {
     ['a tab', 'tab\there'],
     ['the DEL control character', 'del\u007f'],
   ])('refuses to carry an unencoded payload with %s', async (_, payload) => {
-    await expect(sign(payload)).rejects.toThrow(joseError(JoseParseError, outsidePrintableAscii))
+    await expect(sign(payload)).rejects.toThrow(joseError(JoseInvalidArgumentError, outsidePrintableAscii))
   })
 
   it('reports a period rather than a character outside printable ASCII when the payload has both', async () => {
-    await expect(sign('caf\u00e9 3.50')).rejects.toThrow(joseError(JoseParseError, containsPeriod))
+    await expect(sign('caf\u00e9 3.50')).rejects.toThrow(joseError(JoseInvalidArgumentError, containsPeriod))
   })
 
   it('refuses before the signing callback is called', async () => {
@@ -170,7 +172,7 @@ describe('the characters of an unencoded payload in a compact JWS', () => {
           return { signature: 'c2lnbmF0dXJl', signerJwk: publicJwk }
         },
       })
-    ).rejects.toThrow(JoseParseError)
+    ).rejects.toThrow(JoseInvalidArgumentError)
     expect(callbackCalled).toBe(false)
   })
 

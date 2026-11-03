@@ -1,6 +1,6 @@
 import { base64url, parseWithErrorHandling, stringToBytes, zBase64Url } from '@owf/identity-common'
 import type { SignJwsCallback } from '../callbacks'
-import { JoseInvalidArgumentError, JoseParseError, JoseValidationError } from '../error'
+import { JoseInvalidArgumentError, JoseValidationError } from '../error'
 import type { Jwk } from '../jwk/z-jwk'
 import { decodeUnencodedPayload, encodeBase64UrlJson, unencodedCompactPayloadIssue } from '../utils/encoding'
 import { assertCriticalHeaderParameters, isPayloadBase64UrlEncoded } from './critical-headers'
@@ -48,10 +48,10 @@ export interface SignCompactJwsResult {
  * @throws JoseValidationError if the protected header is not a valid JWS header.
  * @throws JoseValidationError with an `invalid_crit` issue if `crit` is invalid.
  * @throws JoseNotSupportedError if the payload is unencoded (`b64` is false) and not valid UTF-8.
- * @throws JoseParseError if the payload is unencoded, is not detached, and contains a character that
- *   RFC 7797 does not allow in a compact serialization: a '.', or anything outside printable ASCII.
- * @throws JoseInvalidArgumentError if the signer uses another algorithm than the header names, or the
- *   callback does not return a base64url encoded signature.
+ * @throws JoseInvalidArgumentError if the signer uses another algorithm than the header names, the
+ *   callback does not return a base64url encoded signature, or the payload is unencoded, not detached,
+ *   and contains a character RFC 7797 does not allow in a compact serialization: a '.', or anything
+ *   outside printable ASCII.
  */
 export async function signCompactJws(options: SignCompactJwsOptions): Promise<SignCompactJwsResult> {
   const protectedHeader = parseWithErrorHandling(
@@ -87,7 +87,7 @@ export async function signCompactJws(options: SignCompactJwsOptions): Promise<Si
   const compactPayloadIssue =
     !isBase64UrlEncoded && !options.detachPayload ? unencodedCompactPayloadIssue(encodedPayload) : undefined
   if (compactPayloadIssue) {
-    throw new JoseParseError(
+    throw new JoseInvalidArgumentError(
       `Unable to sign the JWS. ${compactPayloadIssue} Detach the payload, or leave out 'b64' so that it is base64url encoded.`
     )
   }

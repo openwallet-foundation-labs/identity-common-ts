@@ -121,9 +121,9 @@ Besides validating the structures, verification applies these rules:
 - Security relevant header parameters are read from the protected header only, and a parameter present in both the protected and the unprotected header is rejected.
 - A header that identifies the signer in more than one way is rejected. No precedence is applied.
 - `extractJwkFromJwkSet` selects a key from a JWK Set by its `kid` and `use`. The selection is rejected when no key in the set has the `kid`, or when several keys that differ have it. Without a `kid`, it is rejected when the set holds more than one key for the use. The same JWK listed twice counts as one key.
-- An unencoded payload (RFC 7797, `b64: false`) is only carried in a compact serialization when it holds nothing but printable ASCII other than `.`, as RFC 7797 requires. Signing refuses anything else, and parsing rejects it. A detached payload, or one in a JSON serialization, is not limited this way.
+- An unencoded payload (RFC 7797, `b64: false`) is opt-in: `parseJws` rejects a JWS with `b64` in `crit` unless `understoodCriticalParameters` includes `'b64'`. In a compact serialization, such a payload can only hold printable ASCII other than `.`, as RFC 7797 requires. Signing refuses anything else, and parsing rejects it. A detached payload, or one in a JSON serialization, is not limited this way.
 
-`signCompactJws` throws a `JoseInvalidArgumentError` for a signer whose `alg` is not the `alg` of the header, and for a signing callback that does not return a non-empty base64url signature.
+`signCompactJws` throws a `JoseInvalidArgumentError` for a signer whose `alg` is not the `alg` of the header, for an unencoded payload that a compact serialization cannot carry, and for a signing callback that does not return a non-empty base64url signature. `verifyJwsSignature` throws a `JoseAlgorithmNotAllowedError` when the `signer` it is given has another `alg` than the JWS.
 
 ## Errors
 

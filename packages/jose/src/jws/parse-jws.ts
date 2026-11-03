@@ -44,7 +44,10 @@ export interface ParseJwsOptions<
    */
   signatureIndex?: number
 
-  /** The critical header parameters the caller understands, see {@link assertCriticalHeaderParameters}. */
+  /**
+   * The critical header parameters the caller understands, see {@link assertCriticalHeaderParameters}.
+   * Include `b64` to accept an unencoded payload (RFC 7797).
+   */
   understoodCriticalParameters?: ReadonlyArray<string>
 }
 
