@@ -1,5 +1,18 @@
 # @openid4vc/openid4vp
 
+## 0.9.2
+
+### Patch Changes
+
+- 153b672: The `client_id` of an unsigned DC API request is now ignored, as required by OpenID4VP 1.0 Appendix A.2. Before, a web page could set any `client_id` in an unsigned request, and the wallet used it as the client. `resolveOpenid4vpAuthorizationRequest` and `validateOpenid4vpClientId` now identify the client by the origin, and the resolved `authorizationRequestPayload` no longer contains the `client_id`.
+  
+  `getOpenid4vpClientId` now rejects a `client_id` with the reserved `origin:` or `web-origin:` prefix.
+- 410d45a: `zJarAuthorizationRequest` now requires `request` or `request_uri`. Before, it matched any object. An unsigned request that failed the regular schema was accepted without validation in `resolveOpenid4vpAuthorizationRequest`, `parseOpenid4vpAuthorizationRequest`, `parsePushedAuthorizationRequest` and `parseInteractiveAuthorizationRequest`. For OpenID4VP, this skipped the https check on `response_uri`, so a wallet could send the presentation over plain http.
+- fe62e01: Treat the legacy `w3c_dc_api.jwt` response mode as an encrypted response mode, like `dc_api.jwt`. Before, a holder could send an unencrypted response to a verifier that requested `w3c_dc_api.jwt`.
+- Updated dependencies [410d45a]
+  - @openid4vc/oauth2@0.9.2
+  - @openid4vc/utils@0.9.2
+
 ## 0.9.1
 
 ### Patch Changes
