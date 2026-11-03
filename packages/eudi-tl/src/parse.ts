@@ -2,7 +2,7 @@ import { base64, hexEncode } from '@owf/identity-common'
 import { AsnConvert, type IAsnParseOptions } from '@peculiar/asn1-schema'
 import { Certificate, id_ce_subjectKeyIdentifier, SubjectKeyIdentifier } from '@peculiar/asn1-x509'
 import { DOMParser, type Element } from '@xmldom/xmldom'
-import { TrustedListParseException } from './trusted-list-exception'
+import { TrustedListParseError } from './trusted-list-error'
 import type {
   DigitalIdentity,
   ServiceHistoryInstance,
@@ -163,7 +163,7 @@ export function parseTrustedList(xml: string, options: ParseTrustedListOptions =
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   const root: Element | null = doc.documentElement
   if (root?.localName !== 'TrustServiceStatusList') {
-    throw new TrustedListParseException('Root element is not a TS 119 612 TrustServiceStatusList')
+    throw new TrustedListParseError('Root element is not a TS 119 612 TrustServiceStatusList')
   }
 
   const schemeInfo = firstDescendant(root, 'SchemeInformation')

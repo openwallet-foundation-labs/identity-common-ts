@@ -2,7 +2,7 @@ import { base64, compareBytes } from '@owf/identity-common'
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import * as xadesjs from 'xadesjs'
 import * as xpath from 'xpath'
-import { TrustedListSignatureException } from './trusted-list-exception'
+import { TrustedListSignatureError } from './trusted-list-error'
 
 const XMLDSIG_NS = 'http://www.w3.org/2000/09/xmldsig#'
 
@@ -72,7 +72,7 @@ export interface VerifyTrustedListResult {
 
 /**
  * Verify the enveloped XAdES/XMLDSig signature of an ETSI TS 119 612 Trusted
- * List. Throws {@link TrustedListSignatureException} when the signature is
+ * List. Throws {@link TrustedListSignatureError} when the signature is
  * missing, invalid, or (with `trustAnchors`) not signed by a pinned scheme
  * operator.
  *
@@ -91,7 +91,7 @@ export async function verifyTrustedListSignature(
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   const signatures = doc.getElementsByTagNameNS(XMLDSIG_NS, 'Signature')
   if (signatures.length === 0) {
-    throw new TrustedListSignatureException('No ds:Signature found in the trusted list')
+    throw new TrustedListSignatureError('No ds:Signature found in the trusted list')
   }
 
   // xadesjs is typed against the lib.dom DOM; @xmldom implements the same
@@ -103,20 +103,20 @@ export async function verifyTrustedListSignature(
   try {
     valid = await signedXml.Verify()
   } catch (error) {
-    throw new TrustedListSignatureException(
+    throw new TrustedListSignatureError(
       `Trusted list signature could not be verified: ${error instanceof Error ? error.message : String(error)}`,
       { cause: error }
     )
   }
   if (!valid) {
-    throw new TrustedListSignatureException('Trusted list signature is invalid')
+    throw new TrustedListSignatureError('Trusted list signature is invalid')
   }
 
   // The signature KeyInfo carries the signer certificate (ds:X509Certificate,
   // namespace-scoped so it never picks up service certificates).
   const signerCertEl = signatures[0].getElementsByTagNameNS(XMLDSIG_NS, 'X509Certificate')[0]
   if (!signerCertEl?.textContent) {
-    throw new TrustedListSignatureException('Trusted list signature has no X509Certificate in KeyInfo')
+    throw new TrustedListSignatureError('Trusted list signature has no X509Certificate in KeyInfo')
   }
   const signerCertificateBase64 = signerCertEl.textContent.replace(/\s/g, '')
 
@@ -124,9 +124,7 @@ export async function verifyTrustedListSignature(
     const signerDer = base64.decode(signerCertificateBase64)
     const trusted = options.trustAnchors.some((anchor) => compareBytes(anchor, signerDer))
     if (!trusted) {
-      throw new TrustedListSignatureException(
-        'Trusted list signer certificate is not among the configured trust anchors'
-      )
+      throw new TrustedListSignatureError('Trusted list signer certificate is not among the configured trust anchors')
     }
   }
 

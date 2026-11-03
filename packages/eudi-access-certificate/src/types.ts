@@ -1,4 +1,4 @@
-import type { JsonWebKey, ValidationIssue, ValidationSeverity } from '@owf/identity-common'
+import type { JsonWebKey, ValidationSeverity } from '@owf/identity-common'
 import type {
   Certificate,
   CertificateInput,
@@ -68,13 +68,6 @@ export interface AccessCertificate {
 // ============================================================================
 
 export type AccessCertificateValidationSeverity = ValidationSeverity
-
-/**
- * A validation issue. `path` points into the {@link AccessCertificate}, e.g.
- * `['certificate', 'subject', 'organizationIdentifier']`, and `requirement` is the
- * requirement identifier of the originating specification, e.g. `GEN-6.6.1-05`.
- */
-export type AccessCertificateValidationIssue<Code extends string = string> = ValidationIssue<Code>
 
 export interface AccessCertificateValidationOptions {
   /** Reference time for the validity period check; defaults to now. Pass `false` to skip it. */

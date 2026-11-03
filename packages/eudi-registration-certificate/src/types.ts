@@ -11,21 +11,21 @@ import type { Signer } from '@owf/crypto'
 import type { z } from 'zod'
 import type { WRPRCDialect } from './dialect'
 import type {
-  ClaimSchema,
-  CredentialSchema,
-  IntermediarySchema,
-  LegalPersonSubjectSchema,
-  MultiLangStringSchema,
-  NaturalPersonSubjectSchema,
-  ProvidedAttestationSchema,
-  StatusListSchema,
-  StatusSchema,
-  SupervisoryAuthoritySchema,
-  WRPRCCWTHeaderSchema,
-  WRPRCCWTSchema,
-  WRPRCJWTHeaderSchema,
-  WRPRCJWTSchema,
-  WRPRCPayloadSchema,
+  zClaim,
+  zCredential,
+  zIntermediary,
+  zLegalPersonSubject,
+  zMultiLangString,
+  zNaturalPersonSubject,
+  zProvidedAttestation,
+  zStatus,
+  zStatusList,
+  zSupervisoryAuthority,
+  zWRPRCCWT,
+  zWRPRCCWTHeader,
+  zWRPRCJWT,
+  zWRPRCJWTHeader,
+  zWRPRCPayload,
 } from './schemas'
 
 // ============================================================================
@@ -33,65 +33,65 @@ import type {
 // ============================================================================
 
 /** Multilingual string with language tag (B.2.6 Class MultiLangString) */
-export type MultiLangString = z.infer<typeof MultiLangStringSchema>
+export type MultiLangString = z.infer<typeof zMultiLangString>
 
 // ============================================================================
 // Identity Types
 // ============================================================================
 
 /** Supervisory Authority (Data Protection Authority) */
-export type SupervisoryAuthority = z.infer<typeof SupervisoryAuthoritySchema>
+export type SupervisoryAuthority = z.infer<typeof zSupervisoryAuthority>
 
 /** Claim specification for credential attributes (B.2.10 Class Claim) */
-export type Claim = z.infer<typeof ClaimSchema>
+export type Claim = z.infer<typeof zClaim>
 
 /** Credential specification for attestations (B.2.9 Class Credential) */
-export type Credential = z.infer<typeof CredentialSchema>
+export type Credential = z.infer<typeof zCredential>
 
 /** Credential issued by the WRP for `provides_attestations` (Table 8) */
-export type ProvidedAttestation = z.infer<typeof ProvidedAttestationSchema>
+export type ProvidedAttestation = z.infer<typeof zProvidedAttestation>
 
 /** Status list reference for certificate validity */
-export type StatusList = z.infer<typeof StatusListSchema>
+export type StatusList = z.infer<typeof zStatusList>
 
 /** Status reference for WRPRC validity */
-export type Status = z.infer<typeof StatusSchema>
+export type Status = z.infer<typeof zStatus>
 
 /** Intermediary information */
-export type Intermediary = z.infer<typeof IntermediarySchema>
+export type Intermediary = z.infer<typeof zIntermediary>
 
 // ============================================================================
 // WRPRC Document Types
 // ============================================================================
 
 /** WRPRC Payload */
-export type WRPRCPayload = z.infer<typeof WRPRCPayloadSchema>
+export type WRPRCPayload = z.infer<typeof zWRPRCPayload>
 
 /** Legal person subject payload */
-export type LegalPersonSubject = z.infer<typeof LegalPersonSubjectSchema>
+export type LegalPersonSubject = z.infer<typeof zLegalPersonSubject>
 
 /** Natural person subject payload */
-export type NaturalPersonSubject = z.infer<typeof NaturalPersonSubjectSchema>
+export type NaturalPersonSubject = z.infer<typeof zNaturalPersonSubject>
 
 // ============================================================================
 // Header Types
 // ============================================================================
 
 /** JWT Header for WRPRC */
-export type WRPRCJWTHeader = z.infer<typeof WRPRCJWTHeaderSchema>
+export type WRPRCJWTHeader = z.infer<typeof zWRPRCJWTHeader>
 
 /** CWT Header for WRPRC */
-export type WRPRCCWTHeader = z.infer<typeof WRPRCCWTHeaderSchema>
+export type WRPRCCWTHeader = z.infer<typeof zWRPRCCWTHeader>
 
 // ============================================================================
 // Complete WRPRC Types
 // ============================================================================
 
 /** Complete JWT WRPRC document */
-export type WRPRCJWT = z.infer<typeof WRPRCJWTSchema>
+export type WRPRCJWT = z.infer<typeof zWRPRCJWT>
 
 /** Complete CWT WRPRC document */
-export type WRPRCCWT = z.infer<typeof WRPRCCWTSchema>
+export type WRPRCCWT = z.infer<typeof zWRPRCCWT>
 
 // ============================================================================
 // Signed WRPRC Types

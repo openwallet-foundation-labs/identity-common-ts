@@ -6,10 +6,10 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
-import { dateToSeconds, nowInSeconds } from '@owf/identity-common'
+import { dateToSeconds, nowInSeconds, parseWithSchema } from '@owf/identity-common'
 import type { z } from 'zod'
 import { ENTITLEMENT_SERVICE_PROVIDER, type WRP_ENTITLEMENTS } from './entitlements'
-import { WRPRCPayloadSchema } from './schemas'
+import { zWRPRCPayload } from './schemas'
 import type {
   Claim,
   Credential,
@@ -22,13 +22,14 @@ import type {
   SupervisoryAuthority,
   WRPRCPayload,
 } from './types'
-import { WRPRCException } from './wrprc-exception'
+import { WRPRC_VALIDATION_CODES } from './validator'
+import { WRPRCError, WRPRCValidationError } from './wrprc-error'
 
 // ============================================================================
 // Partial Payload Type
 // ============================================================================
 
-type PartialWRPRCPayload = Partial<z.input<typeof WRPRCPayloadSchema>>
+type PartialWRPRCPayload = Partial<z.input<typeof zWRPRCPayload>>
 
 // ============================================================================
 // WRPRC Payload Builder
@@ -295,7 +296,7 @@ export class WRPRCBuilder {
   /**
    * Build the WRPRC payload
    *
-   * @throws WRPRCException if the payload is invalid
+   * @throws WRPRCError if the payload is invalid
    */
   build(): WRPRCPayload {
     // Set default iat if not provided
@@ -303,11 +304,10 @@ export class WRPRCBuilder {
       this.payload.iat = nowInSeconds()
     }
 
-    const result = WRPRCPayloadSchema.safeParse(this.payload)
+    const result = parseWithSchema(zWRPRCPayload, this.payload, { codes: WRPRC_VALIDATION_CODES })
 
     if (!result.success) {
-      const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-      throw new WRPRCException(`Invalid WRPRC payload:\n${messages}`, result.error.issues)
+      throw new WRPRCValidationError('Invalid WRPRC payload', result.issues)
     }
 
     return result.data
@@ -386,10 +386,10 @@ export class CredentialBuilder {
    */
   build(): Credential {
     if (!this.credential.format) {
-      throw new WRPRCException('Credential format is required')
+      throw new WRPRCError('Credential format is required')
     }
     if (!this.credential.meta) {
-      throw new WRPRCException('Credential meta is required')
+      throw new WRPRCError('Credential meta is required')
     }
     return this.credential as Credential
   }

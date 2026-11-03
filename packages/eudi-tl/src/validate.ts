@@ -1,17 +1,17 @@
 import {
   type ValidationResult as CommonValidationResult,
-  type SchemaIssueCode,
-  schemaIssueToValidationIssue,
+  parseWithSchema,
+  type SchemaValidationCode,
   toValidationResult,
   type ValidationIssueOf,
+  ValidationIssues,
 } from '@owf/identity-common'
-import type { z } from 'zod'
-import { TrustedListParseException } from './trusted-list-exception'
-import { type TrustedList, TrustedListSchema } from './types'
+import { TrustedListValidationError } from './trusted-list-error'
+import { type TrustedList, zTrustedList } from './types'
 
 /**
- * Codes for the profile checks, beyond schema parsing, whose issues carry the zod issue
- * code instead.
+ * Codes for the profile checks, beyond schema parsing, whose issues have a code of
+ * `SCHEMA_VALIDATION_CODES` instead.
  */
 export const TRUSTED_LIST_VALIDATION_CODES = {
   /** `TSLType` differs from the one of the profile */
@@ -26,15 +26,14 @@ export const TRUSTED_LIST_VALIDATION_CODES = {
 export type TrustedListValidationCode =
   (typeof TRUSTED_LIST_VALIDATION_CODES)[keyof typeof TRUSTED_LIST_VALIDATION_CODES]
 
-/** An issue of a trusted list validation, with a zod issue code for schema issues */
-export type TrustedListValidationIssue = ValidationIssueOf<TrustedListValidationCode | SchemaIssueCode>
+/** An issue of a trusted list validation, with a code of `SCHEMA_VALIDATION_CODES` for schema issues */
+export type TrustedListValidationIssue = ValidationIssueOf<TrustedListValidationCode | SchemaValidationCode>
 
 /** Result of a validation, the same as `@owf/eudi-lote`'s ValidationResult */
 export type ValidationResult = CommonValidationResult<TrustedListValidationIssue>
 
-function fromZodError(error: z.ZodError): TrustedListValidationIssue[] {
-  return error.issues.map((issue) => schemaIssueToValidationIssue(issue) as TrustedListValidationIssue)
-}
+const parseTrustedListSchema = (value: unknown) =>
+  parseWithSchema(zTrustedList, value, { codes: TRUSTED_LIST_VALIDATION_CODES })
 
 /**
  * Structurally validate an object against the ETSI TS 119 612 trusted-list
@@ -43,22 +42,17 @@ function fromZodError(error: z.ZodError): TrustedListValidationIssue[] {
  * validate the object here.
  */
 export function validateTrustedList(value: unknown): ValidationResult {
-  const result = TrustedListSchema.safeParse(value)
-  return toValidationResult(result.success ? [] : fromZodError(result.error))
+  const result = parseTrustedListSchema(value)
+  return toValidationResult(result.success ? [] : result.issues)
 }
 
 /**
  * Structurally validate and return the typed trusted list, throwing
- * {@link TrustedListParseException} when it does not conform to the schema.
+ * {@link TrustedListValidationError} when it does not conform to the schema.
  */
 export function assertValidTrustedList(value: unknown): TrustedList {
-  const result = TrustedListSchema.safeParse(value)
-  if (!result.success) {
-    const details = fromZodError(result.error)
-      .map((e) => `${e.path.join('.')}: ${e.message}`)
-      .join('; ')
-    throw new TrustedListParseException(`Invalid trusted list: ${details}`)
-  }
+  const result = parseTrustedListSchema(value)
+  if (!result.success) throw new TrustedListValidationError('Invalid trusted list', result.issues)
   return result.data
 }
 
@@ -89,9 +83,9 @@ export const stripScheme = (uri: string | undefined): string => (uri ?? '').repl
 
 function profileErrors(trustedList: TrustedList, rule: ProfileRule): TrustedListValidationIssue[] {
   const label = rule.name ?? 'profile'
-  const errors: TrustedListValidationIssue[] = []
+  const issues = new ValidationIssues<TrustedListValidationCode>()
   const add = (code: TrustedListValidationCode, path: (string | number)[], message: string) =>
-    errors.push({ severity: 'error', code, path, message: `[${label}] ${message}` })
+    issues.add({ code, path, message: `[${label}] ${message}` })
 
   if (stripScheme(trustedList.tslType) !== stripScheme(rule.tslType)) {
     add(
@@ -123,7 +117,7 @@ function profileErrors(trustedList: TrustedList, rule: ProfileRule): TrustedList
     })
   })
 
-  return errors
+  return issues.issues
 }
 
 /**

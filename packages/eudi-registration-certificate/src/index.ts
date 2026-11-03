@@ -38,19 +38,19 @@ export type { OverAskingCode, OverAskingIssue, OverAskingResult, RegisteredCrede
 export { checkOverAsking, OVER_ASKING_CODES } from './over-asking'
 // Schemas
 export {
-  ClaimSchema,
-  CredentialSchema,
-  IntermediarySchema,
-  LegalPersonSubjectSchema,
-  MultiLangStringSchema,
-  NaturalPersonSubjectSchema,
-  ProvidedAttestationSchema,
-  StatusSchema,
-  SupervisoryAuthoritySchema,
   WRPRC_JWS_ALGORITHMS,
-  WRPRCCWTHeaderSchema,
-  WRPRCJWTHeaderSchema,
-  WRPRCPayloadSchema,
+  zClaim,
+  zCredential,
+  zIntermediary,
+  zLegalPersonSubject,
+  zMultiLangString,
+  zNaturalPersonSubject,
+  zProvidedAttestation,
+  zStatus,
+  zSupervisoryAuthority,
+  zWRPRCCWTHeader,
+  zWRPRCJWTHeader,
+  zWRPRCPayload,
 } from './schemas'
 // Signer
 export { createWRPRCPayload, decodeWRPRC, parseWRPRC, signWRPRC } from './signer'
@@ -89,5 +89,5 @@ export {
   WRPRC_VALIDATION_CODES,
 } from './validator'
 
-// Exception
-export { WRPRCException } from './wrprc-exception'
+// Error
+export { WRPRCError, WRPRCValidationError } from './wrprc-error'

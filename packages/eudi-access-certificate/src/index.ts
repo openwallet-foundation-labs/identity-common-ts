@@ -10,7 +10,7 @@
  * @packageDocumentation
  */
 
-export { AccessCertificateException } from './access-certificate-exception'
+export { AccessCertificateError, AccessCertificateValidationError } from './access-certificate-error'
 export type { AccessCertificatePolicy, AccessCertificateSubjectType } from './constants'
 export { ACCESS_CERTIFICATE_POLICIES, ACCESS_CERTIFICATE_POLICY_INFO } from './constants'
 export {
@@ -27,8 +27,8 @@ export {
 } from './semantic-identifier'
 export type * from './types'
 export type {
-  AccessCertificateIssue,
   AccessCertificateValidationCode,
+  AccessCertificateValidationIssue,
   AccessCertificateValidationResult,
 } from './validate'
 export {

@@ -2,12 +2,14 @@ import { base64 } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
   ACTIVE_SERVICE_STATUSES,
+  assertValidTrustedList,
   getPointerSigningCertificates,
   getTrustAnchors,
   parseTrustedList,
   ServiceStatus,
   ServiceType,
-  TrustedListParseException,
+  TrustedListParseError,
+  TrustedListValidationError,
   TSLType,
   validateTrustedList,
 } from '../index'
@@ -102,7 +104,19 @@ describe('parseTrustedList', () => {
   })
 
   it('rejects XML whose root is not a TrustServiceStatusList', () => {
-    expect(() => parseTrustedList('<root/>')).toThrow(TrustedListParseException)
+    expect(() => parseTrustedList('<root/>')).toThrow(TrustedListParseError)
+  })
+
+  it('throws the issues of a list that does not conform, as a parse error', () => {
+    let error: unknown
+    try {
+      assertValidTrustedList({})
+    } catch (thrown) {
+      error = thrown
+    }
+    expect(error).toBeInstanceOf(TrustedListValidationError)
+    expect(error).toBeInstanceOf(TrustedListParseError)
+    expect((error as TrustedListValidationError).issues).toEqual(validateTrustedList({}).issues)
   })
 })
 
