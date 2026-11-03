@@ -1,4 +1,4 @@
-import { nowInSeconds } from '@owf/identity-common'
+import { isJwtTyp, nowInSeconds } from '@owf/identity-common'
 import { getJwtTimeValidationOptions, Jwt, type VerifierOptions, validateJwtPayload } from './jwt'
 import { timeClaimError } from './time-claim-error'
 import { KB_JWT_TYP, type KbJwtHeader, type KbJwtPayload, type KbVerifier } from './types'
@@ -28,8 +28,7 @@ export class KbJwt<Header extends KbJwtHeader = KbJwtHeader, Payload extends KbJ
     if (
       typeof this.header.alg !== 'string' ||
       this.header.alg === 'none' ||
-      typeof this.header.typ !== 'string' ||
-      this.header.typ !== KB_JWT_TYP ||
+      !isJwtTyp(this.header.typ, KB_JWT_TYP) ||
       typeof this.payload.iat !== 'number' ||
       typeof this.payload.aud !== 'string' ||
       typeof this.payload.nonce !== 'string' ||

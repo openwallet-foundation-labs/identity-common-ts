@@ -1,11 +1,5 @@
-import {
-  ContentType,
-  createZodFetcher,
-  Headers,
-  InvalidFetchResponseError,
-  objectToQueryParams,
-} from '@openid4vc/utils'
-import { ValidationError } from '@owf/identity-common'
+import { createZodFetcher, Headers, InvalidFetchResponseError, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, ValidationError } from '@owf/identity-common'
 import { calculateJwkThumbprint } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import { zOauth2ErrorResponse } from '../common/z-oauth2-error'
@@ -209,7 +203,7 @@ async function pushAuthorizationRequest(options: PushAuthorizationRequestOptions
 
   const headers = new Headers({
     ...options.headers,
-    'Content-Type': ContentType.XWwwFormUrlencoded,
+    'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
   })
 
   // NOTE: this will currently be called twice if we need to retry dpop.
@@ -220,13 +214,13 @@ async function pushAuthorizationRequest(options: PushAuthorizationRequestOptions
     method: 'POST',
     authorizationServerMetadata: options.authorizationServerMetadata,
     body: options.authorizationRequest,
-    contentType: ContentType.XWwwFormUrlencoded,
+    contentType: CommonMediaTypes.XWwwFormUrlencoded,
     headers,
   })
 
   const { response, result } = await fetchWithZod(
     zPushedAuthorizationResponse,
-    ContentType.Json,
+    CommonMediaTypes.Json,
     options.pushedAuthorizationRequestEndpoint,
     {
       method: 'POST',

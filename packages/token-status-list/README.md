@@ -263,7 +263,7 @@ const decoded = decodeCWTStatusClaim(encoded)
 | `EncryptBlock` | Type of the `encryptBlock` callback: AES on one 16-byte block |
 | `StatusListError` | Error class thrown by status-list operations |
 | `StatusTypes` | Constants: `VALID`, `INVALID`, `SUSPENDED`, etc. |
-| `MediaTypes` | MIME types for JWT and CWT status list tokens |
+| `StatusListMediaTypes` | MIME types for JWT and CWT status list tokens |
 | `BitsPerStatus` | Type: `1 \| 2 \| 4 \| 8` |
 | `StatusListEntry` | Type: `{ idx: number; uri: string }` |
 

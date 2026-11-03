@@ -9,8 +9,8 @@ import {
   SupportedAuthenticationScheme,
   SupportedClientAuthenticationMethod,
 } from '@openid4vc/oauth2'
-import { addSecondsToDate, ContentType, type HttpMethod } from '@openid4vc/utils'
-import { base64url } from '@owf/identity-common'
+import { addSecondsToDate, type HttpMethod } from '@openid4vc/utils'
+import { base64url, CommonMediaTypes } from '@owf/identity-common'
 import { calculateJwkThumbprint, type Jwk, type JwkSet } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -182,7 +182,7 @@ describe('Full E2E test', () => {
       ),
       http.get(`${authorizationServerMetadata.jwks_uri}`, () =>
         HttpResponse.json({ keys: [accessTokenJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       ),
       http.post(authorizationServerMetadata.token_endpoint, async ({ request }) => {
@@ -316,7 +316,7 @@ describe('Full E2E test', () => {
             knownCredentialConfigurations: credentialConfigurationsSupported,
           },
           credentialRequest: credentialRequest as Record<string, unknown>,
-          contentType: ContentType.Json,
+          contentType: CommonMediaTypes.Json,
         })
 
         if (!parsedCredentialRequest.proofs?.jwt) {
@@ -510,7 +510,7 @@ describe('Full E2E test', () => {
       ),
       http.get(`${authorizationServerMetadata.jwks_uri}`, () =>
         HttpResponse.json({ keys: [accessTokenJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       ),
       http.post(`${authorizationServerMetadata.pushed_authorization_request_endpoint}`, async ({ request }) => {
@@ -759,7 +759,7 @@ describe('Full E2E test', () => {
             knownCredentialConfigurations: credentialConfigurationsSupported,
           },
           credentialRequest: credentialRequest as Record<string, unknown>,
-          contentType: ContentType.Json,
+          contentType: CommonMediaTypes.Json,
         })
 
         if (!parsedCredentialRequest.proofs?.jwt) {

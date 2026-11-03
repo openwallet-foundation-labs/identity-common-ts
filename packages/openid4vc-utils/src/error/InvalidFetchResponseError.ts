@@ -1,4 +1,4 @@
-import { ContentType, isResponseContentType } from '../content-type'
+import { CommonMediaTypes, isMediaType } from '@owf/identity-common'
 import type { FetchResponse } from '../globals'
 import { Openid4vcBaseError } from './Openid4vcBaseError'
 
@@ -12,7 +12,7 @@ export class InvalidFetchResponseError extends Openid4vcBaseError {
   ) {
     // We don't want to put html content in pages. For other content we take the first 1000 characters
     // to prevent ridiculously long errors.
-    const textResponseMessage = isResponseContentType(ContentType.Html, response)
+    const textResponseMessage = isMediaType(response.headers.get('Content-Type'), CommonMediaTypes.Html)
       ? undefined
       : textResponse.substring(0, 1000)
 

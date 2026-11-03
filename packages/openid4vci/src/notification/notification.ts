@@ -6,8 +6,13 @@ import {
   type ResourceRequestResponseOk,
   resourceRequest,
 } from '@openid4vc/oauth2'
-import { ContentType, isResponseContentType } from '@openid4vc/utils'
-import { parseWithErrorHandling, parseWithSchema, type SchemaParseResult } from '@owf/identity-common'
+import {
+  CommonMediaTypes,
+  isMediaType,
+  parseWithErrorHandling,
+  parseWithSchema,
+  type SchemaParseResult,
+} from '@owf/identity-common'
 import type z from 'zod'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import {
@@ -99,14 +104,17 @@ export async function sendNotification(
     requestOptions: {
       method: 'POST',
       headers: {
-        'Content-Type': ContentType.Json,
+        'Content-Type': CommonMediaTypes.Json,
       },
       body: JSON.stringify(notificationRequest),
     },
   })
 
   if (!resourceResponse.ok) {
-    const notificationErrorResponseResult = isResponseContentType(ContentType.Json, resourceResponse.response)
+    const notificationErrorResponseResult = isMediaType(
+      resourceResponse.response.headers.get('Content-Type'),
+      CommonMediaTypes.Json
+    )
       ? parseWithSchema(zNotificationErrorResponse, await resourceResponse.response.clone().json())
       : undefined
 

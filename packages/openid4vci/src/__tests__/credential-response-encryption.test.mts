@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import type { CallbackContext } from '@openid4vc/oauth2'
-import { ContentType } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
 import type { Jwk } from '@owf/jose'
 import * as jose from 'jose'
 import { HttpResponse, http } from 'msw'
@@ -157,7 +157,7 @@ describe('Credential Response Encryption', () => {
     })
 
     const fetchLegacyIssuer: typeof fetch = async (_input, init) => {
-      expect(new Headers(init?.headers).get('Content-Type')).toBe(ContentType.Json)
+      expect(new Headers(init?.headers).get('Content-Type')).toBe(CommonMediaTypes.Json)
       if (typeof init?.body !== 'string') {
         throw new Error('Expected a JSON Credential Request body')
       }
@@ -169,7 +169,7 @@ describe('Credential Response Encryption', () => {
         expect(requestBody.credential_configuration_id).toBe('pidSdJwt')
       }
       return new Response(requestBody.transaction_id ? encryptedDeferredResponse : encryptedResponse, {
-        headers: { 'Content-Type': ContentType.Jwt },
+        headers: { 'Content-Type': CommonMediaTypes.Jwt },
       })
     }
     const legacyClient = new Openid4vciClient({ callbacks: { ...callbacks, fetch: fetchLegacyIssuer } })
@@ -231,7 +231,7 @@ describe('Credential Response Encryption', () => {
         expect(credentialResponseJwt).toBeDefined()
 
         return new HttpResponse(credentialResponseJwt, {
-          headers: { 'Content-Type': ContentType.Jwt },
+          headers: { 'Content-Type': CommonMediaTypes.Jwt },
         })
       })
     )
@@ -292,7 +292,7 @@ describe('Credential Response Encryption', () => {
         expect(deferredCredentialResponseJwt).toBeDefined()
 
         return new HttpResponse(deferredCredentialResponseJwt, {
-          headers: { 'Content-Type': ContentType.Jwt },
+          headers: { 'Content-Type': CommonMediaTypes.Jwt },
         })
       })
     )
@@ -449,7 +449,7 @@ describe('Credential Request Encryption', () => {
 
     server.resetHandlers(
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
-        expect(request.headers.get('Content-Type')).toBe(ContentType.Jwt)
+        expect(request.headers.get('Content-Type')).toBe(CommonMediaTypes.Jwt)
         const encryptedRequest = await request.text()
         const { plaintext, protectedHeader } = await jose.compactDecrypt(encryptedRequest, encryptionJosePrivateKey)
         expect(protectedHeader).toEqual({
@@ -490,7 +490,7 @@ describe('Credential Request Encryption', () => {
 
     server.resetHandlers(
       http.post(credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
-        expect(request.headers.get('Content-Type')).toBe(ContentType.Jwt)
+        expect(request.headers.get('Content-Type')).toBe(CommonMediaTypes.Jwt)
         const { protectedHeader } = await jose.compactDecrypt(await request.text(), encryptionJosePrivateKey)
         expect(protectedHeader).toEqual({
           alg: 'RSA-OAEP',
@@ -512,7 +512,7 @@ describe('Credential Request Encryption', () => {
   test('encrypts a deferred request when explicitly requested', async () => {
     server.resetHandlers(
       http.post(credentialIssuerMetadata.deferred_credential_endpoint as string, async ({ request }) => {
-        expect(request.headers.get('Content-Type')).toBe(ContentType.Jwt)
+        expect(request.headers.get('Content-Type')).toBe(CommonMediaTypes.Jwt)
         const encryptedRequest = await request.text()
         const { plaintext, protectedHeader } = await jose.compactDecrypt(encryptedRequest, encryptionJosePrivateKey)
         expect(protectedHeader).toEqual({
@@ -600,11 +600,11 @@ describe('Credential Request Encryption', () => {
 
     expect(receivedRequests).toEqual([
       {
-        contentType: ContentType.Json,
+        contentType: CommonMediaTypes.Json,
         body: expect.objectContaining({ credential_configuration_id: 'pidSdJwt' }),
       },
       {
-        contentType: ContentType.Json,
+        contentType: CommonMediaTypes.Json,
         body: expect.objectContaining({ transaction_id: 'txn-plain' }),
       },
     ])
@@ -863,7 +863,7 @@ describe('Credential Request Encryption', () => {
       const plaintextIssuer = new Openid4vciIssuer({
         callbacks: { ...callbacks, decryptJwe: undefined },
       })
-      const options = { issuerMetadata, contentType: ContentType.Json }
+      const options = { issuerMetadata, contentType: CommonMediaTypes.Json }
       if (method === 'parseCredentialRequest') {
         const parsed = await plaintextIssuer.parseCredentialRequest({
           ...options,
@@ -894,6 +894,8 @@ describe('Credential Request Encryption', () => {
     { description: 'missing Content-Type', contentType: undefined },
     { description: 'unsupported text media type', contentType: 'text/plain' },
     { description: 'unsupported JSON-like media type', contentType: 'application/jsonp' },
+    { description: 'JSON sequence media type', contentType: 'application/json-seq' },
+    { description: 'media type in a parameter', contentType: 'multipart/related; type="application/json"' },
     { description: 'combined media types', contentType: 'application/jwt, application/json' },
   ])('rejects unsupported Content-Type: $description', async ({ contentType }) => {
     const issuer = new Openid4vciIssuer({ callbacks })
@@ -949,12 +951,12 @@ describe('Credential Request Encryption', () => {
           ? issuerWithoutRequestEncryption.parseCredentialRequest({
               issuerMetadata,
               credentialRequest: { ...regularRequest, ...additionalPayload },
-              contentType: ContentType.Json,
+              contentType: CommonMediaTypes.Json,
             })
           : issuerWithoutRequestEncryption.parseDeferredCredentialRequest({
               issuerMetadata,
               deferredCredentialRequest: { ...deferredRequest, ...additionalPayload },
-              contentType: ContentType.Json,
+              contentType: CommonMediaTypes.Json,
             })
 
       await expect(plaintextRequest(requiredMetadata, {})).rejects.toMatchObject({
@@ -1008,6 +1010,69 @@ describe('Credential Request Encryption', () => {
     }
   )
 
+  test.each(['Application/JSON', 'application/json; charset=UTF-8'])(
+    'accepts the JSON Content-Type form %s',
+    async (contentType) => {
+      const plaintextIssuer = new Openid4vciIssuer({
+        callbacks: { ...callbacks, decryptJwe: undefined },
+      })
+
+      const regular = await plaintextIssuer.parseCredentialRequest({
+        issuerMetadata,
+        contentType,
+        credentialRequest: { credential_configuration_id: 'pidSdJwt' },
+      })
+      const deferred = await plaintextIssuer.parseDeferredCredentialRequest({
+        issuerMetadata,
+        contentType,
+        deferredCredentialRequest: { transaction_id: 'txn-plaintext' },
+      })
+
+      expect(regular.credentialConfigurationId).toBe('pidSdJwt')
+      expect(deferred.deferredCredentialRequest.transaction_id).toBe('txn-plaintext')
+    }
+  )
+
+  test.each(['Application/JWT', 'application/jwt; charset=UTF-8'])(
+    'accepts the JWT Content-Type form %s for regular and deferred requests',
+    async (contentType) => {
+      const credentialRequestJwe = await encryptJwe(
+        {
+          method: 'jwk',
+          publicJwk: credentialRequestEncryption.jwks.keys[0],
+          alg: 'RSA-OAEP',
+          enc: 'A256GCM',
+          kid: 'credential-request-key',
+        },
+        JSON.stringify({ credential_configuration_id: 'pidSdJwt' })
+      )
+      const deferredCredentialRequestJwe = await encryptJwe(
+        {
+          method: 'jwk',
+          publicJwk: credentialRequestEncryption.jwks.keys[0],
+          alg: 'RSA-OAEP',
+          enc: 'A256GCM',
+          kid: 'credential-request-key',
+        },
+        JSON.stringify({ transaction_id: 'txn-encrypted' })
+      )
+
+      const regular = await issuer.parseCredentialRequest({
+        issuerMetadata,
+        contentType,
+        credentialRequest: credentialRequestJwe.jwe,
+      })
+      const deferred = await issuer.parseDeferredCredentialRequest({
+        issuerMetadata,
+        contentType,
+        deferredCredentialRequest: deferredCredentialRequestJwe.jwe,
+      })
+
+      expect(regular.credentialConfigurationId).toBe('pidSdJwt')
+      expect(deferred.deferredCredentialRequest.transaction_id).toBe('txn-encrypted')
+    }
+  )
+
   test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
     '%s rejects required-encryption plaintext before validating its payload',
     async (method) => {
@@ -1029,12 +1094,12 @@ describe('Credential Request Encryption', () => {
           method === 'parseCredentialRequest'
             ? issuer.parseCredentialRequest({
                 issuerMetadata: metadata,
-                contentType: ContentType.Json,
+                contentType: CommonMediaTypes.Json,
                 credentialRequest: body,
               })
             : issuer.parseDeferredCredentialRequest({
                 issuerMetadata: metadata,
-                contentType: ContentType.Json,
+                contentType: CommonMediaTypes.Json,
                 deferredCredentialRequest: body,
               })
         await expect(parse(requiredMetadata)).rejects.toMatchObject({
@@ -1050,9 +1115,12 @@ describe('Credential Request Encryption', () => {
     }
   )
 
-  test.each(['parseCredentialRequest', 'parseDeferredCredentialRequest'] as const)(
-    '%s reports a missing decryptJwe callback as server_error',
-    async (method) => {
+  test.each([
+    ['parseCredentialRequest', 'Application/JWT'],
+    ['parseDeferredCredentialRequest', 'application/jwt; charset=UTF-8'],
+  ] as const)(
+    '%s accepts %s and reports a missing decryptJwe callback as server_error',
+    async (method, contentType) => {
       const jwe = await encryptJwe(
         {
           method: 'jwk',
@@ -1068,7 +1136,7 @@ describe('Credential Request Encryption', () => {
       })
       const options = {
         issuerMetadata,
-        contentType: ContentType.Jwt,
+        contentType,
       }
       const parsing =
         method === 'parseCredentialRequest'

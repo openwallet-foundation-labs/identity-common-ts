@@ -6,7 +6,7 @@ import {
   RegisteredCwtHeaderClaimKey,
 } from '@owf/cose'
 import z from 'zod'
-import { MediaTypes } from '../types'
+import { StatusListMediaTypes } from '../types'
 
 /**
  * The protected COSE header claims of a status list CWT: the registered ones, with `typ` (16)
@@ -20,7 +20,7 @@ import { MediaTypes } from '../types'
  * @see https://www.rfc-editor.org/rfc/rfc9596.html#section-2
  */
 const statusListCwtProtectedHeaderClaims = extendCoseHeaderClaims([
-  [RegisteredCwtHeaderClaimKey.Typ, z.literal(MediaTypes.StatusListCwt)],
+  [RegisteredCwtHeaderClaimKey.Typ, z.literal(StatusListMediaTypes.StatusListCwt)],
 ] as const)
 
 export class StatusListCwtProtectedHeaders extends ProtectedHeaders<

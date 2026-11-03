@@ -1,6 +1,6 @@
 import 'reflect-metadata'
 import { base64, base64url, stringToBytes } from '@owf/identity-common'
-import { type BitsPerStatus, MediaTypes, StatusList, StatusListCwt, StatusType } from '@owf/token-status-list'
+import { type BitsPerStatus, StatusList, StatusListCwt, StatusListMediaTypes, StatusType } from '@owf/token-status-list'
 import { X509Certificate } from '@peculiar/x509'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -9,7 +9,7 @@ import {
   CoseKey,
   IdentifierList,
   IdentifierListCwt,
-  MediaTypes as IdentifierListMediaTypes,
+  MdocMediaTypes as IdentifierListMediaTypes,
   InvalidRevocationListError,
   InvalidSignatureError,
   ProtectedHeaders,
@@ -84,7 +84,10 @@ suite('verifyStatusListToken with an x5chain in the unprotected header', () => {
     server.use(
       http.get(
         uri,
-        () => new HttpResponse(new Uint8Array(token), { headers: { 'Content-Type': MediaTypes.StatusListCwt } })
+        () =>
+          new HttpResponse(new Uint8Array(token), {
+            headers: { 'Content-Type': StatusListMediaTypes.StatusListCwt },
+          })
       )
     )
 
@@ -158,7 +161,7 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
     )
     const fetch = (async () =>
       new Response(new Uint8Array(token), {
-        headers: { 'Content-Type': MediaTypes.StatusListCwt },
+        headers: { 'Content-Type': StatusListMediaTypes.StatusListCwt },
       })) as typeof globalThis.fetch
 
     return verifyStatusListToken({ statusListInfo, trustedCertificates: [certificate] }, { ...mdocContext, fetch })
@@ -263,7 +266,7 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
         uri,
         () =>
           new HttpResponse(`${signingInput}.${encodedSignature ?? base64url.encode(signature)}`, {
-            headers: { 'Content-Type': MediaTypes.StatusListJwt },
+            headers: { 'Content-Type': StatusListMediaTypes.StatusListJwt },
           })
       )
     )
@@ -403,15 +406,15 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
     server.use(
       http.get(uri, ({ request }) => {
         accept = request.headers.get('Accept')
-        return accept?.startsWith(MediaTypes.StatusListCwt)
-          ? new HttpResponse(new Uint8Array(cwt), { headers: { 'Content-Type': MediaTypes.StatusListCwt } })
-          : new HttpResponse('not.a.jwt', { headers: { 'Content-Type': MediaTypes.StatusListJwt } })
+        return accept?.startsWith(StatusListMediaTypes.StatusListCwt)
+          ? new HttpResponse(new Uint8Array(cwt), { headers: { 'Content-Type': StatusListMediaTypes.StatusListCwt } })
+          : new HttpResponse('not.a.jwt', { headers: { 'Content-Type': StatusListMediaTypes.StatusListJwt } })
       })
     )
 
     const result = await verify(uri)
 
-    expect(accept).toBe(`${MediaTypes.StatusListCwt}, ${MediaTypes.StatusListJwt};q=0.9`)
+    expect(accept).toBe(`${StatusListMediaTypes.StatusListCwt}, ${StatusListMediaTypes.StatusListJwt};q=0.9`)
     expect(result.statusListCwt).toBeDefined()
     expect(result.statusListJwt).toBeUndefined()
   })
@@ -477,7 +480,7 @@ suite('revocation lists signed with ESP256', () => {
     serve(
       uri,
       await statusListCwt.signAndEncode({ signingKey, algorithm }, { sign: mdocContext.cose.sign1.sign }),
-      MediaTypes.StatusListCwt
+      StatusListMediaTypes.StatusListCwt
     )
 
     const { statusListCwt: verified } = await verifyStatusListToken(

@@ -18,7 +18,7 @@ import { StatusListCwtProtectedHeaders } from '../../cbor/status-list-cwt-header
 import { StatusListCwtClaimKey, StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
 import { StatusListError } from '../../status-list-error'
-import { MediaTypes, StatusType } from '../../types'
+import { StatusListMediaTypes, StatusType } from '../../types'
 import { mac0Context, macKey, sign1Context, signKey } from '../context'
 
 suite('StatusListCwt', () => {
@@ -85,7 +85,9 @@ suite('StatusListCwt', () => {
               subject: 'did:test',
               statusList: new StatusList([0, 1, 0], 1),
             },
-            protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListJwt]]),
+            protectedHeaders: new Map<number, unknown>([
+              [RegisteredCwtHeaderClaimKey.Typ, StatusListMediaTypes.StatusListJwt],
+            ]),
           })
       ).toThrow(/StatusListCwtProtectedHeaders/)
     })
@@ -94,18 +96,22 @@ suite('StatusListCwt', () => {
       // `create` is inherited from ProtectedHeaders, so it has to construct the class it was called
       // on — a base ProtectedHeaders would carry no `typ` requirement at all
       const headers = StatusListCwtProtectedHeaders.create({
-        protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListCwt]]),
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.Typ, StatusListMediaTypes.StatusListCwt],
+        ]),
       })
 
       expect(headers).toBeInstanceOf(StatusListCwtProtectedHeaders)
-      expect(headers.headers.get(RegisteredCwtHeaderClaimKey.Typ)).toBe(MediaTypes.StatusListCwt)
+      expect(headers.headers.get(RegisteredCwtHeaderClaimKey.Typ)).toBe(StatusListMediaTypes.StatusListCwt)
 
       expect(() => StatusListCwtProtectedHeaders.create({ protectedHeaders: new Map() })).toThrow(
         /StatusListCwtProtectedHeaders/
       )
       expect(() =>
         StatusListCwtProtectedHeaders.create({
-          protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListJwt]]),
+          protectedHeaders: new Map<number, unknown>([
+            [RegisteredCwtHeaderClaimKey.Typ, StatusListMediaTypes.StatusListJwt],
+          ]),
         })
       ).toThrow(/StatusListCwtProtectedHeaders/)
     })
@@ -118,11 +124,13 @@ suite('StatusListCwt', () => {
           subject: 'did:test',
           statusList: new StatusList([0, 1, 0], 1),
         },
-        unprotectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListJwt]]),
+        unprotectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.Typ, StatusListMediaTypes.StatusListJwt],
+        ]),
       })
 
-      expect(cwt.typ).toBe(MediaTypes.StatusListCwt)
-      expect(cwt.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.Typ)).toBe(MediaTypes.StatusListCwt)
+      expect(cwt.typ).toBe(StatusListMediaTypes.StatusListCwt)
+      expect(cwt.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.Typ)).toBe(StatusListMediaTypes.StatusListCwt)
     })
   })
 
@@ -618,7 +626,7 @@ suite('StatusListCwt', () => {
         await Sign1.create({
           protectedHeaders: new Map<number, unknown>([
             [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
-            [RegisteredCwtHeaderClaimKey.Typ, MediaTypes.StatusListCwt],
+            [RegisteredCwtHeaderClaimKey.Typ, StatusListMediaTypes.StatusListCwt],
           ]),
           payload: foreignPayload,
         }).sign({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)

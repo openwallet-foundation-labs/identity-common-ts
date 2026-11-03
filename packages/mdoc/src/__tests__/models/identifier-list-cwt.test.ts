@@ -14,7 +14,7 @@ import {
   IdentifierListCwt,
   IdentifierListCwtPayload,
   IdentifierListCwtProtectedHeaders,
-  MediaTypes,
+  MdocMediaTypes,
 } from '../..'
 
 const identifier = new Uint8Array([1, 2, 3, 4])
@@ -23,7 +23,7 @@ const uri = 'https://example/identifierlists/1'
 
 // `null` omits the header entirely; `undefined` (or absent) uses the conformant default.
 const identifierListToken = ({
-  typ = MediaTypes.IdentifierListCwt,
+  typ = MdocMediaTypes.IdentifierListCwt,
   algorithm = SignatureAlgorithm.ES256,
   subject = uri,
   issuedAt,
@@ -64,7 +64,7 @@ describe('identifier list cwt', () => {
   it('decodes a cwt carrying typ in the protected header', () => {
     const cwt = IdentifierListCwt.fromToken(identifierListToken())
 
-    expect(cwt.typ).toStrictEqual(MediaTypes.IdentifierListCwt)
+    expect(cwt.typ).toStrictEqual(MdocMediaTypes.IdentifierListCwt)
     expect(cwt.protectedHeaders).toBeInstanceOf(IdentifierListCwtProtectedHeaders)
     expect(cwt.algorithm).toStrictEqual(SignatureAlgorithm.ES256)
     expect(cwt.payload.subject).toStrictEqual(uri)
@@ -107,7 +107,7 @@ describe('identifier list cwt', () => {
       protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256]]),
     })
 
-    expect(cwt.typ).toStrictEqual(MediaTypes.IdentifierListCwt)
+    expect(cwt.typ).toStrictEqual(MdocMediaTypes.IdentifierListCwt)
   })
 })
 
@@ -207,7 +207,7 @@ describe('identifier list cwt protected headers', () => {
     IdentifierListCwtProtectedHeaders.fromDecodedStructure(
       TypedMap.fromMap(
         new Map<number, unknown>([
-          [RegisteredCwtHeaderClaimKey.Typ, MediaTypes.IdentifierListCwt],
+          [RegisteredCwtHeaderClaimKey.Typ, MdocMediaTypes.IdentifierListCwt],
           [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
           [RegisteredCwtHeaderClaimKey.X5Chain, x5chain],
         ])

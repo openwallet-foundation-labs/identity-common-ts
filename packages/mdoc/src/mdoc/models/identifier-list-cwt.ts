@@ -15,7 +15,7 @@ import {
 import { hex, isMediaType } from '@owf/identity-common'
 import type { MdocContext } from '../../context'
 import { IdentifierFoundInRevokedListError, InvalidRevocationListError } from '../errors'
-import { IdentifierListCwtProtectedHeaders, MediaTypes } from './identifier-list-cwt-headers'
+import { IdentifierListCwtProtectedHeaders, MdocMediaTypes } from './identifier-list-cwt-headers'
 import {
   type CreateIdentifierListCwtPayloadOptions,
   IdentifierListCwtClaimKey,
@@ -51,7 +51,7 @@ function identifierListProtectedHeaders(
     protectedHeaders instanceof ProtectedHeaders ? protectedHeaders.decodedStructure : protectedHeaders
   )
   if (headers.get(RegisteredCwtHeaderClaimKey.Typ) === undefined) {
-    headers.set(RegisteredCwtHeaderClaimKey.Typ, MediaTypes.IdentifierListCwt)
+    headers.set(RegisteredCwtHeaderClaimKey.Typ, MdocMediaTypes.IdentifierListCwt)
   }
 
   return IdentifierListCwtProtectedHeaders.fromDecodedStructure(TypedMap.fromMap(headers))
@@ -105,7 +105,7 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
   public static async fetch(uri: string, ctx: Pick<MdocContext, 'fetch'>): Promise<IdentifierListCwt> {
     const response = await ctx.fetch(
       uri,
-      { headers: { Accept: MediaTypes.IdentifierListCwt } },
+      { headers: { Accept: MdocMediaTypes.IdentifierListCwt } },
       { type: 'identifierList' }
     )
 
@@ -117,9 +117,9 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
     // without a Content-Type is let through — the token itself carries the media type in `typ`, and
     // is rejected there if it is not an identifier list.
     const contentType = response.headers.get('Content-Type')
-    if (contentType !== null && !isMediaType(contentType, MediaTypes.IdentifierListCwt)) {
+    if (contentType !== null && !isMediaType(contentType, MdocMediaTypes.IdentifierListCwt)) {
       throw new InvalidRevocationListError(
-        `Identifier list at ${uri} was served as '${contentType}', expected '${MediaTypes.IdentifierListCwt}'`
+        `Identifier list at ${uri} was served as '${contentType}', expected '${MdocMediaTypes.IdentifierListCwt}'`
       )
     }
 

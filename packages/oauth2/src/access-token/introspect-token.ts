@@ -1,11 +1,5 @@
-import {
-  ContentType,
-  createZodFetcher,
-  Headers,
-  InvalidFetchResponseError,
-  objectToQueryParams,
-} from '@openid4vc/utils'
-import { parseWithErrorHandling } from '@owf/identity-common'
+import { createZodFetcher, Headers, InvalidFetchResponseError, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, parseWithErrorHandling } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import { Oauth2Error } from '../error/Oauth2Error'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
@@ -56,7 +50,7 @@ export async function introspectToken(options: IntrospectTokenOptions) {
   }
 
   const headers = new Headers({
-    'Content-Type': ContentType.XWwwFormUrlencoded,
+    'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
   })
 
   // Apply client authentication
@@ -65,13 +59,13 @@ export async function introspectToken(options: IntrospectTokenOptions) {
     method: 'POST',
     authorizationServerMetadata: options.authorizationServerMetadata,
     body: introspectionRequest,
-    contentType: ContentType.XWwwFormUrlencoded,
+    contentType: CommonMediaTypes.XWwwFormUrlencoded,
     headers,
   })
 
   const { result, response } = await fetchWithZod(
     zTokenIntrospectionResponse,
-    ContentType.Json,
+    CommonMediaTypes.Json,
     introspectionEndpoint,
     {
       body: objectToQueryParams(introspectionRequest).toString(),

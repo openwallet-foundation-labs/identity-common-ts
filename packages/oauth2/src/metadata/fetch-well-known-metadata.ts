@@ -1,5 +1,5 @@
-import { ContentType, createZodFetcher, type Fetch, InvalidFetchResponseError } from '@openid4vc/utils'
-import { type BaseSchema, ValidationError } from '@owf/identity-common'
+import { createZodFetcher, type Fetch, InvalidFetchResponseError } from '@openid4vc/utils'
+import { type BaseSchema, CommonMediaTypes, ValidationError } from '@owf/identity-common'
 import type z from 'zod'
 
 export interface FetchWellKnownMetadataOptions {
@@ -9,11 +9,11 @@ export interface FetchWellKnownMetadataOptions {
   fetch?: Fetch
 
   /**
-   * The accepted content types. If not provided a default of `ContentType.Json`
+   * The accepted content types. If not provided a default of `CommonMediaTypes.Json`
    * will be used. This will be used for the `Accept` header, as well as verified
    * against the `Content-Type` response header.
    */
-  acceptedContentType?: [ContentType, ...ContentType[]]
+  acceptedContentType?: [string, ...string[]]
 }
 
 /**
@@ -34,7 +34,7 @@ export async function fetchWellKnownMetadata<Schema extends BaseSchema>(
 ): Promise<z.infer<Schema> | null> {
   const fetcher = createZodFetcher(options?.fetch)
 
-  const acceptedContentType = options?.acceptedContentType ?? [ContentType.Json]
+  const acceptedContentType = options?.acceptedContentType ?? [CommonMediaTypes.Json]
 
   const { result, response } = await fetcher(schema, acceptedContentType, wellKnownMetadataUrl)
   if (response.status === 404) {

@@ -1,5 +1,6 @@
 import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { ContentType, URLSearchParams } from '@openid4vc/utils'
+import { URLSearchParams } from '@openid4vc/utils'
+import { CommonMediaTypes, isMediaType } from '@owf/identity-common'
 import { zCompactJwe, zCompactJwt } from '@owf/jose'
 import z from 'zod'
 
@@ -13,7 +14,7 @@ export async function parseJarmAuthorizationResponseDirectPostJwt(request: Reque
     })
   }
 
-  if (!contentType.includes(ContentType.XWwwFormUrlencoded)) {
+  if (!isMediaType(contentType, CommonMediaTypes.XWwwFormUrlencoded)) {
     throw new Oauth2ServerErrorResponseError(
       {
         error: Oauth2ErrorCodes.InvalidRequest,

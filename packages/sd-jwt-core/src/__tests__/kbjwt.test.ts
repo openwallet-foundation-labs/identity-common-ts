@@ -123,6 +123,28 @@ describe('KB JWT', () => {
     })
   })
 
+  test.each(['application/kb+jwt', 'KB+JWT'])('verify accepts the typ %s (RFC 7515 Section 4.1.9)', async (typ) => {
+    const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
+    const testSigner: Signer = async (data: string) =>
+      Buffer.from(Crypto.sign(null, Buffer.from(data), privateKey)).toString('base64url')
+    const testVerifier: KbVerifier = async (data: string, sig: string) =>
+      Crypto.verify(null, Buffer.from(data), publicKey, Buffer.from(sig, 'base64url'))
+
+    const kbJwt = new KbJwt({
+      header: { typ: typ as typeof KB_JWT_TYP, alg: 'EdDSA' },
+      payload: { iat: 1, aud: 'aud', nonce: 'nonce', sd_hash: 'hash' },
+    })
+    const decoded = KbJwt.fromKbEncode(await kbJwt.sign(testSigner))
+
+    await expect(
+      decoded.verifyKb({
+        verifier: testVerifier,
+        payload: { cnf: { jwk: await exportJWK(publicKey) } },
+        nonce: 'nonce',
+      })
+    ).resolves.toMatchObject({ header: { typ } })
+  })
+
   test('verify failed', async () => {
     const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
     const testSigner: Signer = async (data: string) => {

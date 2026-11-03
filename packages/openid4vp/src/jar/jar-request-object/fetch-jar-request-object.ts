@@ -1,6 +1,6 @@
-import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { ContentType, createFetcher, type Fetch, objectToQueryParams } from '@openid4vc/utils'
-import { createAcceptHeader } from '@owf/identity-common'
+import { Oauth2ErrorCodes, Oauth2MediaTypes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
+import { createFetcher, type Fetch, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, createAcceptHeader } from '@owf/identity-common'
 import type { ClientIdPrefix } from '../../client-identifier-prefix/z-client-id-prefix'
 import type { WalletMetadata } from '../../models/z-wallet-metadata'
 
@@ -38,8 +38,12 @@ export async function fetchJarRequestObject(options: {
     method,
     body: method === 'post' ? objectToQueryParams(wallet.metadata ?? {}) : undefined,
     headers: {
-      Accept: createAcceptHeader([ContentType.OauthAuthorizationRequestJwt, ContentType.Jwt, 'text/plain']),
-      'Content-Type': ContentType.XWwwFormUrlencoded,
+      Accept: createAcceptHeader([
+        Oauth2MediaTypes.AuthorizationRequestJwt,
+        CommonMediaTypes.Jwt,
+        CommonMediaTypes.TextPlain,
+      ]),
+      'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
     },
   }).catch(() => {
     throw new Oauth2ServerErrorResponseError({

@@ -1,10 +1,10 @@
 import { base64, isMediaType, secondsToDate } from '@owf/identity-common'
 import {
   getListFromStatusListJwt,
-  MediaTypes,
   StatusListError,
   type StatusListJwtHeaderParameters,
   type StatusListJwtPayload,
+  StatusListMediaTypes,
   StatusType,
   verifyStatusListJwtClaims,
   verifyStatusListJwtHeader,
@@ -153,14 +153,14 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
     try {
       const response = await fetch(uri, {
         signal: controller.signal,
-        headers: { Accept: MediaTypes.StatusListJwt },
+        headers: { Accept: StatusListMediaTypes.StatusListJwt },
       })
       if (!response.ok) {
         throw new Error(`Error fetching status list: ${response.status} ${await response.text()}`)
       }
 
       // according to the spec the content type should be application/statuslist+jwt
-      if (!isMediaType(response.headers.get('content-type'), MediaTypes.StatusListJwt)) {
+      if (!isMediaType(response.headers.get('content-type'), StatusListMediaTypes.StatusListJwt)) {
         throw new Error('Invalid content type')
       }
 

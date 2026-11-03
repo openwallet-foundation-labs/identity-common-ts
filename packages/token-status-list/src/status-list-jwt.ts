@@ -1,10 +1,10 @@
 import type { JwtPayload } from '@owf/identity-common'
-import { base64url, decodeJwt, isMediaType } from '@owf/identity-common'
+import { base64url, decodeJwt, isJwtTyp } from '@owf/identity-common'
 import type { JwtWithStatusListPayload, StatusListJwtHeaderParameters, StatusListJwtPayload } from './jwt-types'
 import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
 import { StatusListEntryNotValidError, StatusListError } from './status-list-error'
-import { MediaTypes, type StatusListEntry, StatusType } from './types'
+import { type StatusListEntry, StatusListMediaTypes, StatusType } from './types'
 
 /**
  * Decode a JWT and return the payload.
@@ -170,8 +170,7 @@ export function verifyStatusListJwtHeader<Header extends { typ?: unknown; alg?: 
     throw new StatusListError('The status list token has no typ header, which is required')
   }
 
-  const mediaType = typ.includes('/') ? typ : `application/${typ}`
-  if (!isMediaType(mediaType, MediaTypes.StatusListJwt)) {
+  if (!isJwtTyp(typ, StatusListMediaTypes.StatusListJwt)) {
     throw new StatusListError(`The typ header '${typ}' must be equal to '${JWT_STATUS_LIST_TYPE}'`)
   }
 

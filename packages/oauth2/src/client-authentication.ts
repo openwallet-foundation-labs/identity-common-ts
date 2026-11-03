@@ -1,4 +1,4 @@
-import type { ContentType, FetchHeaders, HttpMethod } from '@openid4vc/utils'
+import type { FetchHeaders, HttpMethod } from '@openid4vc/utils'
 import { base64, stringToBytes } from '@owf/identity-common'
 import type { JwsSignerJwk } from '@owf/jose'
 import { decodeJwt } from '@owf/jose'
@@ -156,7 +156,7 @@ export interface ClientAuthenticationCallbackOptions {
    */
   headers: FetchHeaders
 
-  contentType: ContentType
+  contentType: string
 
   /**
    * The body as a JSON object. If content type `x-www-form-urlencoded`

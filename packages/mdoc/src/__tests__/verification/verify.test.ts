@@ -1,6 +1,6 @@
 import 'reflect-metadata'
 import { base64, base64url, stringToBytes } from '@owf/identity-common'
-import { MediaTypes, StatusList, StatusListCwt, StatusListInfo, StatusType } from '@owf/token-status-list'
+import { StatusList, StatusListCwt, StatusListInfo, StatusListMediaTypes, StatusType } from '@owf/token-status-list'
 import { X509Certificate } from '@peculiar/x509'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -15,7 +15,7 @@ import {
   Holder,
   IdentifierList,
   IdentifierListCwt,
-  MediaTypes as IdentifierListMediaTypes,
+  MdocMediaTypes as IdentifierListMediaTypes,
   Issuer,
   IssuerSigned,
   ItemsRequest,
@@ -477,7 +477,12 @@ suite('Verification', () => {
   const mockStatusList = async (path: string, options: Omit<Parameters<typeof signStatusListCwt>[0], 'uri'>) => {
     const uri = `https://example.org${path}`
 
-    mockGet(uri, await signStatusListCwt({ uri, ...options }), MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      uri,
+      await signStatusListCwt({ uri, ...options }),
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     return uri
   }
@@ -506,7 +511,7 @@ suite('Verification', () => {
       algorithm: SignatureAlgorithm.ES256,
     })
 
-    mockGet(uri, `${signingInput}.${base64url.encode(signature)}`, MediaTypes.StatusListJwt)
+    mockGet(uri, `${signingInput}.${base64url.encode(signature)}`, StatusListMediaTypes.StatusListJwt)
 
     return uri
   }
@@ -832,7 +837,7 @@ suite('Verification', () => {
     const id = new Uint8Array([0xab, 0xcd])
     const uri = 'https://example.org/identifier-list/wrong-content-type'
 
-    mockGet(uri, await signIdentifierListCwt({ uri, identifiers: [] }), MediaTypes.StatusListCwt)
+    mockGet(uri, await signIdentifierListCwt({ uri, identifiers: [] }), StatusListMediaTypes.StatusListCwt)
 
     const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
 
@@ -860,7 +865,12 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    mockGet('https://example.org/status-list/10', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/10',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -990,7 +1000,12 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    mockGet('https://example.org/status-list/10', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/10',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1099,7 +1114,7 @@ suite('Verification', () => {
     mockGet(
       'https://example.org/status-list/30',
       'invalid-jwt',
-      MediaTypes.StatusListJwt,
+      StatusListMediaTypes.StatusListJwt,
       /application\/statuslist\+cwt/
     )
 
@@ -1155,7 +1170,12 @@ suite('Verification', () => {
       { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
       { sign: mdocContext.cose.sign1.sign }
     )
-    mockGet('https://example.org/status-list/40', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/40',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1209,7 +1229,12 @@ suite('Verification', () => {
       { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
       { sign: mdocContext.cose.sign1.sign }
     )
-    mockGet('https://example.org/status-list/40', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/40',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1266,7 +1291,12 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    mockGet('https://example.org/status-list/10', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/10',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1321,7 +1351,12 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    mockGet('https://example.org/status-list/20', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/20',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1660,7 +1695,12 @@ suite('Verification', () => {
         { sign: mdocContext.cose.sign1.sign }
       )
 
-      mockGet(`https://example.org${path}`, encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+      mockGet(
+        `https://example.org${path}`,
+        encodedCwt,
+        StatusListMediaTypes.StatusListCwt,
+        /application\/statuslist\+cwt/
+      )
     }
 
     const signCredentialWithStatus = async (uri: string) => {

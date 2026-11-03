@@ -1,4 +1,4 @@
-import { ContentType } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
 import { type Jwk, type JwkSet, type JwsSigner, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -68,7 +68,7 @@ describe('Verify ID Token JWT', () => {
     server.resetHandlers(
       http.get(authorizationServerMetadata.jwks_uri, () =>
         HttpResponse.json({ keys: [signerJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       )
     )

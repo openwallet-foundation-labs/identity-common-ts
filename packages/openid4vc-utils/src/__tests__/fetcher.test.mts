@@ -1,6 +1,6 @@
+import { CommonMediaTypes } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
 import z from 'zod'
-import { ContentType } from '../content-type.js'
 import { createZodFetcher } from '../fetcher.js'
 import type { Fetch } from '../globals.js'
 
@@ -19,14 +19,19 @@ describe('createZodFetcher', () => {
     const { fetch, acceptHeaders } = createRecordingFetch()
     const fetchWithZod = createZodFetcher(fetch)
 
-    await fetchWithZod(z.object({ hello: z.string() }), ContentType.Json, 'https://example.com')
-    await fetchWithZod(z.object({ hello: z.string() }), [ContentType.Jwt, ContentType.Json], 'https://example.com', {
-      headers: { 'Content-Type': ContentType.Json },
-    })
+    await fetchWithZod(z.object({ hello: z.string() }), CommonMediaTypes.Json, 'https://example.com')
+    await fetchWithZod(
+      z.object({ hello: z.string() }),
+      [CommonMediaTypes.Jwt, CommonMediaTypes.Json],
+      'https://example.com',
+      {
+        headers: { 'Content-Type': CommonMediaTypes.Json },
+      }
+    )
 
     await fetchWithZod(
       z.object({ hello: z.string() }),
-      [ContentType.Jwt, ContentType.JwkSet, ContentType.Json],
+      [CommonMediaTypes.Jwt, CommonMediaTypes.JwkSet, CommonMediaTypes.Json],
       'https://example.com'
     )
 
@@ -41,10 +46,36 @@ describe('createZodFetcher', () => {
     const { fetch, acceptHeaders } = createRecordingFetch()
     const fetchWithZod = createZodFetcher(fetch)
 
-    await fetchWithZod(z.object({ hello: z.string() }), ContentType.Json, 'https://example.com', {
+    await fetchWithZod(z.object({ hello: z.string() }), CommonMediaTypes.Json, 'https://example.com', {
       headers: new Headers({ Accept: 'application/json;q=0.9' }),
     })
 
     expect(acceptHeaders).toEqual(['application/json;q=0.9'])
   })
+
+  test.each(['application/json-seq', 'multipart/related; type="application/json"'])(
+    'rejects a lookalike response Content-Type: %s',
+    async (contentType) => {
+      const fetchWithZod = createZodFetcher(
+        async () => new Response('{"hello":"world"}', { headers: { 'Content-Type': contentType } })
+      )
+
+      await expect(
+        fetchWithZod(z.object({ hello: z.string() }), CommonMediaTypes.Json, 'https://example.com')
+      ).rejects.toThrow('Expected response to match content type application/json')
+    }
+  )
+
+  test.each(['application/json; charset=UTF-8', 'Application/JSON'])(
+    'accepts a matching response Content-Type: %s',
+    async (contentType) => {
+      const fetchWithZod = createZodFetcher(
+        async () => new Response('{"hello":"world"}', { headers: { 'Content-Type': contentType } })
+      )
+
+      await expect(
+        fetchWithZod(z.object({ hello: z.string() }), CommonMediaTypes.Json, 'https://example.com')
+      ).resolves.toMatchObject({ result: { success: true, data: { hello: 'world' } } })
+    }
+  )
 })

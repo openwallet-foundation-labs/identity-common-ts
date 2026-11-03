@@ -11,6 +11,7 @@
 
 import { pemToDer } from '@owf/crypto'
 import { decode, JadesProfile, Token, validateProfile } from '@owf/eudi-jades'
+import { isJwtTyp } from '@owf/identity-common'
 import { REGISTRATION_CERTIFICATE_DIALECTS, toRegistrationCertificateDialect } from './dialect'
 import { RegistrationCertificateError } from './registration-certificate-error'
 import type {
@@ -98,7 +99,7 @@ export function decodeRegistrationCertificate(
   }
 
   // Validate typ header
-  if (decoded.header.typ !== 'rc-wrp+jwt') {
+  if (!isJwtTyp(decoded.header.typ, 'rc-wrp+jwt')) {
     throw new RegistrationCertificateError(
       `Invalid registration certificate type: expected "rc-wrp+jwt", got "${decoded.header.typ}"`
     )

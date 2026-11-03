@@ -1,6 +1,6 @@
 import { createAcceptHeader, isMediaType } from '@owf/identity-common'
 import { StatusListError } from './status-list-error'
-import { MediaTypes } from './types'
+import { StatusListMediaTypes } from './types'
 
 export const fetchStatusList = async ({
   uri,
@@ -20,7 +20,9 @@ export const fetchStatusList = async ({
     }
 
     const acceptHeader = createAcceptHeader(
-      acceptedFormats.map((format) => (format === 'jwt' ? MediaTypes.StatusListJwt : MediaTypes.StatusListCwt))
+      acceptedFormats.map((format) =>
+        format === 'jwt' ? StatusListMediaTypes.StatusListJwt : StatusListMediaTypes.StatusListCwt
+      )
     )
 
     const response = await customFetcher(uri, {
@@ -34,9 +36,9 @@ export const fetchStatusList = async ({
     }
 
     const contentType = response.headers.get('Content-Type')
-    if (isMediaType(contentType, MediaTypes.StatusListJwt)) {
+    if (isMediaType(contentType, StatusListMediaTypes.StatusListJwt)) {
       return await response.text()
-    } else if (isMediaType(contentType, MediaTypes.StatusListCwt)) {
+    } else if (isMediaType(contentType, StatusListMediaTypes.StatusListCwt)) {
       // NOTE: RN does not support .blob, use .arrayBuffer() instead
       return new Uint8Array(await response.arrayBuffer())
     }

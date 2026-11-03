@@ -1,6 +1,5 @@
 import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { ContentType } from '@openid4vc/utils'
-import { isMediaType, ValidationError } from '@owf/identity-common'
+import { CommonMediaTypes, isMediaType, ValidationError } from '@owf/identity-common'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../version'
 import { type CredentialRequestBodyOptions, decryptCredentialRequest } from './decrypt-credential-request'
@@ -89,7 +88,7 @@ function credentialRequestEncryptionRequired(): Oauth2ServerErrorResponseError {
 export async function parseCredentialRequest(
   options: ParseCredentialRequestOptions
 ): Promise<ParseCredentialRequestReturn> {
-  if (isMediaType(options.contentType, ContentType.Jwt)) {
+  if (isMediaType(options.contentType, CommonMediaTypes.Jwt)) {
     const credentialRequest = await decryptCredentialRequest({
       body: options.body,
       issuerMetadata: options.issuerMetadata,
@@ -102,7 +101,7 @@ export async function parseCredentialRequest(
     )
   }
 
-  if (isMediaType(options.contentType, ContentType.Json)) {
+  if (isMediaType(options.contentType, CommonMediaTypes.Json)) {
     if (options.issuerMetadata.credentialIssuer.credential_request_encryption?.encryption_required) {
       throw credentialRequestEncryptionRequired()
     }
@@ -124,7 +123,7 @@ export async function parseCredentialRequest(
 export async function parseDeferredCredentialRequest(
   options: ParseCredentialRequestOptions
 ): Promise<ParseDeferredCredentialRequestReturn> {
-  if (isMediaType(options.contentType, ContentType.Jwt)) {
+  if (isMediaType(options.contentType, CommonMediaTypes.Jwt)) {
     const credentialRequest = await decryptCredentialRequest({
       body: options.body,
       issuerMetadata: options.issuerMetadata,
@@ -137,7 +136,7 @@ export async function parseDeferredCredentialRequest(
     )
   }
 
-  if (isMediaType(options.contentType, ContentType.Json)) {
+  if (isMediaType(options.contentType, CommonMediaTypes.Json)) {
     if (options.issuerMetadata.credentialIssuer.credential_request_encryption?.encryption_required) {
       throw credentialRequestEncryptionRequired()
     }
