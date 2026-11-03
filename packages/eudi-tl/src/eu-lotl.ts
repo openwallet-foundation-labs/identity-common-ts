@@ -23,7 +23,7 @@ import { type VerifyTrustedListOptions, type VerifyTrustedListResult, verifyTrus
  * 1. pass its own `trustAnchors`, e.g. from configuration;
  * 2. after verifying a LOTL, read the currently published set from its own
  *    self-pointer with `getPointerSigningCertificates(lotl, { tslType:
- *    TSLType.EUlistofthelists })` and persist it — rotation is announced in a
+ *    TslType.EUlistofthelists })` and persist it — rotation is announced in a
  *    list still signed by the previous generation of keys;
  * 3. follow the pivot LOTLs advertised in the list's `SchemeInformationURI`
  *    when the pinned set has fallen behind entirely.

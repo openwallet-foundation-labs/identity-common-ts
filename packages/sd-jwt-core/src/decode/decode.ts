@@ -12,10 +12,10 @@ import {
   SD_LIST_KEY,
   SD_SEPARATOR,
 } from '../types'
-import { Disclosure, SDJWTError } from '../utils'
+import { Disclosure, SdJwtError } from '../utils'
 
 /**
- * Decode a JWT with `decodeJwt` from `@owf/identity-common`, rethrowing failures as an `SDJWTError`.
+ * Decode a JWT with `decodeJwt` from `@owf/identity-common`, rethrowing failures as an `SdJwtError`.
  */
 export const decodeJwt = <H extends Record<string, unknown>, T extends Record<string, unknown>>(
   jwt: string
@@ -23,7 +23,7 @@ export const decodeJwt = <H extends Record<string, unknown>, T extends Record<st
   try {
     return decodeJwtCommon<H, T>(jwt)
   } catch {
-    throw new SDJWTError('Invalid JWT as input')
+    throw new SdJwtError('Invalid JWT as input')
   }
 }
 
@@ -35,7 +35,7 @@ export const decodeJwt = <H extends Record<string, unknown>, T extends Record<st
 export const splitSdJwt = (sdjwt: string): { jwt: string; disclosures: string[]; kbJwt?: string } => {
   const [encodedJwt, ...encodedDisclosures] = sdjwt.split(SD_SEPARATOR)
   if (encodedDisclosures.length === 0) {
-    throw new SDJWTError('Invalid SD-JWT: missing SD-JWT separator')
+    throw new SdJwtError('Invalid SD-JWT: missing SD-JWT separator')
   }
 
   const encodedKeyBindingJwt = encodedDisclosures.pop()
@@ -48,18 +48,18 @@ export const splitSdJwt = (sdjwt: string): { jwt: string; disclosures: string[];
 
 // Decode the sdjwt into the jwt, disclosures and keybinding jwt
 // jwt, disclosures and keybinding jwt are also decoded
-export const decodeSdJwt = async (sdjwt: string, hasher: Hasher): Promise<DecodedSDJwt> => {
+export const decodeSdJwt = async (sdjwt: string, hasher: Hasher): Promise<DecodedSdJwt> => {
   const [encodedJwt, ...encodedDisclosures] = sdjwt.split(SD_SEPARATOR)
   const jwt = decodeJwt(encodedJwt)
 
   if (encodedDisclosures.length === 0) {
-    throw new SDJWTError('Invalid SD-JWT: missing SD-JWT separator')
+    throw new SdJwtError('Invalid SD-JWT: missing SD-JWT separator')
   }
 
   const encodedKeyBindingJwt = encodedDisclosures.pop()
   const kbJwt = encodedKeyBindingJwt ? decodeJwt(encodedKeyBindingJwt) : undefined
 
-  const { _sd_alg } = getSDAlgAndPayload(jwt.payload)
+  const { _sd_alg } = getSdAlgAndPayload(jwt.payload)
 
   const disclosures = await Promise.all(
     encodedDisclosures.map((ed) => Disclosure.fromEncode(ed, { alg: _sd_alg, hasher }))
@@ -72,18 +72,18 @@ export const decodeSdJwt = async (sdjwt: string, hasher: Hasher): Promise<Decode
   }
 }
 
-export const decodeSdJwtSync = (sdjwt: string, hasher: HasherSync): DecodedSDJwt => {
+export const decodeSdJwtSync = (sdjwt: string, hasher: HasherSync): DecodedSdJwt => {
   const [encodedJwt, ...encodedDisclosures] = sdjwt.split(SD_SEPARATOR)
   const jwt = decodeJwt(encodedJwt)
 
   if (encodedDisclosures.length === 0) {
-    throw new SDJWTError('Invalid SD-JWT: missing SD-JWT separator')
+    throw new SdJwtError('Invalid SD-JWT: missing SD-JWT separator')
   }
 
   const encodedKeyBindingJwt = encodedDisclosures.pop()
   const kbJwt = encodedKeyBindingJwt ? decodeJwt(encodedKeyBindingJwt) : undefined
 
-  const { _sd_alg } = getSDAlgAndPayload(jwt.payload)
+  const { _sd_alg } = getSdAlgAndPayload(jwt.payload)
 
   const disclosures = encodedDisclosures.map((ed) => Disclosure.fromEncodeSync(ed, { alg: _sd_alg, hasher }))
 
@@ -131,19 +131,19 @@ const unpackArray = (
       const hash = item[SD_LIST_KEY]
       if (SD_LIST_KEY in item) {
         if (Object.keys(item).length !== 1 || typeof hash !== 'string') {
-          throw new SDJWTError('Invalid array disclosure placeholder')
+          throw new SdJwtError('Invalid array disclosure placeholder')
         }
         // RFC 9901 Section 7.1 step 4: reject duplicate digests
         if (seenDigests) {
           if (seenDigests.has(hash)) {
-            throw new SDJWTError('Duplicate digest found in SD-JWT payload')
+            throw new SdJwtError('Duplicate digest found in SD-JWT payload')
           }
           seenDigests.add(hash)
         }
         const disclosed = map[hash]
         if (disclosed) {
           if (typeof disclosed.key === 'string') {
-            throw new SDJWTError('Object-property disclosure cannot be used as an array element')
+            throw new SdJwtError('Object-property disclosure cannot be used as an array element')
           }
           const presentKey = prefix ? `${prefix}.${idx}` : `${idx}`
           keys[presentKey] = hash
@@ -189,7 +189,7 @@ export const unpackObj = (obj: unknown, map: Record<string, Disclosure>) => {
   const mapDigests = Object.keys(map)
   const unusedDigests = mapDigests.filter((d) => !seenDigests.has(d))
   if (unusedDigests.length > 0) {
-    throw new SDJWTError('Unreferenced disclosure(s) detected in SD-JWT')
+    throw new SdJwtError('Unreferenced disclosure(s) detected in SD-JWT')
   }
 
   return result
@@ -210,7 +210,7 @@ const unpackObjInternal = (
     const record = obj as Record<string, unknown>
     for (const key in record) {
       if (prefix && key === '_sd_alg') {
-        throw new SDJWTError('Nested _sd_alg is not allowed')
+        throw new SdJwtError('Nested _sd_alg is not allowed')
       }
       if (key !== SD_DIGEST && key !== SD_LIST_KEY && typeof record[key] === 'object') {
         const escapedKey = encodePathSegment(key)
@@ -232,27 +232,27 @@ const unpackObjInternal = (
     const claims: Record<string, unknown> = {}
     if (_sd !== undefined) {
       if (!Array.isArray(_sd) || !_sd.every((hash) => typeof hash === 'string')) {
-        throw new SDJWTError('Invalid _sd claim: expected array of strings')
+        throw new SdJwtError('Invalid _sd claim: expected array of strings')
       }
       for (const hash of _sd) {
         // RFC 9901 Section 7.1 step 4: reject duplicate digests
         if (seenDigests) {
           if (seenDigests.has(hash)) {
-            throw new SDJWTError('Duplicate digest found in SD-JWT payload')
+            throw new SdJwtError('Duplicate digest found in SD-JWT payload')
           }
           seenDigests.add(hash)
         }
         const disclosed = map[hash]
         if (disclosed) {
           if (typeof disclosed.key !== 'string') {
-            throw new SDJWTError('Array disclosure cannot be used as an object property')
+            throw new SdJwtError('Array disclosure cannot be used as an object property')
           }
           // RFC 9901 Section 7.1 step 3c.ii.3: reject if claim name already exists
           if (disclosed.key in payload) {
-            throw new SDJWTError(`Disclosed claim name "${disclosed.key}" conflicts with existing payload key`)
+            throw new SdJwtError(`Disclosed claim name "${disclosed.key}" conflicts with existing payload key`)
           }
           if (disclosed.key in claims) {
-            throw new SDJWTError(`Disclosed claim name "${disclosed.key}" conflicts with another disclosure`)
+            throw new SdJwtError(`Disclosed claim name "${disclosed.key}" conflicts with another disclosure`)
           }
 
           const escapedKey = encodePathSegment(disclosed.key)
@@ -289,7 +289,7 @@ export const createHashMapping = async (disclosures: Array<Disclosure>, hash: Ha
     const disclosure = disclosures[i]
     const digest = await disclosure.digest(hash)
     if (digest in map) {
-      throw new SDJWTError('Duplicate disclosure digest detected')
+      throw new SdJwtError('Duplicate disclosure digest detected')
     }
     map[digest] = disclosure
   }
@@ -302,7 +302,7 @@ export const createHashMappingSync = (disclosures: Array<Disclosure>, hash: Hash
     const disclosure = disclosures[i]
     const digest = disclosure.digestSync(hash)
     if (digest in map) {
-      throw new SDJWTError('Duplicate disclosure digest detected')
+      throw new SdJwtError('Duplicate disclosure digest detected')
     }
     map[digest] = disclosure
   }
@@ -310,7 +310,7 @@ export const createHashMappingSync = (disclosures: Array<Disclosure>, hash: Hash
 }
 
 // Extract _sd_alg. If it is not present, it is assumed to be sha-256
-export const getSDAlgAndPayload = (
+export const getSdAlgAndPayload = (
   SdJwtPayload: Record<string, unknown>,
   allowedAlgorithms: ReadonlyArray<HashAlgorithm> = DEFAULT_SECURE_HASH_ALGORITHMS
 ) => {
@@ -319,22 +319,22 @@ export const getSDAlgAndPayload = (
     return { _sd_alg: 'sha-256', payload }
   }
   if (typeof _sd_alg !== 'string') {
-    throw new SDJWTError('Invalid _sd_alg: expected string')
+    throw new SdJwtError('Invalid _sd_alg: expected string')
   }
   if (!IANA_HASH_ALGORITHMS.includes(_sd_alg as (typeof IANA_HASH_ALGORITHMS)[number])) {
-    throw new SDJWTError(`Invalid _sd_alg: ${_sd_alg}`)
+    throw new SdJwtError(`Invalid _sd_alg: ${_sd_alg}`)
   }
   if (!allowedAlgorithms.includes(_sd_alg as HashAlgorithm)) {
-    throw new SDJWTError(`Disallowed _sd_alg: ${_sd_alg}`)
+    throw new SdJwtError(`Disallowed _sd_alg: ${_sd_alg}`)
   }
   return { _sd_alg, payload }
 }
 
 // Match the digests of the disclosures with the claims and extract the claims
 // unpack function use unpackObjInternal and unpackArray to recursively unpack the claims
-// Since getSDAlgAndPayload create new object So we don't need to clone it again
+// Since getSdAlgAndPayload create new object So we don't need to clone it again
 export const unpack = async (SdJwtPayload: Record<string, unknown>, disclosures: Array<Disclosure>, hasher: Hasher) => {
-  const { _sd_alg, payload } = getSDAlgAndPayload(SdJwtPayload)
+  const { _sd_alg, payload } = getSdAlgAndPayload(SdJwtPayload)
   const hash = { hasher, alg: _sd_alg }
   const map = await createHashMapping(disclosures, hash)
 
@@ -346,7 +346,7 @@ export const unpackSync = (
   disclosures: Array<Disclosure>,
   hasher: HasherSync
 ) => {
-  const { _sd_alg, payload } = getSDAlgAndPayload(SdJwtPayload)
+  const { _sd_alg, payload } = getSdAlgAndPayload(SdJwtPayload)
   const hash = { hasher, alg: _sd_alg }
   const map = createHashMappingSync(disclosures, hash)
 
@@ -355,7 +355,7 @@ export const unpackSync = (
 
 // This is the type of the object that is returned by the decodeSdJwt function
 // It is a combination of the decoded jwt, the disclosures and the keybinding jwt
-export type DecodedSDJwt = {
+export type DecodedSdJwt = {
   jwt: {
     header: Record<string, unknown>
     payload: Record<string, unknown> // raw payload of sd-jwt

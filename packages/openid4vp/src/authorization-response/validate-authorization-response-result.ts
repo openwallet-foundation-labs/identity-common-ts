@@ -1,7 +1,7 @@
 import type { PexPresentationSubmission } from '../models/z-pex'
 import type { VpTokenPresentationEntry } from '../vp-token/z-vp-token'
 
-export interface ValidateOpenid4VpPexAuthorizationResponseResult {
+export interface ValidateOpenid4vpPexAuthorizationResponseResult {
   type: 'pex'
 
   pex: {
@@ -13,13 +13,13 @@ export interface ValidateOpenid4VpPexAuthorizationResponseResult {
   )
 }
 
-export interface ValidateOpenid4VpDcqlAuthorizationResponseResult {
+export interface ValidateOpenid4vpDcqlAuthorizationResponseResult {
   type: 'dcql'
   dcql: {
     presentations: Record<string, [VpTokenPresentationEntry, ...VpTokenPresentationEntry[]]>
   } & ({ scope: string; query?: never } | { scope?: never; query: unknown })
 }
 
-export type ValidateOpenid4VpAuthorizationResponseResult =
-  | ValidateOpenid4VpPexAuthorizationResponseResult
-  | ValidateOpenid4VpDcqlAuthorizationResponseResult
+export type ValidateOpenid4vpAuthorizationResponseResult =
+  | ValidateOpenid4vpPexAuthorizationResponseResult
+  | ValidateOpenid4vpDcqlAuthorizationResponseResult

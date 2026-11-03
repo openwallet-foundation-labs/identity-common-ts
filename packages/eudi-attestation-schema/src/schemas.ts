@@ -18,14 +18,14 @@ export const AttestationFormatValues = ['dc+sd-jwt', 'mso_mdoc'] as const
 
 export const zAttestationFormat = z.enum(AttestationFormatValues)
 
-export const AttestationLoSValues = [
+export const AttestationLosValues = [
   'iso_18045_high',
   'iso_18045_moderate',
   'iso_18045_enhanced-basic',
   'iso_18045_basic',
 ] as const
 
-export const zAttestationLoS = z.enum(AttestationLoSValues)
+export const zAttestationLos = z.enum(AttestationLosValues)
 
 export const BindingTypeValues = ['claim', 'key', 'biometric', 'none'] as const
 
@@ -84,7 +84,7 @@ const zX509TrustAuthority = z
 export const zTrustAuthority = z.discriminatedUnion('frameworkType', [zEtsiTlTrustAuthority, zX509TrustAuthority])
 
 // ============================================================================
-// SchemaURI Meta Sub-schemas
+// SchemaUri Meta Sub-schemas
 // ============================================================================
 
 /**
@@ -190,19 +190,19 @@ export const zSha256Sri = z
 // Schema Sub-class (Section 4.3.2)
 // ============================================================================
 
-const _schemaURIBase = {
+const _schemaUriBase = {
   uri: z.string().url(),
   integrity: zSha256Sri,
 }
 
-export const zSchemaURI = z.discriminatedUnion('formatIdentifier', [
+export const zSchemaUri = z.discriminatedUnion('formatIdentifier', [
   z.object({
-    ..._schemaURIBase,
+    ..._schemaUriBase,
     formatIdentifier: z.literal('dc+sd-jwt'),
     meta: zSdJwtMeta,
   }),
   z.object({
-    ..._schemaURIBase,
+    ..._schemaUriBase,
     formatIdentifier: z.literal('mso_mdoc'),
     meta: zMsoMdocMeta,
   }),
@@ -258,9 +258,9 @@ export const zSchemaMeta = z
     rulebookURI: z.string().url(),
     rulebookIntegrity: zSha256Sri,
     trustedAuthorities: z.array(zTrustAuthority).optional(),
-    attestationLoS: zAttestationLoS,
+    attestationLoS: zAttestationLos,
     bindingType: zBindingType,
-    schemaURIs: z.array(zSchemaURI).min(1),
+    schemaURIs: z.array(zSchemaUri).min(1),
     issuanceProfile: zIssuanceProfile.optional(),
   })
   .superRefine((data, ctx) => {

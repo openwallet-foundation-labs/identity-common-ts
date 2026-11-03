@@ -1,4 +1,4 @@
-import type { kbHeader, kbPayload } from '@sd-jwt/core'
+import type { KbJwtHeader, KbJwtPayload } from '@sd-jwt/core'
 import type { SdJwtVcPayload } from './sd-jwt-vc-payload'
 import type { ResolvedTypeMetadata } from './sd-jwt-vc-type-metadata-format'
 import type { TypeMetadataVerificationResult } from './type-metadata-verification'
@@ -8,8 +8,8 @@ export type VerificationResult = {
   header: Record<string, unknown> | undefined
   kb:
     | {
-        payload: kbPayload
-        header: kbHeader
+        payload: KbJwtPayload
+        header: KbJwtHeader
       }
     | undefined
 

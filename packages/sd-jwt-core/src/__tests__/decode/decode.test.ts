@@ -7,11 +7,11 @@ import {
   decodeSdJwtSync,
   getClaims,
   getClaimsSync,
-  getSDAlgAndPayload,
+  getSdAlgAndPayload,
   splitSdJwt,
   unpackObj,
 } from '../../decode'
-import { base64urlEncode, SDJWTError, uint8ArrayToBase64Url } from '../../utils'
+import { base64urlEncode, SdJwtError, uint8ArrayToBase64Url } from '../../utils'
 
 describe('decode tests', () => {
   test('decode jwt', () => {
@@ -32,14 +32,14 @@ describe('decode tests', () => {
     expect(() => decodeJwt(jwt)).toThrow('Invalid JWT as input')
   })
 
-  test('decode jwt rejects invalid UTF-8 and invalid JSON with an SDJWTError', () => {
+  test('decode jwt rejects invalid UTF-8 and invalid JSON with an SdJwtError', () => {
     const header = base64urlEncode(JSON.stringify({ alg: 'EdDSA' }))
     // `{"a":"` followed by an invalid UTF-8 sequence (0xc3 0x28) and `"}`
     const invalidUtf8 = uint8ArrayToBase64Url(
       new Uint8Array([0x7b, 0x22, 0x61, 0x22, 0x3a, 0x22, 0xc3, 0x28, 0x22, 0x7d])
     )
 
-    expect(() => decodeJwt(`${header}.${invalidUtf8}.sig`)).toThrow(SDJWTError)
+    expect(() => decodeJwt(`${header}.${invalidUtf8}.sig`)).toThrow(SdJwtError)
     expect(() => decodeJwt(`${header}.${invalidUtf8}.sig`)).toThrow('Invalid JWT as input')
     expect(() => decodeJwt(`${header}.${base64urlEncode('{not json')}.sig`)).toThrow('Invalid JWT as input')
   })
@@ -166,7 +166,7 @@ describe('decode tests', () => {
   })
 
   test('Test default sd hash algorithm', () => {
-    const { _sd_alg } = getSDAlgAndPayload({})
+    const { _sd_alg } = getSdAlgAndPayload({})
     expect(_sd_alg).toBe('sha-256')
   })
 
@@ -176,7 +176,7 @@ describe('decode tests', () => {
     const decodedSdJwt = await decodeSdJwt(sdjwt, digest)
     const jwtPayload = JSON.parse(JSON.stringify(decodedSdJwt.jwt.payload))
 
-    const { _sd_alg } = getSDAlgAndPayload(decodedSdJwt.jwt.payload)
+    const { _sd_alg } = getSdAlgAndPayload(decodedSdJwt.jwt.payload)
     const hash = { hasher: digest, alg: _sd_alg }
     const map = await createHashMapping(decodedSdJwt.disclosures, hash)
 

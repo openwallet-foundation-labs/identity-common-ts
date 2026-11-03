@@ -7,7 +7,7 @@ import {
   hasAttestationProviderEntitlement,
   isLegalPersonRegistrationCertificate,
   isNaturalPersonRegistrationCertificate,
-  isPSPSubEntitlement,
+  isPspSubEntitlement,
   isValidEntitlement,
   PSP_SUB_ENTITLEMENTS,
   RegistrationCertificateError,
@@ -15,7 +15,7 @@ import {
   validateLegalPersonRegistrationCertificate,
   validateNaturalPersonRegistrationCertificate,
   validateRegistrationCertificate,
-  validateRegistrationCertificateJWTHeader,
+  validateRegistrationCertificateJwtHeader,
   validateRegistrationCertificatePayload,
   WRP_ENTITLEMENTS,
   zRegistrationCertificatePayload,
@@ -146,13 +146,13 @@ describe('Entitlements', () => {
     })
   })
 
-  describe('isPSPSubEntitlement', () => {
+  describe('isPspSubEntitlement', () => {
     it('should return true for PSP sub-entitlements', () => {
-      expect(isPSPSubEntitlement(PSP_SUB_ENTITLEMENTS.PAYMENT_INITIATION)).toBe(true)
+      expect(isPspSubEntitlement(PSP_SUB_ENTITLEMENTS.PAYMENT_INITIATION)).toBe(true)
     })
 
     it('should return false for non-PSP entitlements', () => {
-      expect(isPSPSubEntitlement(WRP_ENTITLEMENTS.SERVICE_PROVIDER)).toBe(false)
+      expect(isPspSubEntitlement(WRP_ENTITLEMENTS.SERVICE_PROVIDER)).toBe(false)
     })
   })
 
@@ -221,14 +221,14 @@ describe('Validators', () => {
     })
   })
 
-  describe('validateRegistrationCertificateJWTHeader', () => {
+  describe('validateRegistrationCertificateJwtHeader', () => {
     it('should validate valid header', () => {
-      const result = validateRegistrationCertificateJWTHeader(validJWTHeader)
+      const result = validateRegistrationCertificateJwtHeader(validJWTHeader)
       expect(result.valid).toBe(true)
     })
 
     it('should reject invalid typ', () => {
-      const result = validateRegistrationCertificateJWTHeader({ ...validJWTHeader, typ: 'jwt' })
+      const result = validateRegistrationCertificateJwtHeader({ ...validJWTHeader, typ: 'jwt' })
       expect(result.valid).toBe(false)
     })
   })

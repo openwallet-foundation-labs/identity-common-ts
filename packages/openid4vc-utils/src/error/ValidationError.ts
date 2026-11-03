@@ -1,8 +1,8 @@
 import type { ZodError } from 'zod'
 import { formatZodError } from '../zod-error'
-import { OpenId4VcBaseError } from './OpenId4VcBaseError'
+import { Openid4vcBaseError } from './Openid4vcBaseError'
 
-export class ValidationError extends OpenId4VcBaseError {
+export class ValidationError extends Openid4vcBaseError {
   public zodError: ZodError | undefined
 
   constructor(message: string, zodError?: ZodError) {

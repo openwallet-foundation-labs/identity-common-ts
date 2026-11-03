@@ -143,7 +143,7 @@ async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetc
   const response = await createFetcher(fetch)(requestUri, {
     method: 'get',
     headers: {
-      Accept: `${ContentType.OAuthAuthorizationRequestJwt}, ${ContentType.Jwt};q=0.9, text/plain`,
+      Accept: `${ContentType.OauthAuthorizationRequestJwt}, ${ContentType.Jwt};q=0.9, text/plain`,
       'Content-Type': ContentType.XWwwFormUrlencoded,
     },
   }).catch(() => {

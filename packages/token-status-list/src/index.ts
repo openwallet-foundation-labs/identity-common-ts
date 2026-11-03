@@ -16,8 +16,8 @@ export type {
 export { StatusListInfo } from './cbor/status-list-info'
 export { fetchStatusList } from './fetch-status-list'
 export type { EncryptBlock } from './ff1'
-export type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
-export { JWT_STATUS_LIST_TYPE, JWTClaimNames } from './jwt-types'
+export type { JwtWithStatusListPayload, StatusListJwtHeaderParameters, StatusListJwtPayload } from './jwt-types'
+export { JWT_STATUS_LIST_TYPE, JwtClaimNames } from './jwt-types'
 export { StatusList } from './status-list'
 export { StatusListEntryNotValidError, StatusListError } from './status-list-error'
 export type {
@@ -35,8 +35,8 @@ export { createFeistelStatusListIndexAllocator, FeistelStatusListIndexAllocator 
 export type { VerifyStatusListJwtClaimsOptions } from './status-list-jwt'
 export {
   createHeaderAndPayload,
-  getListFromStatusListJWT,
-  getStatusListFromJWT,
+  getListFromStatusListJwt,
+  getStatusListFromJwt,
   verifyStatus,
   verifyStatusListJwtClaims,
   verifyStatusListJwtHeader,

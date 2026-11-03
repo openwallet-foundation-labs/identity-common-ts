@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { schemaMeta, schemaURI, trustAuthority } from '../builders'
+import { schemaMeta, schemaUri, trustAuthority } from '../builders'
 
 const RULEBOOK_INTEGRITY = 'sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw='
 const SCHEMA_INTEGRITY = 'sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw='
@@ -60,9 +60,9 @@ describe('TrustAuthorityBuilder', () => {
   })
 })
 
-describe('SchemaURIBuilder', () => {
+describe('SchemaUriBuilder', () => {
   it('should create a schema URI for dc+sd-jwt format with vct', () => {
-    const schema = schemaURI()
+    const schema = schemaUri()
       .format('dc+sd-jwt')
       .uri('https://example.com/schema.json')
       .integrity(SCHEMA_INTEGRITY)
@@ -76,7 +76,7 @@ describe('SchemaURIBuilder', () => {
   })
 
   it('should create a schema URI for mso_mdoc format', () => {
-    const schema = schemaURI()
+    const schema = schemaUri()
       .format('mso_mdoc')
       .uri('https://example.com/schema.json')
       .integrity(SCHEMA_INTEGRITY)
@@ -88,7 +88,7 @@ describe('SchemaURIBuilder', () => {
   })
 
   it('adds portable OID4VCI metadata to an SD-JWT binding', () => {
-    const schema = schemaURI()
+    const schema = schemaUri()
       .format('dc+sd-jwt')
       .uri('https://example.com/schema.json')
       .integrity(SCHEMA_INTEGRITY)
@@ -109,13 +109,13 @@ describe('SchemaURIBuilder', () => {
 
   it('should throw when integrity is missing', () => {
     expect(() => {
-      schemaURI().format('dc+sd-jwt').uri('https://example.com/schema.json').meta({ vct: 'example.1' }).build()
+      schemaUri().format('dc+sd-jwt').uri('https://example.com/schema.json').meta({ vct: 'example.1' }).build()
     }).toThrow('Invalid SchemaURI')
   })
 
   it('should throw when integrity is not sha256 SRI', () => {
     expect(() => {
-      schemaURI()
+      schemaUri()
         .format('dc+sd-jwt')
         .uri('https://example.com/schema.json')
         .integrity('sha512-abc')
@@ -134,8 +134,8 @@ describe('SchemaMetaBuilder', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/schema.json')
           .integrity(SCHEMA_INTEGRITY)
@@ -167,8 +167,8 @@ describe('SchemaMetaBuilder', () => {
       )
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/schema.json')
           .integrity(SCHEMA_INTEGRITY)
@@ -189,16 +189,16 @@ describe('SchemaMetaBuilder', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_high')
       .bindingType('claim')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/schema-sdjwt.json')
           .integrity(SCHEMA_INTEGRITY)
           .meta({ vct: 'eu.example.schema.1' })
           .build()
       )
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('mso_mdoc')
           .uri('https://example.com/schema-mdoc.json')
           .integrity(SCHEMA_INTEGRITY)
@@ -219,16 +219,16 @@ describe('SchemaMetaBuilder', () => {
         .rulebookIntegrity(RULEBOOK_INTEGRITY)
         .attestationLoS('iso_18045_basic')
         .bindingType('none')
-        .addSchemaURI(
-          schemaURI()
+        .addSchemaUri(
+          schemaUri()
             .format('dc+sd-jwt')
             .uri('https://example.com/schema.json')
             .integrity(SCHEMA_INTEGRITY)
             .meta({ vct: 'eu.example.1' })
             .build()
         )
-        .addSchemaURI(
-          schemaURI()
+        .addSchemaUri(
+          schemaUri()
             .format('dc+sd-jwt')
             .uri('https://example.com/schema-v2.json')
             .integrity(SCHEMA_INTEGRITY)
@@ -247,8 +247,8 @@ describe('SchemaMetaBuilder', () => {
         .rulebookURI('https://example.com/rulebook.md')
         .attestationLoS('iso_18045_basic')
         .bindingType('key')
-        .addSchemaURI(
-          schemaURI()
+        .addSchemaUri(
+          schemaUri()
             .format('dc+sd-jwt')
             .uri('https://example.com/schema.json')
             .integrity(SCHEMA_INTEGRITY)
@@ -268,8 +268,8 @@ describe('SchemaMetaBuilder', () => {
         .rulebookIntegrity(RULEBOOK_INTEGRITY)
         .attestationLoS('iso_18045_basic')
         .bindingType('key')
-        .addSchemaURI(
-          schemaURI()
+        .addSchemaUri(
+          schemaUri()
             .format('dc+sd-jwt')
             .uri('https://example.com/schema.json')
             .integrity(SCHEMA_INTEGRITY)

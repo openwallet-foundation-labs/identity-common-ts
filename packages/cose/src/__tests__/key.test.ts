@@ -120,4 +120,24 @@ describe('cose key', () => {
     expect(newJwk.y).toStrictEqual(jwk.y)
     expect(newJwk.alg).toStrictEqual(jwk.alg)
   })
+
+  test('converts jwk key_ops (RFC 7517 Section 4.3)', () => {
+    const coordinate = base64url.encode(new Uint8Array(32).fill(1))
+    const coseKey = CoseKey.fromJwk({ kty: 'EC', crv: 'P-256', x: coordinate, y: coordinate, key_ops: ['verify'] })
+
+    expect(coseKey.keyOps).toStrictEqual([KeyOps.Verify])
+    expect(coseKey.jwk.key_ops).toStrictEqual(['verify'])
+    expect(coseKey.jwk).not.toHaveProperty('keyOps')
+  })
+
+  test('converts jwk sign and verify of a MAC key to COSE MAC create and MAC verify (RFC 9052 Table 5)', () => {
+    const coseKey = CoseKey.fromJwk({
+      kty: 'oct',
+      k: base64url.encode(new Uint8Array(32)),
+      key_ops: ['sign', 'verify'],
+    })
+
+    expect(coseKey.keyOps).toStrictEqual([KeyOps.MacCreate, KeyOps.MacVerify])
+    expect(coseKey.jwk.key_ops).toStrictEqual(['sign', 'verify'])
+  })
 })

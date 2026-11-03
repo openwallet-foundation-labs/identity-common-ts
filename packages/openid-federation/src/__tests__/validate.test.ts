@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { zConstraint } from '../constraints'
 import { zEntityConfigurationClaims } from '../entityConfiguration'
 import { zEntityStatementClaims } from '../entityStatement'
-import { federationEntityMetadata, openIdProviderEntityMetadata } from '../metadata'
+import { federationEntityMetadata, openidProviderEntityMetadata } from '../metadata'
 import { zMetadataPolicy } from '../metadata/metadataPolicy'
 import { zTrustMarkClaims, zTrustMarkIssuer, zTrustMarkOwner } from '../trustMark'
 import { validate } from '../utils/validate'
@@ -239,7 +239,7 @@ describe('zod validation schemas', () => {
     })
 
     it('should validate figure 63 -- metadata', () => {
-      expect(() => validate({ schema: openIdProviderEntityMetadata.schema, data: metadataFigure63 })).not.toThrow()
+      expect(() => validate({ schema: openidProviderEntityMetadata.schema, data: metadataFigure63 })).not.toThrow()
     })
 
     it('should validate figure 69 -- entity configuration', () => {

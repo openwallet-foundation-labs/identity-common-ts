@@ -222,7 +222,7 @@ export const REGISTRATION_CERTIFICATE_JWS_ALGORITHMS = [
  * requires a JAdES B-B signature, whose protected header carries `iat` as the claimed
  * signing time (ETSI TS 119 182-1 clause 5.1.9). The informative Annex C header omits it.
  */
-export const zRegistrationCertificateJWTHeader = z.object({
+export const zRegistrationCertificateJwtHeader = z.object({
   /** Type of the Web Token - must be "rc-wrp+jwt" for JWT */
   typ: zTyp('rc-wrp+jwt'),
   /** Algorithm used to sign the JWT */
@@ -241,7 +241,7 @@ export const zRegistrationCertificateJWTHeader = z.object({
  * GEN-5.2.1-05 requires an advanced electronic signature per RFC 9052 and RFC 9360
  * rather than a JAdES profile, so no claimed signing time is imposed here.
  */
-export const zRegistrationCertificateCWTHeader = z.object({
+export const zRegistrationCertificateCwtHeader = z.object({
   /** Type of the Web Token - must be "rc-wrp+cwt" for CWT */
   typ: z.literal('rc-wrp+cwt'),
   /** Algorithm used to sign the CWT per RFC 9052 */
@@ -259,16 +259,16 @@ export const zRegistrationCertificateCWTHeader = z.object({
 /**
  * Complete JWT registration certificate schema
  */
-export const zRegistrationCertificateJWT = z.object({
-  header: zRegistrationCertificateJWTHeader,
+export const zRegistrationCertificateJwt = z.object({
+  header: zRegistrationCertificateJwtHeader,
   payload: zRegistrationCertificatePayload,
 })
 
 /**
  * Complete CWT registration certificate schema
  */
-export const zRegistrationCertificateCWT = z.object({
-  header: zRegistrationCertificateCWTHeader,
+export const zRegistrationCertificateCwt = z.object({
+  header: zRegistrationCertificateCwtHeader,
   payload: zRegistrationCertificatePayload,
 })
 

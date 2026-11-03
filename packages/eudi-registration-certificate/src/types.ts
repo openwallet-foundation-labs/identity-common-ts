@@ -18,10 +18,10 @@ import type {
   zMultiLangString,
   zNaturalPersonSubject,
   zProvidedAttestation,
-  zRegistrationCertificateCWT,
-  zRegistrationCertificateCWTHeader,
-  zRegistrationCertificateJWT,
-  zRegistrationCertificateJWTHeader,
+  zRegistrationCertificateCwt,
+  zRegistrationCertificateCwtHeader,
+  zRegistrationCertificateJwt,
+  zRegistrationCertificateJwtHeader,
   zRegistrationCertificatePayload,
   zStatus,
   zStatusList,
@@ -78,20 +78,20 @@ export type NaturalPersonSubject = z.infer<typeof zNaturalPersonSubject>
 // ============================================================================
 
 /** JWT Header for registration certificate */
-export type RegistrationCertificateJWTHeader = z.infer<typeof zRegistrationCertificateJWTHeader>
+export type RegistrationCertificateJwtHeader = z.infer<typeof zRegistrationCertificateJwtHeader>
 
 /** CWT Header for registration certificate */
-export type RegistrationCertificateCWTHeader = z.infer<typeof zRegistrationCertificateCWTHeader>
+export type RegistrationCertificateCwtHeader = z.infer<typeof zRegistrationCertificateCwtHeader>
 
 // ============================================================================
 // Complete Registration Certificate Types
 // ============================================================================
 
 /** Complete JWT registration certificate document */
-export type RegistrationCertificateJWT = z.infer<typeof zRegistrationCertificateJWT>
+export type RegistrationCertificateJwt = z.infer<typeof zRegistrationCertificateJwt>
 
 /** Complete CWT registration certificate document */
-export type RegistrationCertificateCWT = z.infer<typeof zRegistrationCertificateCWT>
+export type RegistrationCertificateCwt = z.infer<typeof zRegistrationCertificateCwt>
 
 // ============================================================================
 // Signed Registration Certificate Types
@@ -102,7 +102,7 @@ export interface SignedRegistrationCertificate {
   /** The compact JWS string */
   jws: string
   /** Decoded header */
-  header: RegistrationCertificateJWTHeader
+  header: RegistrationCertificateJwtHeader
   /** Decoded payload */
   payload: RegistrationCertificatePayload
 }
@@ -114,7 +114,7 @@ export interface SignOptions {
   /** Required subject of the access certificate the registration certificate is intended to authorize */
   accessCertificateSub: string
   /** Algorithm (default: ES256) */
-  algorithm?: RegistrationCertificateJWTHeader['alg']
+  algorithm?: RegistrationCertificateJwtHeader['alg']
   /** PEM-encoded certificates for x5c header (each element is a single PEM certificate) */
   certificates: string[]
   /** Key ID (optional) */

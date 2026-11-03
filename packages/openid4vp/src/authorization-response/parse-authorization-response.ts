@@ -5,10 +5,10 @@ import { getOpenid4vpClientId } from '../client-identifier-prefix/parse-client-i
 import type { VerifiedJarmAuthorizationResponse } from '../jarm/jarm-authorization-response/verify-jarm-authorization-response'
 import type { JarmHeader } from '../jarm/jarm-authorization-response/z-jarm-authorization-response'
 import { isJarmResponseMode } from '../jarm/jarm-response-mode'
-import { parseOpenid4VpAuthorizationResponsePayload } from './parse-authorization-response-payload'
+import { parseOpenid4vpAuthorizationResponsePayload } from './parse-authorization-response-payload'
 import { parseJarmAuthorizationResponse } from './parse-jarm-authorization-response'
 import { validateOpenid4vpAuthorizationResponsePayload } from './validate-authorization-response'
-import type { ValidateOpenid4VpAuthorizationResponseResult } from './validate-authorization-response-result'
+import type { ValidateOpenid4vpAuthorizationResponseResult } from './validate-authorization-response-result'
 import type { Openid4vpAuthorizationResponse } from './z-authorization-response'
 
 export interface ParseOpenid4vpAuthorizationResponseOptions {
@@ -23,7 +23,7 @@ export interface ParseOpenid4vpAuthorizationResponseOptions {
   origin?: string
 }
 
-export type ParsedOpenid4vpAuthorizationResponse = ValidateOpenid4VpAuthorizationResponseResult & {
+export type ParsedOpenid4vpAuthorizationResponse = ValidateOpenid4vpAuthorizationResponseResult & {
   authorizationResponsePayload: Openid4vpAuthorizationResponse
   expectedNonce: string
   jarm?: VerifiedJarmAuthorizationResponse & {
@@ -51,9 +51,9 @@ export async function parseOpenid4vpAuthorizationResponse(
     })
   }
 
-  const authorizationResponsePayload = parseOpenid4VpAuthorizationResponsePayload(authorizationResponse)
+  const authorizationResponsePayload = parseOpenid4vpAuthorizationResponsePayload(authorizationResponse)
 
-  const validatedOpenId4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
+  const validatedOpenid4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
     authorizationRequestPayload: authorizationRequestPayload,
     authorizationResponsePayload: authorizationResponsePayload,
   })
@@ -71,7 +71,7 @@ export async function parseOpenid4vpAuthorizationResponse(
   }
 
   return {
-    ...validatedOpenId4vpResponse,
+    ...validatedOpenid4vpResponse,
     expectedNonce: authorizationRequestPayload.nonce,
 
     authorizationResponsePayload,

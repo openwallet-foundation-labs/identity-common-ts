@@ -245,10 +245,10 @@ export function getRevocationStatus(
   }
 
   if (idp) {
-    const isCA = certificate.basicConstraints?.cA === true
+    const isCa = certificate.basicConstraints?.cA === true
     if (idp.onlyContainsAttributeCerts) return unknown('out_of_scope', 'The CRL only covers attribute certificates')
-    if (idp.onlyContainsCACerts && !isCA) return unknown('out_of_scope', 'The CRL only covers CA certificates')
-    if (idp.onlyContainsUserCerts && isCA) return unknown('out_of_scope', 'The CRL only covers end-entity certificates')
+    if (idp.onlyContainsCACerts && !isCa) return unknown('out_of_scope', 'The CRL only covers CA certificates')
+    if (idp.onlyContainsUserCerts && isCa) return unknown('out_of_scope', 'The CRL only covers end-entity certificates')
     if (
       idp.distributionPointUris.length > 0 &&
       !idp.distributionPointUris.some((uri) => certificate.crlDistributionPoints.includes(uri))

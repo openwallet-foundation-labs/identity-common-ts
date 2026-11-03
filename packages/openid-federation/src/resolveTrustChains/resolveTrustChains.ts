@@ -2,7 +2,7 @@ import type { EntityConfigurationClaims } from '../entityConfiguration'
 import { zEntityConfigurationJwt } from '../entityConfiguration/entityConfigurationJwt'
 import type { EntityStatementChain, EntityStatementClaims } from '../entityStatement'
 import { zEntityStatementJwt } from '../entityStatement/entityStatementJwt'
-import { OpenIdFederationError } from '../error/OpenIdFederationError'
+import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import type { JsonWebKeySetOptions } from '../jsonWeb'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
@@ -119,7 +119,7 @@ type FetchedEntityConfiguration = { jwt: string; claims: EntityConfigurationClai
 
 const ENTITY_STATEMENT_CONTENT_TYPE = 'application/entity-statement+jwt'
 
-const fail = (message: string) => new OpenIdFederationError(PolicyErrorStage.Validation, message)
+const fail = (message: string) => new OpenidFederationError(PolicyErrorStage.Validation, message)
 
 const reasonOf = (error: unknown) => (error instanceof Error && error.message ? error.message : String(error))
 

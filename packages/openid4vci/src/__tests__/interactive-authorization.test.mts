@@ -10,7 +10,7 @@ import {
 import {
   createOpenid4vpAuthorizationRequest,
   type Openid4vpAuthorizationRequestIae,
-  parseOpenid4VpAuthorizationResponsePayload,
+  parseOpenid4vpAuthorizationResponsePayload,
   resolveOpenid4vpAuthorizationRequest,
   validateOpenid4vpAuthorizationRequestIaePayload,
   validateOpenid4vpAuthorizationResponsePayload,
@@ -1337,7 +1337,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
     // --- STEP 7: Wallet creates and validates openid4vp response ---
     const authorizationResponsePayload = { vp_token: exampleVpToken }
 
-    const parsedResponse = parseOpenid4VpAuthorizationResponsePayload(authorizationResponsePayload)
+    const parsedResponse = parseOpenid4vpAuthorizationResponsePayload(authorizationResponsePayload)
     expect(parsedResponse.vp_token).toEqual(exampleVpToken)
 
     const validatedResponse = validateOpenid4vpAuthorizationResponsePayload({

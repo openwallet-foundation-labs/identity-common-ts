@@ -14,9 +14,9 @@
  */
 
 // Constants
-export { CommitmentOIDs, CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS, JAdESProfile } from './constants'
+export { CommitmentOids, CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS, JadesProfile } from './constants'
 // Error
-export { JAdESError } from './jades-error'
+export { JadesError } from './jades-error'
 // Profile validation
 export type { ProfileValidationOptions, ProfileValidationResult } from './profile'
 export { detectProfiles, validateProfile } from './profile'
@@ -27,12 +27,12 @@ export {
   zCertId,
   zClaimedSigningTime,
   zCommitmentReference,
-  zCompactJWS,
+  zCompactJws,
   zEtsiU,
   zEtsiUClearInstance,
-  zFlattenedJWS,
-  zGeneralJWS,
-  zOId,
+  zFlattenedJws,
+  zGeneralJws,
+  zOid,
   zPkiObject,
   zProtectedHeader,
   zProtectedHeaderForSigning,
@@ -66,12 +66,12 @@ export type {
   ArcTst,
   CertId,
   CommitmentReference,
-  CompactJWS,
+  CompactJws,
   EtsiU,
   EtsiUClearInstance,
-  FlattenedJWS,
-  GeneralJWS,
-  OId,
+  FlattenedJws,
+  GeneralJws,
+  Oid,
   PkiObject,
   ProtectedHeader,
   ProtectedHeaderParams,

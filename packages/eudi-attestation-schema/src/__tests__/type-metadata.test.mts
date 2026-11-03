@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { schemaMeta, schemaURI } from '../builders'
+import { schemaMeta, schemaUri } from '../builders'
 import { buildDcqlFromSchemaMeta } from '../dcql'
 import { resolveSchemaReferences } from '../resolver'
 import { mergeTypeMetadata, zTypeMetadata } from '../type-metadata'
@@ -21,7 +21,7 @@ function buildMeta(uri: string, integrity: string, vct = VCT) {
     .rulebookIntegrity(RULEBOOK_INTEGRITY)
     .attestationLoS('iso_18045_basic')
     .bindingType('key')
-    .addSchemaURI(schemaURI().format('dc+sd-jwt').uri(uri).integrity(integrity).meta({ vct }).build())
+    .addSchemaUri(schemaUri().format('dc+sd-jwt').uri(uri).integrity(integrity).meta({ vct }).build())
     .build()
 }
 

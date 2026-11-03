@@ -1,8 +1,8 @@
 import { splitSdJwt } from './decode'
 import { SD_SEPARATOR, type Signer } from './types'
-import { base64urlEncode, SDJWTError } from './utils'
+import { base64urlEncode, SdJwtError } from './utils'
 
-export type GeneralJSONData = {
+export type GeneralJsonData = {
   payload: string
   disclosures: Array<string>
   kb_jwt?: string
@@ -13,7 +13,7 @@ export type GeneralJSONData = {
   }>
 }
 
-export type GeneralJSONSerialized = {
+export type GeneralJsonSerialized = {
   payload: string
   signatures: Array<{
     header: {
@@ -27,7 +27,7 @@ export type GeneralJSONSerialized = {
   }>
 }
 
-export class GeneralJSON {
+export class GeneralJson {
   public payload: string
   public disclosures: Array<string>
   public kb_jwt?: string
@@ -37,7 +37,7 @@ export class GeneralJSON {
     kid?: string
   }>
 
-  constructor(data: GeneralJSONData) {
+  constructor(data: GeneralJsonData) {
     this.payload = data.payload
     this.disclosures = data.disclosures
     this.kb_jwt = data.kb_jwt
@@ -49,10 +49,10 @@ export class GeneralJSON {
 
     const { 0: protectedHeader, 1: payload, 2: signature } = jwt.split('.')
     if (!protectedHeader || !payload || !signature) {
-      throw new SDJWTError('Invalid JWT')
+      throw new SdJwtError('Invalid JWT')
     }
 
-    return new GeneralJSON({
+    return new GeneralJson({
       payload,
       disclosures,
       kb_jwt: kbJwt,
@@ -65,23 +65,23 @@ export class GeneralJSON {
     })
   }
 
-  public static fromSerialized(json: GeneralJSONSerialized) {
+  public static fromSerialized(json: GeneralJsonSerialized) {
     if (!json.signatures[0]) {
-      throw new SDJWTError('Invalid JSON')
+      throw new SdJwtError('Invalid JSON')
     }
     // RFC 7515 Section 4.1.11: crit MUST be integrity protected
     if (json.signatures.some((s) => s.header && 'crit' in s.header)) {
-      throw new SDJWTError('crit MUST only appear in the protected header')
+      throw new SdJwtError('crit MUST only appear in the protected header')
     }
     for (let index = 1; index < json.signatures.length; index++) {
       const header = json.signatures[index].header
       if (header && ('disclosures' in header || 'kb_jwt' in header)) {
-        throw new SDJWTError('disclosures and kb_jwt MUST only appear in the first unprotected header')
+        throw new SdJwtError('disclosures and kb_jwt MUST only appear in the first unprotected header')
       }
     }
     const disclosures = json.signatures[0].header?.disclosures ?? []
     const kb_jwt = json.signatures[0].header?.kb_jwt
-    return new GeneralJSON({
+    return new GeneralJson({
       payload: json.payload,
       disclosures,
       kb_jwt,
@@ -125,7 +125,7 @@ export class GeneralJSON {
 
   public toEncoded(index: number) {
     if (index < 0 || index >= this.signatures.length) {
-      throw new SDJWTError('Index out of bounds')
+      throw new SdJwtError('Index out of bounds')
     }
     const data: string[] = []
 

@@ -190,7 +190,7 @@ export class CoseKey extends CborStructure<CoseKeyEncodedStructure, CoseKeyDecod
       const mappedKey = jwkCoseOptionsMap[key] ?? key
 
       const mapFunction = jwkToCoseKey[key as keyof typeof jwkToCoseKey]
-      const convertedValue = mapFunction ? mapFunction(value) : value
+      const convertedValue = mapFunction ? mapFunction(value, jwk) : value
 
       // Only include if value is not undefined
       if (convertedValue !== undefined) {

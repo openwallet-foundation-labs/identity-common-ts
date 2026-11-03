@@ -14,7 +14,7 @@ export async function authorizationServerRequestWithDpopRetry<T>(options: {
     return await options.request(options.dpop)
   } catch (error) {
     if (options.dpop && error instanceof Oauth2ClientErrorResponseError) {
-      const dpopRetry = shouldRetryAuthorizationServerRequestWithDPoPNonce({
+      const dpopRetry = shouldRetryAuthorizationServerRequestWithDpopNonce({
         responseHeaders: error.response.headers,
         errorResponse: error.errorResponse,
       })
@@ -49,7 +49,7 @@ export interface ShouldRetryAuthorizationServerRequestWithDpopNonceOptions {
   responseHeaders: FetchHeaders
 }
 
-export function shouldRetryAuthorizationServerRequestWithDPoPNonce(
+export function shouldRetryAuthorizationServerRequestWithDpopNonce(
   options: ShouldRetryAuthorizationServerRequestWithDpopNonceOptions
 ) {
   if (options.errorResponse.error !== 'use_dpop_nonce') {
@@ -84,7 +84,7 @@ export interface ShouldRetryResourceRequestWithDpopNonceOptions {
   responseHeaders: FetchHeaders
 }
 
-export function shouldRetryResourceRequestWithDPoPNonce(options: ShouldRetryResourceRequestWithDpopNonceOptions) {
+export function shouldRetryResourceRequestWithDpopNonce(options: ShouldRetryResourceRequestWithDpopNonceOptions) {
   const useDpopNonceChallenge = options.resourceUnauthorizedError.wwwAuthenticateHeaders.find(
     (challenge) =>
       challenge.scheme === SupportedAuthenticationScheme.DPoP && challenge.error === Oauth2ErrorCodes.UseDpopNonce

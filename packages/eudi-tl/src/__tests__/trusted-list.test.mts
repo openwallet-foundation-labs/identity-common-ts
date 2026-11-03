@@ -10,7 +10,7 @@ import {
   ServiceType,
   TrustedListParseError,
   TrustedListValidationError,
-  TSLType,
+  TslType,
   validateTrustedList,
 } from '../index'
 import {
@@ -32,7 +32,7 @@ describe('parseTrustedList', () => {
     const tl = parseTrustedList(UNSIGNED_TSL_XML)
     expect(validateTrustedList(tl).valid).toBe(true)
 
-    expect(tl.tslType).toBe(TSLType.EUgeneric)
+    expect(tl.tslType).toBe(TslType.EUgeneric)
     expect(tl.schemeOperatorName).toBe('Test Scheme Operator') // 'en' entry preferred
     // the list's own territory, not the one of a pointer
     expect(tl.schemeTerritory).toBe('ES')
@@ -75,7 +75,7 @@ describe('parseTrustedList', () => {
     expect(tl.pointersToOtherLists).toHaveLength(2)
     expect(tl.pointersToOtherLists?.[0]).toEqual({
       location: 'https://ec.europa.eu/tools/lotl/eu-lotl.xml',
-      tslType: TSLType.EUlistofthelists,
+      tslType: TslType.EUlistofthelists,
       schemeTerritory: 'EU',
       digitalIdentities: [
         {

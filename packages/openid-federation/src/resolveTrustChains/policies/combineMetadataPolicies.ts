@@ -1,5 +1,5 @@
 import type { EntityStatementClaims } from '../../entityStatement'
-import { OpenIdFederationError } from '../../error/OpenIdFederationError'
+import { OpenidFederationError } from '../../error/OpenidFederationError'
 import { PolicyErrorStage } from '../../error/PolicyErrorStage'
 import { isExistingPolicyKey, zMetadataPolicy } from '../../metadata'
 import type { MetadataPolicy } from '../../metadata/metadataPolicy'
@@ -17,7 +17,7 @@ export function combineMetadataPolicies({
 }): {
   mergedPolicy: MetadataPolicy
 } {
-  if (statements.length === 0) throw new OpenIdFederationError(PolicyErrorStage.Generic, 'Chain is empty')
+  if (statements.length === 0) throw new OpenidFederationError(PolicyErrorStage.Generic, 'Chain is empty')
   const mergedPolicyMap = new MetadataHelper({})
 
   // We start from the TA and go down to the intermediate
@@ -42,7 +42,7 @@ export function combineMetadataPolicies({
             (method) => !isExistingPolicyKey(method) && metadataPolicyCrit.includes(method)
           )
           if (unsupportedMethodsAndRequired.length > 0) {
-            throw new OpenIdFederationError(
+            throw new OpenidFederationError(
               PolicyErrorStage.MetadataPolicyCrit,
               `Unsupported policy method and is required by the metadata_policy_crit: ${unsupportedMethodsAndRequired.join(', ')}`
             )

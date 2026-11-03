@@ -2,7 +2,7 @@ import { hasher } from '@owf/crypto'
 import { base64, compareBytes } from '@owf/identity-common'
 import { SchemaMetaError } from './schema-meta-error'
 import { mergeTypeMetadata, type TypeMetadata, zTypeMetadata } from './type-metadata'
-import type { ResolvedSchemaReference, ResolverContent, ResolveSchemaReferencesOptions, SchemaURI } from './types'
+import type { ResolvedSchemaReference, ResolverContent, ResolveSchemaReferencesOptions, SchemaUri } from './types'
 
 const DEFAULT_MAX_EXTENDS_DEPTH = 10
 
@@ -159,7 +159,7 @@ async function resolveExtendsChain(
 
 async function resolveSdJwtReference(
   document: unknown,
-  schemaURI: Extract<SchemaURI, { formatIdentifier: 'dc+sd-jwt' }>,
+  schemaUri: Extract<SchemaUri, { formatIdentifier: 'dc+sd-jwt' }>,
   context: string,
   options: FetchOptions & { maxExtendsDepth: number }
 ): Promise<{ typeMetadata?: TypeMetadata; parsedSchema?: Record<string, unknown> }> {
@@ -170,12 +170,12 @@ async function resolveSdJwtReference(
 
   const typeMetadata = await resolveExtendsChain(parseTypeMetadata(document, context), context, {
     ...options,
-    visited: new Set<string>([schemaURI.uri]),
+    visited: new Set<string>([schemaUri.uri]),
   })
 
-  if (typeMetadata.vct !== schemaURI.meta.vct) {
+  if (typeMetadata.vct !== schemaUri.meta.vct) {
     throw new SchemaMetaError(
-      `${context}.vct '${typeMetadata.vct}' does not match the catalogue entry vct '${schemaURI.meta.vct}'`
+      `${context}.vct '${typeMetadata.vct}' does not match the catalogue entry vct '${schemaUri.meta.vct}'`
     )
   }
 
@@ -196,24 +196,24 @@ export async function resolveSchemaReferences(
   const fetchOptions: FetchOptions = { resolve, verifyIntegrity }
   const resolved: ResolvedSchemaReference[] = []
 
-  for (const [index, schemaURI] of schemaMeta.schemaURIs.entries()) {
-    if (selectedSet && !selectedSet.has(schemaURI.formatIdentifier)) {
+  for (const [index, schemaUri] of schemaMeta.schemaURIs.entries()) {
+    if (selectedSet && !selectedSet.has(schemaUri.formatIdentifier)) {
       continue
     }
 
     const context = `schemaURIs[${index}]`
-    const rawSchema = await fetchDocument(schemaURI.uri, schemaURI.integrity, `${context}.uri`, fetchOptions)
+    const rawSchema = await fetchDocument(schemaUri.uri, schemaUri.integrity, `${context}.uri`, fetchOptions)
 
     const { typeMetadata, parsedSchema } =
-      schemaURI.formatIdentifier === 'dc+sd-jwt'
-        ? await resolveSdJwtReference(rawSchema, schemaURI, context, { ...fetchOptions, maxExtendsDepth })
+      schemaUri.formatIdentifier === 'dc+sd-jwt'
+        ? await resolveSdJwtReference(rawSchema, schemaUri, context, { ...fetchOptions, maxExtendsDepth })
         : { typeMetadata: undefined, parsedSchema: isPlainObject(rawSchema) ? rawSchema : undefined }
 
     resolved.push({
-      format: schemaURI.formatIdentifier,
-      uri: schemaURI.uri,
-      integrity: schemaURI.integrity,
-      meta: schemaURI.meta,
+      format: schemaUri.formatIdentifier,
+      uri: schemaUri.uri,
+      integrity: schemaUri.integrity,
+      meta: schemaUri.meta,
       rawSchema,
       typeMetadata,
       parsedSchema,

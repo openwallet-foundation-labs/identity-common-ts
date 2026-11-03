@@ -53,7 +53,7 @@ describe('validateSchemaMeta', () => {
     expect(result.valid).toBe(false)
   })
 
-  it('rejects schemaURI missing integrity', () => {
+  it('rejects schemaUri missing integrity', () => {
     const result = validateSchemaMeta({
       ...validSchemaMeta,
       schemaURIs: [{ formatIdentifier: 'dc+sd-jwt', uri: 'https://example.com/schema.json', meta: { vct: 'x' } }],

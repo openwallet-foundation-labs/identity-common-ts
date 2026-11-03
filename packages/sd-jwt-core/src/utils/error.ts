@@ -4,7 +4,7 @@ import type {
   VerificationErrorCode,
 } from '../types/verification-error'
 
-export interface SDJWTErrorOptions {
+export interface SdJwtErrorOptions {
   /**
    * Additional information about the failure, for example the values a failed check compared.
    */
@@ -22,7 +22,7 @@ export interface SDJWTErrorOptions {
   cause?: unknown
 }
 
-export class SDJWTError extends Error {
+export class SdJwtError extends Error {
   public details?: unknown
 
   /**
@@ -36,10 +36,10 @@ export class SDJWTError extends Error {
    */
   public cause?: unknown
 
-  constructor(message: string, options: SDJWTErrorOptions = {}) {
+  constructor(message: string, options: SdJwtErrorOptions = {}) {
     super(message)
-    Object.setPrototypeOf(this, SDJWTError.prototype)
-    this.name = 'SDJWTError'
+    Object.setPrototypeOf(this, SdJwtError.prototype)
+    this.name = 'SdJwtError'
     this.details = options.details
     this.code = options.code
     if (options.cause !== undefined) this.cause = options.cause
@@ -55,13 +55,13 @@ export class SDJWTError extends Error {
  * check compared: a token a few seconds past the allowed skew points to clock drift, one far past
  * it to an expired or stale token.
  */
-export class JwtTimeClaimError extends SDJWTError {
+export class JwtTimeClaimError extends SdJwtError {
   declare details: JwtTimeClaimErrorDetails
   declare code: JwtTimeClaimErrorCode
 
   constructor(
     message: string,
-    options: SDJWTErrorOptions & { details: JwtTimeClaimErrorDetails; code: JwtTimeClaimErrorCode }
+    options: SdJwtErrorOptions & { details: JwtTimeClaimErrorDetails; code: JwtTimeClaimErrorCode }
   ) {
     super(message, options)
     Object.setPrototypeOf(this, JwtTimeClaimError.prototype)

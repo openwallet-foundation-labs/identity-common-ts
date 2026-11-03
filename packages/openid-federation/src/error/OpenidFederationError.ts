@@ -1,7 +1,7 @@
 import type { ZodError } from 'zod'
 import { PolicyErrorStage } from './PolicyErrorStage'
 
-export class OpenIdFederationError extends Error {
+export class OpenidFederationError extends Error {
   public constructor(
     public readonly errorCode: PolicyErrorStage,
     message?: string,
@@ -11,10 +11,10 @@ export class OpenIdFederationError extends Error {
   }
 
   public static fromZodError(zodError: ZodError) {
-    return new OpenIdFederationError(PolicyErrorStage.Validation, undefined, zodError)
+    return new OpenidFederationError(PolicyErrorStage.Validation, undefined, zodError)
   }
 
   public static isMetadataPolicyCritError(error: unknown) {
-    return error instanceof OpenIdFederationError && error.errorCode === PolicyErrorStage.MetadataPolicyCrit
+    return error instanceof OpenidFederationError && error.errorCode === PolicyErrorStage.MetadataPolicyCrit
   }
 }

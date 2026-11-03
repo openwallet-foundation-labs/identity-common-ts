@@ -10,15 +10,15 @@
 import type { Signer } from '@owf/crypto'
 import type { z } from 'zod'
 import type {
-  zCompatLoTEDocument,
-  zJWKPublicKey,
+  zCompatLoteDocument,
+  zJwkPublicKey,
   zListAndSchemeInformation,
   zLocalizedString,
-  zLocalizedURI,
-  zLoTE,
-  zLoTEDocument,
-  zLoTEQualifier,
-  zOtherLoTEPointer,
+  zLocalizedUri,
+  zLote,
+  zLoteDocument,
+  zLoteQualifier,
+  zOtherLotePointer,
   zPkiObject,
   zPolicyOrLegalNotice,
   zPostalAddress,
@@ -39,7 +39,7 @@ import type {
 // ============================================================================
 
 export type LocalizedString = z.infer<typeof zLocalizedString>
-export type LocalizedURI = z.infer<typeof zLocalizedURI>
+export type LocalizedUri = z.infer<typeof zLocalizedUri>
 
 // ============================================================================
 // Address Types
@@ -55,7 +55,7 @@ export type TrustedEntityAddress = z.infer<typeof zTrustedEntityAddress>
 
 export type PkiObject = z.infer<typeof zPkiObject>
 export type X509CertificateRef = z.infer<typeof zX509CertificateRef>
-export type JWKPublicKey = z.infer<typeof zJWKPublicKey>
+export type JwkPublicKey = z.infer<typeof zJwkPublicKey>
 export type ServiceDigitalIdentity = z.infer<typeof zServiceDigitalIdentity>
 
 // ============================================================================
@@ -82,9 +82,9 @@ export type TrustedEntity = z.infer<typeof zTrustedEntity>
 // ============================================================================
 
 export type PolicyOrLegalNotice = z.infer<typeof zPolicyOrLegalNotice>
-export type LoTEQualifier = z.infer<typeof zLoTEQualifier>
-export type OtherLoTEPointer = z.infer<typeof zOtherLoTEPointer>
-export type PointersToOtherLoTE = OtherLoTEPointer[]
+export type LoTEQualifier = z.infer<typeof zLoteQualifier>
+export type OtherLotePointer = z.infer<typeof zOtherLotePointer>
+export type PointersToOtherLoTE = OtherLotePointer[]
 export type SchemeExtensions = unknown[]
 export type ListAndSchemeInformation = z.infer<typeof zListAndSchemeInformation>
 
@@ -92,17 +92,17 @@ export type ListAndSchemeInformation = z.infer<typeof zListAndSchemeInformation>
 // LoTE Root Types
 // ============================================================================
 
-export type LoTE = z.infer<typeof zLoTE>
-export type LoTEDocument = z.infer<typeof zLoTEDocument>
-/** A LoTE document that `validateLoTE` accepts in compat mode */
-export type CompatLoTEDocument = z.infer<typeof zCompatLoTEDocument>
+export type LoTE = z.infer<typeof zLote>
+export type LoteDocument = z.infer<typeof zLoteDocument>
+/** A LoTE document that `validateLote` accepts in compat mode */
+export type CompatLoteDocument = z.infer<typeof zCompatLoteDocument>
 
 // ============================================================================
 // Signed LoTE Types
 // ============================================================================
 
 /** Signed LoTE document (JWS format) */
-export interface SignedLoTE {
+export interface SignedLote {
   /** The compact JWS string */
   jws: string
   /** Decoded header */
@@ -113,13 +113,13 @@ export interface SignedLoTE {
     x5c?: string[]
   }
   /** Decoded payload */
-  payload: LoTEDocument
+  payload: LoteDocument
 }
 
 /** Options for signing a LoTE document */
 export interface SignOptions {
   /** The LoTE document to sign */
-  lote: LoTEDocument
+  lote: LoteDocument
   /** Key ID for the signing key */
   keyId: string
   /** Algorithm (default: ES256) */

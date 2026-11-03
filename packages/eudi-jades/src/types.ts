@@ -7,9 +7,9 @@ import type {
   zCommitmentReference,
   zEtsiU,
   zEtsiUClearInstance,
-  zFlattenedJWS,
-  zGeneralJWS,
-  zOId,
+  zFlattenedJws,
+  zGeneralJws,
+  zOid,
   zPkiObject,
   zProtectedHeader,
   zProtectedHeaderParams,
@@ -34,7 +34,7 @@ import type {
 } from './schemas'
 
 export type SignAlg = z.infer<typeof zSignAlg>
-export type OId = z.infer<typeof zOId>
+export type Oid = z.infer<typeof zOid>
 export type PkiObject = z.infer<typeof zPkiObject>
 export type TstToken = z.infer<typeof zTstToken>
 export type TstContainer = z.infer<typeof zTstContainer>
@@ -59,9 +59,9 @@ export type CertId = z.infer<typeof zCertId>
 export type XRefs = z.infer<typeof zXRefs>
 export type RRefs = z.infer<typeof zRRefs>
 export type ArcTst = TstContainer
-export type GeneralJWS = z.infer<typeof zGeneralJWS>
-export type FlattenedJWS = z.infer<typeof zFlattenedJWS>
-export type CompactJWS = string
+export type GeneralJws = z.infer<typeof zGeneralJws>
+export type FlattenedJws = z.infer<typeof zFlattenedJws>
+export type CompactJws = string
 
 /** Callbacks the token needs from its host environment. */
 export type TokenContext = {

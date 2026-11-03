@@ -29,7 +29,7 @@ export const zClaimedSigningTime = z
 /** JWS algorithm identifier from the IANA JOSE registry. */
 export const zSignAlg = zText.refine((value) => value.toLowerCase() !== 'none', 'alg must identify a signature')
 
-export const zOId = z
+export const zOid = z
   .object({ id: zUri, desc: z.string().optional(), docRefs: z.array(zUri).min(1).optional() })
   .strict()
 
@@ -58,7 +58,7 @@ export const zX5tO = zCertificateDigest.superRefine((value, context) => {
 
 export const zCommitmentReference = z
   .object({
-    commId: zOId,
+    commId: zOid,
     commQuals: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
   })
   .strict()
@@ -106,12 +106,12 @@ const zUserNotice = z
 export const zSignaturePolicyQualifier = z.union([
   z.object({ spURI: zUri }).strict(),
   z.object({ spUserNotice: zUserNotice }).strict(),
-  z.object({ spDSpec: zOId }).strict(),
+  z.object({ spDSpec: zOid }).strict(),
 ])
 
 export const zSignaturePolicy = z
   .object({
-    id: zOId,
+    id: zOid,
     digAlg: zDigestAlgorithm.optional(),
     digVal: zBase64Url.optional(),
     digPSp: z.boolean().optional(),
@@ -167,8 +167,8 @@ export const zSigD = z
   })
 
 export const zSignaturePolicyStore = z.union([
-  z.object({ sigPolDoc: zBase64Url, spDSpec: zOId.optional() }).strict(),
-  z.object({ sigPolLocalURI: zUriReference, spDSpec: zOId.optional() }).strict(),
+  z.object({ sigPolDoc: zBase64Url, spDSpec: zOid.optional() }).strict(),
+  z.object({ sigPolLocalURI: zUriReference, spDSpec: zOid.optional() }).strict(),
 ])
 export const zCertificateValue = z.union([
   z.object({ x509Cert: zPkiObject }).strict(),
@@ -192,7 +192,7 @@ export const zCertId = z
   .object({ digAlg: zDigestAlgorithm, digVal: zBase64Url, kid: zBase64.optional(), x5u: zUriReference.optional() })
   .strict()
 export const zXRefs = z.array(zCertId).min(1)
-const zCRLReference = z
+const zCrlReference = z
   .object({
     digAlg: zDigestAlgorithm,
     digVal: zBase64Url,
@@ -207,7 +207,7 @@ const zCRLReference = z
       .optional(),
   })
   .strict()
-const zOCSPReference = z
+const zOcspReference = z
   .object({
     ocspId: z
       .object({
@@ -222,24 +222,24 @@ const zOCSPReference = z
   .strict()
 export const zRRefs = z
   .object({
-    crlRefs: z.array(zCRLReference).min(1).optional(),
-    ocspRefs: z.array(zOCSPReference).min(1).optional(),
+    crlRefs: z.array(zCrlReference).min(1).optional(),
+    ocspRefs: z.array(zOcspReference).min(1).optional(),
     otherRefs: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, 'rRefs must not be empty')
 
-export const zJWSSignature = z
+export const zJwsSignature = z
   .object({
     protected: zBase64Url.optional(),
     header: z.record(z.string(), z.unknown()).optional(),
     signature: zBase64Url,
   })
   .strict()
-export const zGeneralJWS = z
-  .object({ payload: z.string().optional(), signatures: z.array(zJWSSignature).min(1) })
+export const zGeneralJws = z
+  .object({ payload: z.string().optional(), signatures: z.array(zJwsSignature).min(1) })
   .strict()
-export const zFlattenedJWS = z
+export const zFlattenedJws = z
   .object({
     protected: zBase64Url.optional(),
     header: z.record(z.string(), z.unknown()).optional(),
@@ -247,7 +247,7 @@ export const zFlattenedJWS = z
     signature: zBase64Url,
   })
   .strict()
-export const zCompactJWS = z.object({ protected: zBase64Url, payload: z.string(), signature: zBase64Url }).strict()
+export const zCompactJws = z.object({ protected: zBase64Url, payload: z.string(), signature: zBase64Url }).strict()
 
 const zCanonicalizedTstContainer = zTstContainer.extend({ canonAlg: zUri })
 const zNoCanonTstContainer = z.object({ canonAlg: z.never().optional(), tstTokens: zTstTokens }).strict()
@@ -264,7 +264,7 @@ const sharedEtsiUInstances = [
   z.object({ rRefs: zRRefs }).strict(),
   z.object({ axRefs: zXRefs }).strict(),
   z.object({ arRefs: zRRefs }).strict(),
-  z.object({ cSig: z.union([zGeneralJWS, zFlattenedJWS, z.string()]) }).strict(),
+  z.object({ cSig: z.union([zGeneralJws, zFlattenedJws, z.string()]) }).strict(),
 ] as const
 export const zEtsiUClearInstance = z.union([
   ...sharedEtsiUInstances,

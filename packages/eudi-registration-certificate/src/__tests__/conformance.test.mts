@@ -17,7 +17,7 @@ import {
   signRegistrationCertificate,
   toRegistrationCertificateDialect,
   validateRegistrationCertificate,
-  validateRegistrationCertificateJWTHeader,
+  validateRegistrationCertificateJwtHeader,
   validateRegistrationCertificatePayload,
   WRP_ENTITLEMENTS,
   zRegistrationCertificatePayload,
@@ -215,7 +215,7 @@ describe('GEN-5.2.1-04 JAdES B-B signature', () => {
     expect(signed.header.iat).toBeTypeOf('number')
     expect(signed.header.typ).toBe('rc-wrp+jwt')
     expect(signed.header.x5c).toHaveLength(1)
-    expect(validateRegistrationCertificateJWTHeader(signed.header).valid).toBe(true)
+    expect(validateRegistrationCertificateJwtHeader(signed.header).valid).toBe(true)
 
     expect(decodeRegistrationCertificate(signed.jws, 'LEINL-529900T8BM49AURSDO55').payload).toEqual(signed.payload)
   })
@@ -319,7 +319,7 @@ describe('issues', () => {
   })
 
   it('reports a wrong typ with the common code and the expected and actual typ', () => {
-    const result = validateRegistrationCertificateJWTHeader({
+    const result = validateRegistrationCertificateJwtHeader({
       typ: 'JWT',
       alg: 'ES256',
       x5c: ['MII'],
@@ -339,12 +339,12 @@ describe('issues', () => {
       ],
     })
     expect(
-      validateRegistrationCertificateJWTHeader({ alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 }).issues.map(
+      validateRegistrationCertificateJwtHeader({ alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 }).issues.map(
         (issue) => issue.message
       )
     ).toEqual(['typ is missing, it must be rc-wrp+jwt'])
     expect(
-      validateRegistrationCertificateJWTHeader({ typ: 'rc-wrp+jwt', alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 })
+      validateRegistrationCertificateJwtHeader({ typ: 'rc-wrp+jwt', alg: 'ES256', x5c: ['MII'], iat: 1_700_000_000 })
         .valid
     ).toBe(true)
   })

@@ -9,7 +9,7 @@ import {
   verifyJwt,
   zCompactJwt,
 } from '@openid4vc/oauth2'
-import { ContentType, joinUriParts, OpenId4VcBaseError, parseWithErrorHandling, URL } from '@openid4vc/utils'
+import { ContentType, joinUriParts, Openid4vcBaseError, parseWithErrorHandling, URL } from '@openid4vc/utils'
 import type { CredentialFormatIdentifier } from '../../formats/credential'
 import type { Openid4vciVersion } from '../../version'
 import type { IssuerMetadataResult } from '../fetch-issuer-metadata'
@@ -125,7 +125,7 @@ export async function fetchCredentialIssuerMetadata(
       acceptedContentType,
     })
   } catch (error) {
-    if (error instanceof OpenId4VcBaseError) throw error
+    if (error instanceof Openid4vcBaseError) throw error
 
     // An exception occurs if a CORS-policy blocks the request, i.e. because the URL is invalid due to the legacy path being used
     // The legacy path should still be tried therefore we store the first error to rethrow it later if needed

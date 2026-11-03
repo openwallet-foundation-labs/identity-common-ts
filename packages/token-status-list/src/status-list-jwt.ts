@@ -1,6 +1,6 @@
 import type { JwtPayload } from '@owf/identity-common'
 import { base64url, decodeJwt, isMediaType } from '@owf/identity-common'
-import type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
+import type { JwtWithStatusListPayload, StatusListJwtHeaderParameters, StatusListJwtPayload } from './jwt-types'
 import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
 import { StatusListEntryNotValidError, StatusListError } from './status-list-error'
@@ -17,7 +17,7 @@ function decodeJwtPayload<T extends Record<string, unknown>>(jwt: string): T {
 /**
  * Adds the status list to the payload and header of a JWT.
  */
-export function createHeaderAndPayload(list: StatusList, payload: JwtPayload, header: StatusListJWTHeaderParameters) {
+export function createHeaderAndPayload(list: StatusList, payload: JwtPayload, header: StatusListJwtHeaderParameters) {
   if (!payload.sub) {
     throw new StatusListError('sub field is required')
   }
@@ -36,8 +36,8 @@ export function createHeaderAndPayload(list: StatusList, payload: JwtPayload, he
 /**
  * Get the status list from a JWT, but do not verify the signature.
  */
-export function getListFromStatusListJWT(jwt: string): StatusList {
-  const payload = decodeJwtPayload<StatusListJWTPayload>(jwt)
+export function getListFromStatusListJwt(jwt: string): StatusList {
+  const payload = decodeJwtPayload<StatusListJwtPayload>(jwt)
   const statusList = payload.status_list
   const compressed = base64url.decode(statusList.lst)
   return StatusList.decompressStatusListFromBytes(compressed, statusList.bits)
@@ -46,8 +46,8 @@ export function getListFromStatusListJWT(jwt: string): StatusList {
 /**
  * Get the status list entry from a JWT, but do not verify the signature.
  */
-export function getStatusListFromJWT(jwt: string): StatusListEntry {
-  const payload = decodeJwtPayload<JWTwithStatusListPayload>(jwt)
+export function getStatusListFromJwt(jwt: string): StatusListEntry {
+  const payload = decodeJwtPayload<JwtWithStatusListPayload>(jwt)
   return payload.status.status_list
 }
 
@@ -85,7 +85,7 @@ export type VerifyStatusListJwtClaimsOptions = {
  * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5
  */
 export function verifyStatusListJwtClaims(
-  payload: StatusListJWTPayload,
+  payload: StatusListJwtPayload,
   {
     uri,
     now = new Date(),
@@ -192,7 +192,7 @@ export function verifyStatus({
   idx,
   ...claimsOptions
 }: { token: string; idx: number } & VerifyStatusListJwtClaimsOptions) {
-  const { header, payload } = decodeJwt<Record<string, unknown>, StatusListJWTPayload>(token)
+  const { header, payload } = decodeJwt<Record<string, unknown>, StatusListJwtPayload>(token)
 
   verifyStatusListJwtHeader(header)
   verifyStatusListJwtClaims(payload, claimsOptions)

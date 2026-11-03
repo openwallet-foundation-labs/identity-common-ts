@@ -6,7 +6,7 @@
 
 import { parseCertificateChain, sha256, sha384, sha512 } from '@owf/crypto'
 import { base64, base64urlEncode, uint8ArrayToBase64Url } from '@owf/identity-common'
-import { JAdESError } from './jades-error'
+import { JadesError } from './jades-error'
 import type { X5tO } from './types'
 
 /**
@@ -75,7 +75,7 @@ export function generateX5tO(certDer: string, algorithm: 'SHA-384' | 'SHA-512' =
  */
 export function generateSigX5ts(certsDer: string[], algorithm: 'SHA-256' | 'SHA-384' | 'SHA-512' = 'SHA-512'): X5tO[] {
   if (certsDer.length < 2) {
-    throw new JAdESError('sigX5ts requires at least 2 certificates')
+    throw new JadesError('sigX5ts requires at least 2 certificates')
   }
 
   if (algorithm === 'SHA-256') {
@@ -91,7 +91,7 @@ export function generateSigX5ts(certsDer: string[], algorithm: 'SHA-256' | 'SHA-
  * @returns Base64url-encoded JSON string
  * @internal
  */
-export function encodeJSON(obj: object): string {
+export function encodeJson(obj: object): string {
   return base64urlEncode(JSON.stringify(obj))
 }
 

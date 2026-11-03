@@ -1,16 +1,16 @@
 import { decodeJwt } from '@owf/identity-common'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
-  assertValidLoTE,
+  assertValidLote,
   getNotifiedTrustedEntities,
   LOTE_VALIDATION_CODES,
-  LoTEError,
-  type LoTEValidationError,
-  validateLoTE,
+  LoteError,
+  type LoteValidationError,
+  validateLote,
 } from '../index'
 import { LOTE_TYPES } from '../profiles'
-import type { CompatLoTEDocument, LoTEDocument } from '../types'
-import { LoTEProfile, type LoTEProfileDocument, type ValidationResult, validateLoTEProfile } from '../validator'
+import type { CompatLoteDocument, LoteDocument } from '../types'
+import { LoteProfile, type LoteProfileDocument, type ValidationResult, validateLoteProfile } from '../validator'
 import {
   EUPIDProvidersJWT,
   GermanPIDProvidersJWT,
@@ -26,7 +26,7 @@ import {
 } from './fixtures.mjs'
 
 describe('LoTE Validator', () => {
-  const createMinimalValidLoTE = (): LoTEDocument => ({
+  const createMinimalValidLote = (): LoteDocument => ({
     LoTE: {
       ListAndSchemeInformation: {
         LoTEVersionIdentifier: 1,
@@ -39,43 +39,43 @@ describe('LoTE Validator', () => {
     },
   })
 
-  describe('validateLoTE', () => {
+  describe('validateLote', () => {
     it('should validate a minimal valid LoTE document', () => {
-      const lote = createMinimalValidLoTE()
-      const result = validateLoTE(lote)
+      const lote = createMinimalValidLote()
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(true)
       expect(result.issues).toHaveLength(0)
     })
 
     it('should reject null', () => {
-      const result = validateLoTE(null)
+      const result = validateLote(null)
 
       expect(result.valid).toBe(false)
       expect(result.issues[0].message).toContain('expected object')
     })
 
     it('should reject undefined', () => {
-      const result = validateLoTE(undefined)
+      const result = validateLote(undefined)
 
       expect(result.valid).toBe(false)
     })
 
     it('should reject non-object values', () => {
-      expect(validateLoTE('string').valid).toBe(false)
-      expect(validateLoTE(123).valid).toBe(false)
-      expect(validateLoTE([]).valid).toBe(false)
+      expect(validateLote('string').valid).toBe(false)
+      expect(validateLote(123).valid).toBe(false)
+      expect(validateLote([]).valid).toBe(false)
     })
 
     it('should require LoTE field', () => {
-      const result = validateLoTE({})
+      const result = validateLote({})
 
       expect(result.valid).toBe(false)
       expect(result.issues.some((issue) => issue.path.join('.') === 'LoTE')).toBe(true)
     })
 
     it('should require ListAndSchemeInformation', () => {
-      const result = validateLoTE({ LoTE: {} })
+      const result = validateLote({ LoTE: {} })
 
       expect(result.valid).toBe(false)
       expect(result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation')).toBe(true)
@@ -84,11 +84,11 @@ describe('LoTE Validator', () => {
 
   describe('ListAndSchemeInformation validation', () => {
     it('should require LoTEVersionIdentifier', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       // @ts-expect-error - Testing invalid input
       delete lote.LoTE.ListAndSchemeInformation.LoTEVersionIdentifier
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(
@@ -97,11 +97,11 @@ describe('LoTE Validator', () => {
     })
 
     it('should require LoTESequenceNumber', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       // @ts-expect-error - Testing invalid input
       delete lote.LoTE.ListAndSchemeInformation.LoTESequenceNumber
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(
@@ -110,11 +110,11 @@ describe('LoTE Validator', () => {
     })
 
     it('should require SchemeOperatorName', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       // @ts-expect-error - Testing invalid input
       delete lote.LoTE.ListAndSchemeInformation.SchemeOperatorName
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(
@@ -123,19 +123,19 @@ describe('LoTE Validator', () => {
     })
 
     it('should require non-empty SchemeOperatorName array', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.SchemeOperatorName = []
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
     })
 
     it('should require valid ListIssueDateTime', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.ListIssueDateTime = 'invalid-date'
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(
@@ -144,10 +144,10 @@ describe('LoTE Validator', () => {
     })
 
     it('should require valid NextUpdate', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.NextUpdate = 'not-a-date'
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.NextUpdate')).toBe(
@@ -156,11 +156,11 @@ describe('LoTE Validator', () => {
     })
 
     it('should validate optional URI fields', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.LoTEType = 'not-a-uri'
       lote.LoTE.ListAndSchemeInformation.DistributionPoints = ['not-a-uri']
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(result.issues.some((issue) => issue.path.join('.') === 'LoTE.ListAndSchemeInformation.LoTEType')).toBe(
@@ -172,10 +172,10 @@ describe('LoTE Validator', () => {
     })
 
     it('should validate SchemeTerritory is 2-character code', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.SchemeTerritory = 'GERMANY'
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(
@@ -184,10 +184,10 @@ describe('LoTE Validator', () => {
     })
 
     it('should accept valid 2-character SchemeTerritory', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.SchemeTerritory = 'DE'
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(true)
     })
@@ -195,7 +195,7 @@ describe('LoTE Validator', () => {
 
   describe('PointersToOtherLoTE validation', () => {
     it('should validate PointersToOtherLoTE structure', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.PointersToOtherLoTE = [
         {
           LoTELocation: 'https://example.com/lote',
@@ -210,13 +210,13 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(true)
     })
 
     it('should reject invalid LoTELocation URI', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.PointersToOtherLoTE = [
         {
           LoTELocation: 'not-a-uri',
@@ -231,7 +231,7 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
     })
@@ -239,7 +239,7 @@ describe('LoTE Validator', () => {
 
   describe('TrustedEntity validation', () => {
     it('should validate trusted entities with services', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.TrustedEntitiesList = [
         {
           TrustedEntityInformation: {
@@ -270,13 +270,13 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(true)
     })
 
     it('should validate optional URI fields', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.TrustedEntitiesList = [
         {
           TrustedEntityInformation: {
@@ -313,7 +313,7 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(
@@ -326,7 +326,7 @@ describe('LoTE Validator', () => {
     })
 
     it('should require at least one service per entity', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.TrustedEntitiesList = [
         {
           TrustedEntityInformation: {
@@ -340,14 +340,14 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(result.issues.some((issue) => issue.path.includes('TrustedEntityServices'))).toBe(true)
     })
 
     it('should require service name', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.TrustedEntitiesList = [
         {
           TrustedEntityInformation: {
@@ -365,13 +365,13 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
     })
 
     it('should require digital identity with at least one type', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.TrustedEntitiesList = [
         {
           TrustedEntityInformation: {
@@ -389,7 +389,7 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       // The TS 119 602 JSON schema allows an empty ServiceDigitalIdentity; the EU profiles do not
       expect(result).toMatchObject({ valid: true, issues: [] })
@@ -398,7 +398,7 @@ describe('LoTE Validator', () => {
 
   describe('ServiceHistory validation', () => {
     it('should validate service history entries', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.TrustedEntitiesList = [
         {
           TrustedEntityInformation: {
@@ -424,13 +424,13 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(true)
     })
 
     it('should reject invalid service history status URI', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.TrustedEntitiesList = [
         {
           TrustedEntityInformation: {
@@ -456,7 +456,7 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
     })
@@ -486,28 +486,28 @@ describe('LoTE Validator', () => {
     })
 
     const withEntity = (entity: Record<string, unknown>) => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       return { LoTE: { ...lote.LoTE, TrustedEntitiesList: [entity] } }
     }
 
     const fullAddress = { lang: 'en', StreetAddress: '123 St', Locality: 'City', PostalCode: '12345', Country: 'DE' }
 
     it('should accept a list without TrustedEntitiesList', () => {
-      const { LoTE } = createMinimalValidLoTE()
+      const { LoTE } = createMinimalValidLote()
       const { TrustedEntitiesList: _, ...withoutEntities } = LoTE
 
-      expect(validateLoTE({ LoTE: withoutEntities })).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote({ LoTE: withoutEntities })).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should accept a service supply point without ServiceType', () => {
       const lote = withEntity(createTrustedEntity(fullAddress, [{ uriValue: 'https://issuer.example.com/' }]))
 
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should still require uriValue on a service supply point', () => {
       const lote = withEntity(createTrustedEntity(fullAddress, [{ ServiceType: 'https://example.com/type' }]))
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(result.issues.map((issue) => issue.path.join('.'))).toEqual([
@@ -522,7 +522,7 @@ describe('LoTE Validator', () => {
         ])
       )
 
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should still require StreetAddress and Country on a postal address', () => {
@@ -531,7 +531,7 @@ describe('LoTE Validator', () => {
           { uriValue: 'https://issuer.example.com/' },
         ])
       )
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(result.issues.map((issue) => issue.path.join('.'))).toEqual([
@@ -541,18 +541,18 @@ describe('LoTE Validator', () => {
     })
 
     it('should accept LoTELegalNotice as a plain string or a localized string', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.PolicyOrLegalNotice = [
         { LoTELegalNotice: 'Legal notice' },
         { LoTELegalNotice: { lang: 'en', value: 'Legal notice' } },
       ]
 
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should reject an empty LoTELegalNotice object', () => {
-      const lote = createMinimalValidLoTE()
-      const result = validateLoTE({
+      const lote = createMinimalValidLote()
+      const result = validateLote({
         LoTE: {
           ...lote.LoTE,
           ListAndSchemeInformation: {
@@ -569,7 +569,7 @@ describe('LoTE Validator', () => {
     })
 
     const withPolicyOrLegalNotice = (items: unknown[]) => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       return {
         LoTE: {
           ...lote.LoTE,
@@ -580,14 +580,14 @@ describe('LoTE Validator', () => {
     const policy = { LoTEPolicy: { lang: 'en', uriValue: 'https://example.com/policy' } }
 
     it('should accept an empty string legal notice, as the JSON schema does', () => {
-      expect(validateLoTE(withPolicyOrLegalNotice([{ LoTELegalNotice: '' }]))).toMatchObject({
+      expect(validateLote(withPolicyOrLegalNotice([{ LoTELegalNotice: '' }]))).toMatchObject({
         valid: true,
         issues: [],
       })
     })
 
     it('should reject a PolicyOrLegalNotice item with neither LoTEPolicy nor LoTELegalNotice', () => {
-      const result = validateLoTE(withPolicyOrLegalNotice([{}]))
+      const result = validateLote(withPolicyOrLegalNotice([{}]))
 
       expect(result.valid).toBe(false)
       expect(result.issues.map((issue) => issue.path.join('.'))).toEqual([
@@ -596,7 +596,7 @@ describe('LoTE Validator', () => {
     })
 
     it('should reject a PolicyOrLegalNotice whose every item has both LoTEPolicy and LoTELegalNotice', () => {
-      const result = validateLoTE(withPolicyOrLegalNotice([{ ...policy, LoTELegalNotice: 'Notice' }]))
+      const result = validateLote(withPolicyOrLegalNotice([{ ...policy, LoTELegalNotice: 'Notice' }]))
 
       expect(result.valid).toBe(false)
       expect(result.issues.map((issue) => issue.path.join('.'))).toEqual([
@@ -605,14 +605,14 @@ describe('LoTE Validator', () => {
     })
 
     it('should accept an item with both keys when another item has only one, as the oneOf does', () => {
-      expect(validateLoTE(withPolicyOrLegalNotice([policy, { ...policy, LoTELegalNotice: 'Notice' }]))).toMatchObject({
+      expect(validateLote(withPolicyOrLegalNotice([policy, { ...policy, LoTELegalNotice: 'Notice' }]))).toMatchObject({
         valid: true,
         issues: [],
       })
     })
 
     it('should reject an empty PolicyOrLegalNotice', () => {
-      const result = validateLoTE(withPolicyOrLegalNotice([]))
+      const result = validateLote(withPolicyOrLegalNotice([]))
 
       expect(result.issues.map((issue) => issue.path.join('.'))).toEqual([
         'LoTE.ListAndSchemeInformation.PolicyOrLegalNotice',
@@ -620,7 +620,7 @@ describe('LoTE Validator', () => {
     })
 
     it('should reject policies and legal notices mixed in one PolicyOrLegalNotice', () => {
-      const result = validateLoTE(withPolicyOrLegalNotice([policy, { LoTELegalNotice: 'Notice' }]))
+      const result = validateLote(withPolicyOrLegalNotice([policy, { LoTELegalNotice: 'Notice' }]))
 
       expect(result.valid).toBe(false)
       expect(result.issues.map((issue) => issue.path.join('.'))).toEqual([
@@ -629,27 +629,27 @@ describe('LoTE Validator', () => {
     })
 
     it('should accept date-times with an offset (RFC 3339)', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.ListIssueDateTime = '2026-10-23T10:47:49+02:00'
       lote.LoTE.ListAndSchemeInformation.NextUpdate = '2027-04-23T10:47:49-05:30'
 
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should accept lowercase t and z and a leap second at 23:59:60 UTC (RFC 3339)', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.ListIssueDateTime = '2016-12-31t23:59:60z'
       lote.LoTE.ListAndSchemeInformation.NextUpdate = '2017-01-01T00:59:60+01:00'
 
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should reject a leap second outside 23:59 UTC and an impossible date', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.ListAndSchemeInformation.ListIssueDateTime = '2016-12-31T22:59:60Z'
       lote.LoTE.ListAndSchemeInformation.NextUpdate = '2026-02-29T00:00:00Z'
 
-      expect(validateLoTE(lote).issues.map((issue) => issue.path.join('.'))).toEqual([
+      expect(validateLote(lote).issues.map((issue) => issue.path.join('.'))).toEqual([
         'LoTE.ListAndSchemeInformation.ListIssueDateTime',
         'LoTE.ListAndSchemeInformation.NextUpdate',
       ])
@@ -688,7 +688,7 @@ describe('LoTE Validator', () => {
         ],
       }
 
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should still reject a certificate encoding that is not a URI', () => {
@@ -710,89 +710,89 @@ describe('LoTE Validator', () => {
         ],
       })
 
-      expect(validateLoTE(lote).issues.map((issue) => issue.path.join('.'))).toEqual([
+      expect(validateLote(lote).issues.map((issue) => issue.path.join('.'))).toEqual([
         'LoTE.TrustedEntitiesList.0.TrustedEntityServices.0.ServiceInformation.ServiceDigitalIdentity.X509Certificates.0.encoding',
       ])
     })
   })
 
-  describe('assertValidLoTE', () => {
+  describe('assertValidLote', () => {
     it('should not throw for valid LoTE document', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
 
-      expect(() => assertValidLoTE(lote)).not.toThrow()
+      expect(() => assertValidLote(lote)).not.toThrow()
     })
 
     it('should throw for invalid LoTE document', () => {
-      expect(() => assertValidLoTE({})).toThrow('Invalid LoTE document')
+      expect(() => assertValidLote({})).toThrow('Invalid LoTE document')
     })
 
     it('should include error details in thrown error', () => {
       try {
-        assertValidLoTE({ LoTE: {} })
+        assertValidLote({ LoTE: {} })
         expect.fail('Should have thrown')
       } catch (error) {
         expect((error as Error).message).toContain('ListAndSchemeInformation')
-        expect(error).toBeInstanceOf(LoTEError)
-        expect((error as LoTEValidationError).issues).toEqual(validateLoTE({ LoTE: {} }).issues)
+        expect(error).toBeInstanceOf(LoteError)
+        expect((error as LoteValidationError).issues).toEqual(validateLote({ LoTE: {} }).issues)
       }
     })
   })
 
-  describe('validateLoTEProfile', () => {
-    it('should validate against EUPIDProvidersList profile', () => {
+  describe('validateLoteProfile', () => {
+    it('should validate against EuPidProvidersList profile', () => {
       const { payload: lote } = decodeJwt(EUPIDProvidersJWT)
-      const result = validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList)
+      const result = validateLoteProfile(lote, LoteProfile.EuPidProvidersList)
 
       expect(result.valid).toBe(true)
     })
 
-    it('should validate against EUWalletProvidersList profile', () => {
+    it('should validate against EuWalletProvidersList profile', () => {
       const { payload: lote } = decodeJwt(WalletProvidersJWT)
-      const result = validateLoTEProfile(lote, LoTEProfile.EUWalletProvidersList)
+      const result = validateLoteProfile(lote, LoteProfile.EuWalletProvidersList)
 
       expect(result.valid).toBe(true)
     })
 
-    it('should validate against EUWRPACProvidersList profile', () => {
+    it('should validate against EuWrpacProvidersList profile', () => {
       const { payload: lote } = decodeJwt(WRPACProvidersJWT)
-      const result = validateLoTEProfile(lote, LoTEProfile.EUWRPACProvidersList)
+      const result = validateLoteProfile(lote, LoteProfile.EuWrpacProvidersList)
 
       expect(result.valid).toBe(true)
     })
 
-    it('should validate against EUPubEAAProvidersList profile', () => {
+    it('should validate against EuPubEaaProvidersList profile', () => {
       const { payload: lote } = decodeJwt(PubEAAProvidersJWT)
-      const result = validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList)
+      const result = validateLoteProfile(lote, LoteProfile.EuPubEaaProvidersList)
 
       expect(result.valid).toBe(true)
     })
 
-    it('should validate an EC list without trusted entities against EUPIDProvidersList profile', () => {
-      const { payload: lote } = decodeJwt<any, LoTEDocument>(LP26PIDProvidersEmptyJWT)
+    it('should validate an EC list without trusted entities against EuPidProvidersList profile', () => {
+      const { payload: lote } = decodeJwt<any, LoteDocument>(LP26PIDProvidersEmptyJWT)
 
       expect(lote.LoTE.TrustedEntitiesList).toBeUndefined()
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
-      expect(validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLoteProfile(lote, LoteProfile.EuPidProvidersList)).toMatchObject({ valid: true, issues: [] })
     })
 
-    it('should validate an EC list with a plain string legal notice against EUWRPRCProvidersList profile', () => {
-      const { payload: lote } = decodeJwt<any, LoTEDocument>(LP26WRPRCProvidersEmptyJWT)
+    it('should validate an EC list with a plain string legal notice against EuWrprcProvidersList profile', () => {
+      const { payload: lote } = decodeJwt<any, LoteDocument>(LP26WRPRCProvidersEmptyJWT)
 
       expect(lote.LoTE.ListAndSchemeInformation.PolicyOrLegalNotice).toEqual([{ LoTELegalNotice: 'Legal notice' }])
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
-      expect(validateLoTEProfile(lote, LoTEProfile.EUWRPRCProvidersList)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
+      expect(validateLoteProfile(lote, LoteProfile.EuWrprcProvidersList)).toMatchObject({ valid: true, issues: [] })
     })
 
     /** The EC WRPAC list, turned into a list of another EU profile by its URIs */
     const asProfile = (kind: 'EAA' | 'PubEAA') => {
-      const { payload } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
+      const { payload } = decodeJwt<any, LoteDocument>(WRPACProvidersJWT)
       const json = JSON.stringify(payload)
         .replace(/LoTEType\/EUWRPACProvidersList/g, `LoTEType/EU${kind}ProvidersList`)
         .replace(/WRPACProvidersList\//g, `${kind}ProvidersList/`)
         .replace(/ListOfTrustedEntities\/WRPACProvider\//g, `ListOfTrustedEntities/${kind}Provider/`)
         .replace(/SvcType\/WRPAC\//g, `SvcType/${kind}/`)
-      const lote = JSON.parse(json) as LoTEDocument
+      const lote = JSON.parse(json) as LoteDocument
       if (kind === 'PubEAA') {
         lote.LoTE.ListAndSchemeInformation.HistoricalInformationPeriod = 65535
         for (const service of lote.LoTE.TrustedEntitiesList?.flatMap((e) => e.TrustedEntityServices) ?? []) {
@@ -805,15 +805,15 @@ describe('LoTE Validator', () => {
     it('should validate a list against the EUEAAProvidersList profile', () => {
       const lote = asProfile('EAA')
 
-      expect(lote.LoTE.ListAndSchemeInformation.LoTEType).toBe(LOTE_TYPES.EUEAAProvidersList)
-      expect(validateLoTEProfile(lote, LoTEProfile.EUEAAProvidersList)).toMatchObject({ valid: true, issues: [] })
+      expect(lote.LoTE.ListAndSchemeInformation.LoTEType).toBe(LOTE_TYPES.EuEaaProvidersList)
+      expect(validateLoteProfile(lote, LoteProfile.EuEaaProvidersList)).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should validate a list against the EUPubEAAProvidersList profile', () => {
       const lote = asProfile('PubEAA')
 
-      expect(lote.LoTE.ListAndSchemeInformation.LoTEType).toBe(LOTE_TYPES.EUPubEAAProvidersList)
-      expect(validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList)).toMatchObject({ valid: true, issues: [] })
+      expect(lote.LoTE.ListAndSchemeInformation.LoTEType).toBe(LOTE_TYPES.EuPubEaaProvidersList)
+      expect(validateLoteProfile(lote, LoteProfile.EuPubEaaProvidersList)).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should require a ServiceStatus of TS 119 602 H in the EUPubEAAProvidersList profile', () => {
@@ -822,14 +822,14 @@ describe('LoTE Validator', () => {
         const information = lote.LoTE.TrustedEntitiesList?.[0]?.TrustedEntityServices[0]?.ServiceInformation
         if (!information) throw new Error('The PubEAA list has no service')
         Object.assign(information, { ServiceStatus, StatusStartingTime })
-        return validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList).issues.map((issue) => issue.message)
+        return validateLoteProfile(lote, LoteProfile.EuPubEaaProvidersList).issues.map((issue) => issue.message)
       }
       const statuses = 'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus'
 
       expect(statusErrors(`${statuses}/withdrawn`, '2026-05-01T00:00:00Z')).toEqual([])
-      expect(statusErrors(undefined)).toEqual(['Profile EUPubEAAProvidersList: ServiceStatus must be present'])
+      expect(statusErrors(undefined)).toEqual(['Profile EuPubEaaProvidersList: ServiceStatus must be present'])
       expect(statusErrors('http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified')).toEqual([
-        `Profile EUPubEAAProvidersList: ServiceStatus must be one of the following: ${statuses}/notified, ${statuses}/withdrawn`,
+        `Profile EuPubEaaProvidersList: ServiceStatus must be one of the following: ${statuses}/notified, ${statuses}/withdrawn`,
       ])
     })
 
@@ -842,7 +842,7 @@ describe('LoTE Validator', () => {
       first[0].ServiceInformation.ServiceStatus = withdrawn
       second.push({ ...second[0], ServiceInformation: { ...second[0].ServiceInformation, ServiceStatus: withdrawn } })
 
-      const result = validateLoTEProfile(lote, LoTEProfile.EUPubEAAProvidersList)
+      const result = validateLoteProfile(lote, LoteProfile.EuPubEaaProvidersList)
       if (!result.valid) throw new Error('A list with withdrawn services is valid')
       const notified = getNotifiedTrustedEntities(result.lote)
       expect(result.notifiedTrustedEntities).toEqual(notified)
@@ -852,19 +852,19 @@ describe('LoTE Validator', () => {
       )
       expect(lote.LoTE.TrustedEntitiesList?.[1]?.TrustedEntityServices).toHaveLength(2)
       expectTypeOf(notified).toEqualTypeOf<
-        NonNullable<LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList>['LoTE']['TrustedEntitiesList']>
+        NonNullable<LoteProfileDocument<LoteProfile.EuPubEaaProvidersList>['LoTE']['TrustedEntitiesList']>
       >()
     })
 
     it('should keep every service of a profile without ServiceStatus', () => {
-      const result = validateLoTEProfile(decodeJwt(WRPACProvidersJWT).payload, LoTEProfile.EUWRPACProvidersList)
+      const result = validateLoteProfile(decodeJwt(WRPACProvidersJWT).payload, LoteProfile.EuWrpacProvidersList)
       if (!result.valid) throw new Error('The WRPAC list is valid')
 
       expect(getNotifiedTrustedEntities(result.lote)).toEqual(result.lote.LoTE.TrustedEntitiesList)
     })
 
     it('should keep requiring a 2-letter country and a digital identity in the EU profiles', () => {
-      const { payload: lote } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
+      const { payload: lote } = decodeJwt<any, LoteDocument>(WRPACProvidersJWT)
       const entity = lote.LoTE.TrustedEntitiesList?.[0]
       const address = entity?.TrustedEntityInformation.TEAddress.TEPostalAddress[0]
       const firstService = entity?.TrustedEntityServices[0]
@@ -872,8 +872,8 @@ describe('LoTE Validator', () => {
       address.Country = 'Germany'
       firstService.ServiceInformation.ServiceDigitalIdentity = {}
 
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
-      const result = validateLoTEProfile(lote, LoTEProfile.EUWRPACProvidersList)
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
+      const result = validateLoteProfile(lote, LoteProfile.EuWrpacProvidersList)
       expect(result.valid).toBe(false)
       expect(result.issues.map((issue) => issue.path.join('.'))).toEqual([
         'LoTE.TrustedEntitiesList.0.TrustedEntityInformation.TEAddress.TEPostalAddress.0.Country',
@@ -882,7 +882,7 @@ describe('LoTE Validator', () => {
     })
 
     it('should keep the rules the base schema used to apply in the EU profiles', () => {
-      const { payload: lote } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
+      const { payload: lote } = decodeJwt<any, LoteDocument>(WRPACProvidersJWT)
       const info = lote.LoTE.ListAndSchemeInformation
       const entity = lote.LoTE.TrustedEntitiesList?.[0]
       const firstService = entity?.TrustedEntityServices[0]
@@ -914,8 +914,8 @@ describe('LoTE Validator', () => {
         },
       ]
 
-      expect(validateLoTE(lote)).toMatchObject({ valid: true, issues: [] })
-      const paths = validateLoTEProfile(lote, LoTEProfile.EUWRPACProvidersList).issues.map((issue) =>
+      expect(validateLote(lote)).toMatchObject({ valid: true, issues: [] })
+      const paths = validateLoteProfile(lote, LoteProfile.EuWrpacProvidersList).issues.map((issue) =>
         issue.path.join('.')
       )
       const service = 'LoTE.TrustedEntitiesList.0.TrustedEntityServices.0'
@@ -937,9 +937,9 @@ describe('LoTE Validator', () => {
 
     it('should keep NextUpdate within 6 months of ListIssueDateTime with an offset, lowercase or leap second', () => {
       const errorPaths = (ListIssueDateTime: string, NextUpdate: string) => {
-        const { payload: lote } = decodeJwt<any, LoTEDocument>(EUPIDProvidersJWT)
+        const { payload: lote } = decodeJwt<any, LoteDocument>(EUPIDProvidersJWT)
         Object.assign(lote.LoTE.ListAndSchemeInformation, { ListIssueDateTime, NextUpdate })
-        return validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList).issues.map((issue) => issue.path.join('.'))
+        return validateLoteProfile(lote, LoteProfile.EuPidProvidersList).issues.map((issue) => issue.path.join('.'))
       }
       const tooLate = ['LoTE.ListAndSchemeInformation.NextUpdate']
 
@@ -952,28 +952,28 @@ describe('LoTE Validator', () => {
 
     it('short-circuit errors when validating against wrong profile', () => {
       const { payload: lote } = decodeJwt(WRPACProvidersJWT)
-      const result = validateLoTEProfile(lote, [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUWalletProvidersList])
+      const result = validateLoteProfile(lote, [LoteProfile.EuPidProvidersList, LoteProfile.EuWalletProvidersList])
 
       expect(result.valid).toBe(false)
       expect(result.issues).toEqual(
-        [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUWalletProvidersList].map((profile) => ({
+        [LoteProfile.EuPidProvidersList, LoteProfile.EuWalletProvidersList].map((profile) => ({
           severity: 'error',
           code: LOTE_VALIDATION_CODES.UNEXPECTED_LOTE_TYPE,
           path: ['LoTE', 'ListAndSchemeInformation', 'LoTEType'],
-          message: `Profile ${profile}: LoTEType must be http://uri.etsi.org/19602/LoTEType/${profile}`,
+          message: `Profile ${profile}: LoTEType must be ${LOTE_TYPES[profile]}`,
         }))
       )
     })
 
-    it('only includes errors for matched LoTEProfile', () => {
-      const { payload: lote } = decodeJwt<any, LoTEDocument>(WRPACProvidersJWT)
+    it('only includes errors for matched LoteProfile', () => {
+      const { payload: lote } = decodeJwt<any, LoteDocument>(WRPACProvidersJWT)
 
       lote.LoTE.ListAndSchemeInformation.StatusDeterminationApproach = 'invalid'
 
-      const result = validateLoTEProfile(lote, [
-        LoTEProfile.EUPIDProvidersList,
-        LoTEProfile.EUWalletProvidersList,
-        LoTEProfile.EUWRPACProvidersList,
+      const result = validateLoteProfile(lote, [
+        LoteProfile.EuPidProvidersList,
+        LoteProfile.EuWalletProvidersList,
+        LoteProfile.EuWrpacProvidersList,
       ])
 
       expect(result.valid).toBe(false)
@@ -983,16 +983,16 @@ describe('LoTE Validator', () => {
           code: 'invalid_value',
           path: ['LoTE', 'ListAndSchemeInformation', 'StatusDeterminationApproach'],
           message:
-            'Profile EUWRPACProvidersList: StatusDeterminationApproach must be http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
+            'Profile EuWrpacProvidersList: StatusDeterminationApproach must be http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU',
           context: { allowed: ['http://uri.etsi.org/19602/WRPACProvidersList/StatusDetn/EU'] },
         },
       ])
     })
     it('reports schema issues with numeric array indices', () => {
-      const lote = createMinimalValidLoTE()
+      const lote = createMinimalValidLote()
       lote.LoTE.TrustedEntitiesList = [{} as never]
 
-      const result = validateLoTE(lote)
+      const result = validateLote(lote)
 
       expect(result.valid).toBe(false)
       expect(result.issues.length).toBeGreaterThan(0)
@@ -1003,12 +1003,12 @@ describe('LoTE Validator', () => {
   })
 
   describe('compat mode and allowed territories', () => {
-    const germanPid = () => decodeJwt<any, LoTEDocument>(GermanPIDProvidersJWT).payload
-    const germanSandboxWallet = () => decodeJwt<any, LoTEDocument>(GermanSandboxWalletProvidersJWT).payload
+    const germanPid = () => decodeJwt<any, LoteDocument>(GermanPIDProvidersJWT).payload
+    const germanSandboxWallet = () => decodeJwt<any, LoteDocument>(GermanSandboxWalletProvidersJWT).payload
     const service = 'LoTE.TrustedEntitiesList.0.TrustedEntityServices.0.ServiceInformation'
 
     it('should reject the German PID list in strict mode', () => {
-      const paths = validateLoTEProfile(germanPid(), LoTEProfile.EUPIDProvidersList).issues.map((issue) =>
+      const paths = validateLoteProfile(germanPid(), LoteProfile.EuPidProvidersList).issues.map((issue) =>
         issue.path.join('.')
       )
 
@@ -1020,11 +1020,11 @@ describe('LoTE Validator', () => {
     it('should accept the German lists in compat mode with territory DE', () => {
       const options = { mode: 'compat', allowedTerritories: ['DE'] } as const
 
-      expect(validateLoTEProfile(germanPid(), LoTEProfile.EUPIDProvidersList, options)).toMatchObject({
+      expect(validateLoteProfile(germanPid(), LoteProfile.EuPidProvidersList, options)).toMatchObject({
         valid: true,
         issues: [],
       })
-      expect(validateLoTEProfile(germanSandboxWallet(), LoTEProfile.EUWalletProvidersList, options)).toMatchObject({
+      expect(validateLoteProfile(germanSandboxWallet(), LoteProfile.EuWalletProvidersList, options)).toMatchObject({
         valid: true,
         issues: [],
       })
@@ -1032,12 +1032,12 @@ describe('LoTE Validator', () => {
 
     it('should accept the Norwegian sandbox lists only in compat mode with territory NO', () => {
       for (const [jwt, profile] of [
-        [NorwegianSandboxPIDProvidersJWT, LoTEProfile.EUPIDProvidersList],
-        [NorwegianSandboxWRPACProvidersJWT, LoTEProfile.EUWRPACProvidersList],
+        [NorwegianSandboxPIDProvidersJWT, LoteProfile.EuPidProvidersList],
+        [NorwegianSandboxWRPACProvidersJWT, LoteProfile.EuWrpacProvidersList],
       ] as const) {
         const lote = decodeJwt(jwt).payload
 
-        expect(validateLoTEProfile(lote, profile).issues).toEqual([
+        expect(validateLoteProfile(lote, profile).issues).toEqual([
           {
             severity: 'error',
             code: 'invalid_value',
@@ -1046,7 +1046,7 @@ describe('LoTE Validator', () => {
             context: { allowed: ['EU'] },
           },
         ])
-        expect(validateLoTEProfile(lote, profile, { mode: 'compat', allowedTerritories: ['NO'] })).toMatchObject({
+        expect(validateLoteProfile(lote, profile, { mode: 'compat', allowedTerritories: ['NO'] })).toMatchObject({
           valid: true,
           issues: [],
         })
@@ -1058,27 +1058,27 @@ describe('LoTE Validator', () => {
       const lote = decodeJwt(NorwegianSandboxWalletProvidersJWT).payload
 
       expect(
-        validateLoTEProfile(lote, LoTEProfile.EUWalletProvidersList, { mode: 'compat', allowedTerritories: ['NO'] })
+        validateLoteProfile(lote, LoteProfile.EuWalletProvidersList, { mode: 'compat', allowedTerritories: ['NO'] })
       ).toMatchObject({ valid: true, errors: [] })
     })
 
     it('should only accept the allowed territories, in compat mode only', () => {
-      const issues = (lote: LoTEDocument, allowedTerritories?: string[]) =>
-        validateLoTEProfile(lote, LoTEProfile.EUPIDProvidersList, { mode: 'compat', allowedTerritories }).issues.map(
+      const issues = (lote: LoteDocument, allowedTerritories?: string[]) =>
+        validateLoteProfile(lote, LoteProfile.EuPidProvidersList, { mode: 'compat', allowedTerritories }).issues.map(
           ({ path, message }) => ({ path: path.join('.'), message })
         )
 
       expect(issues(germanPid())).toContainEqual({
         path: 'LoTE.ListAndSchemeInformation.SchemeTerritory',
-        message: 'Profile EUPIDProvidersList: SchemeTerritory must be EU',
+        message: 'Profile EuPidProvidersList: SchemeTerritory must be EU',
       })
       expect(issues(germanPid(), ['EU', 'NL'])).toContainEqual({
         path: 'LoTE.ListAndSchemeInformation.SchemeTerritory',
-        message: 'Profile EUPIDProvidersList: SchemeTerritory must be EU or NL',
+        message: 'Profile EuPidProvidersList: SchemeTerritory must be EU or NL',
       })
       expect(issues(germanPid(), ['EU', 'DE'])).toEqual([])
       expect(
-        validateLoTEProfile(decodeJwt(EUPIDProvidersJWT).payload, LoTEProfile.EUPIDProvidersList, {
+        validateLoteProfile(decodeJwt(EUPIDProvidersJWT).payload, LoteProfile.EuPidProvidersList, {
           mode: 'compat',
           allowedTerritories: ['DE'],
         }).issues.map((issue) => issue.path.join('.'))
@@ -1086,20 +1086,20 @@ describe('LoTE Validator', () => {
 
       // TS 119 602 D to I: SchemeTerritory shall be EU
       expect(() =>
-        validateLoTEProfile(decodeJwt(EUPIDProvidersJWT).payload, LoTEProfile.EUPIDProvidersList, {
+        validateLoteProfile(decodeJwt(EUPIDProvidersJWT).payload, LoteProfile.EuPidProvidersList, {
           // @ts-expect-error allowedTerritories is compat mode only
           allowedTerritories: ['DE'],
         })
-      ).toThrow(new LoTEError('allowedTerritories only applies in compat mode'))
+      ).toThrow(new LoteError('allowedTerritories only applies in compat mode'))
     })
 
     it('should only accept the German notified status in compat mode, on a PID list', () => {
-      const statusErrors = (ServiceStatus: string | undefined, profile = LoTEProfile.EUPIDProvidersList) => {
-        const lote = profile === LoTEProfile.EUPIDProvidersList ? germanPid() : germanSandboxWallet()
+      const statusErrors = (ServiceStatus: string | undefined, profile = LoteProfile.EuPidProvidersList) => {
+        const lote = profile === LoteProfile.EuPidProvidersList ? germanPid() : germanSandboxWallet()
         const information = lote.LoTE.TrustedEntitiesList?.[0]?.TrustedEntityServices[0]?.ServiceInformation
         if (!information) throw new Error('The German fixture has no service')
         information.ServiceStatus = ServiceStatus
-        return validateLoTEProfile(lote, profile, { mode: 'compat', allowedTerritories: ['DE'] }).issues.map(
+        return validateLoteProfile(lote, profile, { mode: 'compat', allowedTerritories: ['DE'] }).issues.map(
           ({ path, message }) => ({ path: path.join('.'), message })
         )
       }
@@ -1113,18 +1113,18 @@ describe('LoTE Validator', () => {
         expect(statusErrors(status)).toEqual([
           {
             path: `${service}.ServiceStatus`,
-            message: `Profile EUPIDProvidersList: ServiceStatus must be one of the following: ${notified}`,
+            message: `Profile EuPidProvidersList: ServiceStatus must be one of the following: ${notified}`,
           },
         ])
       }
       expect(statusErrors(undefined)).toEqual([
         {
           path: `${service}.StatusStartingTime`,
-          message: 'Profile EUPIDProvidersList: StatusStartingTime must not be present',
+          message: 'Profile EuPidProvidersList: StatusStartingTime must not be present',
         },
       ])
-      expect(statusErrors(notified, LoTEProfile.EUWalletProvidersList).map((issue) => issue.message)).toEqual([
-        'Profile EUWalletProvidersList: ServiceStatus must not be present',
+      expect(statusErrors(notified, LoteProfile.EuWalletProvidersList).map((issue) => issue.message)).toEqual([
+        'Profile EuWalletProvidersList: ServiceStatus must not be present',
       ])
     })
 
@@ -1137,17 +1137,17 @@ describe('LoTE Validator', () => {
           LoTEPolicy: { lang: 'de', uriValue: 'https://common.codes/datenschutz' },
         },
       ])
-      expect(validateLoTE(lote).issues.map((issue) => issue.path.join('.'))).toEqual([
+      expect(validateLote(lote).issues.map((issue) => issue.path.join('.'))).toEqual([
         'LoTE.ListAndSchemeInformation.PolicyOrLegalNotice.0.LoTELegalNotice',
       ])
-      expect(validateLoTE(lote, { mode: 'compat' })).toMatchObject({ valid: true, issues: [] })
+      expect(validateLote(lote, { mode: 'compat' })).toMatchObject({ valid: true, issues: [] })
     })
 
     it('should still reject an empty PolicyOrLegalNotice or an item with neither key in compat mode', () => {
       const lote = germanSandboxWallet()
       const paths = (PolicyOrLegalNotice: unknown) => {
         Object.assign(lote.LoTE.ListAndSchemeInformation, { PolicyOrLegalNotice })
-        return validateLoTE(lote, { mode: 'compat' }).issues.map((issue) => issue.path.join('.'))
+        return validateLote(lote, { mode: 'compat' }).issues.map((issue) => issue.path.join('.'))
       }
 
       expect(paths([])).toEqual(['LoTE.ListAndSchemeInformation.PolicyOrLegalNotice'])
@@ -1157,14 +1157,14 @@ describe('LoTE Validator', () => {
 
   describe('typed results', () => {
     it('should return the validated document, typed by the mode', () => {
-      const lote = decodeJwt<any, LoTEDocument>(GermanSandboxWalletProvidersJWT).payload
+      const lote = decodeJwt<any, LoteDocument>(GermanSandboxWalletProvidersJWT).payload
 
-      expectTypeOf(validateLoTE(lote)).toEqualTypeOf<ValidationResult<LoTEDocument>>()
-      expectTypeOf(validateLoTE(lote, { mode: 'compat' })).toEqualTypeOf<ValidationResult<CompatLoTEDocument>>()
+      expectTypeOf(validateLote(lote)).toEqualTypeOf<ValidationResult<LoteDocument>>()
+      expectTypeOf(validateLote(lote, { mode: 'compat' })).toEqualTypeOf<ValidationResult<CompatLoteDocument>>()
       // A compat document can carry a LoTELegalNotice that a strict one can't
-      expectTypeOf<CompatLoTEDocument>().not.toExtend<LoTEDocument>()
+      expectTypeOf<CompatLoteDocument>().not.toExtend<LoteDocument>()
 
-      const result = validateLoTE(lote, { mode: 'compat' })
+      const result = validateLote(lote, { mode: 'compat' })
       if (!result.valid) throw new Error('The German sandbox list is valid in compat mode')
       expect(result.lote).toBe(lote)
     })
@@ -1172,26 +1172,26 @@ describe('LoTE Validator', () => {
     it('should assert the type of the mode', () => {
       const lote: unknown = decodeJwt(GermanSandboxWalletProvidersJWT).payload
 
-      expect(() => assertValidLoTE(lote)).toThrow(LoTEError)
-      assertValidLoTE(lote, { mode: 'compat' })
-      expectTypeOf(lote).toEqualTypeOf<CompatLoTEDocument>()
+      expect(() => assertValidLote(lote)).toThrow(LoteError)
+      assertValidLote(lote, { mode: 'compat' })
+      expectTypeOf(lote).toEqualTypeOf<CompatLoteDocument>()
     })
 
     it('should type the document by the profile it matches', () => {
-      const lote = decodeJwt<any, LoTEDocument>(GermanPIDProvidersJWT).payload
-      const result = validateLoTEProfile(lote, [LoTEProfile.EUPIDProvidersList, LoTEProfile.EUPubEAAProvidersList], {
+      const lote = decodeJwt<any, LoteDocument>(GermanPIDProvidersJWT).payload
+      const result = validateLoteProfile(lote, [LoteProfile.EuPidProvidersList, LoteProfile.EuPubEaaProvidersList], {
         mode: 'compat',
         allowedTerritories: ['DE'],
       })
       if (!result.valid) throw new Error('The German PID list is valid in compat mode')
       expect(result.lote).toBe(lote)
 
-      expect(result.loteType).toBe(LOTE_TYPES.EUPIDProvidersList)
+      expect(result.loteType).toBe(LOTE_TYPES.EuPidProvidersList)
 
-      const information = (lote: CompatLoTEDocument) =>
+      const information = (lote: CompatLoteDocument) =>
         lote.LoTE.TrustedEntitiesList?.[0]?.TrustedEntityServices[0]?.ServiceInformation
-      if (result.loteType === LOTE_TYPES.EUPIDProvidersList) {
-        expectTypeOf(result.lote).toEqualTypeOf<LoTEProfileDocument<LoTEProfile.EUPIDProvidersList, 'compat'>>()
+      if (result.loteType === LOTE_TYPES.EuPidProvidersList) {
+        expectTypeOf(result.lote).toEqualTypeOf<LoteProfileDocument<LoteProfile.EuPidProvidersList, 'compat'>>()
         expectTypeOf(
           result.lote.LoTE.TrustedEntitiesList?.[0]?.TrustedEntityServices[0]?.ServiceInformation.ServiceTypeIdentifier
         ).toEqualTypeOf<
@@ -1204,24 +1204,24 @@ describe('LoTE Validator', () => {
         )
         expectTypeOf(result).not.toHaveProperty('notifiedTrustedEntities')
       } else {
-        expectTypeOf(result.loteType).toEqualTypeOf<typeof LOTE_TYPES.EUPubEAAProvidersList>()
-        expectTypeOf(result.lote).toEqualTypeOf<LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList, 'compat'>>()
+        expectTypeOf(result.loteType).toEqualTypeOf<typeof LOTE_TYPES.EuPubEaaProvidersList>()
+        expectTypeOf(result.lote).toEqualTypeOf<LoteProfileDocument<LoteProfile.EuPubEaaProvidersList, 'compat'>>()
         expectTypeOf(result.notifiedTrustedEntities).toEqualTypeOf<
-          NonNullable<LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList, 'compat'>['LoTE']['TrustedEntitiesList']>
+          NonNullable<LoteProfileDocument<LoteProfile.EuPubEaaProvidersList, 'compat'>['LoTE']['TrustedEntitiesList']>
         >()
       }
 
-      expectTypeOf<LoTEProfileDocument<LoTEProfile.EUPIDProvidersList>>().toExtend<LoTEDocument>()
-      expectTypeOf<LoTEProfileDocument<LoTEProfile.EUPIDProvidersList, 'compat'>>().not.toExtend<LoTEDocument>()
+      expectTypeOf<LoteProfileDocument<LoteProfile.EuPidProvidersList>>().toExtend<LoteDocument>()
+      expectTypeOf<LoteProfileDocument<LoteProfile.EuPidProvidersList, 'compat'>>().not.toExtend<LoteDocument>()
 
-      type Status<D extends CompatLoTEDocument> = NonNullable<
+      type Status<D extends CompatLoteDocument> = NonNullable<
         D['LoTE']['TrustedEntitiesList']
       >[number]['TrustedEntityServices'][number]['ServiceInformation']['ServiceStatus']
-      expectTypeOf<Status<LoTEProfileDocument<LoTEProfile.EUPIDProvidersList>>>().toEqualTypeOf<undefined>()
-      expectTypeOf<Status<LoTEProfileDocument<LoTEProfile.EUPIDProvidersList, 'compat'>>>().toEqualTypeOf<
+      expectTypeOf<Status<LoteProfileDocument<LoteProfile.EuPidProvidersList>>>().toEqualTypeOf<undefined>()
+      expectTypeOf<Status<LoteProfileDocument<LoteProfile.EuPidProvidersList, 'compat'>>>().toEqualTypeOf<
         'http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified' | undefined
       >()
-      expectTypeOf<Status<LoTEProfileDocument<LoTEProfile.EUPubEAAProvidersList>>>().toEqualTypeOf<
+      expectTypeOf<Status<LoteProfileDocument<LoteProfile.EuPubEaaProvidersList>>>().toEqualTypeOf<
         | 'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified'
         | 'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn'
       >()

@@ -338,8 +338,8 @@ This library is **platform agnostic** and works in:
 ### Schemas
 
 - `zRegistrationCertificatePayload` - Full registration certificate payload validation
-- `zRegistrationCertificateJWTHeader` - JWT header validation
-- `zRegistrationCertificateCWTHeader` - CWT header validation
+- `zRegistrationCertificateJwtHeader` - JWT header validation
+- `zRegistrationCertificateCwtHeader` - CWT header validation
 - `zCredential` - Credential specification validation
 - `zClaim` - Claim specification validation
 - `zMultiLangString` - Multilingual string validation
@@ -347,7 +347,7 @@ This library is **platform agnostic** and works in:
 ### Types
 
 - `RegistrationCertificatePayload` - Registration certificate payload type
-- `RegistrationCertificateJWTHeader` - JWT header type
+- `RegistrationCertificateJwtHeader` - JWT header type
 - `SignedRegistrationCertificate` - Signed registration certificate with JWS string
 - `Credential` - Credential specification type
 - `ProvidedAttestation` - Provided attestation credential type with `format` and `meta` only
@@ -363,7 +363,7 @@ This library is **platform agnostic** and works in:
 ### Validators
 
 - `validateRegistrationCertificatePayload(payload, accessCertificateSub)` - Validate payload and access-certificate identity
-- `validateRegistrationCertificateJWTHeader(header)` - Validate JWT header
+- `validateRegistrationCertificateJwtHeader(header)` - Validate JWT header
 - `validateRegistrationCertificate(header, payload, accessCertificateSub)` - Validate complete registration certificate and access-certificate identity
 - `assertValidRegistrationCertificatePayload(payload, accessCertificateSub)` - Assert or throw
 - `parseRegistrationCertificatePayload(payload, accessCertificateSub)` - Validate and return the canonical payload

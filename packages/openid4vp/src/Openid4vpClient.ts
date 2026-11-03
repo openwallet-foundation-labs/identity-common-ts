@@ -32,7 +32,7 @@ export class Openid4vpClient {
     return parseOpenid4vpAuthorizationRequest(options)
   }
 
-  public async resolveOpenId4vpAuthorizationRequest(
+  public async resolveOpenid4vpAuthorizationRequest(
     options: Omit<ResolveOpenid4vpAuthorizationRequestOptions, 'callbacks'>
   ) {
     return resolveOpenid4vpAuthorizationRequest({ ...options, callbacks: this.options.callbacks })

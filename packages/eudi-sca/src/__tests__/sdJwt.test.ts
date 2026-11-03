@@ -1,4 +1,4 @@
-import { KBJwt } from '@sd-jwt/core'
+import { KbJwt } from '@sd-jwt/core'
 import { expect, suite, test, vi } from 'vitest'
 import { AuthenticationMethodsReferences } from '../responseClaims'
 import { createKbJwt } from '../sdJwt'
@@ -26,7 +26,7 @@ suite('createKbJwt', () => {
   }
 
   test('creates KB-JWT with combined claims', async () => {
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: 'kb+jwt',
         alg: 'ES256',
@@ -73,7 +73,7 @@ suite('createKbJwt', () => {
   })
 
   test('throws error when kbJwt payload is undefined', async () => {
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       payload: undefined,
     })
 
@@ -86,7 +86,7 @@ suite('createKbJwt', () => {
   })
 
   test('throws error when duplicate claims exist', async () => {
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: 'kb+jwt',
         alg: 'ES256',
@@ -111,7 +111,7 @@ suite('createKbJwt', () => {
   })
 
   test('returns unsigned KB-JWT when no signer is provided', async () => {
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: 'kb+jwt',
         alg: 'ES256',
@@ -138,8 +138,8 @@ suite('createKbJwt', () => {
 
     const result = await createKbJwt(options, ctxWithoutSigner)
 
-    expect(result).toBeInstanceOf(KBJwt)
-    expect((result as KBJwt).payload).toEqual({
+    expect(result).toBeInstanceOf(KbJwt)
+    expect((result as KbJwt).payload).toEqual({
       iat: expect.any(Number),
       aud: 'test-audience',
       nonce: 'test-nonce',
@@ -159,7 +159,7 @@ suite('createKbJwt', () => {
   })
 
   test('handles different authentication methods', async () => {
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: 'kb+jwt',
         alg: 'ES256',
@@ -189,7 +189,7 @@ suite('createKbJwt', () => {
   })
 
   test('handles different response modes', async () => {
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: 'kb+jwt',
         alg: 'ES256',
@@ -219,7 +219,7 @@ suite('createKbJwt', () => {
   })
 
   test('handles different locales', async () => {
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: 'kb+jwt',
         alg: 'ES256',
@@ -249,7 +249,7 @@ suite('createKbJwt', () => {
   })
 
   test('handles different hashing algorithms', async () => {
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: 'kb+jwt',
         alg: 'ES256',

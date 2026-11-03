@@ -1,4 +1,4 @@
-import { OpenIdFederationError } from '../error/OpenIdFederationError'
+import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
 import { addPaths, type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
@@ -40,7 +40,7 @@ export const fetchEntityConfiguration = async ({
 
   // The entity configuration must be about the requested entity, otherwise any URL could claim to be another entity
   if (!isSameEntityId(claims.sub, entityId)) {
-    throw new OpenIdFederationError(
+    throw new OpenidFederationError(
       PolicyErrorStage.Validation,
       `entity configuration fetched for '${entityId}' has subject '${claims.sub}'`
     )

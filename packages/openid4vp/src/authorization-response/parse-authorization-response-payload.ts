@@ -2,7 +2,7 @@ import { parseWithErrorHandling } from '@openid4vc/utils'
 import { Openid4vpAuthorizationResponseError } from './Openid4vpAuthorizationResponseError'
 import { zOpenid4vpAuthorizationErrorResponse, zOpenid4vpAuthorizationResponse } from './z-authorization-response'
 
-export function parseOpenid4VpAuthorizationResponsePayload(payload: Record<string, unknown>) {
+export function parseOpenid4vpAuthorizationResponsePayload(payload: Record<string, unknown>) {
   // A wallet can return an authorization error response (e.g. if it detected an error
   // with the request, or is unavailable) instead of a successful authorization response.
   // We detect this based on the presence of the `error` parameter and throw a dedicated

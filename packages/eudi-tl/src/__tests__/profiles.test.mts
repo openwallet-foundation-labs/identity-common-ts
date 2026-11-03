@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ServiceStatus, ServiceType, TrustedListProfiles, TSLType, validateTrustedListProfile } from '../index'
+import { ServiceStatus, ServiceType, TrustedListProfiles, TslType, validateTrustedListProfile } from '../index'
 
 /**
  * The shipped {@link TrustedListProfiles} are plain {@link ProfileRule}s fed to
@@ -15,14 +15,14 @@ const service = (serviceTypeIdentifier: string, serviceStatus: string) => ({
 describe('TrustedListProfiles.euLotl', () => {
   it('accepts a List of Trusted Lists with no TSP services', () => {
     const result = validateTrustedListProfile(
-      { tslType: TSLType.EUlistofthelists, providers: [] },
+      { tslType: TslType.EUlistofthelists, providers: [] },
       TrustedListProfiles.euLotl
     )
     expect(result.valid).toBe(true)
   })
 
   it('rejects a generic national list (wrong TSLType)', () => {
-    const result = validateTrustedListProfile({ tslType: TSLType.EUgeneric, providers: [] }, TrustedListProfiles.euLotl)
+    const result = validateTrustedListProfile({ tslType: TslType.EUgeneric, providers: [] }, TrustedListProfiles.euLotl)
     expect(result.valid).toBe(false)
     expect(result.issues.some((issue) => issue.path.join('.') === 'tslType')).toBe(true)
   })
@@ -32,7 +32,7 @@ describe('TrustedListProfiles.euGeneric', () => {
   it('accepts a national list mixing qualified service types and statuses', () => {
     const result = validateTrustedListProfile(
       {
-        tslType: TSLType.EUgeneric,
+        tslType: TslType.EUgeneric,
         providers: [
           { services: [service(ServiceType.CA_QC, ServiceStatus.Granted)] },
           // National lists retain withdrawn/ceased services for history.
@@ -48,7 +48,7 @@ describe('TrustedListProfiles.euGeneric', () => {
   it('rejects a non-standard service type', () => {
     const result = validateTrustedListProfile(
       {
-        tslType: TSLType.EUgeneric,
+        tslType: TslType.EUgeneric,
         providers: [{ services: [service('http://example.org/Svctype/Custom', ServiceStatus.Granted)] }],
       },
       TrustedListProfiles.euGeneric

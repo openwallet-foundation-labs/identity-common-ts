@@ -6,10 +6,10 @@
 
 import { IdentityError } from '@owf/identity-common'
 
-export class JAdESError extends IdentityError {
+export class JadesError extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, JAdESError.prototype)
-    this.name = 'JAdESError'
+    Object.setPrototypeOf(this, JadesError.prototype)
+    this.name = 'JadesError'
   }
 }

@@ -63,7 +63,7 @@ export class SessionTranscript extends CborStructure<
     return z.codec(zSessionTranscriptEncoded, zSessionTranscriptDecoded, {
       decode: ([deviceEngagementDataItem, eReaderKeyDataItem, handoverData]): SessionTranscriptDecodedStructure => {
         // TODO: this checks if it can be decoded, a smarter check could see that the handover
-        // is e.g. OpenId4VP handover but a value in that handover is incorrect
+        // is e.g. OpenID4VP handover but a value in that handover is incorrect
         let handover: SessionTranscriptDecodedStructure['handover'] | null = null
         for (const HandoverStructure of supportedHandoverStructures) {
           handover = (HandoverStructure as typeof NfcHandover).tryDecodeHandover(handoverData)

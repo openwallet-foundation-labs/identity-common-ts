@@ -8,32 +8,32 @@ export {
   trustedEntity,
 } from './builders'
 // Error
-export { LoTEError, LoTEValidationError } from './lote-error'
+export { LoteError, LoteValidationError } from './lote-error'
 // Profiles
-export type { LoTEProfileValidationOptions, LoTEValidationMode } from './profiles'
+export type { LoteProfileValidationOptions, LoteValidationMode } from './profiles'
 export {
   LOTE_TYPES,
-  zEUEAAProvidersList,
-  zEUPIDProvidersList,
-  zEUPubEAAProvidersList,
-  zEUWalletProvidersList,
-  zEUWRPACProvidersList,
-  zEUWRPRCProvidersList,
-  zMDLProvidersList,
+  zEuEaaProvidersList,
+  zEuPidProvidersList,
+  zEuPubEaaProvidersList,
+  zEuWalletProvidersList,
+  zEuWrpacProvidersList,
+  zEuWrprcProvidersList,
+  zMdlProvidersList,
 } from './profiles'
 // Schemas
 export {
   hasDigitalIdentity,
-  zCompatLoTEDocument,
+  zCompatLoteDocument,
   zCompatPolicyOrLegalNoticeList,
-  zJWKPublicKey,
+  zJwkPublicKey,
   zListAndSchemeInformation,
   zLocalizedString,
-  zLocalizedURI,
-  zLoTE,
-  zLoTEDocument,
-  zLoTEQualifier,
-  zOtherLoTEPointer,
+  zLocalizedUri,
+  zLote,
+  zLoteDocument,
+  zLoteQualifier,
+  zOtherLotePointer,
   zPkiObject,
   zPolicyOrLegalNotice,
   zPolicyOrLegalNoticeList,
@@ -49,27 +49,27 @@ export {
   zTrustedEntityService,
   zX509CertificateRef,
 } from './schemas'
-export type { UpdateLoTEVersionOptions } from './signer'
+export type { UpdateLoteVersionOptions } from './signer'
 // Signer
 export {
   addTrustedEntity,
-  createLoTE,
+  createLote,
   removeTrustedEntity,
-  signLoTE,
-  updateLoTEVersion,
+  signLote,
+  updateLoteVersion,
 } from './signer'
 export type {
-  CompatLoTEDocument,
-  JWKPublicKey,
+  CompatLoteDocument,
+  JwkPublicKey,
   ListAndSchemeInformation,
   // Localized values
   LocalizedString,
-  LocalizedURI,
+  LocalizedUri,
   LoTE,
-  LoTEDocument,
   // Pointer types
   LoTEQualifier,
-  OtherLoTEPointer,
+  LoteDocument,
+  OtherLotePointer,
   // Base types
   PkiObject,
   PointersToOtherLoTE,
@@ -87,7 +87,7 @@ export type {
   // Service types
   ServiceSupplyPoint,
   // Signed types
-  SignedLoTE,
+  SignedLote,
   SignOptions,
   TEInformationExtensions,
   TrustedEntity,
@@ -100,17 +100,17 @@ export type {
 } from './types'
 // Validator
 export type {
-  LoTEProfileDocument,
-  LoTEProfileValidationResult,
-  LoTEValidationCode,
-  LoTEValidationIssue,
+  LoteProfileDocument,
+  LoteProfileValidationResult,
+  LoteValidationCode,
+  LoteValidationIssue,
   ValidationResult,
 } from './validator'
 export {
-  assertValidLoTE,
+  assertValidLote,
   getNotifiedTrustedEntities,
   LOTE_VALIDATION_CODES,
-  LoTEProfile,
-  validateLoTE,
-  validateLoTEProfile,
+  LoteProfile,
+  validateLote,
+  validateLoteProfile,
 } from './validator'
