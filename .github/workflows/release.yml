@@ -81,6 +81,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: v${{ steps.get_version.outputs.current_package_version }}
+          target_commitish: ${{ github.sha }}
           name: Identity Common v${{ steps.get_version.outputs.current_package_version }}
           body_path: ${{ runner.temp }}/identity-common.md
 
@@ -90,6 +91,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: sd-jwt-v${{ steps.get_version.outputs.sd_jwt_package_version }}
+          target_commitish: ${{ github.sha }}
           name: SD-JWT v${{ steps.get_version.outputs.sd_jwt_package_version }}
           body_path: ${{ runner.temp }}/sd-jwt.md
 
@@ -99,6 +101,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: mdoc-v${{ steps.get_version.outputs.mdoc_package_version }}
+          target_commitish: ${{ github.sha }}
           name: mDOC v${{ steps.get_version.outputs.mdoc_package_version }}
           body_path: ${{ runner.temp }}/mdoc.md
 
@@ -108,6 +111,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: dcql-v${{ steps.get_version.outputs.dcql_package_version }}
+          target_commitish: ${{ github.sha }}
           name: DCQL v${{ steps.get_version.outputs.dcql_package_version }}
           body_path: ${{ runner.temp }}/dcql.md
 
@@ -117,6 +121,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: openid4vc-v${{ steps.get_version.outputs.openid4vc_package_version }}
+          target_commitish: ${{ github.sha }}
           name: OpenID4VC v${{ steps.get_version.outputs.openid4vc_package_version }}
           body_path: ${{ runner.temp }}/openid4vc.md
 
