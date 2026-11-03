@@ -5,6 +5,7 @@ import { isJwaSignatureAlgorithmCaseVariant, isSymmetricSignatureAlgorithm } fro
 import { assertKeyAllowedForSignatureAlgorithm } from '../jwa/key-compatibility'
 import { zJwsAlg } from '../jwa/z-alg'
 import { zJwk } from '../jwk/z-jwk'
+import type { JwtPayload } from '../jwt/z-jwt'
 import type { ParsedJws } from './parse-jws'
 import type { JwsSigner, JwsSignerMethod, JwsSignerWithJwk } from './signer'
 import { jwsSignerFromHeader } from './signer'
@@ -65,7 +66,7 @@ export interface VerifyJwsSignatureOptions {
   allowSymmetricAlgorithms?: boolean
 
   /** The payload as a JSON object, when the JWS is a JWT. Passed to the callback, and a did signer is bound to its `iss`. */
-  jwtPayload?: Record<string, unknown>
+  jwtPayload?: JwtPayload
 
   /** Prefix for the error thrown when verification fails. */
   errorMessage?: string

@@ -1,8 +1,9 @@
-import { addValidationIssue, zBase64Url, zNonEmptyString } from '@owf/identity-common'
+import { zBase64Url, zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 import { zJwsAlg } from '../jwa/z-alg'
 import { zPublicJwk } from '../jwk/z-jwk'
 import { zX5c } from '../jwk/z-x5c'
+import { zCompactSerialization } from '../utils/z-common'
 
 /**
  * The registered JWS header parameters. Loose, so the parameters of a profile survive. Compose on top
@@ -71,18 +72,7 @@ export type JwsUnprotectedHeader = z.infer<typeof zJwsUnprotectedHeader>
  *
  * @see https://www.rfc-editor.org/rfc/rfc7515#section-7.1
  */
-export const zCompactJws = z.string().superRefine((jws, ctx) => {
-  const parts = jws.split('.')
-  const isCompactJws =
-    parts.length === 3 &&
-    parts[0] !== '' &&
-    parts[2] !== '' &&
-    parts.every((part) => zBase64Url.safeParse(part).success)
-
-  if (!isCompactJws) {
-    addValidationIssue(ctx, { code: 'invalid_format', message: 'Not a valid compact JWS', context: { format: 'jws' } })
-  }
-})
+export const zCompactJws = zCompactSerialization('jws', 3, [1])
 
 /** The signature of a JSON serialized JWS. Never empty: that is an unsecured JWS. */
 const zJwsSignature = zBase64Url.min(1, { message: 'Expected a signature, an unsecured JWS is not supported' })

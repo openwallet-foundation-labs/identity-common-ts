@@ -100,9 +100,9 @@ When an assert or parse function finds an error, it throws the validation error 
 
 This package is part of the Identity Common TypeScript project:
 
-- `@owf/jose` - JOSE/JWT implementation (planned)
-- [`@owf/cose`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/cose) - COSE/CWT implementation (planned)
-- `@owf/x509` - X.509 certificate utilities (planned)
+- [`@owf/jose`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/jose) - JOSE/JWT implementation
+- [`@owf/cose`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/cose) - COSE/CWT implementation
+- [`@owf/x509`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/x509) - X.509 certificate utilities
 
 ## Contributing
 
