@@ -4,10 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { JWT_STATUS_LIST_TYPE } from '../jwt-types'
 import { StatusList } from '../status-list'
 import {
-  type CreateStatusListJwtHeader,
   type CreateStatusListJwtPayload,
-  createHeaderAndPayload,
   decodeStatusListJwt,
+  type SignStatusListJwtOptions,
   signStatusListJwt,
   verifyStatusListJwt,
 } from '../status-list-jwt'
@@ -35,11 +34,17 @@ const signToken = async (statusList = createStatusList()) => {
   return jwt
 }
 
-describe('createHeaderAndPayload', () => {
-  it('creates a header and payload carrying the status list', () => {
+const sign = (
+  statusList: StatusList,
+  payload: CreateStatusListJwtPayload,
+  header?: SignStatusListJwtOptions['header']
+) => signStatusListJwt({ statusList, payload, header, signer: jwsSigner, signJwsCallback: signJws })
+
+describe('signStatusListJwt', () => {
+  it('signs a status list token carrying the status list', async () => {
     const statusList = createStatusList()
 
-    const { header, payload } = createHeaderAndPayload(statusList, { sub: uri, iat }, { alg: 'ES256' })
+    const { jwt, header, payload } = await sign(statusList, { sub: uri, iat })
 
     expect(header).toEqual({ alg: 'ES256', typ: JWT_STATUS_LIST_TYPE })
     expect(payload).toEqual({
@@ -47,182 +52,101 @@ describe('createHeaderAndPayload', () => {
       iat,
       status_list: { bits: 1, lst: base64url.encode(statusList.compressStatusListToBytes()) },
     })
+    const verified = await verifyStatusListJwt({ jwt, uri, verifyJwsCallback: verifyJws })
+    expect(verified.statusList.getStatus(0)).toBe(StatusType.Invalid)
+    expect(verified.statusList.getStatus(5)).toBe(StatusType.Invalid)
   })
 
-  it('carries the aggregation uri of the list', () => {
+  it('carries the aggregation uri of the list', async () => {
     const statusList = new StatusList([0, 1], 1, 'https://example.com/aggregation')
-    const { payload } = createHeaderAndPayload(statusList, { sub: uri, iat }, { alg: 'ES256' })
+    const { payload } = await sign(statusList, { sub: uri, iat })
 
     expect(payload.status_list.aggregation_uri).toBe('https://example.com/aggregation')
   })
 
-  it('leaves out the aggregation uri when the list has none', () => {
-    const { payload } = createHeaderAndPayload(createStatusList(), { sub: uri, iat }, { alg: 'ES256' })
+  it('leaves out the aggregation uri when the list has none', async () => {
+    const { payload } = await sign(createStatusList(), { sub: uri, iat })
 
     expect(Object.keys(payload.status_list)).toEqual(['bits', 'lst'])
   })
 
-  it.each([2, 4, 8] as const)('carries a list of %i bits per status', (bits: BitsPerStatus) => {
+  it.each([2, 4, 8] as const)('carries a list of %i bits per status', async (bits: BitsPerStatus) => {
     const statusList = new StatusList([0, 1, 2 ** bits - 1, 0], bits)
 
-    const { payload } = createHeaderAndPayload(statusList, { sub: uri, iat }, { alg: 'ES256' })
+    const { payload } = await sign(statusList, { sub: uri, iat })
 
     expect(payload.status_list).toEqual({ bits, lst: base64url.encode(statusList.compressStatusListToBytes()) })
   })
 
-  it('keeps the other claims of the payload', () => {
+  it('keeps the other claims of the payload', async () => {
     const claims = { iss: 'https://example.com', sub: uri, iat, exp: iat + 3600, ttl: 300, custom: 'value' }
 
-    const { payload } = createHeaderAndPayload(createStatusList(), claims, { alg: 'ES256' })
+    const { payload } = await sign(createStatusList(), claims)
 
     expect(payload).toMatchObject(claims)
   })
 
-  it('replaces a status_list claim in the payload with the list', () => {
+  it('replaces a status_list claim in the payload with the list', async () => {
     const statusList = createStatusList()
-    const payload: CreateStatusListJwtPayload = { sub: uri, iat, status_list: { bits: 8, lst: 'AAAA' } }
 
-    const created = createHeaderAndPayload(statusList, payload, { alg: 'ES256' })
+    const { payload } = await sign(statusList, { sub: uri, iat, status_list: { bits: 8, lst: 'AAAA' } })
 
-    expect(created.payload.status_list).toEqual({
-      bits: 1,
-      lst: base64url.encode(statusList.compressStatusListToBytes()),
-    })
+    expect(payload.status_list).toEqual({ bits: 1, lst: base64url.encode(statusList.compressStatusListToBytes()) })
   })
 
-  it('does not change the payload it is given', () => {
+  it('does not change the payload and header it is given', async () => {
     const payload: CreateStatusListJwtPayload = { sub: uri, iat }
+    const header = { kid: 'key-1' }
 
-    createHeaderAndPayload(createStatusList(), payload, { alg: 'ES256' })
+    await sign(createStatusList(), payload, header)
 
     expect(payload).toEqual({ sub: uri, iat })
-  })
-
-  it('does not change the header it is given', () => {
-    const header: CreateStatusListJwtHeader = { alg: 'ES256' }
-
-    createHeaderAndPayload(createStatusList(), { sub: uri, iat }, header)
-
-    expect(header).toEqual({ alg: 'ES256' })
-  })
-
-  // RFC 7515 section 4.1.9: `typ` may carry the media type with its `application/` prefix
-  it('keeps a typ with the application/ prefix as it is given', () => {
-    const { header } = createHeaderAndPayload(
-      createStatusList(),
-      { sub: uri, iat },
-      { alg: 'ES256', typ: 'application/statuslist+jwt' }
-    )
-
-    expect(header.typ).toBe('application/statuslist+jwt')
-  })
-
-  it('rejects a typ that is not the status list type', () => {
-    expect(() => createHeaderAndPayload(createStatusList(), { sub: uri, iat }, { alg: 'ES256', typ: 'JWT' })).toThrow(
-      'Unable to create the status list token, invalid header'
-    )
-  })
-
-  // Earlier versions set the typ whatever was passed, and their README passed an empty one
-  it('rejects an empty typ rather than replacing it', () => {
-    const create = () => createHeaderAndPayload(createStatusList(), { sub: uri, iat }, { alg: 'ES256', typ: '' })
-
-    expect(create).toThrow(JoseValidationError)
-    expect(create).toThrow(`Expected the media type to be 'statuslist+jwt' at "typ"`)
-  })
-
-  it('rejects a payload without sub', () => {
-    // @ts-expect-error sub is required
-    const create = () => createHeaderAndPayload(createStatusList(), { iat }, { alg: 'ES256' })
-
-    expect(create).toThrow(JoseValidationError)
-    expect(create).toThrow('at "sub"')
-  })
-
-  it('rejects a payload without iat', () => {
-    // @ts-expect-error iat is required
-    const create = () => createHeaderAndPayload(createStatusList(), { sub: uri }, { alg: 'ES256' })
-
-    expect(create).toThrow(JoseValidationError)
-    expect(create).toThrow('at "iat"')
-  })
-})
-
-describe('signStatusListJwt', () => {
-  it('signs a status list token carrying the status list', async () => {
-    const { jwt, header, payload } = await signStatusListJwt({
-      statusList: createStatusList(),
-      payload: { sub: uri, iat },
-      signer: jwsSigner,
-      signJwsCallback: signJws,
-    })
-
-    expect(header).toEqual({ alg: 'ES256', typ: JWT_STATUS_LIST_TYPE })
-    expect(payload.sub).toBe(uri)
-
-    const { statusList } = await verifyStatusListJwt({ jwt, uri, verifyJwsCallback: verifyJws })
-    expect(statusList.getStatus(0)).toBe(StatusType.Invalid)
-    expect(statusList.getStatus(5)).toBe(StatusType.Invalid)
+    expect(header).toEqual({ kid: 'key-1' })
   })
 
   it('takes alg from the signer', async () => {
-    const { header } = await signStatusListJwt({
-      statusList: createStatusList(),
-      payload: { sub: uri, iat },
-      header: { alg: 'ES384', kid: 'key-1' },
-      signer: jwsSigner,
-      signJwsCallback: signJws,
-    })
+    const { header } = await sign(createStatusList(), { sub: uri, iat }, { alg: 'ES384', kid: 'key-1' })
 
     expect(header).toEqual({ alg: 'ES256', kid: 'key-1', typ: JWT_STATUS_LIST_TYPE })
   })
 
   it('signs the header and claims it returns', async () => {
-    const { jwt, header, payload } = await signStatusListJwt({
-      statusList: createStatusList(),
-      payload: { iss: 'https://example.com', sub: uri, iat, ttl: 300 },
-      header: { kid: 'key-1' },
-      signer: jwsSigner,
-      signJwsCallback: signJws,
-    })
+    const { jwt, header, payload } = await sign(
+      createStatusList(),
+      { iss: 'https://example.com', sub: uri, iat, ttl: 300 },
+      { kid: 'key-1' }
+    )
 
     const decoded = decodeStatusListJwt(jwt)
     expect(decoded.header).toEqual(header)
     expect(decoded.payload).toEqual(payload)
   })
 
-  it('keeps a typ with the application/ prefix', async () => {
-    const { jwt } = await signStatusListJwt({
-      statusList: createStatusList(),
-      payload: { sub: uri, iat },
-      header: { typ: 'application/statuslist+jwt' },
-      signer: jwsSigner,
-      signJwsCallback: signJws,
-    })
+  // Draft 16 § 5.1: "The JWT type MUST be statuslist+jwt". Other forms are only accepted when verifying.
+  it.each(['application/statuslist+jwt', 'StatusList+JWT', 'JWT', ''])('rejects the typ %j', async (typ) => {
+    const signJwsCallback = vi.fn(signJws)
 
-    expect(decodeStatusListJwt(jwt).header.typ).toBe('application/statuslist+jwt')
-  })
-
-  it('rejects a typ that is not the status list type', async () => {
     await expect(
       signStatusListJwt({
         statusList: createStatusList(),
         payload: { sub: uri, iat },
-        header: { typ: 'JWT' },
+        // @ts-expect-error typ must be statuslist+jwt
+        header: { typ },
         signer: jwsSigner,
-        signJwsCallback: signJws,
+        signJwsCallback,
       })
     ).rejects.toThrow(JoseValidationError)
+    expect(signJwsCallback).not.toHaveBeenCalled()
   })
 
-  it('does not sign a payload without iat', async () => {
-    const signJwsCallback = vi.fn(signJws)
+  it('rejects a payload without sub', async () => {
+    // @ts-expect-error sub is required
+    await expect(sign(createStatusList(), { iat })).rejects.toThrow('- sub: ')
+  })
 
-    await expect(
-      // @ts-expect-error iat is required
-      signStatusListJwt({ statusList: createStatusList(), payload: { sub: uri }, signer: jwsSigner, signJwsCallback })
-    ).rejects.toThrow(JoseValidationError)
-    expect(signJwsCallback).not.toHaveBeenCalled()
+  it('rejects a payload without iat', async () => {
+    // @ts-expect-error iat is required
+    await expect(sign(createStatusList(), { sub: uri })).rejects.toThrow('- iat: ')
   })
 })
 
@@ -256,7 +180,7 @@ describe('decodeStatusListJwt', () => {
     const jwt = await signStatusListToken({ status_list: undefined })
 
     expect(() => decodeStatusListJwt(jwt)).toThrow(JoseValidationError)
-    expect(() => decodeStatusListJwt(jwt)).toThrow('at "status_list"')
+    expect(() => decodeStatusListJwt(jwt)).toThrow('- status_list: ')
   })
 
   // The spec allows 1, 2, 4 and 8 bits per status, and nothing else
@@ -264,7 +188,7 @@ describe('decodeStatusListJwt', () => {
     const jwt = await signStatusListToken({ status_list: { bits: 3, lst: 'eNrbuRgAAhcBXQ' } })
 
     expect(() => decodeStatusListJwt(jwt)).toThrow(JoseValidationError)
-    expect(() => decodeStatusListJwt(jwt)).toThrow('at "status_list.bits"')
+    expect(() => decodeStatusListJwt(jwt)).toThrow('- status_list.bits: ')
   })
 
   it.each([
@@ -274,14 +198,21 @@ describe('decodeStatusListJwt', () => {
     const jwt = await signStatusListToken({ status_list: { bits: 1, lst } })
 
     expect(() => decodeStatusListJwt(jwt)).toThrow(JoseValidationError)
-    expect(() => decodeStatusListJwt(jwt)).toThrow('at "status_list.lst"')
+    expect(() => decodeStatusListJwt(jwt)).toThrow('- status_list.lst: ')
+  })
+
+  // Draft 16 § 5.1: "The value of the claim MUST be a positive number"
+  it.each([0, -1])('rejects a ttl of %i', async (ttl) => {
+    const jwt = await signStatusListToken({ ttl })
+
+    expect(() => decodeStatusListJwt(jwt)).toThrow('- ttl: ')
   })
 
   it('rejects a ttl that is not a number', async () => {
     const jwt = await signStatusListToken({ ttl: '300' })
 
     expect(() => decodeStatusListJwt(jwt)).toThrow(JoseValidationError)
-    expect(() => decodeStatusListJwt(jwt)).toThrow('at "ttl"')
+    expect(() => decodeStatusListJwt(jwt)).toThrow('- ttl: ')
   })
 })
 
@@ -321,12 +252,12 @@ describe('verifyStatusListJwt', () => {
 
   // A JWT the issuer signed for another purpose with the same key must not be accepted as a status list
   it('rejects a token signed by the issuer whose typ header is not statuslist+jwt', async () => {
-    const { payload } = createHeaderAndPayload(createStatusList(), { sub: uri, iat }, { alg: 'ES256' })
+    const { payload } = await sign(createStatusList(), { sub: uri, iat })
     const { jwt } = await signJwt({ header: { typ: 'JWT' }, payload, signer: jwsSigner, signJwsCallback: signJws })
     const verifyJwsCallback = vi.fn(verifyJws)
 
     await expect(verifyStatusListJwt({ jwt, uri, verifyJwsCallback })).rejects.toThrow(
-      `Expected the media type to be 'statuslist+jwt' at "typ"`
+      `typ: typ must be statuslist+jwt (invalid_typ)`
     )
     await expect(verifyStatusListJwt({ jwt, uri, verifyJwsCallback })).rejects.toThrow(JoseValidationError)
     // the token is rejected before its signature is verified
@@ -354,7 +285,7 @@ describe('verifyStatusListJwt', () => {
   it('rejects a token without a required claim', async () => {
     await expect(
       verifyStatusListJwt({ jwt: await signToken(), uri, requiredClaims: ['exp'], verifyJwsCallback: verifyJws })
-    ).rejects.toThrow("The token has no 'exp' claim, which is required.")
+    ).rejects.toThrow("exp: The token has no 'exp' claim, which is required (claim_missing)")
   })
 
   it('rejects an index whose status is not valid', async () => {

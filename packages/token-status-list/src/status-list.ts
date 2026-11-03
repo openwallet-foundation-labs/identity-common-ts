@@ -59,20 +59,25 @@ export class StatusList {
 
   /** Get the status at a specific index. */
   getStatus(index: number): StatusType {
-    if (index < 0 || index >= this.totalStatuses) {
-      throw new Error('Index out of bounds')
-    }
+    this.assertIndex(index)
     return this._statusList[index]
   }
 
   /** Set the status at a specific index. */
   setStatus(index: number, value: StatusType | number): void {
-    if (index < 0 || index >= this.totalStatuses) {
-      throw new Error('Index out of bounds')
-    }
+    this.assertIndex(index)
     assertStatusValue(value, this.bitsPerStatus, index)
     this._statusList[index] = value
     this.#isModified = true
+  }
+
+  // Draft 16 § 8.3: an index outside the list must reject the Referenced Token, and NaN or a fraction would read undefined
+  private assertIndex(index: number): void {
+    if (!Number.isInteger(index) || index < 0 || index >= this.totalStatuses) {
+      throw new StatusListError(
+        `Index out of bounds: ${index} is not an index of a list of ${this.totalStatuses} statuses`
+      )
+    }
   }
 
   /** Compress the status list and return as raw bytes. */

@@ -1,7 +1,6 @@
 // Signing, parsing and verifying a Status List Token in JWT format raises `@owf/jose`'s errors,
 // re-exported here so they can be caught without depending on `@owf/jose` directly.
 export {
-  JoseClaimVerificationError,
   JoseError,
   JoseInvalidArgumentError,
   JoseParseError,
@@ -27,14 +26,21 @@ export type {
 export { StatusListInfo } from './cbor/status-list-info'
 export { fetchStatusList } from './fetch-status-list'
 export type { EncryptBlock } from './ff1'
-export type { JwtWithStatusListPayload, StatusListJwtHeaderParameters, StatusListJwtPayload } from './jwt-types'
+export type {
+  ReferencedTokenJwtPayload,
+  StatusClaim,
+  StatusListJwtHeaderParameters,
+  StatusListJwtPayload,
+  StatusListReference,
+} from './jwt-types'
 export {
   JWT_STATUS_LIST_TYPE,
   JwtClaimNames,
-  zJwtWithStatusListPayload,
-  zStatusListEntry,
+  zReferencedTokenJwtPayload,
+  zStatusClaim,
   zStatusListJwtHeader,
   zStatusListJwtPayload,
+  zStatusListReference,
 } from './jwt-types'
 export { StatusList } from './status-list'
 export { StatusListEntryNotValidError, StatusListError } from './status-list-error'
@@ -60,11 +66,10 @@ export type {
   VerifyStatusListJwtResult,
 } from './status-list-jwt'
 export {
-  createHeaderAndPayload,
   decodeStatusListJwt,
   signStatusListJwt,
   verifyStatusListJwt,
   verifyStatusListJwtClaims,
 } from './status-list-jwt'
-export type { BitsPerStatus, StatusListEntry } from './types'
+export type { BitsPerStatus } from './types'
 export { StatusListMediaTypes, StatusType } from './types'

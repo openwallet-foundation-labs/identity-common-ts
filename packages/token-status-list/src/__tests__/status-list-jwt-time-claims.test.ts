@@ -1,20 +1,23 @@
-import { JoseClaimVerificationError } from '@owf/jose'
+import { JoseValidationError, type JoseValidationIssue } from '@owf/jose'
 import { describe, expect, it } from 'vitest'
 import { type VerifyStatusListJwtOptions, verifyStatusListJwt } from '../status-list-jwt'
-import { verifyJws } from './context'
+import { claimIssue, verifyJws } from './context'
 import { now, secondsFromNow, signStatusListToken, uri } from './status-list-jwt-tokens'
 
-// The time claims of a signed Status List Token, verified through `verifyStatusListJwt` at `now`.
-// Unless a test says otherwise, the clock skew is the default of 30 seconds.
+// Unless a test says otherwise, the clock skew is the default of 30 seconds
 
 const verify = async (
   claims: Record<string, unknown>,
   options: Partial<Omit<VerifyStatusListJwtOptions, 'jwt'>> = {}
 ) => verifyStatusListJwt({ jwt: await signStatusListToken(claims), uri, now, verifyJwsCallback: verifyJws, ...options })
 
-const expectRejectedClaim = async (verification: Promise<unknown>, claim: string, reason: string) => {
-  await expect(verification).rejects.toThrow(JoseClaimVerificationError)
-  await expect(verification).rejects.toMatchObject({ claim, reason })
+const expectRejectedClaim = async (
+  verification: Promise<unknown>,
+  claim: string,
+  code: JoseValidationIssue['code']
+) => {
+  await expect(verification).rejects.toThrow(JoseValidationError)
+  await expect(verification).rejects.toEqual(claimIssue(claim, code))
 }
 
 describe('iat', () => {
@@ -25,11 +28,11 @@ describe('iat', () => {
   })
 
   it('rejects a token issued more than 30 seconds after now', async () => {
-    await expectRejectedClaim(verify({ iat: secondsFromNow(31) }), 'iat', 'not-yet-valid')
+    await expectRejectedClaim(verify({ iat: secondsFromNow(31) }), 'iat', 'not_yet_valid')
   })
 
   it('rejects a token issued a second after now when there is no skew', async () => {
-    await expectRejectedClaim(verify({ iat: secondsFromNow(1) }, { skewSeconds: 0 }), 'iat', 'not-yet-valid')
+    await expectRejectedClaim(verify({ iat: secondsFromNow(1) }, { skewSeconds: 0 }), 'iat', 'not_yet_valid')
   })
 
   it('does not compare iat with now when checkIssuedAt is false', async () => {
@@ -73,7 +76,7 @@ describe('exp', () => {
 
   // ISO/IEC 18013-5 second edition § 12.3.6.3 requires it for the revocation list of an MSO
   it('rejects a token without exp when it is required', async () => {
-    await expectRejectedClaim(verify({}, { requiredClaims: ['exp'] }), 'exp', 'missing')
+    await expectRejectedClaim(verify({}, { requiredClaims: ['exp'] }), 'exp', 'claim_missing')
   })
 
   it('does not compare exp with now when checkExpirationTime is false', async () => {
@@ -91,7 +94,7 @@ describe('nbf', () => {
   })
 
   it('rejects a token that is valid from more than 30 seconds after now', async () => {
-    await expectRejectedClaim(verify({ nbf: secondsFromNow(31) }), 'nbf', 'not-yet-valid')
+    await expectRejectedClaim(verify({ nbf: secondsFromNow(31) }), 'nbf', 'not_yet_valid')
   })
 })
 
@@ -102,8 +105,7 @@ describe('ttl', () => {
     expect(payload.ttl).toBe(300)
   })
 
-  // `ttl` says how long the token may be cached before a fresh one should be fetched, it is not an
-  // expiration time. A verifier that wants a recent token sets `maxAgeSeconds`.
+  // `ttl` is a caching hint, not an expiration time
   it('accepts a token issued longer ago than its ttl', async () => {
     const { payload } = await verify({ iat: secondsFromNow(-3600), ttl: 60 })
 
@@ -113,6 +115,6 @@ describe('ttl', () => {
 
 it('reports a claim that does not verify with the errorMessage it is given', async () => {
   await expect(verify({ exp: secondsFromNow(-3600) }, { errorMessage: 'Status list rejected.' })).rejects.toThrow(
-    "Status list rejected. The 'exp' claim"
+    "Status list rejected.\n  - exp: The 'exp' claim"
   )
 })

@@ -6,13 +6,15 @@ BREAKING: the Status List Token JWT API is built on `@owf/jose`:
 
 | Removed | Use instead |
 | --- | --- |
+| `createHeaderAndPayload(list, payload, header)` | `signStatusListJwt({ statusList, payload, header, signer, signJwsCallback })` |
 | `getListFromStatusListJwt(jwt)` | `decodeStatusListJwt(jwt).statusList` |
-| `getStatusListFromJwt(jwt)` | `decodeJwt({ jwt, payloadSchema: zJwtWithStatusListPayload }).payload.status.status_list` of `@owf/jose` |
+| `getStatusListFromJwt(jwt)` | `decodeJwt({ jwt, payloadSchema: zReferencedTokenJwtPayload }).payload.status.status_list` of `@owf/jose` |
 | `verifyStatus({ token, idx, uri })` | `verifyStatusListJwt({ jwt, idx, uri, verifyJwsCallback })`, which also verifies the signature |
-| `verifyStatusListJwtHeader(header)` | `decodeStatusListJwt(jwt)`, which rejects a token with a missing or wrong `typ` or `alg` |
+| `verifyStatusListJwtHeader(header)` | `decodeStatusListJwt(jwt)` |
+| `StatusListEntry`, `JwtWithStatusListPayload` | `StatusListReference`, `ReferencedTokenJwtPayload` |
 
-`signStatusListJwt` creates and signs a Status List Token, and the `zStatusListJwtHeader`, `zStatusListJwtPayload`, `zJwtWithStatusListPayload` and `zStatusListEntry` schemas are exported. A token without `sub`, `iat` or a valid `status_list` is rejected when it is decoded.
+The new `zStatusListJwtHeader`, `zStatusListJwtPayload`, `zReferencedTokenJwtPayload`, `zStatusClaim` and `zStatusListReference` schemas validate tokens as Token Status List draft 16 requires. `signStatusListJwt` only signs a `typ` of `statuslist+jwt`.
 
-BREAKING: `createHeaderAndPayload` validates its input instead of mutating it, sets `typ` to `statuslist+jwt` only when it is missing and rejects any other `typ`, and includes the `aggregation_uri` of the list. `verifyStatusListJwtClaims` takes the claim verification options of `@owf/jose`: `requiredClaims: ['exp']` replaces `requireExpirationTime`, and `checkIssuedAt` replaces `checkFreshness`.
+BREAKING: `verifyStatusListJwtClaims` takes the options of `verifyJwtClaims` of `@owf/jose`: `requiredClaims: ['exp']` replaces `requireExpirationTime`, and `checkIssuedAt` replaces `checkFreshness`. Errors are the `@owf/jose` errors, re-exported here. Claims that don't verify throw a `JoseValidationError` with an issue per claim.
 
-BREAKING: creating, decoding, signing and verifying a token raise the `@owf/jose` errors, which this package re-exports, instead of an `IdentityCommonError` or `StatusListError`: a `JoseParseError` (or `JoseValidationError`) for a token that is not a Status List Token, and a `JoseVerificationError` for one that does not verify. A status list that cannot be decompressed still raises a `StatusListError`, and a status at `idx` that is not valid a `StatusListEntryNotValidError`.
+`StatusList.getStatus` and `setStatus` throw a `StatusListError` for an index outside the list, a fraction or `NaN`, instead of a plain `Error`. `StatusListCwtPayload.verifyStatus` throws a `StatusListEntryNotValidError` for a status that is not valid. A `ttl` that is not a positive number is rejected (draft 16 § 5.1 and § 5.2).

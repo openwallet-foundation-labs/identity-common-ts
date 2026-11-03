@@ -168,24 +168,22 @@ value, while a status list holds at most 2^32.
 The `signer`, `signJwsCallback` and `verifyJwsCallback` are the ones of `@owf/jose`.
 
 ```typescript
+import { dateToSeconds } from '@owf/identity-common'
 import { StatusList, StatusType, signStatusListJwt, verifyStatusListJwt } from '@owf/token-status-list'
 
 const list = new StatusList(new Array(100_000).fill(StatusType.Valid), 1)
 list.setStatus(42, StatusType.Invalid)
 
-// Creates, validates and signs the header and payload. `typ` defaults to `statuslist+jwt`, `alg` is
-// taken from the signer, and the header identifies the signer. Use `createHeaderAndPayload` to only
-// create the header and payload.
+// `typ` is `statuslist+jwt`, and `alg` and the parameters that identify the signer come from the signer
 const { jwt } = await signStatusListJwt({
   statusList: list,
-  payload: { iss: 'https://issuer.example', sub: 'https://issuer.example/statuslists/1', iat: Math.floor(Date.now() / 1000) },
+  payload: { iss: 'https://issuer.example', sub: 'https://issuer.example/statuslists/1', iat: dateToSeconds(new Date()) },
   signer,
   signJwsCallback,
 })
 
-// Verify the signature, the claims (`sub` must equal the uri) and, when `idx` is given, that the
-// status at that index is valid
-const { payload: verifiedPayload, statusList } = await verifyStatusListJwt({
+// Verifies the signature, the claims (`sub` must be `uri`) and the status at `idx`
+const { statusList } = await verifyStatusListJwt({
   jwt,
   uri: 'https://issuer.example/statuslists/1',
   idx: 7,
@@ -194,46 +192,21 @@ const { payload: verifiedPayload, statusList } = await verifyStatusListJwt({
 statusList.getStatus(42) // 1
 ```
 
-`signStatusListJwt` puts the header parameters that identify the signer in the header, as
-`jwsHeaderFromSigner` of `@owf/jose` gives them: `x5c` for an `x5c` signer, `jwk` for a `jwk` signer,
-the DID URL as `kid` for a `did` signer, `kid` and `trust_chain` for a `federation` signer, and the
-`kid` of a `custom` signer that has one. A verifier establishes the signer from them, as
-`verifyStatusListJwt` does by default. The `header` you pass can repeat them and add others, such as a
-`kid` next to an `x5c`. A header that contradicts the signer is rejected with a
-`JoseInvalidArgumentError` instead of being signed: a `kid`, `x5c`, `trust_chain` or `jwk` with another
-value than the signer's, and, unless the signer is a `custom` one, a parameter that identifies the
-signer by another method, such as a `jwk` next to the `x5c` of an `x5c` signer. A `kid` that is a DID
-URL identifies a `did` signer, and so does a fragment such as `#key-1` when `iss` is a DID, as a
-verifier resolves it against `iss`. `createHeaderAndPayload` does not know the signer, so spread
-`jwsHeaderFromSigner(signer)` into the header you give it.
+`signStatusListJwt` rejects a `header` that contradicts the signer, or that also identifies a signer of another method, such as a `jwk` next to the `x5c` of an `x5c` signer.
 
-`createHeaderAndPayload` and `signStatusListJwt` reject a `typ` other than `statuslist+jwt` (or
-`application/statuslist+jwt`) with a `JoseValidationError`, rather than overwriting it. That includes
-an empty `typ`, which earlier versions of this README passed: leave `typ` out instead.
+`verifyStatusListJwt` decompresses the list only once the token verified, as a small `lst` can inflate to a very large list. `decodeStatusListJwt` reads a token without verifying it, for example to pick the key. Its `statusList` is decompressed when first read.
 
-`verifyStatusListJwt` decompresses `lst` only once the signature and the claims have verified: a few
-kilobytes of it can inflate to a list of any size, so it is not decompressed while it is not yet known
-to be the issuer's.
-
-Use `decodeStatusListJwt(jwt)` to read the header and payload without verifying the signature, for
-example to select the key before calling `verifyStatusListJwt`. Its `statusList` is decompressed when it
-is first read, so read the `statusList` that `verifyStatusListJwt` returns instead. When it is given a
-decoded token, `verifyStatusListJwt` decodes its compact serialization again, so what it verifies and
-returns is what the signature covers.
-
-Both reject a token whose `typ` header is missing or is not `statuslist+jwt` (`application/statuslist+jwt`
-is accepted too, as RFC 7515 requires), before its signature is verified.
-
-### JWT transport — read a referenced token's status entry
+### JWT transport — read the status of a Referenced Token
 
 ```typescript
 import { decodeJwt } from '@owf/jose'
-import { zJwtWithStatusListPayload } from '@owf/token-status-list'
+import { zReferencedTokenJwtPayload } from '@owf/token-status-list'
 
-const { payload } = decodeJwt({ jwt: referencedTokenJwt, payloadSchema: zJwtWithStatusListPayload })
-// payload.status.status_list.idx  — index into the status list
-// payload.status.status_list.uri  — URI of the Status List Token
+const { payload } = decodeJwt({ jwt: referencedTokenJwt, payloadSchema: zReferencedTokenJwtPayload })
+payload.status.status_list // { idx, uri }
 ```
+
+Add `status: zStatusClaim` to the payload schema of your own token instead to validate only the `status` claim.
 
 ### CWT transport — issue and verify a Status List Token
 
@@ -307,23 +280,21 @@ them. Callers that need the original logical length must preserve it separately.
 | `StatusType` | Enum of the status values: `Valid`, `Invalid`, `Suspended`, … |
 | `StatusListMediaTypes` | MIME types for JWT and CWT status list tokens |
 | `BitsPerStatus` | Type: `1 \| 2 \| 4 \| 8` |
-| `StatusListEntry` | Type: `{ idx: number; uri: string }` |
 | `fetchStatusList` | Fetch a Status List Token in JWT or CWT format by its uri |
 
 ### JWT Transport
 
 | Export | Description |
 |--------|-------------|
-| `signStatusListJwt` | Create, validate and sign a Status List Token carrying a `StatusList`, with a header that identifies the signer |
-| `createHeaderAndPayload` | Build and validate a JWT header + payload from a `StatusList` |
-| `decodeStatusListJwt` | Decode a Status List Token, without verifying the signature; its `StatusList` is decompressed when read |
-| `verifyStatusListJwt` | Verify the signature, claims and optionally the status at an index |
+| `signStatusListJwt` | Sign a Status List Token carrying a `StatusList` |
+| `decodeStatusListJwt` | Decode a Status List Token without verifying it |
+| `verifyStatusListJwt` | Verify a Status List Token, and optionally the status at an index |
 | `verifyStatusListJwtClaims` | Verify only the claims of a decoded Status List Token |
 | `zStatusListJwtHeader` / `zStatusListJwtPayload` | Schemas for a Status List Token |
-| `zJwtWithStatusListPayload` / `zStatusListEntry` | Schemas for the payload of a referenced token and its status list entry |
+| `zReferencedTokenJwtPayload` / `zStatusClaim` / `zStatusListReference` | Schemas for a Referenced Token, its `status` claim and the `status_list` reference in it |
 | `JWT_STATUS_LIST_TYPE` | `"statuslist+jwt"` |
 | `JwtClaimNames` | Claim name constants |
-| `JoseError`, `JoseParseError`, … | The `@owf/jose` errors signing, decoding and verifying a Status List Token in JWT format raise |
+| `JoseError`, `JoseValidationError`, `JoseParseError`, … | The `@owf/jose` errors signing, decoding and verifying a Status List Token in JWT format raise. `JoseValidationError` is not a `JoseError`, so catch both |
 
 ### CWT Transport
 

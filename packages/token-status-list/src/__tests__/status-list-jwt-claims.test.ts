@@ -46,23 +46,22 @@ describe('verifyStatusListJwtClaims', () => {
     expect(() => verifyClaims(statusListToken())).not.toThrow()
   })
 
-  // `typ` is required by the header schema and has to be `statuslist+jwt`, so a token without it, or
-  // of another type, is rejected when it is decoded
+  // A token without the `statuslist+jwt` typ is rejected when decoded
   it('rejects a token without a typ header', () => {
     expect(() => decodeStatusListJwt(statusListToken({}, { typ: undefined }))).toThrow(JoseValidationError)
-    expect(() => decodeStatusListJwt(statusListToken({}, { typ: undefined }))).toThrow('at "typ"')
+    expect(() => decodeStatusListJwt(statusListToken({}, { typ: undefined }))).toThrow('- typ: ')
   })
 
   it('rejects a token whose typ header is not statuslist+jwt', () => {
     expect(() => decodeStatusListJwt(statusListToken({}, { typ: 'JWT' }))).toThrow(JoseValidationError)
     expect(() => decodeStatusListJwt(statusListToken({}, { typ: 'JWT' }))).toThrow(
-      `Expected the media type to be 'statuslist+jwt' at "typ"`
+      `typ: typ must be statuslist+jwt (invalid_typ)`
     )
   })
 
   it('rejects a token without an alg header', () => {
     expect(() => decodeStatusListJwt(statusListToken({}, { alg: undefined }))).toThrow(JoseValidationError)
-    expect(() => decodeStatusListJwt(statusListToken({}, { alg: undefined }))).toThrow('at "alg"')
+    expect(() => decodeStatusListJwt(statusListToken({}, { alg: undefined }))).toThrow('- alg: ')
   })
 
   it('returns the header it decoded, with its alg', () => {
@@ -80,16 +79,15 @@ describe('verifyStatusListJwtClaims', () => {
     expect(() => verifyClaims(token)).not.toThrow()
   })
 
-  // `sub` and `iat` are required by the payload schema, so a token without one is rejected when it
-  // is decoded rather than when its claims are verified
+  // A token without `sub` or `iat` is rejected when decoded
   it('rejects a token without a subject', () => {
     expect(() => decodeStatusListJwt(statusListToken({ sub: undefined }))).toThrow(JoseValidationError)
-    expect(() => decodeStatusListJwt(statusListToken({ sub: undefined }))).toThrow('at "sub"')
+    expect(() => decodeStatusListJwt(statusListToken({ sub: undefined }))).toThrow('- sub: ')
   })
 
   it('rejects a token without an issued at', () => {
     expect(() => decodeStatusListJwt(statusListToken({ iat: undefined }))).toThrow(JoseValidationError)
-    expect(() => decodeStatusListJwt(statusListToken({ iat: undefined }))).toThrow('at "iat"')
+    expect(() => decodeStatusListJwt(statusListToken({ iat: undefined }))).toThrow('- iat: ')
   })
 
   it('rejects a token published for a different uri', () => {

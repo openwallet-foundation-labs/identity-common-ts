@@ -116,6 +116,8 @@ describe('StatusList', () => {
 
         expect(() => manager.getStatus(-1)).toThrow('Index out of bounds')
         expect(() => manager.getStatus(listLength)).toThrow('Index out of bounds')
+        expect(() => manager.getStatus(1.5)).toThrow(StatusListError)
+        expect(() => manager.getStatus(Number.NaN)).toThrow(StatusListError)
       })
 
       it('setStatus throws an error for out of bounds index', () => {

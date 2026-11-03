@@ -74,8 +74,7 @@ describe('verifyStatusListJwt with an idx', () => {
     expect(statusList.getStatus(0)).toBe(StatusType.Invalid)
   })
 
-  // The list is carried in whole bytes, so the statuses after the last one issued decode as valid.
-  // See "Known limitation" in the README.
+  // The list is carried in whole bytes, see "Known limitation" in the README
   it('accepts an idx in the unused bits of the last byte of the list', async () => {
     const { statusList } = await verifyStatusAt(7, new StatusList([StatusType.Invalid, 0, 0], 1))
 

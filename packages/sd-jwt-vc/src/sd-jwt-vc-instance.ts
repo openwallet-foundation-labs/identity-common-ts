@@ -741,9 +741,6 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
         // fetch the status list from the uri
         const statusListJwt = await fetcher(uri)
 
-        // Decoding checks that the token is a Status List Token, by its `typ`, before its signature is
-        // verified. The status list itself is only decompressed once the token verified.
-        const decodedStatusListJwt = decodeStatusListJwt(statusListJwt)
         const slJWT = Jwt.fromEncode<StatusListJwtHeaderParameters, StatusListJwtPayload>(statusListJwt)
         // check if the status list has a valid signature. Falls back to the verifier of the SD-JWT-VC.
         const statusListVerifier = this.userConfig.statusVerifier ?? this.userConfig.verifier
@@ -765,13 +762,14 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
           })
 
         // check the claims required for a Status List Token, e.g. that `sub` matches the referenced uri
+        const decodedStatusListJwt = decodeStatusListJwt(statusListJwt)
         verifyStatusListJwtClaims(decodedStatusListJwt.payload, {
           uri,
           now: options?.currentDate !== undefined ? secondsToDate(options.currentDate) : undefined,
           skewSeconds: options?.skewSeconds,
         })
 
-        // get the status list from the status list JWT, now that the token verified
+        // get the status list from the status list JWT
         const status = decodedStatusListJwt.statusList.getStatus(idx)
 
         // validate the status

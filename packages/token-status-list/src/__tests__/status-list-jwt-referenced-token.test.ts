@@ -1,11 +1,8 @@
 import { decodeJwt, JoseValidationError, signJwt } from '@owf/jose'
 import { describe, expect, it } from 'vitest'
-import { zJwtWithStatusListPayload } from '../jwt-types'
+import { zReferencedTokenJwtPayload } from '../jwt-types'
 import { jwsSigner, signJws } from './context'
 import { uri } from './status-list-jwt-tokens'
-
-// A referenced token — a credential, typically — names the entry in a status list that holds its
-// status. `zJwtWithStatusListPayload` reads it, which is what `getStatusListFromJwt` used to do.
 
 const referencedToken = async (status: unknown) =>
   (
@@ -16,9 +13,9 @@ const referencedToken = async (status: unknown) =>
     })
   ).jwt
 
-const decodeReferencedToken = (jwt: string) => decodeJwt({ jwt, payloadSchema: zJwtWithStatusListPayload })
+const decodeReferencedToken = (jwt: string) => decodeJwt({ jwt, payloadSchema: zReferencedTokenJwtPayload })
 
-describe('zJwtWithStatusListPayload', () => {
+describe('zReferencedTokenJwtPayload', () => {
   it('reads the idx and uri of the status list entry', async () => {
     const { payload } = decodeReferencedToken(await referencedToken({ status_list: { idx: 42, uri } }))
 
@@ -37,7 +34,7 @@ describe('zJwtWithStatusListPayload', () => {
     const jwt = await referencedToken({ other_mechanism: { id: 7 } })
 
     expect(() => decodeReferencedToken(jwt)).toThrow(JoseValidationError)
-    expect(() => decodeReferencedToken(jwt)).toThrow('at "status.status_list"')
+    expect(() => decodeReferencedToken(jwt)).toThrow('- status.status_list: ')
   })
 
   it.each([
@@ -48,13 +45,13 @@ describe('zJwtWithStatusListPayload', () => {
     const jwt = await referencedToken({ status_list: { idx, uri } })
 
     expect(() => decodeReferencedToken(jwt)).toThrow(JoseValidationError)
-    expect(() => decodeReferencedToken(jwt)).toThrow('at "status.status_list.idx"')
+    expect(() => decodeReferencedToken(jwt)).toThrow('- status.status_list.idx: ')
   })
 
   it('rejects a status list entry without a uri', async () => {
     const jwt = await referencedToken({ status_list: { idx: 42 } })
 
     expect(() => decodeReferencedToken(jwt)).toThrow(JoseValidationError)
-    expect(() => decodeReferencedToken(jwt)).toThrow('at "status.status_list.uri"')
+    expect(() => decodeReferencedToken(jwt)).toThrow('- status.status_list.uri: ')
   })
 })

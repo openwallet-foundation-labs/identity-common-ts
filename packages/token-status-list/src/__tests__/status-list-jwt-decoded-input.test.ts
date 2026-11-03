@@ -1,9 +1,9 @@
-import { JoseClaimVerificationError, JoseSignatureVerificationError } from '@owf/jose'
+import { JoseSignatureVerificationError, JoseValidationError } from '@owf/jose'
 import { describe, expect, it } from 'vitest'
 import { StatusListEntryNotValidError } from '../status-list-error'
 import { decodeStatusListJwt, verifyStatusListJwt } from '../status-list-jwt'
 import { StatusType } from '../types'
-import { verifyJws } from './context'
+import { claimIssue, verifyJws } from './context'
 import {
   now,
   signStatusListToken,
@@ -13,8 +13,7 @@ import {
   withInvalidSignature,
 } from './status-list-jwt-tokens'
 
-// A decoded token is handed to `verifyStatusListJwt` by a verifier that had to look at it first. What
-// comes back has to be what the signature covers, whatever happened to the decoded object meanwhile.
+// What `verifyStatusListJwt` returns for a decoded token is what the signature covers
 
 // A token whose status at index 3 is not valid
 const decodedToken = async () =>
@@ -51,8 +50,8 @@ describe('verifyStatusListJwt with a decoded token', () => {
       verifyJwsCallback: verifyJws,
     })
 
-    await expect(verification).rejects.toThrow(JoseClaimVerificationError)
-    await expect(verification).rejects.toMatchObject({ claim: 'sub', reason: 'mismatch' })
+    await expect(verification).rejects.toThrow(JoseValidationError)
+    await expect(verification).rejects.toEqual(claimIssue('sub', 'claim_value_mismatch'))
   })
 
   it('returns the signed header and claims rather than the ones on the decoded token', async () => {

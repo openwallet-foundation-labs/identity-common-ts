@@ -4,7 +4,14 @@ import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { CoseKey, type Mac0Context, type Sign1Context } from '@owf/cose'
 import { base64url, type Hasher } from '@owf/identity-common'
-import type { JwsSigner, SignJwsCallback, VerifyJwsCallback } from '@owf/jose'
+import {
+  JoseValidationError,
+  type JoseValidationIssue,
+  type JwsSigner,
+  type SignJwsCallback,
+  type VerifyJwsCallback,
+} from '@owf/jose'
+import { expect } from 'vitest'
 
 const jwsKeyPair = p256.keygen()
 // The uncompressed point is 0x04 || x || y
@@ -27,6 +34,13 @@ export const verifyJws: VerifyJwsCallback = (_signer, { signingInputBytes, signa
   p256.verify(base64url.decode(signature), signingInputBytes, jwsKeyPair.publicKey)
     ? { verified: true, signerJwk: jwsPublicJwk }
     : { verified: false }
+
+/** Matches a `JoseValidationError` with an issue of `code` at `claim`. */
+export const claimIssue = (claim: string, code: JoseValidationIssue['code']) =>
+  expect.objectContaining({
+    name: JoseValidationError.name,
+    issues: expect.arrayContaining([expect.objectContaining({ code, path: [claim] })]),
+  })
 
 export const sign1Context: Sign1Context = {
   sign: async (input) => {

@@ -13,8 +13,7 @@ import { StatusListError } from '../../status-list-error'
 import { StatusListMediaTypes } from '../../types'
 import { otherSignKey, sign1Context, signKey } from '../context'
 
-// The CWT counterpart of status-list-jwt-decompression.test.ts: `lst` is only decompressed once the
-// signature over it has verified.
+// `lst` is only decompressed once the signature verified, as in status-list-jwt-decompression.test.ts
 
 const uri = 'https://example.com/statuslists/1'
 const now = new Date('2026-01-01T12:00:00.000Z')

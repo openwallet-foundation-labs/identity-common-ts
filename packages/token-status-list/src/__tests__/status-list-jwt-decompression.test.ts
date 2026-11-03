@@ -1,12 +1,12 @@
 import { base64url } from '@owf/identity-common'
-import { JoseClaimVerificationError, JoseSignatureVerificationError, JoseValidationError } from '@owf/jose'
+import { JoseSignatureVerificationError, JoseValidationError } from '@owf/jose'
 import { deflate } from 'pako'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { StatusList } from '../status-list'
 import { StatusListEntryNotValidError, StatusListError } from '../status-list-error'
 import { decodeStatusListJwt, verifyStatusListJwt } from '../status-list-jwt'
 import { StatusType } from '../types'
-import { verifyJws } from './context'
+import { claimIssue, verifyJws } from './context'
 import {
   notCompressedLst,
   now,
@@ -17,8 +17,7 @@ import {
   withInvalidSignature,
 } from './status-list-jwt-tokens'
 
-// `lst` is compressed, so a few kilobytes of it can inflate to a list of any size. It is only the
-// issuer's once the signature over it verifies, so nothing may decompress it before that.
+// A small `lst` can inflate to a huge list, so nothing decompresses it before the signature verified
 
 // One MiB of zero bytes, a list of 8 388 608 valid statuses, compresses to about a kilobyte
 const largeListLst = base64url.encode(deflate(new Uint8Array(1024 * 1024), { level: 9 }))
@@ -69,8 +68,8 @@ describe('verifyStatusListJwt', () => {
       verifyJwsCallback: verifyJws,
     })
 
-    await expect(verification).rejects.toThrow(JoseClaimVerificationError)
-    await expect(verification).rejects.toMatchObject({ claim: 'sub', reason: 'mismatch' })
+    await expect(verification).rejects.toThrow(JoseValidationError)
+    await expect(verification).rejects.toEqual(claimIssue('sub', 'claim_value_mismatch'))
   })
 
   it('rejects a token that is not a status list token before decompressing its status list', async () => {
@@ -79,7 +78,7 @@ describe('verifyStatusListJwt', () => {
     const verification = verifyStatusListJwt({ jwt, uri, now, verifyJwsCallback: verifyJws })
 
     await expect(verification).rejects.toThrow(JoseValidationError)
-    await expect(verification).rejects.toThrow('at "typ"')
+    await expect(verification).rejects.toThrow('- typ: ')
   })
 
   it('rejects a verified token whose status list cannot be decompressed', async () => {
