@@ -65,7 +65,20 @@ const jwkCoseKeyMap = {
   },
 }
 
-const coseKeyJwkMap = swapNestedMap(jwkCoseKeyMap)
+const swappedJwkCoseKeyMap = swapNestedMap(jwkCoseKeyMap)
+
+// RFC 9864 § 2.1: the JOSE ECDSA algorithms are fully specified, so the fully-specified COSE ECDSA
+// algorithms convert to the same JWA names. They are kept out of `jwkCoseKeyMap`, so that a JWA
+// `ES256` converts to the COSE `ES256` (-7) and not to `ESP256` (-9).
+const coseKeyJwkMap: typeof swappedJwkCoseKeyMap = {
+  ...swappedJwkCoseKeyMap,
+  alg: {
+    ...swappedJwkCoseKeyMap.alg,
+    [SignatureAlgorithm.ESP256]: 'ES256',
+    [SignatureAlgorithm.ESP384]: 'ES384',
+    [SignatureAlgorithm.ESP512]: 'ES512',
+  },
+}
 
 export const jwkCoseOptionsMap: Record<string, keyof CoseKeyOptions> = {
   kty: 'keyType',

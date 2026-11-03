@@ -20,7 +20,7 @@ import {
   UnprotectedHeaders,
   unprotectedHeadersStructure,
 } from './headers'
-import { type CoseKey, coseKeyToJwkClaim } from './key'
+import { type CoseKey, Curve, coseKeyToJwkClaim, KeyType } from './key'
 
 export const sign1EncodedSchema = z.tuple([
   // protected headers
@@ -42,6 +42,29 @@ export const sign1DecodedSchema = z.object({
 
 export type Sign1EncodedStructure = z.infer<typeof sign1EncodedSchema>
 export type Sign1DecodedStructure = z.infer<typeof sign1DecodedSchema>
+
+/** RFC 9864 § 2.1: the curve each fully-specified ECDSA algorithm is defined for. */
+const fullySpecifiedEcdsaCurves = new Map<SignatureAlgorithm, Curve>([
+  [SignatureAlgorithm.ESP256, Curve['P-256']],
+  [SignatureAlgorithm.ESP384, Curve['P-384']],
+  [SignatureAlgorithm.ESP512, Curve['P-521']],
+])
+
+/**
+ * A fully-specified algorithm fixes the curve of the key, so a key on another curve is rejected
+ * rather than left to the context, which may pick the curve from the key alone.
+ */
+const assertKeyMatchesAlgorithm = (key: CoseKey, algorithm?: SignatureAlgorithm) => {
+  if (algorithm === undefined) return
+  const curve = fullySpecifiedEcdsaCurves.get(algorithm)
+  if (curve === undefined) return
+
+  if (key.keyType !== KeyType.Ec || key.curve !== curve) {
+    throw new CoseInvalidAlgorithmError(
+      `Algorithm ${SignatureAlgorithm[algorithm]} requires an EC key on curve ${Curve[curve]}`
+    )
+  }
+}
 
 export type Sign1Context = {
   sign: (options: { toBeSigned: Uint8Array; key: CoseKey; algorithm: SignatureAlgorithm }) => Promise<Uint8Array>
@@ -244,11 +267,14 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
       throw new Error('Cannot provide detachedPayload when the Sign1 already contains an embedded payload')
     }
 
+    const algorithm = this.algorithm
+    assertKeyMatchesAlgorithm(key, algorithm)
+
     return await ctx.verify({
       toBeVerified: this.toBeSigned({ detachedPayload, externalAad }),
       signature: this.signature,
       key,
-      algorithm: this.algorithm,
+      algorithm,
     })
   }
 
@@ -305,6 +331,8 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     if (!Object.values(SignatureAlgorithm).includes(signatureAlgorithm as SignatureAlgorithm)) {
       throw new CoseInvalidAlgorithmError('algorithm provided in the options or key is not a valid signing algorithm')
     }
+
+    assertKeyMatchesAlgorithm(options.signingKey, signatureAlgorithm as SignatureAlgorithm)
 
     this.structure.signature = await ctx.sign({
       toBeSigned: Sign1.toBeSigned({
