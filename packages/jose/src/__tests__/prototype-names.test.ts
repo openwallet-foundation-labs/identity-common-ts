@@ -1,6 +1,6 @@
 import { base64url, stringToBytes } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
-import { JoseClaimVerificationError, JoseCriticalHeaderError, JoseNotSupportedError } from '../error'
+import { JoseNotSupportedError } from '../error'
 import {
   coseAlgorithmsToJwaSignatureAlgorithms,
   coseAlgorithmToJwaSignatureAlgorithm,
@@ -9,7 +9,7 @@ import {
 } from '../jwa/cose-algorithm'
 import { parseJws } from '../jws/parse-jws'
 import { verifyJwtClaims } from '../jwt/verify-jwt-claims'
-import { unsignedCompactJws } from './context'
+import { claimIssue, unsignedCompactJws } from './context'
 
 /**
  * Names such as `constructor` and `toString` are properties of every object through its prototype.
@@ -35,9 +35,15 @@ describe('header parameters named after Object.prototype members', () => {
     const jws = unsignedCompactJws({ alg: 'ES256', crit: [name] }, {})
 
     expect(() => parseJws({ jws, understoodCriticalParameters: [name] })).toThrow(
-      new JoseCriticalHeaderError(
-        `The 'crit' header parameter lists '${name}', but the header does not contain that parameter`
-      )
+      expect.objectContaining({
+        issues: [
+          expect.objectContaining({
+            code: 'invalid_crit',
+            path: ['crit', 0],
+            message: `The 'crit' header parameter lists '${name}', but the header does not contain that parameter`,
+          }),
+        ],
+      })
     )
   })
 
@@ -58,9 +64,7 @@ describe('header parameters named after Object.prototype members', () => {
 
 describe('required claims named after Object.prototype members', () => {
   it.each(['constructor', 'toString'])('rejects a token without a required %s claim', (claim) => {
-    expect(() => verifyJwtClaims({}, { requiredClaims: [claim] })).toThrow(
-      expect.objectContaining({ name: JoseClaimVerificationError.name, claim, reason: 'missing' })
-    )
+    expect(() => verifyJwtClaims({}, { requiredClaims: [claim] })).toThrow(claimIssue(claim, 'claim_missing'))
   })
 
   it('accepts a required claim the token carries as an own property', () => {

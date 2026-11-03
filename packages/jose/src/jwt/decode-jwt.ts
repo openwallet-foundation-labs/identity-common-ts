@@ -1,10 +1,9 @@
-import type { BaseSchema } from '@owf/identity-common'
-import { JoseNotSupportedError, JoseParseError } from '../error'
+import { type BaseSchema, parseWithErrorHandling } from '@owf/identity-common'
+import { JoseNotSupportedError, JoseParseError, JoseValidationError } from '../error'
 import { zJweHeader } from '../jwe/z-jwe'
 import { parseJws } from '../jws/parse-jws'
 import { decodeBase64UrlJsonObject } from '../utils/encoding'
 import type { InferSchemaOrDefaultOutput } from '../utils/zod'
-import { parseWithErrorHandling } from '../utils/zod'
 import { type JwtHeader, type JwtPayload, zJwtHeader, zJwtPayload } from './z-jwt'
 
 export interface DecodeJwtOptions<
@@ -104,8 +103,13 @@ export function decodeJwt<
 
   // Always validated against the registered claims, and only then against the caller's schema: a
   // schema describing a profile's own claims must not be able to leave `exp` unchecked as a number.
-  const registeredPayload = parseWithErrorHandling(zJwtPayload, payloadJson, 'Invalid JWT payload')
-  const payload = parseWithErrorHandling(options.payloadSchema ?? zJwtPayload, payloadJson, 'Invalid JWT payload')
+  const registeredPayload = parseWithErrorHandling(zJwtPayload, payloadJson, 'Invalid JWT payload', JoseValidationError)
+  const payload = parseWithErrorHandling(
+    options.payloadSchema ?? zJwtPayload,
+    payloadJson,
+    'Invalid JWT payload',
+    JoseValidationError
+  )
 
   return {
     header: jws.protectedHeader as InferSchemaOrDefaultOutput<HeaderSchema, typeof zJwtHeader>,
@@ -157,10 +161,10 @@ export function decodeJwtHeader<HeaderSchema extends BaseSchema | undefined = un
   // schema, the way `decodeJwt` validates a header: a schema of the caller's must not be able to let
   // `alg: none` or a private `jwk` through. A JWE is held to the JWE header parameters as well, which
   // require `enc` and an `epk` that is a public key.
-  const registeredHeader = parseWithErrorHandling(zJwtHeader, headerJson, 'Invalid header')
-  if (parts.length === 5) parseWithErrorHandling(zJweHeader, headerJson, 'Invalid JWE header')
+  const registeredHeader = parseWithErrorHandling(zJwtHeader, headerJson, 'Invalid header', JoseValidationError)
+  if (parts.length === 5) parseWithErrorHandling(zJweHeader, headerJson, 'Invalid JWE header', JoseValidationError)
   const header = options.headerSchema
-    ? parseWithErrorHandling(options.headerSchema, headerJson, 'Invalid header')
+    ? parseWithErrorHandling(options.headerSchema, headerJson, 'Invalid header', JoseValidationError)
     : registeredHeader
 
   return { header: header as InferSchemaOrDefaultOutput<HeaderSchema, typeof zJwtHeader> }

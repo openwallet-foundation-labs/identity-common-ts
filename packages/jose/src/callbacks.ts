@@ -2,6 +2,7 @@ import type { OrPromise } from '@owf/identity-common'
 import type { Jwk } from './jwk/z-jwk'
 import type { JwsSigner } from './jws/signer'
 import type { JwsProtectedHeader, JwsUnprotectedHeader } from './jws/z-jws'
+import type { JwtPayload } from './jwt/z-jwt'
 
 /**
  * What a signing or verification callback is given besides the signer. The callbacks sign and verify
@@ -30,7 +31,7 @@ export interface JwsCallbackContext {
   payload: Uint8Array
 
   /** The payload as a JSON object, when the JWS is a JWT, so a callback can use the claims. */
-  jwtPayload?: Record<string, unknown>
+  jwtPayload?: JwtPayload
 }
 
 export interface SignJwsCallbackContext extends JwsCallbackContext {}

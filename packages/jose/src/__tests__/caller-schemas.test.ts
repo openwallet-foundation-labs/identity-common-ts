@@ -4,7 +4,6 @@ import z from 'zod'
 import type { VerifyJwsCallback, VerifyJwsCallbackContext } from '../callbacks'
 import {
   JoseAlgorithmNotAllowedError,
-  JoseClaimVerificationError,
   JoseNotSupportedError,
   JoseParseError,
   JoseSignerError,
@@ -15,7 +14,7 @@ import { type DecodeJwtResult, decodeJwt, decodeJwtHeader } from '../jwt/decode-
 import { signJwt } from '../jwt/sign-jwt'
 import { verifyJwt } from '../jwt/verify-jwt'
 import { zJwtPayload } from '../jwt/z-jwt'
-import { createEs256Context, unsignedCompactJws } from './context'
+import { claimIssue, createEs256Context, unsignedCompactJws } from './context'
 
 const now = new Date('2026-09-15T12:00:00Z')
 const hourAgo = dateToSeconds(now) - 3600
@@ -114,14 +113,12 @@ describe('verifyJwt with a payload schema that drops the registered claims', () 
     })
 
   it('rejects a token that expired an hour ago', async () => {
-    await expect(verify({ iss: 'https://issuer.example', exp: hourAgo })).rejects.toThrow(
-      expect.objectContaining({ name: JoseClaimVerificationError.name, claim: 'exp', reason: 'expired' })
-    )
+    await expect(verify({ iss: 'https://issuer.example', exp: hourAgo })).rejects.toThrow(claimIssue('exp', 'expired'))
   })
 
   it('rejects a token that is not valid for another hour', async () => {
     await expect(verify({ iss: 'https://issuer.example', nbf: hourAhead })).rejects.toThrow(
-      expect.objectContaining({ name: JoseClaimVerificationError.name, claim: 'nbf', reason: 'not-yet-valid' })
+      claimIssue('nbf', 'not_yet_valid')
     )
   })
 
@@ -173,9 +170,7 @@ describe('verifyJwt with a payload schema that fills in registered claims', () =
         now,
         maxAgeSeconds: 60,
       })
-    ).rejects.toThrow(
-      expect.objectContaining({ name: JoseClaimVerificationError.name, claim: 'iat', reason: 'missing' })
-    )
+    ).rejects.toThrow(claimIssue('iat', 'claim_missing'))
   })
 
   it('rejects a token without a required iat', async () => {
@@ -187,9 +182,7 @@ describe('verifyJwt with a payload schema that fills in registered claims', () =
         now,
         requiredClaims: ['iat'],
       })
-    ).rejects.toThrow(
-      expect.objectContaining({ name: JoseClaimVerificationError.name, claim: 'iat', reason: 'missing' })
-    )
+    ).rejects.toThrow(claimIssue('iat', 'claim_missing'))
   })
 })
 
@@ -301,7 +294,9 @@ describe('decodeJwtHeader with a header schema of its own', () => {
   it('rejects a jwk that carries a symmetric key', () => {
     const jwt = unsignedCompactJws({ alg: 'ES256', jwk: { kty: 'oct', k: 'c2VjcmV0' } }, {})
 
-    expect(() => decodeJwtHeader({ jwt, headerSchema: zKidHeader })).toThrow(`contains the private key member(s) 'k'`)
+    expect(() => decodeJwtHeader({ jwt, headerSchema: zKidHeader })).toThrow(
+      `the jwk contains the private key member 'k'`
+    )
   })
 
   it('returns the header as the schema returned it', () => {
@@ -329,7 +324,7 @@ describe('decodeJwtHeader of a compact JWE', () => {
     const epk = { kty: 'EC', crv: 'P-256', x: 'x', y: 'y', d: 'd' }
 
     expect(() => decodeJwtHeader({ jwt: jwe({ alg: 'ECDH-ES', enc: 'A256GCM', epk }) })).toThrow(
-      `contains the private key member(s) 'd'`
+      `the jwk contains the private key member 'd'`
     )
   })
 

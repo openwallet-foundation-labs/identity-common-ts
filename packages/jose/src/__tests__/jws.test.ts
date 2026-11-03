@@ -24,7 +24,7 @@ describe('parseJws', () => {
   it('rejects a jwk header parameter carrying private key material', () => {
     const jws = unsignedCompactJws({ alg: 'ES256', jwk: { kty: 'EC', crv: 'P-256', x: 'x', y: 'y', d: 'd' } }, {})
 
-    expect(() => parseJws({ jws })).toThrow(`contains the private key member(s) 'd'`)
+    expect(() => parseJws({ jws })).toThrow(`the jwk contains the private key member 'd'`)
   })
 
   it('validates against the registered header parameters even when a custom schema is given', async () => {
@@ -102,14 +102,14 @@ describe('parseJws', () => {
           payload,
           signatures: [
             { protected: protectedHeader, signature: 'c2ln' },
-            { protected: otherProtectedHeader, signature: 'c2ln2' },
+            { protected: otherProtectedHeader, signature: 'c2lnMg' },
           ],
         },
         signatureIndex: 1,
       })
 
       expect(parsed.protectedHeader.alg).toBe('ES384')
-      expect(parsed.signature).toBe('c2ln2')
+      expect(parsed.signature).toBe('c2lnMg')
     })
 
     it('rejects a signature index the general JWS does not have', () => {

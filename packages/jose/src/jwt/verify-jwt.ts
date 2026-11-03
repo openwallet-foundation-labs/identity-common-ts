@@ -1,9 +1,9 @@
-import type { BaseSchema } from '@owf/identity-common'
+import { type BaseSchema, parseWithErrorHandling } from '@owf/identity-common'
 import type { VerifyJwsCallback } from '../callbacks'
+import { JoseValidationError } from '../error'
 import type { JwsSigner, JwsSignerMethod, JwsSignerWithJwk } from '../jws/signer'
 import { verifyJwsSignature } from '../jws/verify-jws'
 import type { InferSchemaOrDefaultOutput } from '../utils/zod'
-import { parseWithErrorHandling } from '../utils/zod'
 import { type DecodeJwtResult, decodeJwt } from './decode-jwt'
 import { type VerifyJwtClaimsOptions, verifyJwtClaims } from './verify-jwt-claims'
 import { type JwtPayload, type zJwtHeader, zJwtPayload } from './z-jwt'
@@ -87,7 +87,7 @@ export interface VerifyJwtResult<
  * @throws JoseParseError or JoseValidationError if the token is not a valid JWT.
  * @throws JoseAlgorithmNotAllowedError if the algorithm is not accepted, or does not match the key.
  * @throws JoseSignatureVerificationError if the signature does not verify.
- * @throws JoseClaimVerificationError if a claim does not verify.
+ * @throws JoseValidationError with an issue for each claim that does not verify, see `verifyJwtClaims`.
  * @throws JoseInvalidArgumentError if `now`, `skewSeconds` or `maxAgeSeconds` cannot be used to
  *   verify the claims.
  */
@@ -113,7 +113,8 @@ export async function verifyJwt<
   // A decoded JWT that was put together without `decodeJwt` does not come with them, so its own
   // header and claims are validated instead.
   const registeredPayload: JwtPayload =
-    decoded.registeredPayload ?? parseWithErrorHandling(zJwtPayload, decoded.payload, 'Invalid JWT payload')
+    decoded.registeredPayload ??
+    parseWithErrorHandling(zJwtPayload, decoded.payload, 'Invalid JWT payload', JoseValidationError)
 
   const { signer } = await verifyJwsSignature({
     jws: {

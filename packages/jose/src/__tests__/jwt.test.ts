@@ -1,4 +1,4 @@
-import { dateToSeconds } from '@owf/identity-common'
+import { dateToSeconds, zTyp } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import z from 'zod'
 import { decodeJwt, decodeJwtHeader } from '../jwt/decode-jwt'
@@ -6,8 +6,7 @@ import { signJwt } from '../jwt/sign-jwt'
 import { verifyJwt } from '../jwt/verify-jwt'
 import { verifyJwtClaims } from '../jwt/verify-jwt-claims'
 import { zJwtHeader, zJwtPayload } from '../jwt/z-jwt'
-import { zJoseType } from '../utils/z-common'
-import { createEs256Context, unsignedCompactJws } from './context'
+import { claimIssue, createEs256Context, unsignedCompactJws } from './context'
 
 const now = new Date('2026-09-15T12:00:00Z')
 const inSeconds = (date: Date) => dateToSeconds(date)
@@ -37,7 +36,7 @@ describe('decodeJwt', () => {
 
 describe('schema composition', () => {
   // What a key binding JWT must look like, expressed as a schema rather than as a list of checks
-  const zKeyBindingJwtHeader = z.object({ ...zJwtHeader.shape, typ: zJoseType('kb+jwt') }).loose()
+  const zKeyBindingJwtHeader = z.object({ ...zJwtHeader.shape, typ: zTyp('kb+jwt') }).loose()
   const zKeyBindingJwtPayload = z
     .object({
       ...zJwtPayload.shape,
@@ -66,7 +65,7 @@ describe('schema composition', () => {
   it('rejects a token of a different type', () => {
     const jwt = unsignedCompactJws({ alg: 'ES256', typ: 'dpop+jwt' }, payload)
 
-    expect(() => decodeJwt({ jwt, headerSchema: zKeyBindingJwtHeader })).toThrow(`media type to be 'kb+jwt'`)
+    expect(() => decodeJwt({ jwt, headerSchema: zKeyBindingJwtHeader })).toThrow('typ must be kb+jwt')
   })
 
   it('rejects a key binding JWT with an empty sd_hash', () => {
@@ -124,13 +123,11 @@ describe('verifyJwtClaims', () => {
 
     expect(() => verifyJwtClaims({ iat }, { now, skewSeconds: 0, maxAgeSeconds: minutes(10) })).not.toThrow()
     expect(() => verifyJwtClaims({ iat }, { now, skewSeconds: 0, maxAgeSeconds: minutes(1) })).toThrow(
-      expect.objectContaining({ claim: 'iat', reason: 'expired' })
+      claimIssue('iat', 'expired')
     )
     // The skew applies, as it does to `exp`
     expect(() => verifyJwtClaims({ iat }, { now, skewSeconds: minutes(5), maxAgeSeconds: minutes(1) })).not.toThrow()
-    expect(() => verifyJwtClaims({}, { now, maxAgeSeconds: minutes(1) })).toThrow(
-      expect.objectContaining({ claim: 'iat', reason: 'missing' })
-    )
+    expect(() => verifyJwtClaims({}, { now, maxAgeSeconds: minutes(1) })).toThrow(claimIssue('iat', 'claim_missing'))
   })
 
   it('checks the expected issuer, subject and nonce', () => {
@@ -195,7 +192,7 @@ describe('signJwt and verifyJwt', () => {
     const { signJws, publicJwk } = await createEs256Context()
     const signer = { method: 'jwk', alg: 'ES256', publicJwk } as const
 
-    const zKeyBindingJwtHeader = z.object({ ...zJwtHeader.shape, typ: zJoseType('kb+jwt') }).loose()
+    const zKeyBindingJwtHeader = z.object({ ...zJwtHeader.shape, typ: zTyp('kb+jwt') }).loose()
     const zKeyBindingJwtPayload = z
       .object({ ...zJwtPayload.shape, iat: z.number(), aud: z.string(), nonce: z.string(), sd_hash: z.string().min(1) })
       .loose()
@@ -221,13 +218,14 @@ describe('signJwt and verifyJwt', () => {
     ).rejects.toThrow('invalid claims set')
 
     await expect(
+      // @ts-expect-error a typ the schema does not allow is a type error as well as a validation error
       signJwt({ header: { typ: 'dpop+jwt' }, payload: valid, ...schemas, signer, signJwsCallback: signJws })
     ).rejects.toThrow('invalid header')
   })
 
   it('types the header and the claims set from the schemas', async () => {
     const { signJws, publicJwk } = await createEs256Context()
-    const zHeader = z.object({ ...zJwtHeader.shape, typ: zJoseType('kb+jwt') }).loose()
+    const zHeader = z.object({ ...zJwtHeader.shape, typ: zTyp('kb+jwt') }).loose()
     const zPayload = z.object({ ...zJwtPayload.shape, sd_hash: z.string() }).loose()
 
     const options = {

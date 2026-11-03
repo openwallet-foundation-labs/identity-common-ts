@@ -1,5 +1,7 @@
 import { base64url } from '@owf/identity-common'
+import { expect } from 'vitest'
 import type { SignJwsCallback, VerifyJwsCallback } from '../callbacks'
+import { JoseValidationError, type JoseValidationIssue } from '../error'
 import type { Jwk } from '../jwk/z-jwk'
 
 /**
@@ -50,3 +52,10 @@ export function unsignedCompactJws(header: unknown, payload: unknown, signature 
   const encode = (value: unknown) => base64url.encode(new TextEncoder().encode(JSON.stringify(value)))
   return `${encode(header)}.${encode(payload)}.${signature}`
 }
+
+/** Matches a `JoseValidationError` with an issue of `code` at `claim`, with `message` when given. */
+export const claimIssue = (claim: string, code: JoseValidationIssue['code'], message?: string) =>
+  expect.objectContaining({
+    name: JoseValidationError.name,
+    issues: expect.arrayContaining([expect.objectContaining({ code, path: [claim], ...(message && { message }) })]),
+  })

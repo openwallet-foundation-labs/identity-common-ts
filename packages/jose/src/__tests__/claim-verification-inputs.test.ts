@@ -1,11 +1,11 @@
 import { dateToSeconds } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
-import { JoseClaimVerificationError, type JoseClaimVerificationReason, JoseInvalidArgumentError } from '../error'
+import { JoseInvalidArgumentError, JoseValidationError } from '../error'
 import { signJwt } from '../jwt/sign-jwt'
 import { verifyJwt } from '../jwt/verify-jwt'
 import { verifyJwtClaims } from '../jwt/verify-jwt-claims'
 import type { JwtPayload } from '../jwt/z-jwt'
-import { createEs256Context } from './context'
+import { claimIssue, createEs256Context } from './context'
 
 const now = new Date('2026-09-15T12:00:00Z')
 const expiredAnHourAgo = { exp: dateToSeconds(now) - 3600 }
@@ -53,7 +53,7 @@ describe('options that cannot be used to verify the time claims', () => {
   })
 
   it('does not report invalid options as a claim that did not verify', () => {
-    // Caught rather than asserted with `not.toThrow(JoseClaimVerificationError)`, which also passes
+    // Caught rather than asserted with `not.toThrow(JoseValidationError)`, which also passes
     // when nothing is thrown at all — which is what a NaN skew used to do for this expired token
     let error: unknown
     try {
@@ -63,7 +63,7 @@ describe('options that cannot be used to verify the time claims', () => {
     }
 
     expect(error).toBeInstanceOf(JoseInvalidArgumentError)
-    expect(error).not.toBeInstanceOf(JoseClaimVerificationError)
+    expect(error).not.toBeInstanceOf(JoseValidationError)
   })
 
   it('accepts a skewSeconds of 0', () => {
@@ -88,14 +88,10 @@ describe('options that cannot be used to verify the time claims', () => {
   })
 })
 
-/** Matches a `JoseClaimVerificationError` by its claim, its reason and its message. */
-const claimError = (claim: string, reason: JoseClaimVerificationReason, message: string) =>
-  expect.objectContaining({ name: JoseClaimVerificationError.name, claim, reason, message: `${prefix} ${message}` })
-
 /**
  * A `Date` holds up to 8.64e15 milliseconds either side of 1970, but a NumericDate is any JSON number.
  * The time claims are compared as numbers of seconds, so one outside the range of a `Date` still
- * orders: an `exp` of 9999999999999 is a token that does not expire. An error message prints such a
+ * orders: an `exp` of 9999999999999 is a token that does not expire. An issue message prints such a
  * NumericDate as the number, as it has no date to print.
  */
 describe('a NumericDate outside the range of a Date', () => {
@@ -108,20 +104,20 @@ describe('a NumericDate outside the range of a Date', () => {
 
   it('rejects an exp far in the past as expired', () => {
     expect(() => verifyJwtClaims({ exp: -1e13 }, { now })).toThrow(
-      claimError(
+      claimIssue(
         'exp',
         'expired',
-        `The 'exp' claim '-10000000000000' is in the past (compared to '2026-09-15T12:00:00.000Z'), and therefore not valid.`
+        `The 'exp' claim '-10000000000000' is in the past (compared to '2026-09-15T12:00:00.000Z')`
       )
     )
   })
 
   it.each(['nbf', 'iat'])('rejects an %s far in the future as not yet valid', (claim) => {
     expect(() => verifyJwtClaims({ [claim]: 1e13 }, { now })).toThrow(
-      claimError(
+      claimIssue(
         claim,
-        'not-yet-valid',
-        `The '${claim}' claim '10000000000000' is in the future (compared to '2026-09-15T12:00:00.000Z'), and therefore not valid.`
+        'not_yet_valid',
+        `The '${claim}' claim '10000000000000' is in the future (compared to '2026-09-15T12:00:00.000Z')`
       )
     )
   })
@@ -132,10 +128,10 @@ describe('a NumericDate outside the range of a Date', () => {
 
   it('rejects an iat far in the past as older than maxAgeSeconds', () => {
     expect(() => verifyJwtClaims({ iat: -1e13 }, { now, maxAgeSeconds: 60 })).toThrow(
-      claimError(
+      claimIssue(
         'iat',
         'expired',
-        `The 'iat' claim '-10000000000000' is more than 60 seconds in the past (compared to '2026-09-15T12:00:00.000Z'), and therefore too old.`
+        `The 'iat' claim '-10000000000000' is more than 60 seconds in the past (compared to '2026-09-15T12:00:00.000Z')`
       )
     )
   })
@@ -150,10 +146,10 @@ describe('a NumericDate outside the range of a Date', () => {
 
   it('rejects an nbf at the last instant a date can hold as not yet valid', () => {
     expect(() => verifyJwtClaims({ nbf: 8.64e12 }, { now })).toThrow(
-      claimError(
+      claimIssue(
         'nbf',
-        'not-yet-valid',
-        `The 'nbf' claim '+275760-09-13T00:00:00.000Z' is in the future (compared to '2026-09-15T12:00:00.000Z'), and therefore not valid.`
+        'not_yet_valid',
+        `The 'nbf' claim '+275760-09-13T00:00:00.000Z' is in the future (compared to '2026-09-15T12:00:00.000Z')`
       )
     )
   })
@@ -183,9 +179,7 @@ describe('a NumericDate outside the range of a Date', () => {
       signJwsCallback: signJws,
     })
 
-    await expect(verifyJwt({ jwt, verifyJwsCallback: verifyJws, now })).rejects.toThrow(
-      expect.objectContaining({ name: JoseClaimVerificationError.name, claim: 'exp', reason: 'expired' })
-    )
+    await expect(verifyJwt({ jwt, verifyJwsCallback: verifyJws, now })).rejects.toThrow(claimIssue('exp', 'expired'))
   })
 })
 
@@ -203,17 +197,13 @@ describe('a time claim that is not a finite number', () => {
     ['iat', Number.POSITIVE_INFINITY],
   ])('rejects an %s of %d as an invalid claim', (claim, value) => {
     expect(() => verifyJwtClaims({ [claim]: value }, { now })).toThrow(
-      claimError(
-        claim,
-        'invalid',
-        `The '${claim}' claim '${value}' is not a NumericDate, and therefore cannot be verified.`
-      )
+      claimIssue(claim, 'invalid_type', `The '${claim}' claim '${value}' is not a NumericDate`)
     )
   })
 
   it('rejects an iat of NaN against maxAgeSeconds as an invalid claim', () => {
     expect(() => verifyJwtClaims({ iat: Number.NaN }, { now, checkIssuedAt: false, maxAgeSeconds: 60 })).toThrow(
-      claimError('iat', 'invalid', `The 'iat' claim 'NaN' is not a NumericDate, and therefore cannot be verified.`)
+      claimIssue('iat', 'invalid_type', `The 'iat' claim 'NaN' is not a NumericDate`)
     )
   })
 
@@ -221,11 +211,7 @@ describe('a time claim that is not a finite number', () => {
     const payload = { exp: '1700000000' } as unknown as JwtPayload
 
     expect(() => verifyJwtClaims(payload, { now })).toThrow(
-      claimError(
-        'exp',
-        'invalid',
-        `The 'exp' claim '1700000000' is not a NumericDate, and therefore cannot be verified.`
-      )
+      claimIssue('exp', 'invalid_type', `The 'exp' claim '1700000000' is not a NumericDate`)
     )
   })
 })

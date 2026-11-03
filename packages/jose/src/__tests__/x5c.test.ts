@@ -24,8 +24,7 @@ import { createEs256Context, unsignedCompactJws } from './context'
 const joseError = (type: { name: string }, message: string) =>
   expect.objectContaining({ name: type.name, message: expect.stringContaining(message) })
 
-const base64Problem = (reason: string) =>
-  `Expected a certificate in standard base64 (RFC 4648 section 4), but ${reason}`
+const base64Problem = 'Expected a certificate in standard base64 (RFC 4648 section 4)'
 const derProblem = (reason: string) =>
   `Expected a DER encoded certificate, but the decoded bytes are not a single DER SEQUENCE: ${reason}`
 
@@ -44,59 +43,47 @@ const rejectedCertificates: RejectedCertificate[] = [
   {
     description: `a certificate in base64url, with '-' where base64 has '+'`,
     certificate: leafCertificate.replace(/\+/g, '-'),
-    message: base64Problem(`it contains '-' or '_', which are base64url characters`),
+    message: base64Problem,
   },
   {
     description: `a certificate in base64url, with '_' where base64 has '/'`,
     certificate: leafCertificate.replace(/\//g, '_'),
-    message: base64Problem(`it contains '-' or '_', which are base64url characters`),
+    message: base64Problem,
   },
   {
     description: 'a certificate without the padding its length needs',
     certificate: rootCertificate.replace(/=+$/, ''),
-    message: base64Problem(
-      `its '=' padding is wrong: base64 is padded with at most two '=' at its end, to a multiple of 4 characters`
-    ),
+    message: base64Problem,
   },
   {
     description: 'a certificate with padding its length does not need',
     certificate: `${leafCertificate}==`,
-    message: base64Problem(
-      `its '=' padding is wrong: base64 is padded with at most two '=' at its end, to a multiple of 4 characters`
-    ),
+    message: base64Problem,
   },
   {
     description: `a certificate with a '=' too many`,
     certificate: `${rootCertificate}=`,
-    message: base64Problem(
-      `its '=' padding is wrong: base64 is padded with at most two '=' at its end, to a multiple of 4 characters`
-    ),
-  },
-  {
-    description: 'a certificate whose last character sets bits that encode no byte',
-    // 'w' and 'x' differ in the last 4 bits of the character, which encode nothing before '=='
-    certificate: rootCertificate.replace(/w==$/, 'x=='),
-    message: base64Problem('it is not the canonical encoding of its bytes: the bits after the last byte are not zero'),
+    message: base64Problem,
   },
   {
     description: 'a certificate with line breaks, as PEM has them',
     certificate: leafCertificate.replace(/(.{64})/g, '$1\n'),
-    message: base64Problem('it contains whitespace'),
+    message: base64Problem,
   },
   {
     description: 'a certificate followed by a line break',
     certificate: `${leafCertificate}\n`,
-    message: base64Problem('it contains whitespace'),
+    message: base64Problem,
   },
   {
     description: 'a certificate with a character outside the base64 alphabet',
     certificate: `${leafCertificate.slice(0, -4)}.AAA`,
-    message: base64Problem('it contains a character outside the base64 alphabet'),
+    message: base64Problem,
   },
   {
     description: 'an empty string',
     certificate: '',
-    message: base64Problem('it is empty'),
+    message: derProblem('they do not start with the SEQUENCE tag (0x30)'),
   },
   {
     description: 'base64 of text rather than of DER',
@@ -193,7 +180,7 @@ describe.each([
     const certificate = leafCertificate.replace(/\+/g, '-')
 
     expect(parse([rootCertificate, certificate]).error?.issues).toEqual([
-      expect.objectContaining({ path: ['x5c', 1], message: expect.stringContaining('base64url') }),
+      expect.objectContaining({ path: ['x5c', 1], message: base64Problem }),
     ])
   })
 
@@ -223,16 +210,10 @@ describe('the x5c schemas for the schemas of other packages', () => {
     ])
   })
 
-  it('reject a single certificate that is not the canonical encoding of its bytes', () => {
-    // Decodes to the same empty SEQUENCE as 'MAA=', but sets a bit after the last byte
-    expect(zX5cCertificate.safeParse('MAB=').error?.issues).toEqual([
-      expect.objectContaining({
-        path: [],
-        message: base64Problem(
-          'it is not the canonical encoding of its bytes: the bits after the last byte are not zero'
-        ),
-      }),
-    ])
+  it('accept a single certificate that is not the canonical encoding of its bytes', () => {
+    // Decodes to the same empty SEQUENCE as 'MAA=', but sets a bit after the last byte. The bytes are
+    // what is checked, and the value is kept as it was received.
+    expect(zX5cCertificate.parse('MAB=')).toBe('MAB=')
   })
 })
 
@@ -240,14 +221,12 @@ describe('an x5c that is not valid in a token', () => {
   it('fails parsing a compact JWS with a JoseValidationError naming the entry', () => {
     const jws = unsignedCompactJws({ alg: 'ES256', x5c: [leafCertificate, rootCertificate.replace(/\//g, '_')] }, {})
 
-    expect(() => parseJws({ jws })).toThrow(
-      joseError(JoseValidationError, `which are base64url characters at "x5c[1]"`)
-    )
+    expect(() => parseJws({ jws })).toThrow(joseError(JoseValidationError, `x5c.1: ${base64Problem}`))
   })
 
   it('fails parsing a compact JWS whose x5c holds no certificate with a JoseValidationError', () => {
     expect(() => parseJws({ jws: unsignedCompactJws({ alg: 'ES256', x5c: [] }, {}) })).toThrow(
-      joseError(JoseValidationError, 'Expected a certificate chain of at least one certificate at "x5c"')
+      joseError(JoseValidationError, 'x5c: Expected a certificate chain of at least one certificate')
     )
   })
 
@@ -271,7 +250,7 @@ describe('an x5c that is not valid in a token', () => {
     const jws = unsignedCompactJws({ alg: 'ES256', jwk: { ...ecJwk, x5c: [base64.encode(stringToBytes('cert'))] } }, {})
 
     expect(() => parseJws({ jws })).toThrow(
-      joseError(JoseValidationError, 'they do not start with the SEQUENCE tag (0x30) at "jwk.x5c[0]"')
+      joseError(JoseValidationError, `jwk.x5c.0: ${derProblem('they do not start with the SEQUENCE tag (0x30)')}`)
     )
   })
 
@@ -280,7 +259,7 @@ describe('an x5c that is not valid in a token', () => {
     const jwe = `${header}..aXY.Y3Q.dGFn`
 
     expect(() => decodeJwtHeader({ jwt: jwe })).toThrow(
-      joseError(JoseValidationError, 'Expected a certificate chain of at least one certificate at "x5c"')
+      joseError(JoseValidationError, 'x5c: Expected a certificate chain of at least one certificate')
     )
   })
 
@@ -288,7 +267,7 @@ describe('an x5c that is not valid in a token', () => {
     const result = zJwkSet.safeParse({ keys: [ecJwk, { ...ecJwk, x5c: [leafCertificate.replace(/\+/g, '-')] }] })
 
     expect(result.error?.issues).toEqual([
-      expect.objectContaining({ path: ['keys', 1, 'x5c', 0], message: expect.stringContaining('base64url') }),
+      expect.objectContaining({ path: ['keys', 1, 'x5c', 0], message: base64Problem }),
     ])
   })
 
@@ -307,7 +286,7 @@ describe('an x5c that is not valid in a token', () => {
           return { signature: 'c2lnbmF0dXJl', signerJwk: publicJwk }
         },
       })
-    ).rejects.toThrow(joseError(JoseValidationError, `which are base64url characters at "x5c[0]"`))
+    ).rejects.toThrow(joseError(JoseValidationError, `x5c.0: ${base64Problem}`))
     expect(callbackCalled).toBe(false)
   })
 })

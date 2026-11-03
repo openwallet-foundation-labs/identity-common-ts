@@ -1,58 +1,45 @@
-import type { OrPromise } from '@owf/identity-common'
+import { type OrPromise, zBase64Url, zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 import { zJweAlg, zJweEnc } from '../jwa/z-alg'
 import type { Jwk } from '../jwk/z-jwk'
 import { zPublicJwk } from '../jwk/z-jwk'
-import { zX5c } from '../jwk/z-x5c'
 import type { JwsSignerJwk } from '../jws/signer'
+import { zJwsProtectedHeader } from '../jws/z-jws'
+import { zCompactSerialization } from '../utils/z-common'
 
 /**
  * A JWE in compact serialization.
  *
  * The encrypted key part may be empty, as it is for direct key agreement (`ECDH-ES`) and direct
- * encryption (`dir`).
+ * encryption (`dir`). The authentication tag may not: RFC 7516 allows an empty one for an algorithm
+ * without a tag, but every registered `enc` has one.
  *
  * @see https://www.rfc-editor.org/rfc/rfc7516#section-7.1
  */
-export const zCompactJwe = z
-  .string()
-  .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/, {
-    message: 'Not a valid compact JWE',
-  })
+export const zCompactJwe = zCompactSerialization('jwe', 5, [1])
 
 /**
- * The header parameters registered for a JWE.
+ * The header parameters registered for a JWE. The ones a JWE shares with a JWS are validated as in
+ * `zJwsProtectedHeader`.
  *
  * @see https://www.rfc-editor.org/rfc/rfc7516#section-4.1
  */
 export const zJweHeader = z
   .object({
+    ...zJwsProtectedHeader.omit({ alg: true, b64: true, trust_chain: true }).shape,
+
     alg: zJweAlg,
     enc: zJweEnc,
-
-    typ: z.string().optional(),
-    cty: z.string().optional(),
-    zip: z.string().optional(),
-
-    kid: z.string().optional(),
-    jwk: zPublicJwk.optional(),
-    jku: z.string().optional(),
-
-    x5c: zX5c.optional(),
-    x5u: z.string().optional(),
-    x5t: z.string().optional(),
-    'x5t#S256': z.string().optional(),
-
-    crit: z.array(z.string().min(1)).min(1).optional(),
+    zip: zNonEmptyString.optional(),
 
     /** The ephemeral public key of the originator, for the key agreement algorithms. */
     epk: zPublicJwk.optional(),
 
     /** Agreement PartyUInfo, base64url encoded. */
-    apu: z.string().optional(),
+    apu: zBase64Url.optional(),
 
     /** Agreement PartyVInfo, base64url encoded. */
-    apv: z.string().optional(),
+    apv: zBase64Url.optional(),
   })
   .loose()
 
