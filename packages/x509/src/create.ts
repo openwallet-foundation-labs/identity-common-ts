@@ -52,7 +52,7 @@ import type {
   SignOptions,
   X509Extension,
 } from './types'
-import { X509Exception } from './x509-exception'
+import { X509Error } from './x509-error'
 
 function extension(extnID: string, value: unknown, critical = false): Extension {
   return new Extension({ extnID, critical, extnValue: new OctetString(AsnConvert.serialize(value)) })
@@ -67,7 +67,7 @@ export function parseIssuerCertificate(input: CertificateInput): X509Certificate
   try {
     return AsnConvert.parse(toArrayBuffer(toDer(input, PEM_LABELS.certificate)), X509Certificate)
   } catch (error) {
-    throw new X509Exception('Invalid issuer certificate', error)
+    throw new X509Error('Invalid issuer certificate', error)
   }
 }
 
@@ -96,7 +96,7 @@ export function stringOtherName(typeId: string, value: string): { typeId: string
  */
 export async function prepareCertificate(template: CertificateTemplate): Promise<PreparedSignedStructure> {
   if (!(template.notAfter > template.notBefore)) {
-    throw new X509Exception('notAfter must be later than notBefore')
+    throw new X509Error('notAfter must be later than notBefore')
   }
 
   const spkiDer =
@@ -107,12 +107,12 @@ export async function prepareCertificate(template: CertificateTemplate): Promise
   try {
     subjectPublicKeyInfo = AsnConvert.parse(toArrayBuffer(spkiDer), SubjectPublicKeyInfo)
   } catch (error) {
-    throw new X509Exception('Invalid subject public key', error)
+    throw new X509Error('Invalid subject public key', error)
   }
 
   const issuer = template.issuerCertificate ? parseIssuerCertificate(template.issuerCertificate) : undefined
   const subject = buildName(template.subject)
-  if (subject.length === 0) throw new X509Exception('The subject must not be empty')
+  if (subject.length === 0) throw new X509Error('The subject must not be empty')
 
   const extensions: Extension[] = []
   const basicConstraints = template.basicConstraints ?? { cA: false }
@@ -222,7 +222,7 @@ export async function prepareCertificate(template: CertificateTemplate): Promise
   }
   const seen = new Set<string>()
   for (const { extnID } of extensions) {
-    if (seen.has(extnID)) throw new X509Exception(`Duplicate extension ${extnID}`)
+    if (seen.has(extnID)) throw new X509Error(`Duplicate extension ${extnID}`)
     seen.add(extnID)
   }
 

@@ -2,9 +2,10 @@ import Crypto, { type KeyLike } from 'node:crypto'
 import { hasher as digest, ES256, generateSalt } from '@owf/crypto'
 import { exportJWK, importJWK, type JWK } from 'jose'
 import { describe, expect, test } from 'vitest'
-import { SDJwtGeneralJSONInstance, SDJwtInstance, type SdJwtPayload } from '../index'
+import { SdJwtGeneralJsonInstance, SdJwtInstance, type SdJwtPayload } from '../index'
 import type { VerifierOptions } from '../jwt'
-import type { JwtPayload, KbVerifier, Signer, Verifier } from '../types'
+import { KbJwt } from '../kbjwt'
+import { type JwtPayload, KB_JWT_TYP, type KbVerifier, type Signer, type Verifier } from '../types'
 import { Disclosure } from '../utils'
 
 // Extract the major version as a number
@@ -33,7 +34,7 @@ const createKeyBoundPresentation = async (settings?: {
   const es256Keys = algorithm === 'ES256' ? await ES256.generateKeyPair() : undefined
   const kbSigner = es256Keys ? await ES256.getSigner(es256Keys.privateKey) : holder.signer
   const kbVerifier = es256Keys ? await ES256.getVerifier(es256Keys.publicKey) : holder.verifier
-  const sdjwt = new SDJwtInstance<SdJwtPayload>({
+  const sdjwt = new SdJwtInstance<SdJwtPayload>({
     signer,
     signAlg: 'EdDSA',
     verifier,
@@ -71,13 +72,13 @@ const createKeyBoundPresentation = async (settings?: {
 
 describe('index', () => {
   test('create', async () => {
-    const sdjwt = new SDJwtInstance<SdJwtPayload>()
+    const sdjwt = new SdJwtInstance<SdJwtPayload>()
     expect(sdjwt).toBeDefined()
   })
 
   test('kbJwt', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -119,7 +120,7 @@ describe('index', () => {
 
   test('issue', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -143,7 +144,7 @@ describe('index', () => {
 
   test('issue rejects reserved disclosure frame keys', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -181,7 +182,7 @@ describe('index', () => {
       return Crypto.verify(null, Buffer.from(data), publicKey, Buffer.from(sig, 'base64url'))
     }
 
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier: failedverifier,
@@ -214,7 +215,7 @@ describe('index', () => {
     const failedverifier: Verifier = async (data: string, sig: string) => {
       return Crypto.verify(null, Buffer.from(data), publicKey, Buffer.from(sig, 'base64url'))
     }
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -286,7 +287,7 @@ describe('index', () => {
       return Buffer.from(sig).toString('base64url')
     }
 
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -348,7 +349,7 @@ describe('index', () => {
       return Buffer.from(sig).toString('base64url')
     }
 
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -420,7 +421,7 @@ describe('index', () => {
       return Buffer.from(sig).toString('base64url')
     }
 
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -464,7 +465,7 @@ describe('index', () => {
   })
 
   test('Hasher not found', async () => {
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({})
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({})
     try {
       const credential = await sdjwt.issue(
         {
@@ -486,7 +487,7 @@ describe('index', () => {
 
   test('decode rejects invalid _sd_alg values', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -515,7 +516,7 @@ describe('index', () => {
   })
 
   test('SaltGenerator not found', async () => {
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       hasher: digest,
     })
     try {
@@ -538,7 +539,7 @@ describe('index', () => {
   })
 
   test('Signer not found', async () => {
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       hasher: digest,
       saltGenerator: generateSalt,
     })
@@ -563,7 +564,7 @@ describe('index', () => {
 
   test('Verifier not found', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       hasher: digest,
       saltGenerator: generateSalt,
@@ -607,7 +608,7 @@ describe('index', () => {
 
   test('kbSigner not found', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       verifier,
       hasher: digest,
@@ -649,7 +650,7 @@ describe('index', () => {
 
   test('kbVerifier not found', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       verifier,
       hasher: digest,
@@ -693,7 +694,7 @@ describe('index', () => {
 
   test('kbSignAlg not found', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       verifier,
       hasher: digest,
@@ -732,7 +733,7 @@ describe('index', () => {
 
   test('hasher is not found', async () => {
     const { signer } = createSignerVerifier()
-    const sdjwt_create = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt_create = new SdJwtInstance<SdJwtPayload>({
       signer,
       hasher: digest,
       saltGenerator: generateSalt,
@@ -749,7 +750,7 @@ describe('index', () => {
         _sd: ['foo'],
       }
     )
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({})
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({})
     await expect(sdjwt.keys('')).rejects.toThrow('Hasher not found')
     await expect(sdjwt.presentableKeys('')).rejects.toThrow('Hasher not found')
     await expect(sdjwt.getClaims('')).rejects.toThrow('Hasher not found')
@@ -759,7 +760,7 @@ describe('index', () => {
 
   test('presentableKeys', async () => {
     const { signer } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       hasher: digest,
       saltGenerator: generateSalt,
@@ -783,7 +784,7 @@ describe('index', () => {
 
   test('present all disclosures with kb jwt', async () => {
     const { signer } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       kbSigner: signer,
       hasher: digest,
@@ -835,7 +836,7 @@ describe('index', () => {
     const encodedJwt =
       'eyJhbGciOiAiRVMyNTYiLCAidHlwIjogInZjK3NkLWp3dCIsICJraWQiOiAiZG9jLXNpZ25lci0wNS0yNS0yMDIyIn0.eyJfc2QiOiBbIjA5dktySk1PbHlUV00wc2pwdV9wZE9CVkJRMk0xeTNLaHBINTE1blhrcFkiLCAiMnJzakdiYUMwa3k4bVQwcEpyUGlvV1RxMF9kYXcxc1g3NnBvVWxnQ3diSSIsICJFa084ZGhXMGRIRUpidlVIbEVfVkNldUM5dVJFTE9pZUxaaGg3WGJVVHRBIiwgIklsRHpJS2VpWmREd3BxcEs2WmZieXBoRnZ6NUZnbldhLXNONndxUVhDaXciLCAiSnpZakg0c3ZsaUgwUjNQeUVNZmVadTZKdDY5dTVxZWhabzdGN0VQWWxTRSIsICJQb3JGYnBLdVZ1Nnh5bUphZ3ZrRnNGWEFiUm9jMkpHbEFVQTJCQTRvN2NJIiwgIlRHZjRvTGJnd2Q1SlFhSHlLVlFaVTlVZEdFMHc1cnREc3JaemZVYW9tTG8iLCAiamRyVEU4WWNiWTRFaWZ1Z2loaUFlX0JQZWt4SlFaSUNlaVVRd1k5UXF4SSIsICJqc3U5eVZ1bHdRUWxoRmxNXzNKbHpNYVNGemdsaFFHMERwZmF5UXdMVUs0Il0sICJpc3MiOiAiaHR0cHM6Ly9leGFtcGxlLmNvbS9pc3N1ZXIiLCAiaWF0IjogMTY4MzAwMDAwMCwgImV4cCI6IDE4ODMwMDAwMDAsICJ2Y3QiOiAiaHR0cHM6Ly9jcmVkZW50aWFscy5leGFtcGxlLmNvbS9pZGVudGl0eV9jcmVkZW50aWFsIiwgIl9zZF9hbGciOiAic2hhLTI1NiIsICJjbmYiOiB7Imp3ayI6IHsia3R5IjogIkVDIiwgImNydiI6ICJQLTI1NiIsICJ4IjogIlRDQUVSMTladnUzT0hGNGo0VzR2ZlNWb0hJUDFJTGlsRGxzN3ZDZUdlbWMiLCAieSI6ICJaeGppV1diWk1RR0hWV0tWUTRoYlNJaXJzVmZ1ZWNDRTZ0NGpUOUYySFpRIn19fQ.QXgzrePAdq_WZVGCwDxP-l8h0iyckrHBNidxVqGtKJ0LMzObqgaXUD1cgGEf7d9TexPkBcgQYqjuzlfbeCxxuA~WyJRZ19PNjR6cUF4ZTQxMmExMDhpcm9BIiwgImFkZHJlc3MiLCB7InN0cmVldF9hZGRyZXNzIjogIjEyMyBNYWluIFN0IiwgImxvY2FsaXR5IjogIkFueXRvd24iLCAicmVnaW9uIjogIkFueXN0YXRlIiwgImNvdW50cnkiOiAiVVMifV0~WyI2SWo3dE0tYTVpVlBHYm9TNXRtdlZBIiwgImVtYWlsIiwgImpvaG5kb2VAZXhhbXBsZS5jb20iXQ~WyJlbHVWNU9nM2dTTklJOEVZbnN4QV9BIiwgImZhbWlseV9uYW1lIiwgIkRvZSJd~WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgImdpdmVuX25hbWUiLCAiSm9obiJd~eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImtiK2p3dCJ9.eyJub25jZSI6ICIxMjM0NTY3ODkwIiwgImF1ZCI6ICJodHRwczovL2V4YW1wbGUuY29tL3ZlcmlmaWVyIiwgImlhdCI6IDE3MDk5OTYxODUsICJzZF9oYXNoIjogIjc4cFFEazJOblNEM1dKQm5SN015aWpmeUVqcGJ5a01yRnlpb2ZYSjlsN0kifQ.7k4goAlxM4a3tHnvCBCe70j_I-BCwtzhBRXQNk9cWJnQWxxt2kIqCyzcwzzUc0gTwtbGWVQoeWCiL5K6y3a4VQ'
 
-    const sdjwt = new SDJwtInstance({
+    const sdjwt = new SdJwtInstance({
       hasher: digest,
       verifier: await ES256.getVerifier(publicKeyExampleJwt),
       kbVerifier: await ES256.getVerifier(kbPubkey),
@@ -847,7 +848,7 @@ describe('index', () => {
 
   test('safeVerify - success case', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -876,7 +877,7 @@ describe('index', () => {
   })
 
   test('safeVerify - collect multiple errors', async () => {
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({})
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({})
 
     const result = await sdjwt.safeVerify('invalid.jwt.token')
 
@@ -894,14 +895,14 @@ describe('index', () => {
     const { signer } = createSignerVerifier()
     const { verifier: wrongVerifier } = createSignerVerifier() // Different key pair
 
-    const issuer = new SDJwtInstance<SdJwtPayload>({
+    const issuer = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       hasher: digest,
       saltGenerator: generateSalt,
     })
 
-    const verifierInstance = new SDJwtInstance<SdJwtPayload>({
+    const verifierInstance = new SdJwtInstance<SdJwtPayload>({
       verifier: wrongVerifier,
       hasher: digest,
     })
@@ -936,13 +937,13 @@ describe('index', () => {
       throw new Error('signature key for issuer has expired in the key store')
     }
 
-    const issuer = new SDJwtInstance<SdJwtPayload>({
+    const issuer = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       hasher: digest,
       saltGenerator: generateSalt,
     })
-    const verifierInstance = new SDJwtInstance<SdJwtPayload>({
+    const verifierInstance = new SdJwtInstance<SdJwtPayload>({
       verifier: throwingVerifier,
       hasher: digest,
     })
@@ -962,7 +963,7 @@ describe('index', () => {
 
   test('safeVerify - disallowed algorithm error', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -985,7 +986,7 @@ describe('index', () => {
 
   test('safeVerify - expired JWT error', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -1015,7 +1016,7 @@ describe('index', () => {
 
   test('safeVerify - missing required claims error', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -1049,7 +1050,7 @@ describe('index', () => {
 
   test('safeVerify - invalid issuer, subject, audience, maxAge, and vct errors', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtInstance<SdJwtPayload>({
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -1120,8 +1121,8 @@ describe('index', () => {
       await expect(sdjwt.verify(presentation, verificationOptions)).resolves.toHaveProperty('kb')
       await expect(sdjwt.safeVerify(presentation, verificationOptions)).resolves.toMatchObject({ success: true })
 
-      const general = new SDJwtGeneralJSONInstance<SdJwtPayload>({ verifier, kbVerifier, hasher: digest })
-      await expect(general.verify(sdjwt.toGeneralJSON(presentation), verificationOptions)).resolves.toHaveProperty('kb')
+      const general = new SdJwtGeneralJsonInstance<SdJwtPayload>({ verifier, kbVerifier, hasher: digest })
+      await expect(general.verify(sdjwt.toGeneralJson(presentation), verificationOptions)).resolves.toHaveProperty('kb')
     }
 
     test('expectedIssuer constrains the credential, not the key binding JWT', async () => {
@@ -1149,9 +1150,9 @@ describe('index', () => {
 
     test('General JSON verification accepts matching issuer with key binding', async () => {
       const { sdjwt, presentation, options, verifier, kbVerifier } = await createKeyBoundPresentation()
-      const general = new SDJwtGeneralJSONInstance<SdJwtPayload>({ verifier, kbVerifier, hasher: digest })
+      const general = new SdJwtGeneralJsonInstance<SdJwtPayload>({ verifier, kbVerifier, hasher: digest })
       await expect(
-        general.verify(sdjwt.toGeneralJSON(presentation), { ...options, expectedIssuer: 'Issuer' })
+        general.verify(sdjwt.toGeneralJson(presentation), { ...options, expectedIssuer: 'Issuer' })
       ).resolves.toHaveProperty('kb')
     })
 
@@ -1268,5 +1269,80 @@ describe('index', () => {
         sdjwt.verify(presentation, { ...options, allowedKeyBindingAlgorithms: ['ES256'] })
       ).resolves.toHaveProperty('kb')
     })
+  })
+})
+
+describe('critical header parameters (RFC 7515 Section 4.1.11)', () => {
+  const crit = { crit: ['urn:example:ext'], 'urn:example:ext': true }
+
+  test('verify and safeVerify reject an issuer-signed JWT with crit', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      saltGenerator: generateSalt,
+    })
+    const payload = { foo: 'bar', iat: Math.floor(Date.now() / 1000) }
+
+    const control = await sdjwt.issue(payload, { _sd: ['foo'] })
+    await expect(sdjwt.verify(control)).resolves.toHaveProperty('payload')
+
+    const credential = await sdjwt.issue(payload, { _sd: ['foo'] }, { header: crit })
+    await expect(sdjwt.verify(credential)).rejects.toMatchObject({
+      code: 'INVALID_JWT_SIGNATURE',
+      message: 'Verify Error: unsupported critical header parameters',
+    })
+    const result = await sdjwt.safeVerify(credential)
+    expect(result.success).toBe(false)
+    expect(result.errors?.map((e) => e.code)).toEqual(['INVALID_JWT_SIGNATURE'])
+  })
+
+  test('verify and safeVerify reject a Key Binding JWT with crit', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    const holder = createSignerVerifier()
+    const kbVerifier: KbVerifier = (data, sig) => holder.verifier(data, sig)
+    const sdjwt = new SdJwtInstance<SdJwtPayload>({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      saltGenerator: generateSalt,
+      kbVerifier,
+    })
+    const now = Math.floor(Date.now() / 1000)
+    const credential = await sdjwt.issue({ foo: 'bar', iat: now }, { _sd: ['foo'] })
+    const sdHash = Buffer.from(await digest(credential, 'sha-256')).toString('base64url')
+    const present = async (header: Record<string, unknown>) => {
+      const kbJwt = new KbJwt({
+        header: { typ: KB_JWT_TYP, alg: 'EdDSA', ...header },
+        payload: { iat: now, aud: 'aud', nonce: 'nonce', sd_hash: sdHash },
+      })
+      return `${credential}${await kbJwt.sign(holder.signer)}`
+    }
+
+    await expect(sdjwt.verify(await present({}), { keyBindingNonce: 'nonce' })).resolves.toHaveProperty('kb')
+
+    const presentation = await present(crit)
+    await expect(sdjwt.verify(presentation, { keyBindingNonce: 'nonce' })).rejects.toThrowError(
+      'Verify Error: unsupported critical header parameters in Key Binding JWT'
+    )
+    const result = await sdjwt.safeVerify(presentation, { keyBindingNonce: 'nonce' })
+    expect(result.success).toBe(false)
+    expect(result.errors?.map((e) => e.code)).toEqual(['KEY_BINDING_SIGNATURE_INVALID'])
+  })
+
+  test('General JSON verify rejects a signature whose protected header has crit', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    const sdjwt = new SdJwtGeneralJsonInstance<SdJwtPayload>({ verifier, hasher: digest, saltGenerator: generateSalt })
+    const payload = { foo: 'bar', iat: Math.floor(Date.now() / 1000) }
+    const issue = (header?: Record<string, unknown>) =>
+      sdjwt.issue(payload, { _sd: ['foo'] }, { sigs: [{ signer, alg: 'EdDSA', kid: 'key-1', header }] })
+
+    await expect(sdjwt.verify(await issue())).resolves.toHaveProperty('payload')
+    await expect(sdjwt.verify(await issue(crit))).rejects.toThrowError(
+      'Verify Error: unsupported critical header parameters'
+    )
   })
 })

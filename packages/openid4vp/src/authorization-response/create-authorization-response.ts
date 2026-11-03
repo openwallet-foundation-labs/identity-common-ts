@@ -1,14 +1,13 @@
 import {
   type CallbackContext,
   fetchJwks,
-  type Jwk,
-  type JwkSet,
-  type JwtSigner,
   Oauth2Error,
   Oauth2ErrorCodes,
   Oauth2ServerErrorResponseError,
 } from '@openid4vc/oauth2'
-import { addSecondsToDate, dateToSeconds, encodeToBase64Url } from '@openid4vc/utils'
+import { addSecondsToDate } from '@openid4vc/utils'
+import { base64urlEncode, dateToSeconds } from '@owf/identity-common'
+import type { Jwk, JwkSet, JwsSigner } from '@owf/jose'
 import type { Openid4vpAuthorizationRequest } from '../authorization-request/z-authorization-request'
 import type { Openid4vpAuthorizationRequestDcApi } from '../authorization-request/z-authorization-request-dc-api'
 import { getOpenid4vpClientId } from '../client-identifier-prefix/parse-client-identifier-prefix'
@@ -47,7 +46,7 @@ export interface CreateOpenid4vpAuthorizationResponseOptions<
    */
   authorizationResponsePayload: ResponsePayload & { state?: never }
   jarm?: {
-    jwtSigner?: JwtSigner
+    jwtSigner?: JwsSigner
     encryption?: {
       nonce: string
 
@@ -61,9 +60,9 @@ export interface CreateOpenid4vpAuthorizationResponseOptions<
     serverMetadata: JarmServerMetadata
     authorizationServer?: string // The issuer URL of the authorization server that created the response
     audience?: string // The client_id of the client the response is intended for
-    expiresInSeconds?: number // The expiration time of the JWT. A maximum JWT lifetime of 10 minutes is RECOMMENDED.
+    expiresInSeconds?: number // The JWT lifetime in seconds. Defaults to, and RECOMMENDED to be at most, 10 minutes.
   }
-  callbacks: Pick<CallbackContext, 'signJwt' | 'encryptJwe' | 'fetch' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'encryptJwe' | 'fetch' | 'getJwks'>
 }
 
 export interface CreateOpenid4vpAuthorizationResponseResult<
@@ -233,7 +232,7 @@ export async function createOpenid4vpAuthorizationResponse<
     additionalJwtPayload = {
       iss: jarm.authorizationServer,
       aud: jarm.audience,
-      exp: jarm.expiresInSeconds ?? dateToSeconds(addSecondsToDate(new Date(), 60 * 10)), // default: 10 minutes
+      exp: dateToSeconds(addSecondsToDate(new Date(), jarm.expiresInSeconds ?? 60 * 10)), // default: 10 minutes
     }
   }
 
@@ -249,14 +248,14 @@ export async function createOpenid4vpAuthorizationResponse<
       ? {
           method: 'jwk',
           publicJwk: encJwk,
-          apu: jarm.encryption.nonce ? encodeToBase64Url(jarm.encryption.nonce) : undefined,
-          apv: encodeToBase64Url(authorizationRequestPayload.nonce),
+          apu: jarm.encryption.nonce ? base64urlEncode(jarm.encryption.nonce) : undefined,
+          apv: base64urlEncode(authorizationRequestPayload.nonce),
           alg,
           enc,
         }
       : undefined,
     callbacks: {
-      signJwt: callbacks.signJwt,
+      signJws: callbacks.signJws,
       encryptJwe: callbacks.encryptJwe,
     },
   })

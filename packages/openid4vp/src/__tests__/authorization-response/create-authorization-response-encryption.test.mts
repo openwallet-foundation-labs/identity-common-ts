@@ -38,7 +38,7 @@ async function createResponse(clientMetadata: Record<string, unknown>) {
         encryptor = { alg: jweEncryptor.alg, enc: jweEncryptor.enc }
         return { encryptionJwk: encJwk, jwe: 'jwe' }
       },
-      signJwt: () => {
+      signJws: () => {
         throw new Error('Not implemented')
       },
       fetch,
@@ -87,5 +87,23 @@ describe('createOpenid4vpAuthorizationResponse response encryption metadata', ()
       alg: 'ECDH-ES',
       enc: 'A128GCM',
     })
+  })
+})
+
+describe('createOpenid4vpAuthorizationResponse encrypted response modes', () => {
+  test.each(['dc_api.jwt', 'w3c_dc_api.jwt'])('requires jarm options for %s', async (responseMode) => {
+    await expect(
+      createOpenid4vpAuthorizationResponse({
+        authorizationRequestPayload: {
+          response_type: 'vp_token',
+          response_mode: responseMode,
+          client_id: 'x509_hash:vNyA8UYcjZBBewa_AMzAV3Bs3B1Ql9yH01xQhQVXN7o',
+          nonce: 'HVI5aa23NzijX-AMlQ3jDJMMCx8nkdlSdnji44Zq1-c',
+        } as any,
+        origin: 'https://verify.trinsic.id',
+        authorizationResponsePayload: { vp_token: { cred: ['abc'] } },
+        callbacks: {} as any,
+      })
+    ).rejects.toThrow(`Missing jarm options for creating Jarm response with response mode '${responseMode}'`)
   })
 })

@@ -50,15 +50,67 @@ If it is not available, make sure to add a polyfill like [this one](https://gith
 
 ## API Reference
 
-*Documentation will be added as the API is developed.*
+### Validation
+
+Validators of the packages in this project return `{ valid, issues }`. Each issue has a `severity` (`error`, `warning` or `info`), a `code`, a `path` into the validated value, a `message`, and an optional `requirement` and `context`. `valid` is `false` when any issue is an error.
+
+The type of an issue ties each code to its context. The codes of a validator are a closed union, so checking the code narrows the context:
+
+```typescript
+for (const issue of result.issues) {
+  if (issue.code === 'expired') console.log(issue.context.expiredAt)
+}
+```
+
+A validator collects its issues with `ValidationIssues`, which checks that each code gets its context. Validators parse with `parseWithSchema(schema, value, { codes })`, which gives the issues of a zod schema as validation issues, with the path zod gives them. Checks in a zod schema add theirs with `addValidationIssue`. The issues zod reports itself get a code of `SCHEMA_VALIDATION_CODES`, with a context:
+
+| Code | When | Context |
+| --- | --- | --- |
+| `missing_value` | a required value is absent | `expected`, e.g. `string` |
+| `not_allowed` | a value is present that must not be | |
+| `invalid_type` | a value has the wrong type | `expected`, e.g. `string` or `int` |
+| `invalid_value` | a value is not one of the allowed ones, or matches none of the forms of a union | `allowed`, when the schema lists them, and `branches`, the issues of each form of a union |
+| `invalid_format` | a string does not have the format | `format`, e.g. `url` |
+| `too_small`, `too_big` | a number, length or number of items is out of range | `minimum` or `maximum`, `inclusive`, `origin` |
+| `unrecognized_keys` | an object or map has members the schema does not allow | `keys`, as in the value |
+
+```typescript
+import { addValidationIssue, ValidationIssues } from '@owf/identity-common'
+
+const issues = new ValidationIssues<'expired' | 'missing_name'>()
+issues.add({ code: 'expired', path: ['exp'], message: 'Expired', context: { expiredAt } })
+issues.result() // { valid: false, issues: [...] }
+
+z.object({ exp: z.number(), iat: z.number() }).superRefine((payload, ctx) => {
+  if (payload.exp > payload.iat) return
+  addValidationIssue(ctx, {
+    code: 'expires_before_issued',
+    path: ['exp'],
+    message: 'exp must be after iat',
+    context: { issuedAt: secondsToDate(payload.iat), expiresAt: secondsToDate(payload.exp) },
+  })
+})
+```
+
+When an assert or parse function finds an error, it throws the validation error of its package, e.g. `RegistrationCertificateValidationError`, with the `issues` of the validation. It extends `ValidationError`, so `instanceof ValidationError` catches the validation errors of every package, and `validationErrorMessage` builds its message.
+
+`parseWithSchema` returns a `SchemaParseResult`: `{ success: true, data }` or `{ success: false, issues }`. `parseWithErrorHandling(schema, value, message)` parses without `codes` and throws a `ValidationError` with the issues. The message lists the errors with their path, never the parsed value. A union that no member matches lists its members as numbered options, each with its errors. Give the members a label, e.g. the version of a specification, with `unionParams`:
+
+```typescript
+import { unionParams } from '@owf/identity-common'
+
+const zMetadata = z.union([zMetadataV1, zMetadataDraft11], unionParams('Invalid metadata', ['version 1.0', 'draft 11']))
+```
+
+`zTyp('dpop+jwt')` validates a JOSE `typ` header and `isJwtTyp(typ, 'dpop+jwt')` compares one. Both accept the `typ` in any casing and with the `application/` prefix (RFC 7515 Section 4.1.9), so compare a parsed `typ` with `isJwtTyp`, not with `===`.
 
 ## Related Packages
 
 This package is part of the Identity Common TypeScript project:
 
-- `@owf/jose` - JOSE/JWT implementation (planned)
-- [`@owf/cose`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/cose) - COSE/CWT implementation (planned)
-- `@owf/x509` - X.509 certificate utilities (planned)
+- [`@owf/jose`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/jose) - JOSE/JWT implementation
+- [`@owf/cose`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/cose) - COSE/CWT implementation
+- [`@owf/x509`](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/x509) - X.509 certificate utilities
 
 ## Contributing
 

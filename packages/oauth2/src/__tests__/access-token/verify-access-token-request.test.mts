@@ -1,3 +1,4 @@
+import { calculateJwkThumbprint, type Jwk } from '@owf/jose'
 import * as jose from 'jose'
 import { describe, expect, test } from 'vitest'
 import {
@@ -6,11 +7,8 @@ import {
   verifyPreAuthorizedCodeAccessTokenRequest,
   verifyRefreshTokenAccessTokenRequest,
 } from '../../access-token/verify-access-token-request'
-import { HashAlgorithm } from '../../callbacks'
 import { createClientAttestationJwt } from '../../client-attestation/client-attestation'
 import { createClientAttestationPopJwt } from '../../client-attestation/client-attestation-pop'
-import { calculateJwkThumbprint } from '../../common/jwk/jwk-thumbprint'
-import type { Jwk } from '../../common/jwk/z-jwk'
 import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
 import { createDpopJwt } from '../../dpop/dpop'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
@@ -20,7 +18,7 @@ import {
   preAuthorizedCodeGrantIdentifier,
   refreshTokenGrantIdentifier,
 } from '../../z-grant-type'
-import { callbacks, getSignJwtCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback } from '../util.mjs'
 
 const request = {
   headers: new Headers(),
@@ -282,7 +280,7 @@ describe('Verify Pre Authorized Code Access Token Request', () => {
           jwt: 'ey',
         },
       })
-    ).rejects.toThrow('Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow('Unable to parse the JWS, a compact JWS must consist of exactly three parts')
   })
 
   test('handles client attestation provided but not valid', async () => {
@@ -305,7 +303,9 @@ describe('Verify Pre Authorized Code Access Token Request', () => {
           clientAttestationPopJwt: 'something-else',
         },
       })
-    ).rejects.toThrow('Error verifying client attestation. Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow(
+      'Error verifying client attestation. Unable to parse the JWS, a compact JWS must consist of exactly three parts'
+    )
   })
 
   test('handles valid pre-authorized code access token request', async () => {
@@ -321,7 +321,7 @@ describe('Verify Pre Authorized Code Access Token Request', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopPrivateJwk]),
+        signJws: getSignJwsCallback([dpopPrivateJwk]),
       },
       request,
       signer: {
@@ -567,7 +567,7 @@ describe('Verify Authorization Code Access Token Request', () => {
           jwt: 'ey',
         },
       })
-    ).rejects.toThrow('Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow('Unable to parse the JWS, a compact JWS must consist of exactly three parts')
   })
 
   test('handles client attestation provided but not valid', async () => {
@@ -596,7 +596,9 @@ describe('Verify Authorization Code Access Token Request', () => {
           clientAttestationPopJwt: 'something-else',
         },
       })
-    ).rejects.toThrow('Error verifying client attestation. Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow(
+      'Error verifying client attestation. Unable to parse the JWS, a compact JWS must consist of exactly three parts'
+    )
   })
 
   test('handles valid authorization code request', async () => {
@@ -612,7 +614,7 @@ describe('Verify Authorization Code Access Token Request', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopPrivateJwk]),
+        signJws: getSignJwsCallback([dpopPrivateJwk]),
       },
       request,
       signer: {
@@ -825,7 +827,7 @@ describe('Verify Refresh Token Access Token Request', () => {
           jwt: 'ey',
         },
       })
-    ).rejects.toThrow('Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow('Unable to parse the JWS, a compact JWS must consist of exactly three parts')
   })
 
   test('handles client attestation provided but not valid', async () => {
@@ -854,7 +856,9 @@ describe('Verify Refresh Token Access Token Request', () => {
           clientAttestationPopJwt: 'something-else',
         },
       })
-    ).rejects.toThrow('Error verifying client attestation. Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow(
+      'Error verifying client attestation. Unable to parse the JWS, a compact JWS must consist of exactly three parts'
+    )
   })
 
   test('handles valid authorization code request', async () => {
@@ -870,7 +874,7 @@ describe('Verify Refresh Token Access Token Request', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopPrivateJwk]),
+        signJws: getSignJwsCallback([dpopPrivateJwk]),
       },
       request,
       signer: {
@@ -934,16 +938,16 @@ describe('Verify client instance key of Access Token Request', () => {
     attester: Awaited<ReturnType<typeof generateEs256Key>>,
     instance: Awaited<ReturnType<typeof generateEs256Key>>
   ) {
-    const signJwt = getSignJwtCallback([attester.privateJwk, instance.privateJwk])
+    const signJws = getSignJwsCallback([attester.privateJwk, instance.privateJwk])
     const clientAttestationJwt = await createClientAttestationJwt({
-      callbacks: { signJwt },
+      callbacks: { signJws },
       clientId: 'wallet',
       confirmation: { jwk: instance.publicJwk },
       expiresAt: new Date(Date.now() + 3600 * 1000),
       signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
     })
     const clientAttestationPopJwt = await createClientAttestationPopJwt({
-      callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+      callbacks: { signJws, generateRandom: callbacks.generateRandom },
       authorizationServer: authorizationServerMetadata.issuer,
       clientAttestation: clientAttestationJwt,
     })
@@ -969,7 +973,7 @@ describe('Verify client instance key of Access Token Request', () => {
     const confirmationJwkThumbprint = first.clientAttestation?.clientAttestation.confirmationJwkThumbprint
     expect(confirmationJwkThumbprint).toEqual(
       await calculateJwkThumbprint({
-        hashAlgorithm: HashAlgorithm.Sha256,
+        hashAlgorithm: 'sha-256',
         hashCallback: callbacks.hash,
         jwk: instance.publicJwk,
       })

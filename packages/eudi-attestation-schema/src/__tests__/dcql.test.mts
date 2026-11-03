@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { schemaMeta, schemaURI, trustAuthority } from '../builders'
+import { schemaMeta, schemaUri, trustAuthority } from '../builders'
 import { buildDcqlFromSchemaMeta, toDcqlCredentialInput, toDcqlTrustedAuthorities } from '../dcql'
 
 const RULEBOOK_INTEGRITY = 'sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw='
@@ -18,8 +18,8 @@ describe('toDcqlTrustedAuthorities', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/sd-jwt.json')
           .integrity(SCHEMA_INTEGRITY)
@@ -57,8 +57,8 @@ describe('toDcqlCredentialInput', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/pid.json')
           .integrity(SCHEMA_INTEGRITY)
@@ -84,8 +84,8 @@ describe('toDcqlCredentialInput', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('mso_mdoc')
           .uri('https://example.com/mdl.json')
           .integrity(SCHEMA_INTEGRITY)
@@ -113,8 +113,8 @@ describe('claims path pointers', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/claims.json')
           .integrity(SCHEMA_INTEGRITY)
@@ -236,16 +236,16 @@ describe('buildDcqlFromSchemaMeta', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/pid.json')
           .integrity(SCHEMA_INTEGRITY)
           .meta({ vct: 'eu.example.pid.1' })
           .build()
       )
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('mso_mdoc')
           .uri('https://example.com/mdl.json')
           .integrity(SCHEMA_INTEGRITY)

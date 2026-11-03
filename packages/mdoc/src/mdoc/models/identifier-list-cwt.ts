@@ -82,7 +82,7 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
    * Decodes an identifier list CWT from a tagged COSE_Sign1 (tag 18) or COSE_Mac0 (tag 17) token.
    *
    * @throws CwtPayloadDecodeError if the payload is not a valid identifier list claims set.
-   * @throws ZodValidationError if the protected headers do not carry the identifier list `typ`.
+   * @throws CoseValidationError (from `@owf/cose`) if the protected headers do not carry the identifier list `typ`.
    */
   public static override fromToken<T extends AnyCwt>(this: CwtStaticThis<T>, token: Uint8Array): T {
     // NOTE: `super.fromToken`, not `Cwt.fromToken`: the base implementation constructs `this`, so a
@@ -103,8 +103,11 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
    * about, so the content type negotiation for it lives here.
    */
   public static async fetch(uri: string, ctx: Pick<MdocContext, 'fetch'>): Promise<IdentifierListCwt> {
-    const fetcher = ctx.fetch ?? fetch
-    const response = await fetcher(uri, { headers: { Accept: MdocMediaTypes.IdentifierListCwt } })
+    const response = await ctx.fetch(
+      uri,
+      { headers: { Accept: MdocMediaTypes.IdentifierListCwt } },
+      { type: 'identifierList' }
+    )
 
     if (!response.ok) {
       throw new InvalidRevocationListError(`Identifier list fetch at ${uri} failed with status '${response.status}'`)

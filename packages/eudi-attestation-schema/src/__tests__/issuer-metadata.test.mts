@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { schemaMeta, schemaURI } from '../builders'
+import { schemaMeta, schemaUri } from '../builders'
 import { buildCredentialConfigurationTemplate, validateIssuerMetadataAgainstProfile } from '../issuer-metadata'
 import type { IssuanceProfile, ResolvedSchemaReference } from '../types'
 
@@ -27,8 +27,8 @@ function buildSchemaMeta(profile?: IssuanceProfile) {
     .rulebookIntegrity(RULEBOOK_INTEGRITY)
     .attestationLoS('iso_18045_basic')
     .bindingType('key')
-    .addSchemaURI(
-      schemaURI()
+    .addSchemaUri(
+      schemaUri()
         .format('dc+sd-jwt')
         .uri('https://example.com/sd-jwt.json')
         .integrity(SCHEMA_INTEGRITY)
@@ -82,8 +82,8 @@ describe('issuanceProfile', () => {
         .rulebookIntegrity(RULEBOOK_INTEGRITY)
         .attestationLoS('iso_18045_basic')
         .bindingType('none')
-        .addSchemaURI(
-          schemaURI()
+        .addSchemaUri(
+          schemaUri()
             .format('dc+sd-jwt')
             .uri('https://example.com/sd-jwt.json')
             .integrity(SCHEMA_INTEGRITY)
@@ -138,8 +138,8 @@ describe('buildCredentialConfigurationTemplate', () => {
       .rulebookIntegrity(RULEBOOK_INTEGRITY)
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/sd-jwt.json')
           .integrity(SCHEMA_INTEGRITY)
@@ -204,7 +204,7 @@ describe('buildCredentialConfigurationTemplate', () => {
         schemaMeta: buildSchemaMeta(),
         format: 'mso_mdoc',
       })
-    ).toThrow(/no schemaURI for format/)
+    ).toThrow(/no schemaUri for format/)
   })
 })
 

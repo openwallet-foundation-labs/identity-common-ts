@@ -1,25 +1,25 @@
-import * as v from 'valibot'
-import { DcqlMdocCredential, DcqlSdJwtVcCredential, DcqlW3cVcCredential } from '../u-dcql-credential'
+import { z } from 'zod'
+import { zIssues } from '../u-dcql.js'
+import { DcqlMdocCredential, DcqlSdJwtVcCredential, DcqlW3cVcCredential } from '../u-dcql-credential.js'
 
 export namespace DcqlMetaResult {
-  export const vMetaSuccessResult = v.object({
-    success: v.literal(true),
+  export const zMetaSuccessResult = z.object({
+    success: z.literal(true),
 
-    output: v.variant('credential_format', [
-      v.pick(DcqlSdJwtVcCredential.vModel, ['credential_format', 'cryptographic_holder_binding', 'vct']),
-      v.pick(DcqlMdocCredential.vModel, ['credential_format', 'cryptographic_holder_binding', 'doctype']),
-      v.pick(DcqlW3cVcCredential.vModel, ['credential_format', 'cryptographic_holder_binding', 'type']),
+    output: z.union([
+      DcqlSdJwtVcCredential.zModel.pick({ credential_format: true, cryptographic_holder_binding: true, vct: true }),
+      DcqlMdocCredential.zModel.pick({ credential_format: true, cryptographic_holder_binding: true, doctype: true }),
+      DcqlW3cVcCredential.zModel.pick({ credential_format: true, cryptographic_holder_binding: true, type: true }),
     ]),
   })
 
-  export const vMetaFailureResult = v.object({
-    success: v.literal(false),
-    issues: v.record(v.string(), v.unknown()),
-    output: v.unknown(),
+  export const zMetaFailureResult = z.object({
+    success: z.literal(false),
+    issues: zIssues,
   })
 
-  export const vModel = v.union([vMetaSuccessResult, vMetaFailureResult])
-  export type Input = v.InferInput<typeof vModel>
-  export type Output = v.InferOutput<typeof vModel>
+  export const zModel = z.union([zMetaSuccessResult, zMetaFailureResult])
+  export type Input = z.input<typeof zModel>
+  export type Output = z.output<typeof zModel>
 }
 export type DcqlMetaResult = DcqlMetaResult.Output

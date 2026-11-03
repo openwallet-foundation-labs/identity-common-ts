@@ -1,4 +1,3 @@
-import { addExtension } from 'cbor-x'
 import z from 'zod'
 import {
   type AnyCborStructure,
@@ -8,40 +7,81 @@ import {
   cborEncode,
   type EncodedStructureType,
 } from '../cbor'
+import { addExtension } from '../cbor/cbor-x'
 import { zUint8Array } from '../utils/zod'
 import { CoseCertificateNotFoundError, CoseInvalidAlgorithmError, CosePayloadMustBeDefinedError } from './error'
 import {
   type ProtectedHeaderOptions,
   ProtectedHeaders,
-  protectedHeadersEncodedStructure,
   RegisteredCwtHeaderClaimKey,
   SignatureAlgorithm,
   type UnprotectedHeaderOptions,
   UnprotectedHeaders,
-  unprotectedHeadersStructure,
+  zProtectedHeadersEncoded,
+  zUnprotectedHeaders,
 } from './headers'
-import { type CoseKey, coseKeyToJwkClaim } from './key'
+import { type CoseKey, Curve, coseKeyToJwkClaim, KeyType } from './key'
 
-export const sign1EncodedSchema = z.tuple([
+export const zSign1Encoded = z.tuple([
   // protected headers
-  protectedHeadersEncodedStructure,
+  zProtectedHeadersEncoded,
   // unprotected headers
-  unprotectedHeadersStructure,
+  zUnprotectedHeaders,
   // payload
   zUint8Array.nullable(),
   // signature
   zUint8Array,
 ])
 
-export const sign1DecodedSchema = z.object({
+export const zSign1Decoded = z.object({
   protectedHeaders: z.instanceof(ProtectedHeaders),
   unprotectedHeaders: z.instanceof(UnprotectedHeaders),
-  payload: sign1EncodedSchema.def.items[2],
-  signature: sign1EncodedSchema.def.items[3],
+  payload: zSign1Encoded.def.items[2],
+  signature: zSign1Encoded.def.items[3],
 })
 
-export type Sign1EncodedStructure = z.infer<typeof sign1EncodedSchema>
-export type Sign1DecodedStructure = z.infer<typeof sign1DecodedSchema>
+export type Sign1EncodedStructure = z.infer<typeof zSign1Encoded>
+export type Sign1DecodedStructure = z.infer<typeof zSign1Decoded>
+
+const ecdsaCurves = [Curve['P-256'], Curve['P-384'], Curve['P-521']]
+const eddsaCurves = [Curve.Ed25519, Curve.Ed448]
+
+/**
+ * The key type and curves each signature algorithm accepts: RFC 9053 § 2.1 and § 2.2 for the
+ * polymorphic ECDSA and EdDSA algorithms, and RFC 9864 § 2.1 and § 2.2 for the fully-specified
+ * ones, which fix the curve. RSA keys have no `KeyType`, so the RSA algorithms are not listed.
+ */
+const signatureAlgorithmKeys = new Map<SignatureAlgorithm, { keyType: KeyType.Ec | KeyType.Okp; curves: Curve[] }>([
+  [SignatureAlgorithm.ES256, { keyType: KeyType.Ec, curves: ecdsaCurves }],
+  [SignatureAlgorithm.ES384, { keyType: KeyType.Ec, curves: ecdsaCurves }],
+  [SignatureAlgorithm.ES512, { keyType: KeyType.Ec, curves: ecdsaCurves }],
+  [SignatureAlgorithm.ESP256, { keyType: KeyType.Ec, curves: [Curve['P-256']] }],
+  [SignatureAlgorithm.ESP384, { keyType: KeyType.Ec, curves: [Curve['P-384']] }],
+  [SignatureAlgorithm.ESP512, { keyType: KeyType.Ec, curves: [Curve['P-521']] }],
+  [SignatureAlgorithm.EdDSA, { keyType: KeyType.Okp, curves: eddsaCurves }],
+  [SignatureAlgorithm.Ed25519, { keyType: KeyType.Okp, curves: [Curve.Ed25519] }],
+  [SignatureAlgorithm.Ed448, { keyType: KeyType.Okp, curves: [Curve.Ed448] }],
+])
+
+const keyTypeNames = { [KeyType.Ec]: 'EC2', [KeyType.Okp]: 'OKP' }
+
+/**
+ * Rejects a key the algorithm is not defined for, rather than leaving it to the context, which may
+ * pick the curve from the key alone. Only the key type and curve are compared: a key is valid for
+ * every algorithm that accepts them, whatever its own `alg`.
+ */
+const assertKeyMatchesAlgorithm = (key: CoseKey, algorithm?: SignatureAlgorithm) => {
+  if (algorithm === undefined) return
+  const requirement = signatureAlgorithmKeys.get(algorithm)
+  if (!requirement) return
+
+  const { keyType, curves } = requirement
+  if (key.keyType !== keyType || key.curve === undefined || !curves.includes(key.curve)) {
+    throw new CoseInvalidAlgorithmError(
+      `Algorithm ${SignatureAlgorithm[algorithm]} requires an ${keyTypeNames[keyType]} key on curve ${curves.map((curve) => Curve[curve]).join(' or ')}`
+    )
+  }
+}
 
 export type Sign1Context = {
   sign: (options: { toBeSigned: Uint8Array; key: CoseKey; algorithm: SignatureAlgorithm }) => Promise<Uint8Array>
@@ -72,7 +112,7 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
   protected override _tag = Sign1.tag
 
   public static override get encodingSchema() {
-    return z.codec(sign1EncodedSchema, sign1DecodedSchema, {
+    return z.codec(zSign1Encoded, zSign1Decoded, {
       encode: (decoded) => {
         if (decoded.signature.length === 0) {
           throw new Error('Signature has not been set. Required for encoding the sign1 structure')
@@ -244,11 +284,14 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
       throw new Error('Cannot provide detachedPayload when the Sign1 already contains an embedded payload')
     }
 
+    const algorithm = this.algorithm
+    assertKeyMatchesAlgorithm(key, algorithm)
+
     return await ctx.verify({
       toBeVerified: this.toBeSigned({ detachedPayload, externalAad }),
       signature: this.signature,
       key,
-      algorithm: this.algorithm,
+      algorithm,
     })
   }
 
@@ -305,6 +348,8 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
     if (!Object.values(SignatureAlgorithm).includes(signatureAlgorithm as SignatureAlgorithm)) {
       throw new CoseInvalidAlgorithmError('algorithm provided in the options or key is not a valid signing algorithm')
     }
+
+    assertKeyMatchesAlgorithm(options.signingKey, signatureAlgorithm as SignatureAlgorithm)
 
     this.structure.signature = await ctx.sign({
       toBeSigned: Sign1.toBeSigned({

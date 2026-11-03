@@ -1,6 +1,6 @@
 {
   "name": "@owf/eudi-registration-certificate",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "ETSI TS 119 475 Wallet-Relying Party Registration Certificate (WRPRC) implementation",
   "files": [
     "dist"
@@ -43,6 +43,7 @@
     "@owf/crypto": "workspace:^",
     "@owf/eudi-jades": "workspace:*",
     "@owf/identity-common": "workspace:^",
+    "dcql": "workspace:^",
     "zod": "catalog:"
   }
 }

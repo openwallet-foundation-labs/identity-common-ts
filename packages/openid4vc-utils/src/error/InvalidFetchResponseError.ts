@@ -1,9 +1,9 @@
 import { isMediaType } from '@owf/identity-common'
 import { ContentType } from '../content-type'
 import type { FetchResponse } from '../globals'
-import { OpenId4VcBaseError } from './OpenId4VcBaseError'
+import { Openid4vcBaseError } from './Openid4vcBaseError'
 
-export class InvalidFetchResponseError extends OpenId4VcBaseError {
+export class InvalidFetchResponseError extends Openid4vcBaseError {
   public readonly response: FetchResponse
 
   public constructor(

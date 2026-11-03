@@ -2,7 +2,7 @@ import Crypto from 'node:crypto'
 import { describe, expect, test } from 'vitest'
 import { Jwt } from '../jwt'
 import type { Signer, Verifier } from '../types'
-import { base64urlEncode, JwtTimeClaimException, SDJWTException } from '../utils'
+import { base64urlEncode, JwtTimeClaimError, SdJwtError } from '../utils'
 
 describe('JWT', () => {
   test('create', async () => {
@@ -19,7 +19,7 @@ describe('JWT', () => {
     const jwt = `${base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}.${base64urlEncode(
       JSON.stringify({ sub: '1234567890', name: 'John Doe' })
     )}.signature`
-    const result = Jwt.decodeJWT(jwt)
+    const result = Jwt.decodeJwt(jwt)
     expect(result).toEqual({
       header: { alg: 'HS256', typ: 'JWT' },
       payload: { sub: '1234567890', name: 'John Doe' },
@@ -29,12 +29,12 @@ describe('JWT', () => {
 
   test('throws an error when JWT string is not correctly formed', () => {
     const jwt = 'abc.def'
-    expect(() => Jwt.decodeJWT(jwt)).toThrow('Invalid JWT as input')
+    expect(() => Jwt.decodeJwt(jwt)).toThrow('Invalid JWT as input')
   })
 
   test('throws an error when JWT parts are missing', () => {
     const jwt = `${base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}`
-    expect(() => Jwt.decodeJWT(jwt)).toThrow('Invalid JWT as input')
+    expect(() => Jwt.decodeJwt(jwt)).toThrow('Invalid JWT as input')
   })
 
   test('set', async () => {
@@ -86,8 +86,29 @@ describe('JWT', () => {
     try {
       await newJwt.verify(() => false)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
+  })
+
+  test('verify rejects critical header parameters', async () => {
+    const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
+    const testSigner: Signer = async (data: string) => {
+      const sig = Crypto.sign(null, Buffer.from(data), privateKey)
+      return Buffer.from(sig).toString('base64url')
+    }
+    const testVerifier: Verifier = async (data: string, sig: string) => {
+      return Crypto.verify(null, Buffer.from(data), publicKey, Buffer.from(sig, 'base64url'))
+    }
+
+    const jwt = new Jwt({
+      header: { alg: 'EdDSA', crit: ['urn:example:ext'], 'urn:example:ext': true },
+      payload: { foo: 'bar' },
+    })
+    const newJwt = Jwt.fromEncode(await jwt.sign(testSigner))
+    await expect(newJwt.verify(testVerifier)).rejects.toMatchObject({
+      code: 'INVALID_JWT_SIGNATURE',
+      message: 'Verify Error: unsupported critical header parameters',
+    })
   })
 
   test('encode', async () => {
@@ -120,7 +141,7 @@ describe('JWT', () => {
     try {
       jwt.encodeJwt()
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
   })
 
@@ -138,7 +159,7 @@ describe('JWT', () => {
     try {
       await jwt.sign(testSigner)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
   })
 
@@ -158,7 +179,7 @@ describe('JWT', () => {
     try {
       await jwt.sign(testSigner)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
   })
 
@@ -176,7 +197,7 @@ describe('JWT', () => {
     try {
       await jwt.verify(testVerifier)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SdJwtError)
     }
   })
 
@@ -192,7 +213,7 @@ describe('JWT', () => {
     })
 
     const error = await jwt.verify(testVerifier, { currentDate: 1000 }).catch((e: unknown) => e)
-    expect(error).toBeInstanceOf(JwtTimeClaimException)
+    expect(error).toBeInstanceOf(JwtTimeClaimError)
     expect(error).toMatchObject({
       message: 'Verify Error: JWT is not yet valid',
       code: 'JWT_NOT_YET_VALID',
@@ -212,7 +233,7 @@ describe('JWT', () => {
     })
 
     const error = await jwt.verify(testVerifier, { currentDate: 1000 }).catch((e: unknown) => e)
-    expect(error).toBeInstanceOf(JwtTimeClaimException)
+    expect(error).toBeInstanceOf(JwtTimeClaimError)
     expect(error).toMatchObject({
       message: 'Verify Error: JWT is not yet valid',
       code: 'JWT_NOT_YET_VALID',
@@ -232,10 +253,10 @@ describe('JWT', () => {
     })
 
     const error = await jwt.verify(testVerifier, { currentDate: 1100 }).catch((e: unknown) => e)
-    expect(error).toBeInstanceOf(JwtTimeClaimException)
-    expect(error).toBeInstanceOf(SDJWTException)
+    expect(error).toBeInstanceOf(JwtTimeClaimError)
+    expect(error).toBeInstanceOf(SdJwtError)
     expect(error).toMatchObject({
-      name: 'JwtTimeClaimException',
+      name: 'JwtTimeClaimError',
       message: 'Verify Error: JWT is expired',
       code: 'JWT_EXPIRED',
       details: { claim: 'exp', value: 1000, currentDate: 1100, skewSeconds: 0 },
@@ -249,7 +270,7 @@ describe('JWT', () => {
     })
 
     const error = await jwt.verify(async () => true, { currentDate: 1100, skewSeconds: 30 }).catch((e: unknown) => e)
-    expect((error as JwtTimeClaimException).details).toEqual({
+    expect((error as JwtTimeClaimError).details).toEqual({
       claim: 'exp',
       value: 1000,
       currentDate: 1100,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EntityStatementClaims } from '../entityStatement'
-import { type Metadata, type MetadataPolicyOperator, metadataPolicySchema } from '../metadata'
+import { type Metadata, type MetadataPolicyOperator, zMetadataPolicy } from '../metadata'
 import {
   applyMetadataPolicyToMetadata,
   combineMetadataPolicies,
@@ -182,7 +182,7 @@ describe('metadata policy merge (Section 6.1.3.1)', () => {
 })
 
 describe('metadata policy operator combinations (Section 6.1.3.1)', () => {
-  const allowed = (policy: Record<string, unknown>) => metadataPolicySchema.safeParse(policy).success
+  const allowed = (policy: Record<string, unknown>) => zMetadataPolicy.safeParse(policy).success
 
   // Section 6.1.3.1.1 value: "MAY be combined with add, in which case the values of add MUST be a subset of the values
   // of value."

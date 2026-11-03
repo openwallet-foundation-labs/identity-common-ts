@@ -17,7 +17,7 @@ enum BleOptionsKeys {
 //   ? 11 : bstr, // UUID for central client mode
 //   ? 20 : bstr  // BLE Device Address
 // }
-const bleOptionsSchema = typedMap([
+const zBleOptions = typedMap([
   [BleOptionsKeys.PeripheralServerMode, z.boolean()],
   [BleOptionsKeys.CentralClientMode, z.boolean()],
   [BleOptionsKeys.PeripheralServerModeUuid, zUint8Array.exactOptional()],
@@ -25,8 +25,8 @@ const bleOptionsSchema = typedMap([
   [BleOptionsKeys.PeripheralServerModeDeviceAddress, zUint8Array.exactOptional()],
 ] as const)
 
-export type BleOptionsEncodedStructure = z.input<typeof bleOptionsSchema>
-export type BleOptionsDecodedStructure = z.output<typeof bleOptionsSchema>
+export type BleOptionsEncodedStructure = z.input<typeof zBleOptions>
+export type BleOptionsDecodedStructure = z.output<typeof zBleOptions>
 
 export type BleOptionsOptions = {
   peripheralServerMode: boolean
@@ -38,7 +38,7 @@ export type BleOptionsOptions = {
 
 export class BleOptions extends CborStructure<BleOptionsEncodedStructure, BleOptionsDecodedStructure> {
   public static override get encodingSchema() {
-    return bleOptionsSchema
+    return zBleOptions
   }
 
   public get peripheralServerMode() {

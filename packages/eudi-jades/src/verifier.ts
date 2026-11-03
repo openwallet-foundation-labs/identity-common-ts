@@ -7,9 +7,9 @@ import {
   uint8ArrayToBase64Url,
 } from '@owf/identity-common'
 import { CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS } from './constants'
-import { JAdESException } from './jades-exception'
-import { FlattenedJWSSchema, GeneralJWSSchema, ProtectedHeaderSchema, UnprotectedHeaderSchema } from './schemas'
-import type { FlattenedJWS, GeneralJWS, ProtectedHeader, UnprotectedHeaderParams, VerifyOptions } from './types'
+import { JadesError } from './jades-error'
+import { zFlattenedJws, zGeneralJws, zProtectedHeader, zUnprotectedHeader } from './schemas'
+import type { FlattenedJws, GeneralJws, ProtectedHeader, UnprotectedHeaderParams, VerifyOptions } from './types'
 
 export interface VerifyResult<T = unknown> {
   header: ProtectedHeader
@@ -30,25 +30,25 @@ function formatIssues(issues: ReadonlyArray<{ path: PropertyKey[]; message: stri
 }
 
 function parseProtected(encoded: string | undefined): ProtectedHeader {
-  if (!encoded) throw new JAdESException('JAdES requires a JWS Protected Header')
+  if (!encoded) throw new JadesError('JAdES requires a JWS Protected Header')
   let raw: unknown
   try {
     raw = base64urlDecodeJson(encoded)
   } catch (error) {
-    throw new JAdESException('Invalid protected header encoding', error)
+    throw new JadesError('Invalid protected header encoding', error)
   }
-  const result = ProtectedHeaderSchema.safeParse(raw)
+  const result = zProtectedHeader.safeParse(raw)
   if (!result.success) {
-    throw new JAdESException(`Invalid protected header: ${formatIssues(result.error.issues)}`, result.error)
+    throw new JadesError(`Invalid protected header: ${formatIssues(result.error.issues)}`, result.error)
   }
   return result.data as ProtectedHeader
 }
 
 function parseUnprotected(raw: unknown): UnprotectedHeaderParams | undefined {
   if (raw === undefined) return undefined
-  const result = UnprotectedHeaderSchema.safeParse(raw)
+  const result = zUnprotectedHeader.safeParse(raw)
   if (!result.success) {
-    throw new JAdESException(`Invalid unprotected header: ${formatIssues(result.error.issues)}`, result.error)
+    throw new JadesError(`Invalid unprotected header: ${formatIssues(result.error.issues)}`, result.error)
   }
   return result.data
 }
@@ -81,14 +81,14 @@ function parseSignature<T>(
   ])
   const unsupportedCriticalParameter = header.crit?.find((parameter) => !understoodCriticalParameters.has(parameter))
   if (unsupportedCriticalParameter) {
-    throw new JAdESException(`Unsupported critical header parameter: ${unsupportedCriticalParameter}`)
+    throw new JadesError(`Unsupported critical header parameter: ${unsupportedCriticalParameter}`)
   }
   const suppliedBytes = detachedBytes(options.detachedPayload)
   const suppliedPayload = suppliedBytes ? bytesToString(suppliedBytes) : undefined
   const objectDigest = header.sigD?.mId === DETACHED_MECHANISM_IDS.objectByUriHash
 
   if (serializedPayload === undefined && suppliedPayload === undefined && !objectDigest) {
-    throw new JAdESException('Detached JWS payload is required for verification')
+    throw new JadesError('Detached JWS payload is required for verification')
   }
 
   const signingPayload = objectDigest
@@ -123,7 +123,7 @@ async function verifyParsed<T>(
   parsed: ParsedSignature<T>,
   verifier: (data: string, signature: string) => Promise<boolean>
 ): Promise<VerifyResult<T>> {
-  if (!(await verifier(parsed.signingInput, parsed.signature))) throw new JAdESException('Invalid signature')
+  if (!(await verifier(parsed.signingInput, parsed.signature))) throw new JadesError('Invalid signature')
   const { signingInput: _, signature: __, ...result } = parsed
   return { ...result, valid: true }
 }
@@ -134,22 +134,22 @@ export async function verifyCompact<T = unknown>(
   options: VerifyOptions = {}
 ): Promise<VerifyResult<T>> {
   const parts = jws.split('.')
-  if (parts.length !== 3) throw new JAdESException('Invalid compact JWS: expected 3 parts')
+  if (parts.length !== 3) throw new JadesError('Invalid compact JWS: expected 3 parts')
   return verifyParsed(parseSignature<T>(parts[0], parts[1], parts[2], undefined, options), verifier)
 }
 
 export async function verifyGeneral<T = unknown>(
-  generalJws: GeneralJWS,
+  generalJws: GeneralJws,
   verifier: (data: string, signature: string) => Promise<boolean>,
   signatureIndex = 0,
   options: VerifyOptions = {}
 ): Promise<VerifyResult<T>> {
-  const result = GeneralJWSSchema.safeParse(generalJws)
+  const result = zGeneralJws.safeParse(generalJws)
   if (!result.success) {
-    throw new JAdESException(`Invalid General JWS: ${formatIssues(result.error.issues)}`, result.error)
+    throw new JadesError(`Invalid General JWS: ${formatIssues(result.error.issues)}`, result.error)
   }
   const selected = result.data.signatures[signatureIndex]
-  if (!selected) throw new JAdESException(`Signature at index ${signatureIndex} not found`)
+  if (!selected) throw new JadesError(`Signature at index ${signatureIndex} not found`)
   return verifyParsed(
     parseSignature<T>(selected.protected, result.data.payload, selected.signature, selected.header, options),
     verifier
@@ -157,13 +157,13 @@ export async function verifyGeneral<T = unknown>(
 }
 
 export async function verifyFlattened<T = unknown>(
-  flattenedJws: FlattenedJWS,
+  flattenedJws: FlattenedJws,
   verifier: (data: string, signature: string) => Promise<boolean>,
   options: VerifyOptions = {}
 ): Promise<VerifyResult<T>> {
-  const result = FlattenedJWSSchema.safeParse(flattenedJws)
+  const result = zFlattenedJws.safeParse(flattenedJws)
   if (!result.success) {
-    throw new JAdESException(`Invalid Flattened JWS: ${formatIssues(result.error.issues)}`, result.error)
+    throw new JadesError(`Invalid Flattened JWS: ${formatIssues(result.error.issues)}`, result.error)
   }
   return verifyParsed(
     parseSignature<T>(result.data.protected, result.data.payload, result.data.signature, result.data.header, options),
@@ -172,7 +172,7 @@ export async function verifyFlattened<T = unknown>(
 }
 
 export async function verify<T = unknown>(
-  jws: string | GeneralJWS | FlattenedJWS,
+  jws: string | GeneralJws | FlattenedJws,
   verifier: (data: string, signature: string) => Promise<boolean>,
   options: VerifyOptions = {}
 ): Promise<VerifyResult<T>> {
@@ -182,37 +182,37 @@ export async function verify<T = unknown>(
       : verifyFlattened(jws, verifier, options)
   }
   try {
-    const parsed = JSON.parse(jws) as GeneralJWS | FlattenedJWS
+    const parsed = JSON.parse(jws) as GeneralJws | FlattenedJws
     return await verify(parsed, verifier, options)
   } catch (error) {
-    if (error instanceof JAdESException) throw error
+    if (error instanceof JadesError) throw error
     return verifyCompact(jws, verifier, options)
   }
 }
 
 export function decode<T = unknown>(
-  jws: string | GeneralJWS | FlattenedJWS,
+  jws: string | GeneralJws | FlattenedJws,
   options: VerifyOptions = {}
 ): Omit<VerifyResult<T>, 'valid'> {
   let parsed: ParsedSignature<T>
   if (typeof jws === 'string') {
     try {
-      return decode(JSON.parse(jws) as GeneralJWS | FlattenedJWS, options)
+      return decode(JSON.parse(jws) as GeneralJws | FlattenedJws, options)
     } catch (error) {
-      if (error instanceof JAdESException) throw error
+      if (error instanceof JadesError) throw error
       const parts = jws.split('.')
-      if (parts.length !== 3) throw new JAdESException('Invalid compact JWS: expected 3 parts')
+      if (parts.length !== 3) throw new JadesError('Invalid compact JWS: expected 3 parts')
       parsed = parseSignature(parts[0], parts[1], parts[2], undefined, options)
     }
   } else if ('signatures' in jws) {
-    const result = GeneralJWSSchema.safeParse(jws)
-    if (!result.success) throw new JAdESException(`Invalid General JWS: ${formatIssues(result.error.issues)}`)
+    const result = zGeneralJws.safeParse(jws)
+    if (!result.success) throw new JadesError(`Invalid General JWS: ${formatIssues(result.error.issues)}`)
     const signature = result.data.signatures[options.signatureIndex ?? 0]
-    if (!signature) throw new JAdESException(`Signature at index ${options.signatureIndex ?? 0} not found`)
+    if (!signature) throw new JadesError(`Signature at index ${options.signatureIndex ?? 0} not found`)
     parsed = parseSignature(signature.protected, result.data.payload, signature.signature, signature.header, options)
   } else {
-    const result = FlattenedJWSSchema.safeParse(jws)
-    if (!result.success) throw new JAdESException(`Invalid Flattened JWS: ${formatIssues(result.error.issues)}`)
+    const result = zFlattenedJws.safeParse(jws)
+    if (!result.success) throw new JadesError(`Invalid Flattened JWS: ${formatIssues(result.error.issues)}`)
     parsed = parseSignature(
       result.data.protected,
       result.data.payload,

@@ -1,4 +1,3 @@
-import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
 import { getJsonClaimParser } from '../../dcql-parser/dcql-claims-query-result.js'
 import { DcqlNotDisclosed } from '../../u-dcql.js'
@@ -34,7 +33,7 @@ describe('Json Claim Parser', () => {
         presentation: false,
       }
     )
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({ name: 'Arthur Dent' })
   })
@@ -47,7 +46,7 @@ describe('Json Claim Parser', () => {
         presentation: false,
       }
     )
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({ middle_name: null })
   })
@@ -60,7 +59,7 @@ describe('Json Claim Parser', () => {
         index: 0,
       }
     )
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({
       address: {
@@ -73,7 +72,7 @@ describe('Json Claim Parser', () => {
 
   it('address street address', (_t) => {
     const parser = getJsonClaimParser({ path: ['address', 'street_address'] }, { presentation: false, index: 0 })
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({
       address: {
@@ -90,7 +89,7 @@ describe('Json Claim Parser', () => {
         index: 0,
       }
     )
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({
       nationalities: [DcqlNotDisclosed, 'Betelgeusian'],
@@ -105,7 +104,7 @@ describe('Json Claim Parser', () => {
         index: 0,
       }
     )
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({
       nullable_list: [DcqlNotDisclosed, null],
@@ -120,7 +119,7 @@ describe('Json Claim Parser', () => {
         index: 0,
       }
     )
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({
       degrees: [{ type: 'Bachelor of Science' }, { type: 'Master of Science' }],
@@ -135,7 +134,7 @@ describe('Json Claim Parser', () => {
         index: 0,
       }
     )
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({
       nationalities: ['British', 'Betelgeusian'],
@@ -150,7 +149,7 @@ describe('Json Claim Parser', () => {
         index: 0,
       }
     )
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({
       nationalities: ['British', DcqlNotDisclosed],
@@ -165,8 +164,8 @@ describe('Json Claim Parser', () => {
         index: 0,
       }
     )
-    const res = v.safeParse(parser, claimsPathPointerExample)
-    expect(res.issues?.[0].message).toEqual("Expected path 'nationalities'.0.null to be an array")
+    const res = parser.safeParse(claimsPathPointerExample)
+    expect(res.error?.issues[0].message).toEqual("Expected path 'nationalities'.0.null to be an array")
   })
 
   it('all items from first nationality results in error due to nationality not being an array', (_t) => {
@@ -177,9 +176,21 @@ describe('Json Claim Parser', () => {
         index: 0,
       }
     )
-    const res = v.safeParse(parser, claimsPathPointerExample)
-    expect(res.issues?.[0].message).toEqual(
+    const res = parser.safeParse(claimsPathPointerExample)
+    expect(res.error?.issues[0].message).toEqual(
       "Expected any element in array 'nationalities'.0 to match sub requirement but none matched: Expected path 'nationalities'.0.null to be an array"
     )
+  })
+
+  it('fails without throwing for an empty array in a presentation', (_t) => {
+    const parser = getJsonClaimParser({ path: ['nationalities', 0] }, { presentation: true, index: 0 })
+    const res = parser.safeParse({ nationalities: [] })
+
+    expect(res.error?.issues).toMatchObject([
+      {
+        path: ['nationalities'],
+        message: "Expected any element in array 'nationalities'.0 to match, but the array is empty",
+      },
+    ])
   })
 })

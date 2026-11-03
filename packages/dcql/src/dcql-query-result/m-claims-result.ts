@@ -1,76 +1,76 @@
-import * as v from 'valibot'
-import { vIdString, vNonEmptyArray } from '../u-dcql.js'
+import { z } from 'zod'
+import { zIdString, zIssues, zNonEmptyArray } from '../u-dcql.js'
 import { DcqlMdocCredential, DcqlSdJwtVcCredential, DcqlW3cVcCredential } from '../u-dcql-credential.js'
 
 export namespace DcqlClaimsResult {
-  const vClaimsOutput = v.union([
-    DcqlMdocCredential.vModel.entries.namespaces,
-    DcqlSdJwtVcCredential.vModel.entries.claims,
-    DcqlW3cVcCredential.vModel.entries.claims,
+  const zClaimsOutput = z.union([
+    DcqlMdocCredential.zModel.shape.namespaces,
+    DcqlSdJwtVcCredential.zModel.shape.claims,
+    DcqlW3cVcCredential.zModel.shape.claims,
   ])
-  export const vClaimsEntrySuccessResult = v.object({
-    success: v.literal(true),
-    claim_index: v.number(),
-    claim_id: v.optional(vIdString),
-    output: vClaimsOutput,
+  export type ClaimsOutput = z.output<typeof zClaimsOutput>
+
+  export const zClaimsEntrySuccessResult = z.object({
+    success: z.literal(true),
+    claim_index: z.number(),
+    claim_id: zIdString.optional(),
+    output: zClaimsOutput,
   })
 
-  export const vClaimsEntryFailureResult = v.object({
-    success: v.literal(false),
-    claim_index: v.number(),
-    claim_id: v.optional(vIdString),
+  export const zClaimsEntryFailureResult = z.object({
+    success: z.literal(false),
+    claim_index: z.number(),
+    claim_id: zIdString.optional(),
 
-    issues: v.record(v.string(), v.unknown()),
-
-    output: v.unknown(),
+    issues: zIssues,
   })
 
-  export const vClaimSetSuccessResult = v.object({
-    success: v.literal(true),
+  export const zClaimSetSuccessResult = z.object({
+    success: z.literal(true),
 
     // Undefined in case of no claim set
-    claim_set_index: v.union([v.number(), v.undefined()]),
+    claim_set_index: z.union([z.number(), z.undefined()]),
 
     // We use indexes because if there are no claim sets, the ids can be undefined
     // Can be empty array in case there are no claims
-    valid_claim_indexes: v.optional(vNonEmptyArray(v.number())),
-    failed_claim_indexes: v.optional(v.undefined()),
-    output: vClaimsOutput,
+    valid_claim_indexes: zNonEmptyArray(z.number()).optional(),
+    failed_claim_indexes: z.undefined().optional(),
+    output: zClaimsOutput,
   })
 
-  export const vClaimSetFailureResult = v.object({
-    success: v.literal(false),
+  export const zClaimSetFailureResult = z.object({
+    success: z.literal(false),
 
     // Undefined in case of no claim set
-    claim_set_index: v.union([v.number(), v.undefined()]),
+    claim_set_index: z.union([z.number(), z.undefined()]),
 
     // We use indexes because if there are no claim sets, the ids can be undefined
-    valid_claim_indexes: v.optional(vNonEmptyArray(v.number())),
-    failed_claim_indexes: vNonEmptyArray(v.number()),
+    valid_claim_indexes: zNonEmptyArray(z.number()).optional(),
+    failed_claim_indexes: zNonEmptyArray(z.number()),
 
-    issues: v.record(v.string(), v.unknown()),
+    issues: zIssues,
   })
 
-  export const vClaimsSuccessResult = v.object({
-    success: v.literal(true),
-    valid_claims: v.optional(vNonEmptyArray(vClaimsEntrySuccessResult)),
-    failed_claims: v.optional(vNonEmptyArray(vClaimsEntryFailureResult)),
+  export const zClaimsSuccessResult = z.object({
+    success: z.literal(true),
+    valid_claims: zNonEmptyArray(zClaimsEntrySuccessResult).optional(),
+    failed_claims: zNonEmptyArray(zClaimsEntryFailureResult).optional(),
 
-    valid_claim_sets: vNonEmptyArray(vClaimSetSuccessResult),
-    failed_claim_sets: v.optional(vNonEmptyArray(vClaimSetFailureResult)),
+    valid_claim_sets: zNonEmptyArray(zClaimSetSuccessResult),
+    failed_claim_sets: zNonEmptyArray(zClaimSetFailureResult).optional(),
   })
 
-  export const vClaimsFailureResult = v.object({
-    success: v.literal(false),
-    valid_claims: v.optional(vNonEmptyArray(vClaimsEntrySuccessResult)),
-    failed_claims: vNonEmptyArray(vClaimsEntryFailureResult),
+  export const zClaimsFailureResult = z.object({
+    success: z.literal(false),
+    valid_claims: zNonEmptyArray(zClaimsEntrySuccessResult).optional(),
+    failed_claims: zNonEmptyArray(zClaimsEntryFailureResult),
 
-    valid_claim_sets: v.optional(v.undefined()),
-    failed_claim_sets: vNonEmptyArray(vClaimSetFailureResult),
+    valid_claim_sets: z.undefined().optional(),
+    failed_claim_sets: zNonEmptyArray(zClaimSetFailureResult),
   })
 
-  export const vModel = v.union([vClaimsSuccessResult, vClaimsFailureResult])
-  export type Input = v.InferInput<typeof vModel>
-  export type Output = v.InferOutput<typeof vModel>
+  export const zModel = z.union([zClaimsSuccessResult, zClaimsFailureResult])
+  export type Input = z.input<typeof zModel>
+  export type Output = z.output<typeof zModel>
 }
 export type DcqlClaimsResult = DcqlClaimsResult.Output

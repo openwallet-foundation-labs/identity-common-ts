@@ -3,6 +3,7 @@ import {
   type CallbackContext,
   type CreateAuthorizationRequestUrlOptions,
   createPkce,
+  extractDpopNonceFromHeaders,
   getAuthorizationServerMetadataFromList,
   Oauth2Client,
   Oauth2ClientAuthorizationChallengeError,
@@ -61,11 +62,19 @@ import { Openid4vciVersion } from './version'
 
 export interface Openid4vciClientOptions {
   /**
-   * Callbacks required for the openid4vc client. The `verifyJwt` callback is only
+   * Callbacks required for the openid4vc client. The `verifyJws` callback is only
    * needed for verifying signed credential issuer metadata.
    */
-  callbacks: Omit<CallbackContext, 'verifyJwt' | 'encryptJwe'> &
-    Partial<Pick<CallbackContext, 'verifyJwt' | 'encryptJwe'>>
+  callbacks: Omit<CallbackContext, 'verifyJws' | 'encryptJwe'> &
+    Partial<Pick<CallbackContext, 'verifyJws' | 'encryptJwe'>>
+
+  /**
+   * Default allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of signed credential issuer
+   * metadata. A per-call `allowedSkewInSeconds` takes precedence, including `0`.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export class Openid4vciClient {
@@ -89,11 +98,12 @@ export class Openid4vciClient {
 
   public async resolveIssuerMetadata(
     credentialIssuer: string,
-    options?: Pick<ResolveIssuerMetadataOptions, 'signedMetadata'>
+    options?: Pick<ResolveIssuerMetadataOptions, 'signedMetadata' | 'allowedSkewInSeconds'>
   ): Promise<IssuerMetadataResult> {
     return resolveIssuerMetadata(credentialIssuer, {
       callbacks: this.options.callbacks,
       signedMetadata: options?.signedMetadata,
+      allowedSkewInSeconds: options?.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
     })
   }
 
@@ -353,11 +363,18 @@ export class Openid4vciClient {
             `Expected 'auth_session' to be defined with authorization challenge response error '${error.errorResponse.error}' and 'presentation' parameter`
           )
         }
+        let dpop = options.dpop
+        const dpopNonce = extractDpopNonceFromHeaders(error.response.headers)
+        if (dpop && dpopNonce) {
+          dpop = { ...dpop, nonce: dpopNonce }
+        }
+
         return {
           authorizationFlow: AuthorizationFlow.PresentationDuringIssuance,
           openid4vpRequestUrl: error.errorResponse.presentation,
           authSession: error.errorResponse.auth_session,
           authorizationServer: authorizationServerMetadata.issuer,
+          dpop,
         }
       }
 

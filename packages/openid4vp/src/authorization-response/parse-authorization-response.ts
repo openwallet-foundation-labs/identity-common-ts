@@ -5,10 +5,10 @@ import { getOpenid4vpClientId } from '../client-identifier-prefix/parse-client-i
 import type { VerifiedJarmAuthorizationResponse } from '../jarm/jarm-authorization-response/verify-jarm-authorization-response'
 import type { JarmHeader } from '../jarm/jarm-authorization-response/z-jarm-authorization-response'
 import { isJarmResponseMode } from '../jarm/jarm-response-mode'
-import { parseOpenid4VpAuthorizationResponsePayload } from './parse-authorization-response-payload'
+import { parseOpenid4vpAuthorizationResponsePayload } from './parse-authorization-response-payload'
 import { parseJarmAuthorizationResponse } from './parse-jarm-authorization-response'
 import { validateOpenid4vpAuthorizationResponsePayload } from './validate-authorization-response'
-import type { ValidateOpenid4VpAuthorizationResponseResult } from './validate-authorization-response-result'
+import type { ValidateOpenid4vpAuthorizationResponseResult } from './validate-authorization-response-result'
 import type { Openid4vpAuthorizationResponse } from './z-authorization-response'
 
 export interface ParseOpenid4vpAuthorizationResponseOptions {
@@ -18,12 +18,25 @@ export interface ParseOpenid4vpAuthorizationResponseOptions {
   authorizationResponse: Record<string, unknown>
 
   authorizationRequestPayload: Openid4vpAuthorizationRequest | Openid4vpAuthorizationRequestDcApi
-  callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJws'>
 
   origin?: string
+
+  /**
+   * Date to verify the `exp`, `nbf` and `iat` of a JARM response against. If not provided the current date
+   * will be used.
+   */
+  now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of a JARM response.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
-export type ParsedOpenid4vpAuthorizationResponse = ValidateOpenid4VpAuthorizationResponseResult & {
+export type ParsedOpenid4vpAuthorizationResponse = ValidateOpenid4vpAuthorizationResponseResult & {
   authorizationResponsePayload: Openid4vpAuthorizationResponse
   expectedNonce: string
   jarm?: VerifiedJarmAuthorizationResponse & {
@@ -44,6 +57,8 @@ export async function parseOpenid4vpAuthorizationResponse(
   })
   if (authorizationResponse.response) {
     return parseJarmAuthorizationResponse({
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
       jarmResponseJwt: authorizationResponse.response as string,
       callbacks,
       authorizationRequestPayload,
@@ -51,9 +66,9 @@ export async function parseOpenid4vpAuthorizationResponse(
     })
   }
 
-  const authorizationResponsePayload = parseOpenid4VpAuthorizationResponsePayload(authorizationResponse)
+  const authorizationResponsePayload = parseOpenid4vpAuthorizationResponsePayload(authorizationResponse)
 
-  const validatedOpenId4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
+  const validatedOpenid4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
     authorizationRequestPayload: authorizationRequestPayload,
     authorizationResponsePayload: authorizationResponsePayload,
   })
@@ -71,7 +86,7 @@ export async function parseOpenid4vpAuthorizationResponse(
   }
 
   return {
-    ...validatedOpenId4vpResponse,
+    ...validatedOpenid4vpResponse,
     expectedNonce: authorizationRequestPayload.nonce,
 
     authorizationResponsePayload,

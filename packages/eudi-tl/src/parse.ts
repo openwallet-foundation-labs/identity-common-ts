@@ -2,7 +2,7 @@ import { base64, hexEncode } from '@owf/identity-common'
 import { AsnConvert, type IAsnParseOptions } from '@peculiar/asn1-schema'
 import { Certificate, id_ce_subjectKeyIdentifier, SubjectKeyIdentifier } from '@peculiar/asn1-x509'
 import { DOMParser, type Element } from '@xmldom/xmldom'
-import { TrustedListParseException } from './trusted-list-exception'
+import { TrustedListParseError } from './trusted-list-error'
 import type {
   DigitalIdentity,
   ServiceHistoryInstance,
@@ -23,6 +23,13 @@ function descendants(el: Element, name: string, ns = TSL_NS): Element[] {
 
 function firstDescendant(el: Element, name: string, ns = TSL_NS): Element | undefined {
   return descendants(el, name, ns)[0]
+}
+
+/** The first direct child element with the name, so a nested element of the same name is not taken */
+function child(el: Element, name: string, ns = TSL_NS): Element | undefined {
+  return Array.from(el.childNodes).find(
+    (n): n is Element => (n as Element).namespaceURI === ns && (n as Element).localName === name
+  )
 }
 
 function textOf(el: Element | undefined): string | undefined {
@@ -156,7 +163,7 @@ export function parseTrustedList(xml: string, options: ParseTrustedListOptions =
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   const root: Element | null = doc.documentElement
   if (root?.localName !== 'TrustServiceStatusList') {
-    throw new TrustedListParseException('Root element is not a TS 119 612 TrustServiceStatusList')
+    throw new TrustedListParseError('Root element is not a TS 119 612 TrustServiceStatusList')
   }
 
   const schemeInfo = firstDescendant(root, 'SchemeInformation')
@@ -192,6 +199,8 @@ export function parseTrustedList(xml: string, options: ParseTrustedListOptions =
   return assertValidTrustedList({
     tslType: textOf(schemeInfo && firstDescendant(schemeInfo, 'TSLType')),
     schemeOperatorName: localizedName(schemeInfo && firstDescendant(schemeInfo, 'SchemeOperatorName')),
+    // A pointer to another list has a SchemeTerritory as well, so only a direct child is the list's own
+    schemeTerritory: textOf(schemeInfo && child(schemeInfo, 'SchemeTerritory')),
     sequenceNumber: sequenceText ? Number(sequenceText) : undefined,
     listIssueDateTime: textOf(schemeInfo && firstDescendant(schemeInfo, 'ListIssueDateTime')),
     nextUpdate: textOf(nextUpdate && firstDescendant(nextUpdate, 'dateTime')),
@@ -226,7 +235,7 @@ export interface TrustedListPointerFilter {
  * const esList = await loadTrustedList(esXml, { trustAnchors: esAnchors })
  * ```
  *
- * Passing `{ tslType: TSLType.EUlistofthelists }` returns the LOTL's own
+ * Passing `{ tslType: TslType.EUlistofthelists }` returns the LOTL's own
  * currently published signing certificates (from its self-pointer), which is
  * how a deployment refreshes its pinned set as the scheme operator rotates keys.
  */

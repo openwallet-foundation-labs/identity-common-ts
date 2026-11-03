@@ -1,4 +1,4 @@
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { verifyCredentialResponseEncryption } from './verify-credential-response-encryption'
 import { type DeferredCredentialRequest, zDeferredCredentialRequest } from './z-credential-request'

@@ -1,5 +1,42 @@
 # @owf/mdoc
 
+## 0.9.3
+
+### Patch Changes
+
+- 747a242: Support the fully-specified COSE signature algorithms of RFC 9864: `SignatureAlgorithm.ESP256` (-9), `ESP384` (-51) and `ESP512` (-52) from § 2.1, and `Ed25519` (-19) and `Ed448` (-53) from § 2.2. `Sign1.algorithm` accepts them. `coseKeyToJwkClaim.algorithm` and `Sign1.jwaAlgorithm` convert ESP256, ESP384 and ESP512 to the JWA `ES256`, `ES384` and `ES512`, and Ed25519 and Ed448 to the JWA names of the same name. `jwkToCoseKey.alg('ES256')` still returns `ES256` (-7), and `jwkToCoseKey.alg('Ed25519')` returns -19.
+  
+  `Sign1.sign` and `Sign1.verifySignature` throw `CoseInvalidAlgorithmError` when the key type or curve of the key does not match the algorithm (RFC 9053 § 2.1 and § 2.2, RFC 9864 § 2.1 and § 2.2). ES256, ES384 and ES512 require an EC2 key on P-256, P-384 or P-521, and EdDSA an OKP key on Ed25519 or Ed448. The fully-specified algorithms require the one curve they are defined for. The `alg` of the key is not compared, and RSA algorithms are not checked.
+  
+  In `@owf/mdoc`, issuer auth, device auth, reader auth, `verifyStatusListToken` and `verifyIdentifierListToken` accept these algorithms. Device auth now verifies through `Sign1.verifySignature`, so the `sign1.verify` callback receives the `alg` of the device signature, and the key check applies to it.
+- Updated dependencies [747a242]
+- Updated dependencies [057107b]
+- Updated dependencies [01b6985]
+- Updated dependencies [23f227b]
+  - @owf/cose@0.7.0
+  - @owf/identity-common@0.7.0
+  - @owf/token-status-list@0.7.0
+  - @owf/x509@0.7.0
+
+## 0.9.2
+
+### Patch Changes
+
+- aede3c4: `MdocContext.fetch` receives a third argument naming what it is retrieving, `{ type: 'statusList' | 'identifierList' }`, so an implementation can cache or time out per resource. An implementation written with a rest parameter needs its parameters named:
+  
+  ```diff
+  -fetch: (...args) => fetch(...args),
+  +fetch: (input, init) => fetch(input, init),
+  ```
+
+- bf9b7c8: Accept a status list served as a JWT as a fallback. `verifyStatusListToken` still requests a CWT first, verifies a JWT (ES256/384/512, signer from `x5c`) with the same signer, claim and status checks, and returns it as `statusListJwt` (`IssuerAuth.verify` verifies it but does not return it); `statusListCwt` is now optional and `JwtNotSupportForStatusListError` is deprecated.
+- Updated dependencies [bf9b7c8]
+- Updated dependencies [bf9b7c8]
+  - @owf/identity-common@0.6.1
+  - @owf/token-status-list@0.6.1
+  - @owf/cose@0.6.1
+  - @owf/x509@0.6.1
+
 ## 0.9.1
 
 ### Patch Changes

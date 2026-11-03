@@ -1,4 +1,4 @@
-import { isMediaType } from '@owf/identity-common'
+import { createAcceptHeader, isMediaType, parseWithSchema, type SchemaParseResult } from '@owf/identity-common'
 import type z from 'zod'
 import { ContentType } from './content-type'
 import { FetchError } from './error/FetchError'
@@ -13,7 +13,7 @@ export type ZodFetcher = <Schema extends z.ZodTypeAny>(
   schema: Schema,
   expectedContentType: ContentType | ContentType[],
   ...args: Parameters<Fetch>
-) => Promise<{ response: Awaited<ReturnType<Fetch>>; result?: z.ZodSafeParseResult<z.infer<Schema>> }>
+) => Promise<{ response: Awaited<ReturnType<Fetch>>; result?: SchemaParseResult<z.infer<Schema>> }>
 
 /**
  * The default fetcher used by createZodFetcher when no
@@ -69,14 +69,7 @@ export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
     // Ask for the expected content types in order of preference, unless the caller already set an Accept header
     const headers = new Headers(init?.headers)
     if (!headers.has('Accept')) {
-      headers.set(
-        'Accept',
-        expectedContentTypeArray
-          .map((contentType, index) =>
-            index === 0 ? contentType : `${contentType};q=${Math.max(0.1, 1 - index / 10).toFixed(1)}`
-          )
-          .join(', ')
-      )
+      headers.set('Accept', createAcceptHeader(expectedContentTypeArray))
     }
 
     const response = await createFetcher(fetcher)(input, { ...init, headers })
@@ -90,17 +83,17 @@ export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
     }
 
     if (
-      isMediaType(response.headers.get('Content-Type'), [ContentType.OAuthAuthorizationRequestJwt, ContentType.Jwt])
+      isMediaType(response.headers.get('Content-Type'), [ContentType.OauthAuthorizationRequestJwt, ContentType.Jwt])
     ) {
       return {
         response,
-        result: response.ok ? schema.safeParse(await response.text()) : undefined,
+        result: response.ok ? parseWithSchema(schema, await response.text()) : undefined,
       }
     }
 
     return {
       response,
-      result: response.ok ? schema.safeParse(await response.json()) : undefined,
+      result: response.ok ? parseWithSchema(schema, await response.json()) : undefined,
     }
   }
 }

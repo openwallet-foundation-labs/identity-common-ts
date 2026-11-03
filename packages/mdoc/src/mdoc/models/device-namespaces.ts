@@ -2,14 +2,14 @@ import { z } from 'zod'
 import { OriginalBytesCborStructure } from '../original-bytes-cbor-structure'
 import type { DataElementIdentifier } from './data-element-identifier'
 import type { DataElementValue } from './data-element-value'
-import { DeviceSignedItems, type DeviceSignedItemsStructure, deviceSignedItemsSchema } from './device-signed-items'
+import { DeviceSignedItems, type DeviceSignedItemsStructure, zDeviceSignedItems } from './device-signed-items'
 import type { Namespace } from './namespace'
 
-const deviceNamespacesEncodedSchema = z.map(z.string(), deviceSignedItemsSchema)
-const deviceNamespacesDecodedSchema = z.map(z.string(), z.instanceof(DeviceSignedItems))
+const zDeviceNamespacesEncoded = z.map(z.string(), zDeviceSignedItems)
+const zDeviceNamespacesDecoded = z.map(z.string(), z.instanceof(DeviceSignedItems))
 
-export type DeviceNamespacesDecodedStructure = z.infer<typeof deviceNamespacesDecodedSchema>
-export type DeviceNamespacesEncodedStructure = z.infer<typeof deviceNamespacesEncodedSchema>
+export type DeviceNamespacesDecodedStructure = z.infer<typeof zDeviceNamespacesDecoded>
+export type DeviceNamespacesEncodedStructure = z.infer<typeof zDeviceNamespacesEncoded>
 
 export type DeviceNamespacesOptions = {
   deviceNamespaces: Map<Namespace, DeviceSignedItems>
@@ -20,7 +20,7 @@ export class DeviceNamespaces extends OriginalBytesCborStructure<
   DeviceNamespacesDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(deviceNamespacesEncodedSchema, deviceNamespacesDecodedSchema, {
+    return z.codec(zDeviceNamespacesEncoded, zDeviceNamespacesDecoded, {
       decode: (input) => {
         const deviceNamespaces = new Map<Namespace, DeviceSignedItems>()
         input.forEach((value, key) => {

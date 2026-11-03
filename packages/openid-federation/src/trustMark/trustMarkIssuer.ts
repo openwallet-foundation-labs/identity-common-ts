@@ -1,5 +1,5 @@
 import { z } from 'zod'
 
-export const trustMarkIssuerSchema = z.record(z.string(), z.array(z.string()))
+export const zTrustMarkIssuer = z.record(z.string(), z.array(z.string()))
 
-export type TrustMarkIssuer = z.input<typeof trustMarkIssuerSchema>
+export type TrustMarkIssuer = z.input<typeof zTrustMarkIssuer>

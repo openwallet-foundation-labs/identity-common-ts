@@ -56,17 +56,18 @@ This is a monorepo managed with [pnpm workspaces](https://pnpm.io/workspaces). T
 identity-common-ts/
 ├── packages/                    # All publishable packages
 │   ├── identity-common/         # Core identity utilities (base package)
-│   ├── jose/                    # JOSE/JWT implementation (planned)
-│   ├── cose/                    # COSE/CWT implementation (planned)
-│   ├── x509/                    # X.509 certificate utilities (planned)
-│   ├── token-status-list/       # JWT/CWT Token Status List (planned)
+│   ├── crypto/                  # Crypto implementation based on Web Crypto (@owf/crypto)
+│   ├── jose/                    # JOSE: JWK, JWA, JWS, JWT and JWE (@owf/jose)
+│   ├── cose/                    # COSE/CWT implementation (@owf/cose)
+│   ├── x509/                    # X.509 certificate utilities (@owf/x509)
+│   ├── token-status-list/       # JWT/CWT Token Status List (@owf/token-status-list)
 │   ├── openid-federation/       # OpenID Federation 1.0 (@owf/openid-federation)
 │   ├── sd-jwt-*/                # SD-JWT and SD-JWT VC packages (@sd-jwt/*)
 │   ├── mdoc/                    # ISO/IEC 18013-5 mDOC and mDL (@owf/mdoc)
 │   ├── dcql/                    # Digital Credentials Query Language (dcql)
 │   ├── oauth2/                  # OAuth 2.0 (@openid4vc/oauth2)
 │   ├── openid4vc*/              # OpenID4VCI, OpenID4VP and shared utilities (@openid4vc/*)
-│   └── eudi-*/                  # EUDI-specific packages (planned)
+│   └── eudi-*/                  # EUDI-specific packages (@owf/eudi-*)
 ├── examples/                    # Runnable examples, grouped by topic (e.g. examples/sd-jwt)
 ├── docs/sd-jwt/                 # sdjwt.js.org landing page (deployed to GitHub Pages)
 ├── tests/                       # Integration tests
@@ -78,7 +79,7 @@ identity-common-ts/
 
 Packages are organized into six main categories:
 
-1. **Core Identity Utilities** (`@owf/identity-*`)
+1. **Core Identity Utilities** (`@owf/*`, e.g. `@owf/identity-common`, `@owf/crypto`, `@owf/x509`)
    - Generic, reusable utilities for any identity solution
    - Platform agnostic (Node.js, browsers, React Native)
    - Minimal dependencies
@@ -300,6 +301,17 @@ pnpm test
 - Avoid `any` - use `unknown` when type is truly unknown
 - Document public APIs with JSDoc comments
 
+### Naming
+
+- Function names are camelCase.
+- Object property names are camelCase, unless the object reflects a specification. Then the specification's syntax is leading, e.g. the snake_case of OpenID4VC.
+- Don't abbreviate, unless the abbreviation is the common term. Write abbreviations and names as words in camelCase to avoid ambiguity: `getJwtToken` and `useApiKey`, not `getJWTToken` and `useAPIKey`.
+- Start from how the specification writes a term in prose. Spaces, hyphens and dots separate words. In each word only the first letter is a capital, whatever the term's own spelling: `SD-JWT` → `SdJwt`, `EU PID Providers List` → `EuPidProvidersList`, `OAuth 2.0` → `Oauth2`, `OpenID4VCI` → `Openid4vci`, `OpenID Federation` → `OpenidFederation`, `LoTE` → `Lote`, `JAdES` → `Jades`, `mDL` → `Mdl`.
+- Prefer an options object over many positional arguments, e.g. `validateAccessCertificate(certificate, options)`.
+- Use names that explain themselves, e.g. `timeoutSeconds` instead of `timeout`, which could be seconds or milliseconds.
+
+Don't rename existing exports just to follow these rules: that is a breaking change.
+
 ### Platform Agnostic
 
 This library must work across Node.js, browsers, and React Native:
@@ -352,13 +364,13 @@ pnpm test
 pnpm test --watch
 
 # Run tests for a specific package
-pnpm test --filter @owf/my-package
+pnpm test packages/my-package
 ```
 
 ### Writing Tests
 
 - Place tests in `src/__tests__/` within each package
-- Use `.test.mts` extension for test files
+- Use the `.test.mts` extension in new packages. In an existing package, use the extension its tests already use (some use `.test.ts`)
 - Test public API behavior, not implementation details
 - Include edge cases and error conditions
 
@@ -394,7 +406,7 @@ Follow the prompts to:
 
 - Adding new features (minor)
 - Fixing bugs (patch)
-- Breaking changes (major)
+- Breaking changes (minor for packages below 1.0, which is all of them except `dcql`; major for `dcql`)
 - Documentation improvements that affect the published package (patch)
 
 **When NOT to create a changeset:**

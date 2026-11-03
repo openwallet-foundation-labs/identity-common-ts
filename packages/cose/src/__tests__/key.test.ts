@@ -26,8 +26,7 @@ describe('cose key', () => {
         // @ts-expect-error
         x: 'should be uint8array',
       })
-    ).toThrow(`Error decoding CoseKey
-✖ Expected Uint8Array, received string at "X (-2)"`)
+    ).toThrow('Error decoding CoseKey\n  - X (-2): expected Uint8Array, received string')
   })
 
   test('create ec key instance with public key', () => {
@@ -88,6 +87,18 @@ describe('cose key', () => {
     expect(coseKey.d).toBeDefined()
   })
 
+  test('uses registered jwk crv names', () => {
+    const coordinate = base64url.encode(new Uint8Array(48).fill(1))
+
+    expect(CoseKey.fromJwk({ kty: 'EC', crv: 'P-384', x: coordinate, y: coordinate }).curve).toStrictEqual(
+      Curve['P-384']
+    )
+    expect(CoseKey.fromJwk({ kty: 'EC', crv: 'P-521', x: coordinate, y: coordinate }).curve).toStrictEqual(
+      Curve['P-521']
+    )
+    expect(CoseKey.create({ keyType: KeyType.Ec, curve: Curve['P-384'] }).jwk.crv).toStrictEqual('P-384')
+  })
+
   test('create jwk from cose key', () => {
     const jwk = {
       kty: 'EC',
@@ -107,5 +118,25 @@ describe('cose key', () => {
     expect(newJwk.x).toStrictEqual(jwk.x)
     expect(newJwk.y).toStrictEqual(jwk.y)
     expect(newJwk.alg).toStrictEqual(jwk.alg)
+  })
+
+  test('converts jwk key_ops (RFC 7517 Section 4.3)', () => {
+    const coordinate = base64url.encode(new Uint8Array(32).fill(1))
+    const coseKey = CoseKey.fromJwk({ kty: 'EC', crv: 'P-256', x: coordinate, y: coordinate, key_ops: ['verify'] })
+
+    expect(coseKey.keyOps).toStrictEqual([KeyOps.Verify])
+    expect(coseKey.jwk.key_ops).toStrictEqual(['verify'])
+    expect(coseKey.jwk).not.toHaveProperty('keyOps')
+  })
+
+  test('converts jwk sign and verify of a MAC key to COSE MAC create and MAC verify (RFC 9052 Table 5)', () => {
+    const coseKey = CoseKey.fromJwk({
+      kty: 'oct',
+      k: base64url.encode(new Uint8Array(32)),
+      key_ops: ['sign', 'verify'],
+    })
+
+    expect(coseKey.keyOps).toStrictEqual([KeyOps.MacCreate, KeyOps.MacVerify])
+    expect(coseKey.jwk.key_ops).toStrictEqual(['sign', 'verify'])
   })
 })

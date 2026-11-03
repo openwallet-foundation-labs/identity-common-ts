@@ -35,6 +35,64 @@ const claimsExample = {
 }
 
 describe('Run Claims Query', () => {
+  it('reports the issues of the claims of each failed claim set only', () => {
+    const result = runClaimsQuery(
+      {
+        format: 'dc+sd-jwt',
+        id: 'sd_jwt',
+        multiple: false,
+        require_cryptographic_holder_binding: true,
+        claims: [
+          { id: 'name', path: ['name'], values: ['Ford Prefect'] },
+          { id: 'locality', path: ['address', 'locality'] },
+          { id: 'birthdate', path: ['birthdate'] },
+        ],
+        claim_sets: [['name', 'locality'], ['birthdate']],
+      },
+      {
+        credential: {
+          credential_format: 'dc+sd-jwt',
+          vct: 'https://example.com/pid',
+          claims: claimsExample,
+          cryptographic_holder_binding: true,
+        },
+        presentation: false,
+      }
+    )
+
+    expect(result.failed_claim_sets).toStrictEqual([
+      {
+        success: false,
+        claim_set_index: 0,
+        failed_claim_indexes: [0],
+        valid_claim_indexes: [1],
+        issues: [
+          {
+            severity: 'error',
+            code: 'claim_values_mismatch',
+            path: ['name'],
+            message: "Expected claim 'name' to be 'Ford Prefect' but received 'Arthur Dent'",
+            context: { actual: 'Arthur Dent', expected: ['Ford Prefect'] },
+          },
+        ],
+      },
+      {
+        success: false,
+        claim_set_index: 1,
+        failed_claim_indexes: [2],
+        valid_claim_indexes: undefined,
+        issues: [
+          {
+            severity: 'error',
+            code: 'claims_path_not_found',
+            path: ['birthdate'],
+            message: "Expected claim 'birthdate' to be defined",
+          },
+        ],
+      },
+    ])
+  })
+
   it('mso_mdoc without claims and claim sets', () => {
     const result = runClaimsQuery(
       { format: 'mso_mdoc', id: 'mso_mdoc', multiple: false, require_cryptographic_holder_binding: true },
@@ -158,11 +216,15 @@ describe('Run Claims Query', () => {
         {
           success: false,
           claim_set_index: undefined,
-          issues: {
-            'org.iso.18013.5.1.family_name': [
-              "Expected claim 'org.iso.18013.5.1'.'family_name' to be 'Shakira' but received 'Dent'",
-            ],
-          },
+          issues: [
+            {
+              severity: 'error',
+              code: 'claim_values_mismatch',
+              path: ['org.iso.18013.5.1', 'family_name'],
+              message: "Expected claim 'org.iso.18013.5.1'.'family_name' to be 'Shakira' but received 'Dent'",
+              context: { actual: 'Dent', expected: ['Shakira'] },
+            },
+          ],
           valid_claim_indexes: [0],
           failed_claim_indexes: [1],
         },
@@ -180,16 +242,15 @@ describe('Run Claims Query', () => {
           success: false,
           claim_index: 1,
           claim_id: undefined,
-          output: {
-            'org.iso.18013.5.1': {
-              family_name: 'Dent',
+          issues: [
+            {
+              severity: 'error',
+              code: 'claim_values_mismatch',
+              path: ['org.iso.18013.5.1', 'family_name'],
+              message: "Expected claim 'org.iso.18013.5.1'.'family_name' to be 'Shakira' but received 'Dent'",
+              context: { actual: 'Dent', expected: ['Shakira'] },
             },
-          },
-          issues: {
-            'org.iso.18013.5.1.family_name': [
-              "Expected claim 'org.iso.18013.5.1'.'family_name' to be 'Shakira' but received 'Dent'",
-            ],
-          },
+          ],
         },
       ],
     })
@@ -410,9 +471,15 @@ describe('Run Claims Query', () => {
         {
           success: false,
           claim_set_index: 0,
-          issues: {
-            'degrees.type': ["Expected claim 'degrees'.1.'type' to be 'RandomType' but received 'Master of Science'"],
-          },
+          issues: [
+            {
+              severity: 'error',
+              code: 'claim_values_mismatch',
+              path: ['degrees', 1, 'type'],
+              message: "Expected claim 'degrees'.1.'type' to be 'RandomType' but received 'Master of Science'",
+              context: { actual: 'Master of Science', expected: ['RandomType'] },
+            },
+          ],
           valid_claim_indexes: [0, 1, 3, 4],
           failed_claim_indexes: [2],
         },
@@ -495,21 +562,15 @@ describe('Run Claims Query', () => {
           success: false,
           claim_index: 2,
           claim_id: '2',
-          issues: {
-            'degrees.type': ["Expected claim 'degrees'.1.'type' to be 'RandomType' but received 'Master of Science'"],
-          },
-          output: {
-            degrees: [
-              {
-                type: 'Bachelor of Science',
-                university: 'University of Betelgeuse',
-              },
-              {
-                type: 'Master of Science',
-                university: 'University of Katala',
-              },
-            ],
-          },
+          issues: [
+            {
+              severity: 'error',
+              code: 'claim_values_mismatch',
+              path: ['degrees', 1, 'type'],
+              message: "Expected claim 'degrees'.1.'type' to be 'RandomType' but received 'Master of Science'",
+              context: { actual: 'Master of Science', expected: ['RandomType'] },
+            },
+          ],
         },
       ],
     })

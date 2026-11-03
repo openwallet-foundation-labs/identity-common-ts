@@ -1,5 +1,5 @@
-import { isMediaType } from '@owf/identity-common'
-import { SLException } from './status-list-exception'
+import { createAcceptHeader, isMediaType } from '@owf/identity-common'
+import { StatusListError } from './status-list-error'
 import { StatusListMediaTypes } from './types'
 
 export const fetchStatusList = async ({
@@ -9,25 +9,25 @@ export const fetchStatusList = async ({
 }: {
   uri: string
   /**
-   *
-   * If none is supplied either can be returned
-   *
+   * The formats to ask for, in order of preference. If none is supplied either can be returned.
    */
   acceptedFormats?: Array<'cwt' | 'jwt'>
   customFetcher?: typeof fetch
 }): Promise<string | Uint8Array> => {
   try {
     if (acceptedFormats.length === 0) {
-      throw new SLException(`At least one accepted format (cwt, jwt) needs to be provided`)
+      throw new StatusListError(`At least one accepted format (cwt, jwt) needs to be provided`)
     }
 
-    const acceptHeaders = acceptedFormats.map((format) =>
-      format === 'jwt' ? StatusListMediaTypes.StatusListJwt : StatusListMediaTypes.StatusListCwt
+    const acceptHeader = createAcceptHeader(
+      acceptedFormats.map((format) =>
+        format === 'jwt' ? StatusListMediaTypes.StatusListJwt : StatusListMediaTypes.StatusListCwt
+      )
     )
 
     const response = await customFetcher(uri, {
       headers: {
-        Accept: acceptHeaders.join(','),
+        Accept: acceptHeader,
       },
     })
 
@@ -43,8 +43,8 @@ export const fetchStatusList = async ({
       return new Uint8Array(await response.arrayBuffer())
     }
 
-    throw new SLException('Content type was either not provided in the response or invalid.')
+    throw new StatusListError('Content type was either not provided in the response or invalid.')
   } catch (e) {
-    throw new SLException(`Could not fetch either a JWT or CWT as status list. ${(e as Error).message}`)
+    throw new StatusListError(`Could not fetch either a JWT or CWT as status list. ${(e as Error).message}`)
   }
 }

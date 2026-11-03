@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { StatusList } from '../status-list'
 import type { BitsPerStatus, StatusType } from '../types'
 
-export const statusListCborSchema = typedMap([
+export const zStatusListCbor = typedMap([
   ['bits', z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(8)])],
   ['lst', zUint8Array],
   // NOTE: `exactOptional`, so that the key is omitted when there is no aggregation uri, rather than
@@ -11,8 +11,8 @@ export const statusListCborSchema = typedMap([
   ['aggregation_uri', z.string().exactOptional()],
 ])
 
-export type StatusListCborEncodedStructure = z.input<typeof statusListCborSchema>
-export type StatusListCborDecodedStructure = z.output<typeof statusListCborSchema>
+export type StatusListCborEncodedStructure = z.input<typeof zStatusListCbor>
+export type StatusListCborDecodedStructure = z.output<typeof zStatusListCbor>
 
 export type CreateStatusListCborOptions = {
   bits: BitsPerStatus
@@ -34,7 +34,7 @@ export class StatusListCbor extends CborStructure<StatusListCborEncodedStructure
   #statusList?: StatusList
 
   public static override get encodingSchema() {
-    return statusListCborSchema
+    return zStatusListCbor
   }
 
   public get bits(): BitsPerStatus {

@@ -62,7 +62,7 @@ describe('ServiceBuilder', () => {
 
   it('should add X.509 SKIs', () => {
     const ski = 'base64encodedSKI=='
-    const svc = service().name('Test Service').addX509SKI(ski).build()
+    const svc = service().name('Test Service').addX509Ski(ski).build()
 
     expect(svc.ServiceInformation.ServiceDigitalIdentity.X509SKIs).toHaveLength(1)
     expect(svc.ServiceInformation.ServiceDigitalIdentity.X509SKIs?.[0]).toBe(ski)
@@ -86,6 +86,22 @@ describe('ServiceBuilder', () => {
 
     expect(svc.ServiceInformation.ServiceSupplyPoints).toHaveLength(2)
     expect(svc.ServiceInformation.ServiceSupplyPoints?.[0].uriValue).toBe('https://issuer.example.com')
+  })
+
+  it('should add a service endpoint without a ServiceType', () => {
+    const svc = service()
+      .name('Test Service')
+      .addPublicKey({ kty: 'EC' })
+      .addEndpoint('https://issuer.example.com')
+      .addEndpoint(undefined, 'https://verifier.example.com')
+      .addEndpoint('https://example.org/type/issuer', 'https://typed.example.com')
+      .build()
+
+    expect(svc.ServiceInformation.ServiceSupplyPoints).toStrictEqual([
+      { uriValue: 'https://issuer.example.com' },
+      { uriValue: 'https://verifier.example.com' },
+      { ServiceType: 'https://example.org/type/issuer', uriValue: 'https://typed.example.com' },
+    ])
   })
 
   it('should add service definition URIs', () => {

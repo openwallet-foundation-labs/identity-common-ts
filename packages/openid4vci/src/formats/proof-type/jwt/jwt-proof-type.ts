@@ -1,13 +1,6 @@
-import {
-  type CallbackContext,
-  decodeJwt,
-  isJwkInSet,
-  type JwtSigner,
-  jwtHeaderFromJwtSigner,
-  jwtSignerFromJwt,
-  verifyJwt,
-} from '@openid4vc/oauth2'
-import { dateToSeconds, parseWithErrorHandling } from '@openid4vc/utils'
+import { type CallbackContext, isJwkInSet } from '@openid4vc/oauth2'
+import { dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
+import { decodeJwt, type JwsSigner, jwsHeaderFromSigner, signJwt, verifyJwt } from '@owf/jose'
 import { Openid4vciError } from '../../../error/Openid4vciError'
 import {
   type VerifyKeyAttestationJwtReturn,
@@ -54,15 +47,15 @@ export interface CreateCredentialRequestJwtProofOptions {
    */
   keyAttestationJwt?: string
 
-  signer: JwtSigner
-  callbacks: Pick<CallbackContext, 'signJwt' | 'hash'>
+  signer: JwsSigner
+  callbacks: Pick<CallbackContext, 'signJws' | 'hash'>
 }
 
 export async function createCredentialRequestJwtProof(
   options: CreateCredentialRequestJwtProofOptions
 ): Promise<string> {
   const header = parseWithErrorHandling(zCredentialRequestJwtProofTypeHeader, {
-    ...jwtHeaderFromJwtSigner(options.signer),
+    ...jwsHeaderFromSigner(options.signer),
     key_attestation: options.keyAttestationJwt,
     typ: 'openid4vci-proof+jwt',
   } satisfies CredentialRequestJwtProofTypeHeader)
@@ -70,11 +63,16 @@ export async function createCredentialRequestJwtProof(
   const payload = parseWithErrorHandling(zCredentialRequestJwtProofTypePayload, {
     nonce: options.nonce,
     aud: options.credentialIssuer,
-    iat: dateToSeconds(options.issuedAt),
+    iat: dateToSeconds(options.issuedAt ?? new Date()),
     iss: options.clientId,
   } satisfies CredentialRequestJwtProofTypePayload)
 
-  const { jwt, signerJwk } = await options.callbacks.signJwt(options.signer, { header, payload })
+  const { jwt, signerJwk } = await signJwt({
+    header,
+    payload,
+    signer: options.signer,
+    signJwsCallback: options.callbacks.signJws,
+  })
 
   // Check the jwt is signed with an key from attested_keys in the key_attestation jwt
   if (options.keyAttestationJwt) {
@@ -132,6 +130,13 @@ export interface VerifyCredentialRequestJwtProofOptions {
   now?: Date
 
   /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of the proof and its `key_attestation`.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
+
+  /**
    * The `key_attestations_required` value of the `jwt` proof type from the credential configuration in the
    * credential issuer metadata. If provided, the proof MUST contain a `key_attestation` that meets these
    * requirements.
@@ -143,15 +148,16 @@ export interface VerifyCredentialRequestJwtProofOptions {
    *
    * Will be used for the jwt proof, and optionally a `key_attestation` in the jwt proof header.
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>
 }
 
 export async function verifyCredentialRequestJwtProof(options: VerifyCredentialRequestJwtProofOptions) {
-  const { header, payload } = decodeJwt({
+  const decodedJwt = decodeJwt({
     jwt: options.jwt,
     headerSchema: zCredentialRequestJwtProofTypeHeader,
     payloadSchema: zCredentialRequestJwtProofTypePayload,
   })
+  const { header, payload } = decodedJwt
 
   const now = options.now?.getTime() ?? Date.now()
   if (options.nonceExpiresAt && now > options.nonceExpiresAt.getTime()) {
@@ -159,16 +165,17 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
   }
 
   const { signer } = await verifyJwt({
-    compact: options.jwt,
-    header,
-    payload,
-    signer: jwtSignerFromJwt({ header, payload }),
-    verifyJwtCallback: options.callbacks.verifyJwt,
+    jwt: decodedJwt,
+    // The `iss` of a key proof is the client id rather than the did, so a `kid` that does not start
+    // with it is not a mismatch. This is the one token type that is true for.
+    allowDidKidIssuerMismatch: true,
+    verifyJwsCallback: options.callbacks.verifyJws,
     errorMessage: 'Error verifying credential request proof jwt.',
     expectedNonce: options.expectedNonce,
     expectedAudience: options.credentialIssuer,
     expectedIssuer: options.clientId,
     now: options.now,
+    skewSeconds: options.allowedSkewInSeconds,
   })
 
   let keyAttestationResult: VerifyKeyAttestationJwtReturn | undefined
@@ -178,16 +185,18 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
       callbacks: options.callbacks,
       keyAttestationJwt: header.key_attestation,
       use: 'proof_type.jwt',
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
       keyAttestationsRequired: options.keyAttestationsRequired,
     })
 
-    const isSigedWithAttestedKey = await isJwkInSet({
+    const isSignedWithAttestedKey = await isJwkInSet({
       jwk: signer.publicJwk,
       jwks: keyAttestationResult.payload.attested_keys,
       callbacks: options.callbacks,
     })
 
-    if (!isSigedWithAttestedKey) {
+    if (!isSignedWithAttestedKey) {
       throw new Openid4vciError(
         `Credential request jwt proof is not signed with a key in the 'key_attestation' jwt payload 'attested_keys'`
       )

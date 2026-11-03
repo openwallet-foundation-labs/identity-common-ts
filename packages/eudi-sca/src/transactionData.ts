@@ -6,22 +6,22 @@ import {
   parseCredentialMetadata,
   ValueType,
 } from './credentialMetadata'
-import { getJsonPathValueAndKey, Iso4217Amount, Iso4217CurrencyCode } from './utils'
+import { getJsonPathValueAndKey, zIso4217Amount, zIso4217CurrencyCode } from './utils'
 
 export const TRANSACTION_DATA_SCA_PREFIX = 'urn:eudi:sca:'
 
-const TransactionDataSchema = z.object({
+const zTransactionData = z.object({
   type: z.string(),
   credential_ids: z.array(z.string()),
   transaction_hash_alg: z.string().optional(),
   payload: z.record(z.string(), z.unknown()),
 })
 
-export type TransactionData = z.infer<typeof TransactionDataSchema>
+export type TransactionData = z.infer<typeof zTransactionData>
 
 export const parseTransactionData = (txnData: string) => {
   const decoded = base64urlDecodeJson(txnData)
-  return TransactionDataSchema.parse(decoded)
+  return zTransactionData.parse(decoded)
 }
 
 export type PayloadWithDisplayInfo = Record<
@@ -168,13 +168,13 @@ const matchValueTypeToValue = (valueType: ValueType | string, value: unknown) =>
       }
     case ValueType.IsoCurrency:
       try {
-        return typeof value === 'string' && !!Iso4217CurrencyCode.parse(value)
+        return typeof value === 'string' && !!zIso4217CurrencyCode.parse(value)
       } catch {
         return false
       }
     case ValueType.IsoCurrencyAmount:
       try {
-        return typeof value === 'string' && !!Iso4217Amount.parse(value)
+        return typeof value === 'string' && !!zIso4217Amount.parse(value)
       } catch {
         return false
       }

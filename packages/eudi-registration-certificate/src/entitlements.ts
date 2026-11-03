@@ -1,5 +1,5 @@
 /**
- * WRPRC Entitlement Constants
+ * Registration Certificate Entitlement Constants
  *
  * Entitlement identifiers as defined in ETSI TS 119 475 Annex A.
  * These identifiers define the roles and capabilities of Wallet-Relying Parties.
@@ -211,16 +211,16 @@ export const POLICY_TYPES = {
 // ============================================================================
 
 /**
- * Base OID for WRPRC policies: 0.4.0.19475.3
+ * Base OID for registration certificate policies: 0.4.0.19475.3
  */
-export const WRPRC_POLICY_BASE_OID = `${ETSI_WRPA_BASE_OID}.3`
+export const REGISTRATION_CERTIFICATE_POLICY_BASE_OID = `${ETSI_WRPA_BASE_OID}.3`
 
 /**
- * WRPRC Policy OIDs
+ * Registration Certificate Policy OIDs
  */
-export const WRPRC_POLICIES = {
-  /** WRPRC provider policy identifier */
-  WRPRC_PROVIDER: `${WRPRC_POLICY_BASE_OID}.1`,
+export const REGISTRATION_CERTIFICATE_POLICIES = {
+  /** Registration certificate provider policy identifier */
+  REGISTRATION_CERTIFICATE_PROVIDER: `${REGISTRATION_CERTIFICATE_POLICY_BASE_OID}.1`,
 } as const
 
 // ============================================================================
@@ -237,7 +237,7 @@ export function isValidEntitlement(uri: string): boolean {
 /**
  * Check if a given URI is a PSP sub-entitlement
  */
-export function isPSPSubEntitlement(uri: string): boolean {
+export function isPspSubEntitlement(uri: string): boolean {
   return ALL_PSP_SUB_ENTITLEMENTS.includes(uri as (typeof ALL_PSP_SUB_ENTITLEMENTS)[number])
 }
 

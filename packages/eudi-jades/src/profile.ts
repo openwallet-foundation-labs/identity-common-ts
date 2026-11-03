@@ -1,7 +1,7 @@
 /** Structural baseline-profile checks from ETSI TS 119 182-1 V1.2.1 clause 6.3. */
 import { base64urlDecodeJson } from '@owf/identity-common'
-import { JAdESProfile } from './constants'
-import { ProtectedHeaderSchema, UnprotectedHeaderSchema } from './schemas'
+import { JadesProfile } from './constants'
+import { zProtectedHeader, zUnprotectedHeader } from './schemas'
 import type { ProtectedHeaderParams, UnprotectedHeaderParams } from './types'
 
 export interface ProfileValidationOptions {
@@ -63,10 +63,10 @@ function validateBB(
   unprotectedHeader?: UnprotectedHeaderParams
 ): ProfileValidationResult {
   const missing: string[] = []
-  const protectedResult = ProtectedHeaderSchema.safeParse(header)
+  const protectedResult = zProtectedHeader.safeParse(header)
   if (!protectedResult.success) addSchemaIssues(missing, 'protected.', protectedResult.error.issues)
   if (unprotectedHeader) {
-    const unprotectedResult = UnprotectedHeaderSchema.safeParse(unprotectedHeader)
+    const unprotectedResult = zUnprotectedHeader.safeParse(unprotectedHeader)
     if (!unprotectedResult.success) addSchemaIssues(missing, 'unprotected.', unprotectedResult.error.issues)
   }
   if (header.adoTst) checkBaselineTimestamp(header.adoTst, 'protected.adoTst', missing)
@@ -158,18 +158,18 @@ function validateBLTA(
 
 export function validateProfile(
   header: ProtectedHeaderParams,
-  profile: JAdESProfile,
+  profile: JadesProfile,
   unprotectedHeader?: UnprotectedHeaderParams,
   options: ProfileValidationOptions = {}
 ): ProfileValidationResult {
   switch (profile) {
-    case JAdESProfile.B_B:
+    case JadesProfile.B_B:
       return validateBB(header, unprotectedHeader)
-    case JAdESProfile.B_T:
+    case JadesProfile.B_T:
       return validateBT(header, unprotectedHeader)
-    case JAdESProfile.B_LT:
+    case JadesProfile.B_LT:
       return validateBLT(header, unprotectedHeader, options)
-    case JAdESProfile.B_LTA:
+    case JadesProfile.B_LTA:
       return validateBLTA(header, unprotectedHeader, options)
   }
 }
@@ -178,8 +178,8 @@ export function detectProfiles(
   header: ProtectedHeaderParams,
   unprotectedHeader?: UnprotectedHeaderParams,
   options: ProfileValidationOptions = {}
-): JAdESProfile[] {
-  return [JAdESProfile.B_LTA, JAdESProfile.B_LT, JAdESProfile.B_T, JAdESProfile.B_B].filter(
+): JadesProfile[] {
+  return [JadesProfile.B_LTA, JadesProfile.B_LT, JadesProfile.B_T, JadesProfile.B_B].filter(
     (profile) => validateProfile(header, profile, unprotectedHeader, options).valid
   )
 }

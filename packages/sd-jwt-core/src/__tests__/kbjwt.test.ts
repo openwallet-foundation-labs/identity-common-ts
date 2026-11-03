@@ -1,13 +1,13 @@
 import Crypto, { type KeyLike } from 'node:crypto'
 import { exportJWK, importJWK, type JWK } from 'jose'
 import { describe, expect, test } from 'vitest'
-import { KBJwt } from '../kbjwt'
-import { type JwtPayload, KB_JWT_TYP, type KbVerifier, type kbPayload, type Signer } from '../types'
-import { JwtTimeClaimException, type SDJWTException } from '../utils'
+import { KbJwt } from '../kbjwt'
+import { type JwtPayload, KB_JWT_TYP, type KbJwtPayload, type KbVerifier, type Signer } from '../types'
+import { JwtTimeClaimError, type SdJwtError } from '../utils'
 
 describe('KB JWT', () => {
   test('create', async () => {
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -38,7 +38,7 @@ describe('KB JWT', () => {
       const sig = Crypto.sign(null, Buffer.from(data), privateKey)
       return Buffer.from(sig).toString('base64url')
     }
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -51,7 +51,7 @@ describe('KB JWT', () => {
       },
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
     expect(decoded.header).toEqual({
       typ: KB_JWT_TYP,
       alg: 'EdDSA',
@@ -90,7 +90,7 @@ describe('KB JWT', () => {
         Buffer.from(sig, 'base64url')
       )
     }
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -103,8 +103,8 @@ describe('KB JWT', () => {
       },
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
-    const verified = await decoded.verifyKB({
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
+    const verified = await decoded.verifyKb({
       verifier: testVerifier,
       payload,
       nonce: 'nonce',
@@ -121,6 +121,28 @@ describe('KB JWT', () => {
         sd_hash: 'hash',
       },
     })
+  })
+
+  test.each(['application/kb+jwt', 'KB+JWT'])('verify accepts the typ %s (RFC 7515 Section 4.1.9)', async (typ) => {
+    const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
+    const testSigner: Signer = async (data: string) =>
+      Buffer.from(Crypto.sign(null, Buffer.from(data), privateKey)).toString('base64url')
+    const testVerifier: KbVerifier = async (data: string, sig: string) =>
+      Crypto.verify(null, Buffer.from(data), publicKey, Buffer.from(sig, 'base64url'))
+
+    const kbJwt = new KbJwt({
+      header: { typ: typ as typeof KB_JWT_TYP, alg: 'EdDSA' },
+      payload: { iat: 1, aud: 'aud', nonce: 'nonce', sd_hash: 'hash' },
+    })
+    const decoded = KbJwt.fromKbEncode(await kbJwt.sign(testSigner))
+
+    await expect(
+      decoded.verifyKb({
+        verifier: testVerifier,
+        payload: { cnf: { jwk: await exportJWK(publicKey) } },
+        nonce: 'nonce',
+      })
+    ).resolves.toMatchObject({ header: { typ } })
   })
 
   test('verify failed', async () => {
@@ -149,7 +171,7 @@ describe('KB JWT', () => {
       )
     }
 
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -162,16 +184,44 @@ describe('KB JWT', () => {
       },
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
     try {
-      await decoded.verifyKB({
+      await decoded.verifyKb({
         verifier: testVerifier,
         payload,
         nonce: 'nonce',
       })
     } catch (e: unknown) {
-      const error = e as SDJWTException
+      const error = e as SdJwtError
       expect(error.message).toBe('Invalid Key Binding Jwt')
+    }
+  })
+
+  test('verify rejects critical header parameters', async () => {
+    const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
+    const testSigner: Signer = async (data: string) => {
+      const sig = Crypto.sign(null, Buffer.from(data), privateKey)
+      return Buffer.from(sig).toString('base64url')
+    }
+    const testVerifier: KbVerifier = async (data: string, sig: string) => {
+      return Crypto.verify(null, Buffer.from(data), publicKey, Buffer.from(sig, 'base64url'))
+    }
+    const payload = { iat: 1, aud: 'aud', nonce: 'nonce', sd_hash: 'hash' }
+
+    for (const [header, accepted] of [
+      [{ typ: KB_JWT_TYP, alg: 'EdDSA' }, true],
+      [{ typ: KB_JWT_TYP, alg: 'EdDSA', crit: ['urn:example:ext'], 'urn:example:ext': true }, false],
+    ] as const) {
+      const kbJwt = new KbJwt({ header, payload })
+      const decoded = KbJwt.fromKbEncode(await kbJwt.sign(testSigner))
+      const verification = decoded.verifyKb({ verifier: testVerifier, payload: {}, nonce: 'nonce' })
+      if (accepted) {
+        await expect(verification).resolves.toHaveProperty('payload')
+      } else {
+        await expect(verification).rejects.toThrowError(
+          'Verify Error: unsupported critical header parameters in Key Binding JWT'
+        )
+      }
     }
   })
 
@@ -194,7 +244,7 @@ describe('KB JWT', () => {
       return false
     }
 
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -207,15 +257,15 @@ describe('KB JWT', () => {
       },
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
     try {
-      await decoded.verifyKB({
+      await decoded.verifyKb({
         verifier: testVerifier,
         payload,
         nonce: 'nonce',
       })
     } catch (e: unknown) {
-      const error = e as SDJWTException
+      const error = e as SdJwtError
       expect(error.message).toBe('Verify Error: Invalid JWT Signature')
     }
   })
@@ -239,7 +289,7 @@ describe('KB JWT', () => {
       return false
     }
 
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -252,16 +302,16 @@ describe('KB JWT', () => {
       },
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
     decoded.signature = undefined
     try {
-      await decoded.verifyKB({
+      await decoded.verifyKb({
         verifier: testVerifier,
         payload,
         nonce: 'nonce',
       })
     } catch (e: unknown) {
-      const error = e as SDJWTException
+      const error = e as SdJwtError
       expect(error.message).toBe('Verify Error: Invalid JWT')
     }
   })
@@ -288,7 +338,7 @@ describe('KB JWT', () => {
       )
     }
 
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -300,22 +350,22 @@ describe('KB JWT', () => {
         sd_hash: 'hash',
         // expired one hour before the current date used below
         exp: 1000,
-      } as kbPayload,
+      } as KbJwtPayload,
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
 
     await expect(
-      decoded.verifyKB({
+      decoded.verifyKb({
         verifier: testVerifier,
         payload,
         nonce: 'nonce',
         options: { currentDate: 5000 },
       })
-    ).rejects.toBeInstanceOf(JwtTimeClaimException)
+    ).rejects.toBeInstanceOf(JwtTimeClaimError)
 
     await expect(
-      decoded.verifyKB({
+      decoded.verifyKb({
         verifier: testVerifier,
         payload,
         nonce: 'nonce',
@@ -350,7 +400,7 @@ describe('KB JWT', () => {
       )
     }
 
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -363,10 +413,10 @@ describe('KB JWT', () => {
       },
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
 
     await expect(
-      decoded.verifyKB({
+      decoded.verifyKb({
         verifier: testVerifier,
         payload,
         nonce: 'nonce',
@@ -402,7 +452,7 @@ describe('KB JWT', () => {
       )
     }
 
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -413,13 +463,13 @@ describe('KB JWT', () => {
         nonce: 'nonce',
         sd_hash: 'hash',
         nbf: 5000,
-      } as kbPayload,
+      } as KbJwtPayload,
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
 
     await expect(
-      decoded.verifyKB({
+      decoded.verifyKb({
         verifier: testVerifier,
         payload,
         nonce: 'nonce',
@@ -454,7 +504,7 @@ describe('KB JWT', () => {
       )
     }
 
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -465,20 +515,20 @@ describe('KB JWT', () => {
         nonce: 'nonce',
         sd_hash: 'hash',
         exp: 1000,
-      } as kbPayload,
+      } as KbJwtPayload,
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
 
     // exp (1000) is before the current date (1100) but within the 200s skew
-    const verified = await decoded.verifyKB({
+    const verified = await decoded.verifyKb({
       verifier: testVerifier,
       payload,
       nonce: 'nonce',
       options: { currentDate: 1100, skewSeconds: 200 },
     })
 
-    expect((verified.payload as kbPayload & { exp: number }).exp).toBe(1000)
+    expect((verified.payload as KbJwtPayload & { exp: number }).exp).toBe(1000)
   })
 
   test('rejects draft-era _sd_hash without sd_hash', async () => {
@@ -505,7 +555,7 @@ describe('KB JWT', () => {
         Buffer.from(sig, 'base64url')
       )
     }
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -522,9 +572,9 @@ describe('KB JWT', () => {
     ;(kbJwt.payload as Record<string, unknown>).sd_hash = undefined
 
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
     await expect(
-      decoded.verifyKB({
+      decoded.verifyKb({
         verifier: testVerifier,
         payload,
         nonce: 'nonce',
@@ -554,7 +604,7 @@ describe('KB JWT', () => {
       )
     }
 
-    const kbJwt = new KBJwt({
+    const kbJwt = new KbJwt({
       header: {
         typ: KB_JWT_TYP,
         alg: 'EdDSA',
@@ -567,14 +617,14 @@ describe('KB JWT', () => {
       },
     })
     const encodedKbJwt = await kbJwt.sign(testSigner)
-    const decoded = KBJwt.fromKBEncode(encodedKbJwt)
-    const verifyKB = (options: Record<string, unknown>) =>
-      decoded.verifyKB({ verifier: testVerifier, payload, nonce: 'nonce', options })
+    const decoded = KbJwt.fromKbEncode(encodedKbJwt)
+    const verifyKb = (options: Record<string, unknown>) =>
+      decoded.verifyKb({ verifier: testVerifier, payload, nonce: 'nonce', options })
 
     // The holder may use other algorithms than the issuer
-    await expect(verifyKB({ allowedIssuerAlgorithms: ['ES256'] })).resolves.toBeDefined()
-    await expect(verifyKB({ allowedKeyBindingAlgorithms: ['EdDSA'] })).resolves.toBeDefined()
-    await expect(verifyKB({ allowedKeyBindingAlgorithms: ['ES256'] })).rejects.toThrow(
+    await expect(verifyKb({ allowedIssuerAlgorithms: ['ES256'] })).resolves.toBeDefined()
+    await expect(verifyKb({ allowedKeyBindingAlgorithms: ['EdDSA'] })).resolves.toBeDefined()
+    await expect(verifyKb({ allowedKeyBindingAlgorithms: ['ES256'] })).rejects.toThrow(
       'Verify Error: Disallowed Key Binding alg EdDSA'
     )
   })

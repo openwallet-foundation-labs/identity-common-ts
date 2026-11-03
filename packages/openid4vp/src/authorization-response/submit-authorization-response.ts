@@ -25,7 +25,7 @@ export async function submitOpenid4vpAuthorizationResponse(options: SubmitOpenid
 
   if (!url) {
     throw new Oauth2Error(
-      'Failed to submit OpenId4Vp Authorization Response. No redirect_uri or response_uri provided.'
+      'Failed to submit OpenID4VP Authorization Response. No redirect_uri or response_uri provided.'
     )
   }
 

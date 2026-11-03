@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractMediaType, isJoseTyp, isMediaType, normalizeJoseTyp } from '../../src'
+import { createAcceptHeader, extractMediaType, isJwtTyp, isMediaType } from '../../src'
 
 describe('content type', () => {
   describe('extractMediaType', () => {
@@ -54,33 +54,49 @@ describe('content type', () => {
     })
   })
 
-  describe('normalizeJoseTyp', () => {
-    it('should prepend application/ when the typ is in short form', () => {
-      expect(normalizeJoseTyp('statuslist+jwt')).toBe('application/statuslist+jwt')
+  describe('isJwtTyp', () => {
+    it.each([
+      ['short forms', 'statuslist+jwt', 'statuslist+jwt'],
+      ['a full value and a short expected typ', 'application/statuslist+jwt', 'statuslist+jwt'],
+      ['a short value and a full expected typ', 'statuslist+jwt', 'application/statuslist+jwt'],
+      ['mixed-case forms', 'Application/StatusList+JWT', 'STATUSLIST+JWT'],
+    ])('should match %s', (_description, value, typ) => {
+      expect(isJwtTyp(value, typ)).toBe(true)
     })
 
-    it('should normalize the full media type and strip parameters', () => {
-      expect(normalizeJoseTyp('Application/StatusList+JWT; charset=utf-8')).toBe('application/statuslist+jwt')
+    it('should return false for non-string values, parameters and other types', () => {
+      expect(isJwtTyp(1, 'statuslist+jwt')).toBe(false)
+      expect(isJwtTyp(undefined, 'statuslist+jwt')).toBe(false)
+      expect(isJwtTyp('statuslist+jwt; charset=utf-8', 'statuslist+jwt')).toBe(false)
+      expect(isJwtTyp('application/statuslist+cwt', 'statuslist+jwt')).toBe(false)
     })
   })
 
-  describe('isJoseTyp', () => {
-    it.each([
-      ['short forms', 'statuslist+jwt', 'application/statuslist+jwt'],
-      ['full forms', 'application/statuslist+jwt', 'statuslist+jwt'],
-      ['mixed-case forms', 'Application/StatusList+JWT', 'STATUSLIST+JWT'],
-    ])('should match %s', (_description, value, expected) => {
-      expect(isJoseTyp(value, expected)).toBe(true)
+  describe('createAcceptHeader', () => {
+    it('should ask for a single media type without a quality value', () => {
+      expect(createAcceptHeader(['application/json'])).toStrictEqual('application/json')
     })
 
-    it('should match against an array of expected values', () => {
-      expect(isJoseTyp('statuslist+cwt', ['statuslist+jwt', 'application/statuslist+cwt'])).toBe(true)
+    it('should give every media type after the first a lower quality value', () => {
+      expect(createAcceptHeader(['application/jwt', 'application/jwk-set+json', 'application/json'])).toStrictEqual(
+        'application/jwt, application/jwk-set+json;q=0.9, application/json;q=0.8'
+      )
     })
 
-    it('should return false for non-string values and non-matching types', () => {
-      expect(isJoseTyp(1, 'statuslist+jwt')).toBe(false)
-      expect(isJoseTyp(undefined, 'statuslist+jwt')).toBe(false)
-      expect(isJoseTyp('application/statuslist+cwt', 'statuslist+jwt')).toBe(false)
+    it('should never go below q=0.1, which keeps every media type acceptable', () => {
+      const mediaTypes = Array.from({ length: 12 }, (_, index) => `application/type-${index}`)
+
+      expect(createAcceptHeader(mediaTypes).split(', ').slice(-3)).toStrictEqual([
+        'application/type-9;q=0.1',
+        'application/type-10;q=0.1',
+        'application/type-11;q=0.1',
+      ])
+    })
+
+    it('should drop duplicates', () => {
+      expect(createAcceptHeader(['application/cwt', 'application/cwt', 'application/jwt'])).toStrictEqual(
+        'application/cwt, application/jwt;q=0.9'
+      )
     })
   })
 })

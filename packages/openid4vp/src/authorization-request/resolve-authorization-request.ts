@@ -1,5 +1,5 @@
 import { type CallbackContext, Oauth2Error, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import z from 'zod'
 import {
   type ParsedClientIdentifier,
@@ -38,7 +38,20 @@ export interface ResolveOpenid4vpAuthorizationRequestOptions {
    */
   responseMode: ExpectedResponseMode
 
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'decryptJwe' | 'getX509CertificateMetadata' | 'fetch' | 'hash'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'decryptJwe' | 'getX509CertificateMetadata' | 'fetch' | 'hash'>
+
+  /**
+   * Date to verify the `exp`, `nbf` and `iat` of a signed request object against. If not provided the
+   * current date will be used.
+   */
+  now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of a signed request object.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export type ResolvedOpenid4vpAuthorizationRequest = {
@@ -80,6 +93,8 @@ export async function resolveOpenid4vpAuthorizationRequest(
       wallet,
       // For IAE/DC API only request is allowed
       allowRequestUri: options.responseMode.type === 'direct_post',
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
 
     authorizationRequestPayload = parseWithErrorHandling(
@@ -87,6 +102,10 @@ export async function resolveOpenid4vpAuthorizationRequest(
       jar.authorizationRequestPayload,
       'Invalid authorization request. Could not parse jar request payload as openid4vp auth request.'
     )
+  } else if (isOpenid4vpAuthorizationRequestDcApi(parsed)) {
+    // The wallet MUST ignore the client_id of an unsigned DC API request
+    const { client_id: _clientId, ...payloadWithoutClientId } = parsed
+    authorizationRequestPayload = payloadWithoutClientId
   } else {
     authorizationRequestPayload = parsed
   }
@@ -120,7 +139,7 @@ export async function resolveOpenid4vpAuthorizationRequest(
 
   let payloadValidationError: Oauth2ServerErrorResponseError | undefined
   try {
-    validateOpenId4vpAuthorizationRequestPayload({
+    validateAuthorizationRequestPayloadForResponseMode({
       authorizationRequestPayload,
       wallet,
       jar: jar !== undefined,
@@ -224,7 +243,7 @@ type ExpectedResponseMode =
       type: 'direct_post'
     }
 
-function validateOpenId4vpAuthorizationRequestPayload(options: {
+function validateAuthorizationRequestPayloadForResponseMode(options: {
   authorizationRequestPayload: Openid4vpAuthorizationRequestPayload
   wallet?: WalletVerificationOptions
   jar: boolean

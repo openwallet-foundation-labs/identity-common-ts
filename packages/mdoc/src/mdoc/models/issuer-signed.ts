@@ -10,13 +10,13 @@ import type { Namespace } from './namespace'
 
 // 18013-5 8.3.2.1.2.2: `nameSpaces` is optional, and left out when no issuer-signed element is
 // disclosed, as `IssuerNameSpaces` must have at least one namespace.
-const issuerSignedSchema = typedMap([
+const zIssuerSigned = typedMap([
   ['nameSpaces', z.instanceof(IssuerNamespaces).exactOptional()],
   ['issuerAuth', z.instanceof(IssuerAuth)],
 ])
 
-export type IssuerSignedDecodedStructure = z.output<typeof issuerSignedSchema>
-export type IssuerSignedEncodedStructure = z.input<typeof issuerSignedSchema>
+export type IssuerSignedDecodedStructure = z.output<typeof zIssuerSigned>
+export type IssuerSignedEncodedStructure = z.input<typeof zIssuerSigned>
 
 export type IssuerSignedOptions = {
   issuerNamespaces?: IssuerNamespaces
@@ -27,7 +27,7 @@ export type IssuerSignedVerificationResult = IssuerAuthVerificationResult
 
 export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, IssuerSignedDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(issuerSignedSchema.in, issuerSignedSchema.out, {
+    return z.codec(zIssuerSigned.in, zIssuerSigned.out, {
       decode: (input) => {
         const map: IssuerSignedDecodedStructure = TypedMap.fromMap(input)
 

@@ -1,9 +1,7 @@
-import { ContentType, createFetcher, type Fetch, isJwtTyp, zHttpsUrl } from '@openid4vc/utils'
+import { ContentType, createFetcher, type Fetch, zHttpsUrl } from '@openid4vc/utils'
+import { createAcceptHeader, zTyp } from '@owf/identity-common'
+import { decodeJwt, type JwsSigner, type JwsSignerWithJwk, verifyJwt, zCompactJwe, zCompactJwt } from '@owf/jose'
 import type { CallbackContext } from '../../callbacks'
-import { decodeJwt } from '../../common/jwt/decode-jwt'
-import { verifyJwt } from '../../common/jwt/verify-jwt'
-import { zCompactJwe } from '../../common/jwt/z-jwe'
-import { type JwtSigner, type JwtSignerWithJwk, zCompactJwt } from '../../common/jwt/z-jwt'
 import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
 import { Oauth2ServerErrorResponseError } from '../../error/Oauth2ServerErrorResponseError'
 import { type JarAuthorizationRequest, validateJarRequestParams } from '../z-jar-authorization-request'
@@ -33,8 +31,21 @@ export interface VerifyJarRequestOptions {
     client_id?: string
   }
   authorizationRequestJwt: string
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
-  jwtSigner: JwtSigner
+  callbacks: Pick<CallbackContext, 'verifyJws'>
+  jwtSigner: JwsSigner
+
+  /**
+   * Date to verify the `exp`, `nbf` and `iat` of the request object against. If not provided the
+   * current date will be used.
+   */
+  now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export interface ParsedJarRequest {
@@ -44,7 +55,7 @@ export interface ParsedJarRequest {
 
 export interface VerifiedJarRequest {
   authorizationRequestPayload: JarRequestObjectPayload
-  signer: JwtSignerWithJwk
+  signer: JwsSignerWithJwk
   jwt: ReturnType<typeof decodeJwt<undefined, typeof zJarRequestObjectPayload>>
 }
 /**
@@ -84,7 +95,7 @@ export async function parseJarRequest(options: ParsedJarRequestOptions): Promise
  * @returns The verified authorization request parameters and metadata
  */
 export async function verifyJarRequest(options: VerifyJarRequestOptions): Promise<VerifiedJarRequest> {
-  const { jarRequestParams, authorizationRequestJwt, callbacks, jwtSigner } = options
+  const { jarRequestParams, authorizationRequestJwt, callbacks, jwtSigner, now, allowedSkewInSeconds } = options
 
   /* Encryption is not supported */
   const requestObjectIsEncrypted = zCompactJwe.safeParse(authorizationRequestJwt).success
@@ -107,6 +118,8 @@ export async function verifyJarRequest(options: VerifyJarRequestOptions): Promis
     authorizationRequestJwt,
     callbacks,
     jwtSigner,
+    now,
+    allowedSkewInSeconds,
   })
   if (!authorizationRequestPayload.client_id) {
     throw new Oauth2ServerErrorResponseError({
@@ -143,7 +156,7 @@ async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetc
   const response = await createFetcher(fetch)(requestUri, {
     method: 'get',
     headers: {
-      Accept: `${ContentType.OAuthAuthorizationRequestJwt}, ${ContentType.Jwt};q=0.9, text/plain`,
+      Accept: createAcceptHeader([ContentType.OauthAuthorizationRequestJwt, ContentType.Jwt, 'text/plain']),
       'Content-Type': ContentType.XWwwFormUrlencoded,
     },
   }).catch(() => {
@@ -163,29 +176,29 @@ async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetc
   return await response.text()
 }
 
+const zJarRequestObjectTyp = zTyp(signedAuthorizationRequestJwtHeaderTyp, jwtAuthorizationRequestJwtHeaderTyp)
+
 async function verifyJarRequestObject(options: {
   authorizationRequestJwt: string
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
-  jwtSigner: JwtSigner
+  callbacks: Pick<CallbackContext, 'verifyJws'>
+  jwtSigner: JwsSigner
+  now?: Date
+  allowedSkewInSeconds?: number
 }) {
-  const { authorizationRequestJwt, callbacks, jwtSigner } = options
+  const { authorizationRequestJwt, callbacks, jwtSigner, now, allowedSkewInSeconds } = options
 
   const jwt = decodeJwt({ jwt: authorizationRequestJwt, payloadSchema: zJarRequestObjectPayload })
 
   const { signer } = await verifyJwt({
-    verifyJwtCallback: callbacks.verifyJwt,
-    compact: authorizationRequestJwt,
-    header: jwt.header,
-    payload: jwt.payload,
-
+    verifyJwsCallback: callbacks.verifyJws,
+    jwt,
     signer: jwtSigner,
+    now,
+    skewSeconds: allowedSkewInSeconds,
   })
 
   // Some existing deployments may alternatively be using both type
-  if (
-    !isJwtTyp(jwt.header.typ, signedAuthorizationRequestJwtHeaderTyp) &&
-    !isJwtTyp(jwt.header.typ, jwtAuthorizationRequestJwtHeaderTyp)
-  ) {
+  if (!zJarRequestObjectTyp.safeParse(jwt.header.typ).success) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequestObject,
       error_description: `Invalid Jar Request Object typ header. Expected "oauth-authz-req+jwt" or "jwt", received "${jwt.header.typ}".`,

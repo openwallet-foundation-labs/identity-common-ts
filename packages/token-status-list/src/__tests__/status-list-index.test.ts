@@ -1,16 +1,12 @@
-import { sha256 } from '@noble/hashes/sha2.js'
 import { describe, expect, it } from 'vitest'
 import {
   createStatusListIndexAllocator,
   StatusListIndexAllocator,
   type StatusListIndexAllocatorContext,
 } from '../status-list-index'
+import { hasher } from './context'
 
-const textEncoder = new TextEncoder()
-
-const ctx: StatusListIndexAllocatorContext = {
-  hasher: (data) => sha256(typeof data === 'string' ? textEncoder.encode(data) : new Uint8Array(data)),
-}
+const ctx: StatusListIndexAllocatorContext = { hasher }
 
 describe('StatusListIndexAllocator', () => {
   const seed = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])
@@ -35,6 +31,31 @@ describe('StatusListIndexAllocator', () => {
     expect(firstIndex).not.toBe(restored.next())
     expect(restored.remaining()).toBe(8)
   })
+
+  // Positions already handed out must keep mapping to the same index, or new indices collide with
+  // ones already assigned
+  it.each([
+    { seed: [1, 2, 3, 4, 5, 6, 7, 8], length: 10, indices: [2, 0, 5, 1, 7, 4, 3, 8, 9, 6] },
+    { seed: [1, 2, 3, 4, 5, 6, 7, 8], length: 1000, indices: [396, 365, 221, 318, 120, 833, 902, 977, 246, 312] },
+    {
+      seed: [1, 2, 3, 4, 5, 6, 7, 8],
+      length: 1_000_000,
+      indices: [258266, 648531, 107355, 686438, 640297, 355102, 137710, 262922, 509290, 18266],
+    },
+    { seed: Array.from({ length: 32 }, (_, i) => i), length: 10, indices: [1, 9, 2, 5, 0, 8, 6, 3, 4, 7] },
+    {
+      seed: Array.from({ length: 32 }, (_, i) => i),
+      length: 1000,
+      indices: [460, 13, 901, 861, 5, 666, 151, 375, 88, 604],
+    },
+  ])(
+    'matches the test vector for a $seed.length byte seed and a list of $length',
+    async ({ seed, length, indices }) => {
+      const allocator = await createStatusListIndexAllocator({ length, seed: new Uint8Array(seed) }, ctx)
+
+      expect(indices.map(() => allocator.next())).toEqual(indices)
+    }
+  )
 
   it('throws when exhausted', async () => {
     const allocator = await createStatusListIndexAllocator({ length: 1, seed }, ctx)

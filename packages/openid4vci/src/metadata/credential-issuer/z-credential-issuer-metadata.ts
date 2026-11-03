@@ -1,10 +1,11 @@
-import {
-  fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray,
-  jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray,
-  zAlgValueNotNone,
-  zJwk,
-} from '@openid4vc/oauth2'
 import { type InferOutputUnion, type Simplify, zDataUrl, zHttpsUrl } from '@openid4vc/utils'
+import { addValidationIssue, unionParams, zNonEmptyString, zodErrorMap } from '@owf/identity-common'
+import {
+  coseAlgorithmsToJwaSignatureAlgorithms,
+  jwaSignatureAlgorithmsToCoseAlgorithms,
+  zJweAlg,
+  zJwk,
+} from '@owf/jose'
 import z from 'zod'
 import {
   type CredentialFormatIdentifier,
@@ -68,6 +69,11 @@ const allCredentialIssuerMetadataFormats = [
   zLdpVcCredentialIssuerMetadataDraft14,
   zJwtVcJsonCredentialIssuerMetadataDraft14,
 ] as const
+
+// The issues of a nested parse are passed on as they are. Parse like `parseWithSchema`, so they
+// have its messages and the input that tells a `missing_value` from an `invalid_type`.
+const nestedParseParams = { reportInput: true, error: zodErrorMap }
+
 type CredentialIssuerMetadataFormatValidator = (typeof allCredentialIssuerMetadataFormats)[number]
 export const allCredentialIssuerMetadataFormatIdentifiers = allCredentialIssuerMetadataFormats.map(
   (format) => format.shape.format.value
@@ -98,19 +104,13 @@ export const zCredentialConfigurationSupportedWithFormats = z
             )
           : validators[0]
       )
-      .safeParse(data)
+      .safeParse(data, nestedParseParams)
 
     if (result.success) {
       return result.data as Simplify<typeof result.data & typeof data>
     }
 
-    for (const issue of result.error.issues) {
-      // FIXME: this worked with zod 3
-      ctx.addIssue({
-        ...issue,
-        code: issue.code as 'custom',
-      })
-    }
+    for (const issue of result.error.issues) ctx.addIssue({ ...issue })
 
     return z.NEVER
   })
@@ -141,8 +141,8 @@ const zCredentialIssuerMetadataDisplayEntry = z
 export type CredentialIssuerMetadataDisplayEntry = z.infer<typeof zCredentialIssuerMetadataDisplayEntry>
 
 export const zCredentialRequestEncryptionJwk = zJwk.extend({
-  kid: z.string().min(1),
-  alg: zAlgValueNotNone.min(1),
+  kid: zNonEmptyString,
+  alg: zJweAlg,
 })
 export type CredentialRequestEncryptionJwk = z.infer<typeof zCredentialRequestEncryptionJwk>
 
@@ -177,8 +177,8 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
             const keyIds = new Set<string>()
             for (const [index, key] of keys.entries()) {
               if (keyIds.has(key.kid)) {
-                ctx.addIssue({
-                  code: 'custom',
+                addValidationIssue(ctx, {
+                  code: 'invalid_value',
                   message: `Duplicate JWK kid '${key.kid}'`,
                   path: ['keys', index, 'kid'],
                 })
@@ -210,7 +210,7 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
 export const zCredentialConfigurationSupportedDraft11ToV1 = z
   .object({
     id: z.string().optional(),
-    format: z.string(),
+    format: zNonEmptyString,
     cryptographic_suites_supported: z.array(z.string()).optional(),
     display: z
       .array(
@@ -246,7 +246,7 @@ export const zCredentialConfigurationSupportedDraft11ToV1 = z
           credential_signing_alg_values_supported:
             // For mso_mdoc, transform JWA signature algorithm strings to fully-specified COSE algorithm numbers
             format === zMsoMdocFormatIdentifier.value
-              ? jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray(cryptographic_suites_supported)
+              ? jwaSignatureAlgorithmsToCoseAlgorithms(cryptographic_suites_supported)
               : cryptographic_suites_supported,
         }
       : {}),
@@ -296,15 +296,9 @@ export const zCredentialConfigurationSupportedDraft11ToV1 = z
     if (!Object.keys(formatSpecificTransformations).includes(data.format)) return data
 
     const schema = formatSpecificTransformations[data.format as keyof typeof formatSpecificTransformations]
-    const result = schema.safeParse(data)
+    const result = schema.safeParse(data, nestedParseParams)
     if (result.success) return result.data
-    for (const issue of result.error.issues) {
-      // FIXME: this worked with zod 3
-      ctx.addIssue({
-        ...issue,
-        code: issue.code as 'custom',
-      })
-    }
+    for (const issue of result.error.issues) ctx.addIssue({ ...issue })
     return z.NEVER
   })
   .pipe(zCredentialConfigurationSupportedWithFormats)
@@ -321,13 +315,13 @@ const zCredentialConfigurationSupportedV1ToDraft15 = zCredentialConfigurationSup
 // Ignores unknown formats
 const zCredentialConfigurationSupportedV1ToDraft11 = zCredentialConfigurationSupportedV1ToDraft15
   .transform((configuration, ctx) => {
+    // The id is the key of the credential configuration (see zCredentialIssuerMetadataWithDraft11), so only an empty one is missing
     if (!configuration.id || typeof configuration.id !== 'string') {
-      ctx.addIssue({
-        code: 'invalid_type',
-        expected: 'string',
-        input: configuration.id,
+      addValidationIssue(ctx, {
+        code: 'missing_value',
         path: ['id'],
         message: 'Missing required id field',
+        context: { expected: 'string' },
       })
       return z.NEVER
     }
@@ -359,9 +353,7 @@ const zCredentialConfigurationSupportedV1ToDraft11 = zCredentialConfigurationSup
               // For mso_mdoc, transform fully-specified COSE algorithm numbers to JWA signature algorithm strings
               format === zMsoMdocFormatIdentifier.value &&
               typeof credential_signing_alg_values_supported[0] === 'number'
-                ? fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray(
-                    credential_signing_alg_values_supported as number[]
-                  )
+                ? coseAlgorithmsToJwaSignatureAlgorithms(credential_signing_alg_values_supported as number[])
                 : credential_signing_alg_values_supported,
           }
         : {}),
@@ -393,18 +385,18 @@ const zCredentialConfigurationSupportedV1ToDraft11 = zCredentialConfigurationSup
       // has a transformation it NEEDS to use the format specific transformation, and otherwise we fall back to the common validation
       z
         .object({
-          format: z
-            .string()
-            .refine(
-              (input) =>
-                !(
-                  [
-                    zLdpVcFormatIdentifier.value,
-                    zJwtVcJsonFormatIdentifier.value,
-                    zJwtVcJsonLdFormatIdentifier.value,
-                  ] as string[]
-                ).includes(input)
-            ),
+          format: zNonEmptyString.superRefine((format, ctx) => {
+            const transformed: string[] = [
+              zLdpVcFormatIdentifier.value,
+              zJwtVcJsonFormatIdentifier.value,
+              zJwtVcJsonLdFormatIdentifier.value,
+            ]
+            if (!transformed.includes(format)) return
+            addValidationIssue(ctx, {
+              code: 'invalid_value',
+              message: `A credential configuration with format '${format}' must match the schema of that format`,
+            })
+          }),
         })
         .loose(),
     ])
@@ -473,58 +465,64 @@ export const zCredentialIssuerMetadataWithDraft11 = zCredentialIssuerMetadataDra
     })
   )
 
-export const zCredentialIssuerMetadata = z.union([
-  // First prioritize draft 16/15/14 (and 13)
-  zCredentialIssuerMetadataDraft14Draft15V1,
-  // Then try parsing draft 11 and transform into draft 16
-  zCredentialIssuerMetadataDraft11ToV1,
-])
+export const zCredentialIssuerMetadata = z.union(
+  [
+    // First prioritize draft 16/15/14 (and 13)
+    zCredentialIssuerMetadataDraft14Draft15V1,
+    // Then try parsing draft 11 and transform into draft 16
+    zCredentialIssuerMetadataDraft11ToV1,
+  ],
+  unionParams('Invalid credential issuer metadata', ['OpenID4VCI 1.0 or drafts 13 to 15', 'OpenID4VCI draft 11'])
+)
 
-export const zCredentialIssuerMetadataWithDraftVersion = z.union([
-  zCredentialIssuerMetadataDraft14Draft15V1.transform((credentialIssuerMetadata) => {
-    const credentialConfigurations = Object.values(credentialIssuerMetadata.credential_configurations_supported)
+export const zCredentialIssuerMetadataWithDraftVersion = z.union(
+  [
+    zCredentialIssuerMetadataDraft14Draft15V1.transform((credentialIssuerMetadata) => {
+      const credentialConfigurations = Object.values(credentialIssuerMetadata.credential_configurations_supported)
 
-    const isDraft15 = credentialConfigurations.some((configuration) => {
-      const knownConfiguration = configuration as CredentialConfigurationSupportedWithFormats
+      const isDraft15 = credentialConfigurations.some((configuration) => {
+        const knownConfiguration = configuration as CredentialConfigurationSupportedWithFormats
 
-      // Added in draft 15, it's not possible to detect with 100% guarantee
-      if (knownConfiguration.format === zSdJwtDcFormatIdentifier.value) return true
-      if (Array.isArray(knownConfiguration.claims)) return true
-      if (
-        Object.values(knownConfiguration.proof_types_supported ?? {}).some(
-          (proofType) => proofType.key_attestations_required !== undefined
+        // Added in draft 15, it's not possible to detect with 100% guarantee
+        if (knownConfiguration.format === zSdJwtDcFormatIdentifier.value) return true
+        if (Array.isArray(knownConfiguration.claims)) return true
+        if (
+          Object.values(knownConfiguration.proof_types_supported ?? {}).some(
+            (proofType) => proofType.key_attestations_required !== undefined
+          )
         )
-      )
-        return true
+          return true
 
-      // For now we assume draft 14 if we don't have any evidence it's draft 15
-      return false
-    })
+        // For now we assume draft 14 if we don't have any evidence it's draft 15
+        return false
+      })
 
-    // we assume V1 is used when we detect V1
-    const isV1 =
-      credentialIssuerMetadata.credential_request_encryption !== undefined ||
-      credentialConfigurations.some(
-        (configuration) =>
-          // Added in draft 16, but since there's no other breaking changes
-          configuration.credential_metadata ||
-          // Was changed to COSE algorithms in Draft 16 (which we detect as v1)
-          (configuration.format === 'mso_mdoc' &&
-            configuration.credential_signing_alg_values_supported?.some((supported) => typeof supported === 'number'))
-      )
+      // we assume V1 is used when we detect V1
+      const isV1 =
+        credentialIssuerMetadata.credential_request_encryption !== undefined ||
+        credentialConfigurations.some(
+          (configuration) =>
+            // Added in draft 16, but since there's no other breaking changes
+            configuration.credential_metadata ||
+            // Was changed to COSE algorithms in Draft 16 (which we detect as v1)
+            (configuration.format === 'mso_mdoc' &&
+              configuration.credential_signing_alg_values_supported?.some((supported) => typeof supported === 'number'))
+        )
 
-    return {
+      return {
+        credentialIssuerMetadata,
+        originalDraftVersion: isV1
+          ? Openid4vciVersion.V1
+          : isDraft15
+            ? Openid4vciVersion.Draft15
+            : Openid4vciVersion.Draft14,
+      }
+    }),
+    // Then try parsing draft 11 and transform into draft 16
+    zCredentialIssuerMetadataDraft11ToV1.transform((credentialIssuerMetadata) => ({
       credentialIssuerMetadata,
-      originalDraftVersion: isV1
-        ? Openid4vciVersion.V1
-        : isDraft15
-          ? Openid4vciVersion.Draft15
-          : Openid4vciVersion.Draft14,
-    }
-  }),
-  // Then try parsing draft 11 and transform into draft 16
-  zCredentialIssuerMetadataDraft11ToV1.transform((credentialIssuerMetadata) => ({
-    credentialIssuerMetadata,
-    originalDraftVersion: Openid4vciVersion.Draft11,
-  })),
-])
+      originalDraftVersion: Openid4vciVersion.Draft11,
+    })),
+  ],
+  unionParams('Invalid credential issuer metadata', ['OpenID4VCI 1.0 or drafts 13 to 15', 'OpenID4VCI draft 11'])
+)

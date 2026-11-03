@@ -1,7 +1,6 @@
+import { decodeJwt, verifyJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import { extractJwkFromJwksForJwt } from '../common/jwk/jwks'
-import { decodeJwt } from '../common/jwt/decode-jwt'
-import { verifyJwt } from '../common/jwt/verify-jwt'
 import { Oauth2Error } from '../error/Oauth2Error'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
 import { fetchJwks } from '../metadata/fetch-jwks-uri'
@@ -21,12 +20,19 @@ export interface VerifyJwtProfileAccessTokenOptions {
   /**
    * Callbacks used for verifying the access token
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'fetch' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'fetch' | 'getJwks'>
 
   /**
    * If not provided current time will be used
    */
   now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 
   /**
    * Identifier of the resource server
@@ -43,9 +49,9 @@ export interface VerifyJwtProfileAccessTokenOptions {
  * Verify an access token as a JWT Profile access token.
  *
  * @throws {@link ValidationError} if the JWT header or payload does not align with JWT Profile rules
- * @throws {@link Oauth2JwtParseError} if the jwt is not a valid jwt format, or the jwt header/payload cannot be parsed as JSON
- * @throws {@link Oauth2JwtVerificationError} if the JWT verification fails (signature or nbf/exp)
- * @throws {@link Oauth2JwtVerificationError} if the JWT verification fails (signature or nbf/exp)
+ * @throws {@link JoseParseError} if the jwt is not a valid jwt format, or the jwt header/payload cannot be parsed as JSON
+ * @throws {@link JoseVerificationError} if the signature does not verify
+ * @throws {@link JoseValidationError} if a claim does not verify, e.g. an expired token or one for another audience
  */
 export async function verifyJwtProfileAccessToken(options: VerifyJwtProfileAccessTokenOptions) {
   const decodedJwt = decodeJwt({
@@ -77,13 +83,12 @@ export async function verifyJwtProfileAccessToken(options: VerifyJwtProfileAcces
   })
 
   await verifyJwt({
-    compact: options.accessToken,
-    header: decodedJwt.header,
-    payload: decodedJwt.payload,
+    jwt: decodedJwt,
     signer: { method: 'jwk', publicJwk, alg: decodedJwt.header.alg },
-    verifyJwtCallback: options.callbacks.verifyJwt,
+    verifyJwsCallback: options.callbacks.verifyJws,
     errorMessage: 'Error during verification of access token jwt.',
     now: options.now,
+    skewSeconds: options.allowedSkewInSeconds,
     expectedAudience: options.resourceServer,
   })
 

@@ -1,6 +1,6 @@
 {
   "name": "dcql",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Digital Credentials Query Language (DCQL)",
   "files": [
     "dist"
@@ -50,6 +50,7 @@
     "build": "tsdown src/index.ts --format esm --dts --sourcemap"
   },
   "dependencies": {
-    "valibot": "^1.4.2"
+    "@owf/identity-common": "workspace:^",
+    "zod": "catalog:"
   }
 }

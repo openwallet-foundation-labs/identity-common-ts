@@ -1,8 +1,8 @@
 import type { EntityConfigurationClaims } from '../entityConfiguration'
-import { entityConfigurationJwtSchema } from '../entityConfiguration/entityConfigurationJwt'
+import { zEntityConfigurationJwt } from '../entityConfiguration/entityConfigurationJwt'
 import type { EntityStatementChain, EntityStatementClaims } from '../entityStatement'
-import { entityStatementJwtSchema } from '../entityStatement/entityStatementJwt'
-import { OpenIdFederationError } from '../error/OpenIdFederationError'
+import { zEntityStatementJwt } from '../entityStatement/entityStatementJwt'
+import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import type { JsonWebKeySetOptions } from '../jsonWeb'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
@@ -119,7 +119,7 @@ type FetchedEntityConfiguration = { jwt: string; claims: EntityConfigurationClai
 
 const ENTITY_STATEMENT_CONTENT_TYPE = 'application/entity-statement+jwt'
 
-const fail = (message: string) => new OpenIdFederationError(PolicyErrorStage.Validation, message)
+const fail = (message: string) => new OpenidFederationError(PolicyErrorStage.Validation, message)
 
 const reasonOf = (error: unknown) => (error instanceof Error && error.message ? error.message : String(error))
 
@@ -195,7 +195,7 @@ export const resolveTrustChainsWithFailures = async (
       pending = (async () => {
         const jwt = await get(addPaths(id, '.well-known', 'openid-federation'))
         const { claims } = validate({
-          schema: entityConfigurationJwtSchema,
+          schema: zEntityConfigurationJwt,
           data: jwt,
           errorMessage: `entity configuration of '${id}' is invalid`,
         })
@@ -288,7 +288,7 @@ export const resolveTrustChainsWithFailures = async (
 
       const jwt = await get(fetchEndpoint, { sub: subject.claims.sub })
       const { claims } = validate({
-        schema: entityStatementJwtSchema,
+        schema: zEntityStatementJwt,
         data: jwt,
         errorMessage: `subordinate statement about '${subject.claims.sub}' issued by '${superior.claims.sub}' is invalid`,
       })

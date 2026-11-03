@@ -1,7 +1,6 @@
-import { type CallbackContext, HashAlgorithm } from '../../callbacks'
+import { extractJwkFromJwkSet, type Jwk, type JwkSet, isJwkInSet as joseIsJwkInSet } from '@owf/jose'
+import type { CallbackContext } from '../../callbacks'
 import { Oauth2Error } from '../../error/Oauth2Error'
-import { calculateJwkThumbprint } from './jwk-thumbprint'
-import type { Jwk, JwkSet } from './z-jwk'
 
 interface ExtractJwkFromJwksForJwtOptions {
   kid?: string
@@ -14,27 +13,20 @@ interface ExtractJwkFromJwksForJwtOptions {
 }
 
 /**
- *
- * @param header
- * @param jwks
+ * Selects the key to use from a JWK Set: the key with the given `kid`, or the only key that is
+ * usable for `use` when no `kid` was given.
  */
-export function extractJwkFromJwksForJwt(options: ExtractJwkFromJwksForJwtOptions) {
-  const jwksForUse = options.jwks.keys.filter(({ use }) => !use || use === options.use)
-  const jwkForKid = options.kid ? jwksForUse.find(({ kid }) => kid === options.kid) : undefined
-
-  if (jwkForKid) {
-    return jwkForKid
+export function extractJwkFromJwksForJwt(options: ExtractJwkFromJwksForJwtOptions): Jwk {
+  try {
+    return extractJwkFromJwkSet(options)
+  } catch (error) {
+    throw new Oauth2Error(error instanceof Error ? error.message : 'Unable to extract jwk from jwks', { cause: error })
   }
-
-  if (jwksForUse.length === 1) {
-    return jwksForUse[0]
-  }
-
-  throw new Oauth2Error(
-    `Unable to extract jwk from jwks for use '${options.use}'${options.kid ? `with kid '${options.kid}'.` : '. No kid provided and more than jwk.'}`
-  )
 }
 
+/**
+ * Whether `jwk` is one of `jwks`, compared by JWK thumbprint.
+ */
 export async function isJwkInSet({
   jwk,
   jwks,
@@ -44,21 +36,5 @@ export async function isJwkInSet({
   jwks: Jwk[]
   callbacks: Pick<CallbackContext, 'hash'>
 }) {
-  const jwkThumbprint = await calculateJwkThumbprint({
-    hashAlgorithm: HashAlgorithm.Sha256,
-    hashCallback: callbacks.hash,
-    jwk,
-  })
-
-  for (const jwkFromSet of jwks) {
-    const jwkFromSetThumbprint = await calculateJwkThumbprint({
-      hashAlgorithm: HashAlgorithm.Sha256,
-      hashCallback: callbacks.hash,
-      jwk: jwkFromSet,
-    })
-
-    if (jwkFromSetThumbprint === jwkThumbprint) return true
-  }
-
-  return false
+  return await joseIsJwkInSet({ jwk, jwks, hashCallback: callbacks.hash })
 }

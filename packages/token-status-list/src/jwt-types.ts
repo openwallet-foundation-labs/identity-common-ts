@@ -13,7 +13,7 @@ export const JWT_STATUS_LIST_TYPE = 'statuslist+jwt'
  * JWT claim names for Status List
  * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-14.1
  */
-export const JWTClaimNames = {
+export const JwtClaimNames = {
   STATUS: 'status',
   STATUS_LIST: 'status_list',
   TTL: 'ttl',
@@ -27,7 +27,7 @@ export const JWTClaimNames = {
 /**
  * Payload for a JWT with a status reference.
  */
-export interface JWTwithStatusListPayload extends JwtPayload {
+export interface JwtWithStatusListPayload extends JwtPayload {
   status: {
     status_list: StatusListEntry
   }
@@ -36,7 +36,7 @@ export interface JWTwithStatusListPayload extends JwtPayload {
 /**
  * Payload for a Status List JWT.
  */
-export interface StatusListJWTPayload extends JwtPayload {
+export interface StatusListJwtPayload extends JwtPayload {
   ttl?: number
   status_list: {
     bits: BitsPerStatus
@@ -47,7 +47,7 @@ export interface StatusListJWTPayload extends JwtPayload {
 /**
  * Header parameters for a JWT Status List Token.
  */
-export type StatusListJWTHeaderParameters = {
+export type StatusListJwtHeaderParameters = {
   alg: string
   typ: typeof JWT_STATUS_LIST_TYPE
   [key: string]: unknown

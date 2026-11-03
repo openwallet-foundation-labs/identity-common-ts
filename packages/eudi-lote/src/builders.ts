@@ -1,7 +1,8 @@
-import { LoTEException } from './lote-exception'
-import { TrustedEntitySchema, TrustedEntityServiceSchema } from './schemas'
+import { parseWithSchema } from '@owf/identity-common'
+import { LoteValidationError } from './lote-error'
+import { zTrustedEntity, zTrustedEntityService } from './schemas'
 import type {
-  JWKPublicKey,
+  JwkPublicKey,
   PostalAddress,
   ServiceHistoryInstance,
   ServiceInformation,
@@ -9,6 +10,7 @@ import type {
   TrustedEntityInformation,
   TrustedEntityService,
 } from './types'
+import { LOTE_VALIDATION_CODES } from './validator'
 
 /**
  * Builder for creating TrustedEntity objects with a fluent API
@@ -107,14 +109,17 @@ export class TrustedEntityBuilder {
    * Build the TrustedEntity object
    */
   build(): TrustedEntity {
-    const result = TrustedEntitySchema.safeParse({
-      TrustedEntityInformation: this.info,
-      TrustedEntityServices: this.services,
-    })
+    const result = parseWithSchema(
+      zTrustedEntity,
+      {
+        TrustedEntityInformation: this.info,
+        TrustedEntityServices: this.services,
+      },
+      { codes: LOTE_VALIDATION_CODES }
+    )
 
     if (!result.success) {
-      const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-      throw new LoTEException(`Invalid TrustedEntity:\n${messages}`)
+      throw new LoteValidationError('Invalid TrustedEntity', result.issues)
     }
 
     return result.data
@@ -181,7 +186,7 @@ export class ServiceBuilder {
   /**
    * Add an X.509 Subject Key Identifier (base64-encoded) to the digital identity
    */
-  addX509SKI(ski: string): this {
+  addX509Ski(ski: string): this {
     this.info.ServiceDigitalIdentity = this.info.ServiceDigitalIdentity ?? {}
     this.info.ServiceDigitalIdentity.X509SKIs = this.info.ServiceDigitalIdentity.X509SKIs ?? []
     this.info.ServiceDigitalIdentity.X509SKIs.push(ski)
@@ -201,7 +206,7 @@ export class ServiceBuilder {
   /**
    * Add a public key (JWK) to the digital identity
    */
-  addPublicKey(jwk: JWKPublicKey): this {
+  addPublicKey(jwk: JwkPublicKey): this {
     this.info.ServiceDigitalIdentity = this.info.ServiceDigitalIdentity ?? {}
     this.info.ServiceDigitalIdentity.PublicKeyValues = this.info.ServiceDigitalIdentity.PublicKeyValues ?? []
     this.info.ServiceDigitalIdentity.PublicKeyValues.push(jwk)
@@ -209,11 +214,16 @@ export class ServiceBuilder {
   }
 
   /**
-   * Add a service endpoint
+   * Add a service endpoint (service supply point): `addEndpoint(uri)` for a bare
+   * `{ uriValue }`, as the EC PID and wallet lists use, or `addEndpoint(type, uri)`.
    */
-  addEndpoint(type: string, uri: string): this {
+  addEndpoint(uri: string): this
+  addEndpoint(type: string | undefined, uri: string): this
+  addEndpoint(...args: [string] | [string | undefined, string]): this {
+    // On the number of arguments, so a JavaScript call addEndpoint(type, undefined) keeps its type
+    const [type, uriValue] = args.length === 1 ? [undefined, args[0]] : args
     this.info.ServiceSupplyPoints = this.info.ServiceSupplyPoints ?? []
-    this.info.ServiceSupplyPoints.push({ ServiceType: type, uriValue: uri })
+    this.info.ServiceSupplyPoints.push(type === undefined ? { uriValue } : { ServiceType: type, uriValue })
     return this
   }
 
@@ -255,11 +265,10 @@ export class ServiceBuilder {
       data.ServiceHistory = this.history
     }
 
-    const result = TrustedEntityServiceSchema.safeParse(data)
+    const result = parseWithSchema(zTrustedEntityService, data, { codes: LOTE_VALIDATION_CODES })
 
     if (!result.success) {
-      const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-      throw new LoTEException(`Invalid TrustedEntityService:\n${messages}`)
+      throw new LoteValidationError('Invalid TrustedEntityService', result.issues)
     }
 
     return result.data

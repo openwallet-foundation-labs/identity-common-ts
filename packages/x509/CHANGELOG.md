@@ -1,5 +1,25 @@
 # @owf/x509
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies [23f227b]
+  - @owf/identity-common@0.7.0
+
+## 0.6.2
+
+### Patch Changes
+
+- @owf/identity-common@0.6.2
+
+## 0.6.1
+
+### Patch Changes
+
+- Updated dependencies [bf9b7c8]
+  - @owf/identity-common@0.6.1
+
 ## 0.6.0
 
 ### Patch Changes

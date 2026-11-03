@@ -25,6 +25,17 @@ export const extractMediaType = (contentType: string | undefined | null): string
 }
 
 /**
+ * Whether `value` is the JOSE `typ` (or `cty`) `typ`: in any casing, and with an optional
+ * `application/` prefix. A `typ` has no parameters, so `kb+jwt; charset=utf-8` does not match.
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc7515#section-4.1.9
+ */
+export const isJwtTyp = (value: unknown, typ: string): boolean => {
+  const normalize = (type: string) => type.toLowerCase().replace(/^application\//, '')
+  return typeof value === 'string' && normalize(value) === normalize(typ)
+}
+
+/**
  * Compare a `Content-Type` header value against one or more expected media types,
  * ignoring casing and any parameters on either side.
  *
@@ -45,26 +56,17 @@ export const isMediaType = (
 }
 
 /**
- * Normalize a JOSE `typ` value to a media type.
+ * Create an `Accept` header value that asks for `mediaTypes` in order of preference. The order of
+ * the values alone expresses no preference ({@link https://www.rfc-editor.org/rfc/rfc9110.html#section-12.5.1 | RFC 9110}),
+ * so every media type after the first gets a lower quality value, down to `q=0.1`, which keeps all
+ * of them acceptable. Duplicates are dropped.
  *
- * RFC 7515 §4.1.9 requires recipients to treat a `typ` value without `/` as if
- * `application/` were prepended.
+ * @example
+ * ```ts
+ * createAcceptHeader(['application/jwt', 'application/json']) // 'application/jwt, application/json;q=0.9'
+ * ```
  */
-export const normalizeJoseTyp = (typ: string): string => {
-  const mediaType = typ.includes('/') ? typ : `application/${typ}`
-  return extractMediaType(mediaType) ?? mediaType
-}
-
-/**
- * Compare a JOSE `typ` value with one or more expected media types.
- *
- * Both short and full forms are accepted on either side, as required by
- * RFC 7515 §4.1.9.
- */
-export const isJoseTyp = (value: unknown, expected: string | ReadonlyArray<string>): boolean => {
-  if (typeof value !== 'string') return false
-
-  const normalizedValue = normalizeJoseTyp(value)
-  const expectedTypes = typeof expected === 'string' ? [expected] : expected
-  return expectedTypes.some((expectedType) => normalizeJoseTyp(expectedType) === normalizedValue)
-}
+export const createAcceptHeader = (mediaTypes: ReadonlyArray<string>): string =>
+  Array.from(new Set(mediaTypes))
+    .map((mediaType, index) => (index === 0 ? mediaType : `${mediaType};q=${Math.max(0.1, 1 - index / 10).toFixed(1)}`))
+    .join(', ')

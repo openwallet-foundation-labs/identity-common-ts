@@ -18,7 +18,7 @@ const zCertOrChain = z.union([zUint8Array, z.array(zUint8Array)])
  * The known COSE header claims (RFC 9052 Section 3.1 / RFC 9360 / RFC 9596 / the IANA COSE Header
  * Parameters registry), as `typedMap` entries.
  *
- * Exported separately from {@link coseHeaderClaimsSchema} so a profile can build on them with
+ * Exported separately from {@link zCoseHeaderClaims} so a profile can build on them with
  * {@link extendCoseHeaderClaims}.
  */
 export const coseHeaderClaimEntries = [
@@ -45,12 +45,12 @@ export const coseHeaderClaimEntries = [
  * rejected at decode for every Sign1-derived structure. Additional (unregistered or private-use)
  * labels are allowed through (`allowAdditionalKeys`).
  */
-export const coseHeaderClaimsSchema = typedMap(coseHeaderClaimEntries, {
+export const zCoseHeaderClaims = typedMap(coseHeaderClaimEntries, {
   allowAdditionalKeys: true,
   keyLabels: RegisteredCwtHeaderClaimKey,
 })
 
-export type CoseHeaderClaims = z.infer<typeof coseHeaderClaimsSchema>
+export type CoseHeaderClaims = z.infer<typeof zCoseHeaderClaims>
 
 export type ExtendedCoseHeaderClaimEntries<Entries extends EntriesBase> = ExtendedEntries<
   typeof coseHeaderClaimEntries,
@@ -97,7 +97,7 @@ type OpenIntegerKeys<T> =
 /**
  * Read/write view over a COSE header map: the typed claims above plus open access to any other
  * integer label, because COSE headers are open-ended (unregistered and private-use labels are valid).
- * The typed claims are still validated at decode by `coseHeaderClaimsSchema`; this view only governs
+ * The typed claims are still validated at decode by `zCoseHeaderClaims`; this view only governs
  * typed access.
  */
 export type CoseHeaders = OpenIntegerKeys<CoseHeaderClaims>

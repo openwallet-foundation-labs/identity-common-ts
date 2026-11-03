@@ -10,7 +10,7 @@ export {
   ACTIVE_SERVICE_STATUSES,
   ServiceStatus,
   ServiceType,
-  TSLType,
+  TslType,
 } from './constants'
 export {
   getEuLotlTrustAnchors,
@@ -32,30 +32,33 @@ export {
 } from './parse'
 export { TrustedListProfiles } from './profiles'
 export {
-  TrustedListException,
-  TrustedListParseException,
-  TrustedListSignatureException,
-} from './trusted-list-exception'
+  TrustedListError,
+  TrustedListParseError,
+  TrustedListSignatureError,
+  TrustedListValidationError,
+} from './trusted-list-error'
 export {
   type DigitalIdentity,
-  DigitalIdentitySchema,
   type ServiceHistoryInstance,
-  ServiceHistoryInstanceSchema,
   type TrustAnchor,
-  TrustAnchorSchema,
   type TrustedList,
   type TrustedListPointer,
-  TrustedListPointerSchema,
-  TrustedListSchema,
   type TrustedListService,
-  TrustedListServiceSchema,
   type TrustServiceProvider,
-  TrustServiceProviderSchema,
+  zDigitalIdentity,
+  zServiceHistoryInstance,
+  zTrustAnchor,
+  zTrustedList,
+  zTrustedListPointer,
+  zTrustedListService,
+  zTrustServiceProvider,
 } from './types'
 export {
   assertValidTrustedList,
   type ProfileRule,
-  type ValidationError,
+  TRUSTED_LIST_VALIDATION_CODES,
+  type TrustedListValidationCode,
+  type TrustedListValidationIssue,
   type ValidationResult,
   validateTrustedList,
   validateTrustedListProfile,

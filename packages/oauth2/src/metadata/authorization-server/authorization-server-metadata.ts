@@ -1,11 +1,12 @@
-import { type Fetch, joinUriParts, OpenId4VcBaseError, parseWithErrorHandling, URL } from '@openid4vc/utils'
+import { type Fetch, joinUriParts, URL } from '@openid4vc/utils'
+import { IdentityError, parseWithErrorHandling } from '@owf/identity-common'
 import type { CallbackContext } from '../../callbacks'
 import { Oauth2Error } from '../../error/Oauth2Error'
 import { fetchWellKnownMetadata } from '../fetch-well-known-metadata'
 import { type AuthorizationServerMetadata, zAuthorizationServerMetadata } from './z-authorization-server-metadata'
 
 const wellKnownAuthorizationServerSuffix = '.well-known/oauth-authorization-server'
-const wellKnownOpenIdConfigurationServerSuffix = '.well-known/openid-configuration'
+const wellKnownOpenidConfigurationServerSuffix = '.well-known/openid-configuration'
 
 /**
  * fetch authorization server metadata. It first tries to fetch the oauth-authorization-server metadata. If that returns
@@ -46,7 +47,7 @@ export async function fetchAuthorizationServerMetadata(
   const fetch = callbacks?.fetch
   const parsedIssuerUrl = new URL(issuer)
 
-  const openIdConfigurationWellKnownMetadataUrl = joinUriParts(issuer, [wellKnownOpenIdConfigurationServerSuffix])
+  const openidConfigurationWellKnownMetadataUrl = joinUriParts(issuer, [wellKnownOpenidConfigurationServerSuffix])
   const authorizationServerWellKnownMetadataUrl = joinUriParts(parsedIssuerUrl.origin, [
     wellKnownAuthorizationServerSuffix,
     parsedIssuerUrl.pathname,
@@ -68,7 +69,9 @@ export async function fetchAuthorizationServerMetadata(
       fetch,
     }
   ).catch((error) => {
-    if (error instanceof OpenId4VcBaseError) throw error
+    // A library error, such as invalid metadata (a `ValidationError`) or an error response, is thrown.
+    // `ValidationError` is not an `Openid4vcBaseError`, so `IdentityError` is what covers both.
+    if (error instanceof IdentityError) throw error
 
     // An exception occurs if a CORS-policy blocks the request, i.e. because the URL is invalid due to the legacy path being used
     // The legacy path should still be tried therefore we store the first error to rethrow it later if needed
@@ -88,13 +91,13 @@ export async function fetchAuthorizationServerMetadata(
     ).catch((error) => {
       // Similar to above, if there was a library error, we throw it.
       // However in other cases we swallow it, we only keep the first error
-      if (error instanceof OpenId4VcBaseError) throw error
+      if (error instanceof IdentityError) throw error
     })
   }
 
   if (!authorizationServerResult) {
     authorizationServerResult = await fetchWellKnownMetadata(
-      openIdConfigurationWellKnownMetadataUrl,
+      openidConfigurationWellKnownMetadataUrl,
       zAuthorizationServerMetadata,
       {
         fetch,

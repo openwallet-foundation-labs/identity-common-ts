@@ -1,10 +1,9 @@
 import crypto, { webcrypto } from 'node:crypto'
-import { decodeBase64, encodeToUtf8String } from '@openid4vc/utils'
+import { base64url, bytesToString } from '@owf/identity-common'
+import { calculateJwkThumbprint, type Jwk } from '@owf/jose'
 import * as jose from 'jose'
-import { type CallbackContext, HashAlgorithm, type SignJwtCallback, type VerifyJwtCallback } from '../callbacks'
+import type { CallbackContext, SignJwsCallback, VerifyJwsCallback } from '../callbacks'
 import { clientAuthenticationNone } from '../client-authentication'
-import { calculateJwkThumbprint } from '../common/jwk/jwk-thumbprint'
-import type { Jwk } from '../common/jwk/z-jwk'
 
 // Needed for Node 18 support with jose6. We can soon drop node18 support.
 if (process.versions.node.startsWith('18.')) {
@@ -16,45 +15,84 @@ export function parseXwwwFormUrlEncoded(text: string) {
   return Object.fromEntries(Array.from(new URLSearchParams(text).entries()))
 }
 
-export function getVerifyJwtCallback({ publicJwks }: { publicJwks?: Jwk[] } = {}): VerifyJwtCallback {
-  return async (signer, { compact, payload }) => {
-    let jwk: Jwk
-    if (signer.method === 'did') {
-      jwk = JSON.parse(encodeToUtf8String(decodeBase64(signer.didUrl.split('#')[0].replace('did:jwk:', ''))))
-    } else if (signer.method === 'jwk') {
-      jwk = signer.publicJwk
-    } else if (signer.method === 'federation') {
-      const _jwk = publicJwks?.find((jwk) => jwk.kid === signer.kid)
-      if (!_jwk) throw new Error(`No public jwk found for kid ${signer.kid}`)
-      jwk = _jwk
-    } else {
-      throw new Error('Signer method not supported')
-    }
+/**
+ * The WebCrypto parameters for the JWA algorithms these tests use. The callbacks sign and verify the
+ * signing input directly, so the signature algorithm has to be named here rather than being taken
+ * from a jwt library.
+ */
+const subtleAlgorithm = (alg: string): AlgorithmIdentifier | EcdsaParams | RsaPssParams => {
+  switch (alg) {
+    case 'ES256':
+      return { name: 'ECDSA', hash: 'SHA-256' }
+    case 'ES384':
+      return { name: 'ECDSA', hash: 'SHA-384' }
+    case 'ES512':
+      return { name: 'ECDSA', hash: 'SHA-512' }
+    case 'EdDSA':
+    case 'Ed25519':
+      return { name: 'Ed25519' }
+    case 'RS256':
+    case 'RS384':
+    case 'RS512':
+      return { name: 'RSASSA-PKCS1-v1_5' }
+    case 'PS256':
+      return { name: 'RSA-PSS', saltLength: 32 }
+    case 'PS384':
+      return { name: 'RSA-PSS', saltLength: 48 }
+    case 'PS512':
+      return { name: 'RSA-PSS', saltLength: 64 }
+    default:
+      throw new Error(`Unsupported alg '${alg}' in test callbacks`)
+  }
+}
 
-    const josePublicKey = await jose.importJWK(jwk as jose.JWK, signer.alg)
-    try {
-      await jose.jwtVerify(compact, josePublicKey, {
-        currentDate: payload.exp ? new Date((payload.exp - 300) * 1000) : undefined,
-      })
-      return {
-        verified: true,
-        signerJwk: jwk,
-      }
-    } catch (_error) {
-      return {
-        verified: false,
-      }
-    }
+/** The public jwk a signer identifies, for the signer methods these tests use. */
+function publicJwkForSigner(signer: Parameters<SignJwsCallback>[0], jwks: Jwk[]): Jwk {
+  if (signer.method === 'did') {
+    return JSON.parse(bytesToString(base64url.decode(signer.didUrl.split('#')[0].replace('did:jwk:', ''))))
+  }
+
+  if (signer.method === 'jwk') {
+    return signer.publicJwk
+  }
+
+  if (signer.method === 'federation') {
+    const jwk = jwks.find((jwk) => jwk.kid === signer.kid)
+    if (!jwk) throw new Error(`No jwk found for kid ${signer.kid}`)
+    const { d: _d, ...publicJwk } = jwk
+    return publicJwk
+  }
+
+  throw new Error('Signer method not supported')
+}
+
+export function getVerifyJwsCallback({ publicJwks }: { publicJwks?: Jwk[] } = {}): VerifyJwsCallback {
+  return async (signer, { signingInputBytes, signature }) => {
+    const jwk = publicJwkForSigner(signer, publicJwks ?? [])
+    const key = (await jose.importJWK(jwk as jose.JWK, signer.alg)) as CryptoKey
+
+    const verified = await globalThis.crypto.subtle.verify(
+      subtleAlgorithm(signer.alg),
+      key,
+      decodeBase64Url(signature),
+      signingInputBytes as Uint8Array<ArrayBuffer>
+    )
+
+    return verified ? { verified: true, signerJwk: jwk } : { verified: false }
   }
 }
 
 export const callbacks = {
-  hash: (data, alg) => crypto.createHash(alg.replace('-', '').toLowerCase()).update(data).digest(),
+  hash: (data, alg) =>
+    crypto
+      .createHash(alg.replace('-', '').toLowerCase())
+      .update(typeof data === 'string' ? data : new Uint8Array(data))
+      .digest(),
   generateRandom: (bytes) => crypto.randomBytes(bytes),
   clientAuthentication: clientAuthenticationNone({
     clientId: 'some-random-client-id',
   }),
-  verifyJwt: getVerifyJwtCallback(),
+  verifyJws: getVerifyJwsCallback(),
   encryptJwe: async (encryptor, payload) => {
     const josePublicKey = await jose.importJWK(encryptor.publicJwk as jose.JWK, encryptor.alg)
     const jwe = await new jose.CompactEncrypt(new TextEncoder().encode(payload))
@@ -69,32 +107,20 @@ export const callbacks = {
   },
 } as const satisfies Partial<CallbackContext>
 
-export const getSignJwtCallback = (privateJwks: Jwk[]): SignJwtCallback => {
-  return async (signer, { header, payload }) => {
-    let jwk: Jwk
-    if (signer.method === 'did') {
-      jwk = JSON.parse(encodeToUtf8String(decodeBase64(signer.didUrl.split('#')[0].replace('did:jwk:', ''))))
-    } else if (signer.method === 'federation') {
-      const _jwk = privateJwks.find((jwk) => jwk.kid === signer.kid)
-      if (!_jwk) throw new Error(`No private jwk found for kid ${signer.kid}`)
-      const { d, ...publicJwk } = _jwk
-      jwk = publicJwk
-    } else if (signer.method === 'jwk') {
-      jwk = signer.publicJwk
-    } else {
-      throw new Error('Signer method not supported')
-    }
+export const getSignJwsCallback = (privateJwks: Jwk[]): SignJwsCallback => {
+  return async (signer, { signingInputBytes }) => {
+    const jwk = publicJwkForSigner(signer, privateJwks)
 
     const jwkThumbprint = await calculateJwkThumbprint({
       jwk,
-      hashAlgorithm: HashAlgorithm.Sha256,
+      hashAlgorithm: 'sha-256',
       hashCallback: callbacks.hash,
     })
 
     const privateJwk = await Promise.all(
       privateJwks.map(async (jwk) =>
         (await calculateJwkThumbprint({
-          hashAlgorithm: HashAlgorithm.Sha256,
+          hashAlgorithm: 'sha-256',
           hashCallback: callbacks.hash,
           jwk,
         })) === jwkThumbprint
@@ -107,12 +133,17 @@ export const getSignJwtCallback = (privateJwks: Jwk[]): SignJwtCallback => {
       throw new Error(`No private key available for public jwk \n${JSON.stringify(jwk, null, 2)}`)
     }
 
-    const josePrivateKey = await jose.importJWK(privateJwk as jose.JWK, signer.alg)
-    const jwt = await new jose.SignJWT(payload).setProtectedHeader(header).sign(josePrivateKey)
+    const key = (await jose.importJWK(privateJwk as jose.JWK, signer.alg)) as CryptoKey
+    const signature = await globalThis.crypto.subtle.sign(
+      subtleAlgorithm(signer.alg),
+      key,
+      signingInputBytes as Uint8Array<ArrayBuffer>
+    )
 
-    return {
-      jwt: jwt,
-      signerJwk: jwk,
-    }
+    return { signature: base64url.encode(new Uint8Array(signature)), signerJwk: jwk }
   }
+}
+
+function decodeBase64Url(input: string): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(Buffer.from(input, 'base64url')) as Uint8Array<ArrayBuffer>
 }

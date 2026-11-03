@@ -1,5 +1,5 @@
 /**
- * WRPRC wire dialects
+ * Registration certificate wire dialects
  *
  * ETSI TS 119 475 v1.2.1 names the array of claim queries `claim` and the intermediary
  * common name `sname`. Both read as editorial defects that a later edition is expected to
@@ -9,12 +9,12 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
-import type { WRPRCPayload } from './types'
+import type { RegistrationCertificatePayload } from './types'
 
 /**
  * Wire dialects understood by this package.
  */
-export const WRPRC_DIALECTS = {
+export const REGISTRATION_CERTIFICATE_DIALECTS = {
   /** ETSI TS 119 475 v1.2.1 as published. The default for everything this package emits. */
   CURRENT: 'ts119475-1.2.1',
   /**
@@ -28,7 +28,8 @@ export const WRPRC_DIALECTS = {
 } as const
 
 /** A wire dialect understood by this package */
-export type WRPRCDialect = (typeof WRPRC_DIALECTS)[keyof typeof WRPRC_DIALECTS]
+export type RegistrationCertificateDialect =
+  (typeof REGISTRATION_CERTIFICATE_DIALECTS)[keyof typeof REGISTRATION_CERTIFICATE_DIALECTS]
 
 type Record_ = Record<string, unknown>
 
@@ -64,14 +65,17 @@ function mapPayload(payload: unknown, claimFrom: string, claimTo: string, nameFr
  * Accept the anticipated `claims` and `intermediary.name` spellings when parsing, so a
  * certificate from an SDK that already applies the corrections still validates.
  */
-export function normalizeWRPRCPayload(payload: unknown): unknown {
+export function normalizeRegistrationCertificatePayload(payload: unknown): unknown {
   return mapPayload(payload, 'claims', 'claim', 'name', 'sname')
 }
 
 /**
  * Serialize a canonical payload in the requested dialect.
  */
-export function toWRPRCDialect(payload: WRPRCPayload, dialect: WRPRCDialect): unknown {
-  if (dialect === WRPRC_DIALECTS.CURRENT) return payload
+export function toRegistrationCertificateDialect(
+  payload: RegistrationCertificatePayload,
+  dialect: RegistrationCertificateDialect
+): unknown {
+  if (dialect === REGISTRATION_CERTIFICATE_DIALECTS.CURRENT) return payload
   return mapPayload(payload, 'claim', 'claims', 'sname', 'name')
 }

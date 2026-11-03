@@ -1,15 +1,15 @@
-import { SchemaMetaException } from './schema-meta-exception'
-import { SchemaMetaSchema, SchemaURISchema, TrustAuthoritySchema } from './schemas'
+import { SchemaMetaError } from './schema-meta-error'
+import { zSchemaMeta, zSchemaUri, zTrustAuthority } from './schemas'
 import type {
   AttestationFormat,
-  AttestationLoS,
+  AttestationLos,
   BindingType,
   FrameworkType,
   IssuanceProfile,
   Oid4vciCredentialMetadata,
   SchemaMeta,
-  SchemaURI,
-  SchemaURIMeta,
+  SchemaUri,
+  SchemaUriMeta,
   SdJwtVcTypeMetadata,
   TrustAuthority,
 } from './types'
@@ -52,11 +52,11 @@ export class TrustAuthorityBuilder {
    * Build the TrustAuthority object
    */
   build(): TrustAuthority {
-    const result = TrustAuthoritySchema.safeParse(this.data)
+    const result = zTrustAuthority.safeParse(this.data)
 
     if (!result.success) {
       const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-      throw new SchemaMetaException(`Invalid TrustAuthority:\n${messages}`)
+      throw new SchemaMetaError(`Invalid TrustAuthority:\n${messages}`)
     }
 
     return result.data
@@ -64,9 +64,9 @@ export class TrustAuthorityBuilder {
 }
 
 /**
- * Builder for creating SchemaURI objects with a fluent API
+ * Builder for creating SchemaUri objects with a fluent API
  */
-export class SchemaURIBuilder {
+export class SchemaUriBuilder {
   private data: Record<string, unknown> = {}
 
   /**
@@ -99,7 +99,7 @@ export class SchemaURIBuilder {
    * - mso_mdoc: provide { doctype_value }
    * - other formats: provide {}
    */
-  meta(meta: SchemaURIMeta): this {
+  meta(meta: SchemaUriMeta): this {
     this.data.meta = meta
     return this
   }
@@ -110,7 +110,7 @@ export class SchemaURIBuilder {
   credentialMetadata(metadata: Oid4vciCredentialMetadata): this {
     const meta = this.data.meta as Record<string, unknown> | undefined
     if (!meta || !this.data.formatIdentifier) {
-      throw new SchemaMetaException('OID4VCI credential metadata requires format and meta first')
+      throw new SchemaMetaError('OID4VCI credential metadata requires format and meta first')
     }
 
     this.data.meta = { ...meta, credential_metadata: metadata }
@@ -121,21 +121,21 @@ export class SchemaURIBuilder {
   sdJwtVcMetadata(metadata: SdJwtVcTypeMetadata): this {
     const meta = this.data.meta as Record<string, unknown> | undefined
     if (!meta || this.data.formatIdentifier !== 'dc+sd-jwt') {
-      throw new SchemaMetaException('SD-JWT VC metadata requires dc+sd-jwt format and meta({ vct }) first')
+      throw new SchemaMetaError('SD-JWT VC metadata requires dc+sd-jwt format and meta({ vct }) first')
     }
     this.data.meta = { ...meta, sd_jwt_vc_metadata: metadata }
     return this
   }
 
   /**
-   * Build the SchemaURI object
+   * Build the SchemaUri object
    */
-  build(): SchemaURI {
-    const result = SchemaURISchema.safeParse(this.data)
+  build(): SchemaUri {
+    const result = zSchemaUri.safeParse(this.data)
 
     if (!result.success) {
       const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-      throw new SchemaMetaException(`Invalid SchemaURI:\n${messages}`)
+      throw new SchemaMetaError(`Invalid SchemaURI:\n${messages}`)
     }
 
     return result.data
@@ -192,7 +192,7 @@ export class SchemaMetaBuilder {
   /**
    * Set the level of security
    */
-  attestationLoS(los: AttestationLoS): this {
+  attestationLoS(los: AttestationLos): this {
     this.data.attestationLoS = los
     return this
   }
@@ -208,9 +208,9 @@ export class SchemaMetaBuilder {
   /**
    * Add a schema URI
    */
-  addSchemaURI(schemaURI: SchemaURI): this {
+  addSchemaUri(schemaUri: SchemaUri): this {
     this.data.schemaURIs = this.data.schemaURIs ?? []
-    this.data.schemaURIs.push(schemaURI)
+    this.data.schemaURIs.push(schemaUri)
     return this
   }
 
@@ -226,11 +226,11 @@ export class SchemaMetaBuilder {
    * Build the SchemaMeta object
    */
   build(): SchemaMeta {
-    const result = SchemaMetaSchema.safeParse(this.data)
+    const result = zSchemaMeta.safeParse(this.data)
 
     if (!result.success) {
       const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-      throw new SchemaMetaException(`Invalid SchemaMeta:\n${messages}`)
+      throw new SchemaMetaError(`Invalid SchemaMeta:\n${messages}`)
     }
 
     return result.data
@@ -252,8 +252,8 @@ export function trustAuthority(): TrustAuthorityBuilder {
 }
 
 /**
- * Create a new SchemaURIBuilder
+ * Create a new SchemaUriBuilder
  */
-export function schemaURI(): SchemaURIBuilder {
-  return new SchemaURIBuilder()
+export function schemaUri(): SchemaUriBuilder {
+  return new SchemaUriBuilder()
 }

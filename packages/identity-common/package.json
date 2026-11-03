@@ -1,6 +1,6 @@
 {
   "name": "@owf/identity-common",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "files": [
     "dist"
   ],
@@ -27,5 +27,8 @@
   },
   "scripts": {
     "build": "tsdown src/index.ts --format esm --dts --sourcemap"
+  },
+  "dependencies": {
+    "zod": "catalog:"
   }
 }

@@ -2,7 +2,7 @@ import { base64urlEncode } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import { JWT_STATUS_LIST_TYPE } from '../jwt-types'
 import { StatusList } from '../status-list'
-import { createHeaderAndPayload, getListFromStatusListJWT, getStatusListFromJWT } from '../status-list-jwt'
+import { createHeaderAndPayload, getListFromStatusListJwt, getStatusListFromJwt } from '../status-list-jwt'
 
 describe('StatusListJWT', () => {
   const listLength = 100
@@ -57,7 +57,7 @@ describe('StatusListJWT', () => {
 
     const result = createHeaderAndPayload(statusList, payload, header)
     const jwtString = `${base64urlEncode(JSON.stringify(result.header))}.${base64urlEncode(JSON.stringify(result.payload))}.signature`
-    const decoded = getListFromStatusListJWT(jwtString)
+    const decoded = getListFromStatusListJwt(jwtString)
 
     expect(decoded.getStatus(0)).toBe(1)
     expect(decoded.getStatus(1)).toBe(0)
@@ -76,7 +76,7 @@ describe('StatusListJWT', () => {
       },
     }
     const jwtString = `${base64urlEncode(JSON.stringify({ alg: 'ES256' }))}.${base64urlEncode(JSON.stringify(referencedPayload))}.signature`
-    const entry = getStatusListFromJWT(jwtString)
+    const entry = getStatusListFromJwt(jwtString)
 
     expect(entry.idx).toBe(42)
     expect(entry.uri).toBe('https://example.com/statuslists/1')

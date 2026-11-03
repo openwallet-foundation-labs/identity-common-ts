@@ -1,37 +1,30 @@
-import * as v from 'valibot'
-import { DcqlMdocCredential, DcqlSdJwtVcCredential, DcqlW3cVcCredential } from '../u-dcql-credential'
-import type { InferModelTypes } from '../u-model'
-import { ModelDefinition } from '../u-model'
+import { z } from 'zod'
+import { DcqlMdocCredential, DcqlSdJwtVcCredential, DcqlW3cVcCredential } from '../u-dcql-credential.js'
 
 export namespace DcqlMdocPresentation {
-  export const vModel = DcqlMdocCredential.vModel
-  export const model = new ModelDefinition({ vModel })
-  export type Model = InferModelTypes<typeof model>
+  export const zModel = DcqlMdocCredential.zModel
+  export type Model = DcqlMdocCredential.Model
 }
 export type DcqlMdocPresentation = DcqlMdocPresentation.Model['Output']
 
 export namespace DcqlSdJwtVcPresentation {
-  export const vModel = DcqlSdJwtVcCredential.vModel
-  export const model = new ModelDefinition({ vModel })
-  export type Model = InferModelTypes<typeof model>
+  export const zModel = DcqlSdJwtVcCredential.zModel
+  export type Model = DcqlSdJwtVcCredential.Model
 }
 export type DcqlSdJwtVcPresentation = DcqlSdJwtVcPresentation.Model['Output']
 
 export namespace DcqlW3cVcPresentation {
-  export const vModel = DcqlW3cVcCredential.vModel
-  export const model = new ModelDefinition({ vModel })
-  export type Model = InferModelTypes<typeof model>
+  export const zModel = DcqlW3cVcCredential.zModel
+  export type Model = DcqlW3cVcCredential.Model
 }
 export type DcqlW3cVcPresentation = DcqlW3cVcPresentation.Model['Output']
 
 export namespace DcqlCredentialPresentation {
-  export const model = new ModelDefinition({
-    vModel: v.variant('credential_format', [
-      DcqlMdocPresentation.vModel,
-      DcqlSdJwtVcPresentation.vModel,
-      DcqlW3cVcPresentation.vModel,
-    ]),
-  })
-  export type Model = InferModelTypes<typeof model>
+  export const zModel = z.union([
+    DcqlMdocPresentation.zModel,
+    DcqlSdJwtVcPresentation.zModel,
+    DcqlW3cVcPresentation.zModel,
+  ])
+  export type Model = { Input: z.input<typeof zModel>; Output: z.output<typeof zModel> }
 }
 export type DcqlCredentialPresentation = DcqlCredentialPresentation.Model['Output']

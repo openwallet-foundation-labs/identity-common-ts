@@ -24,14 +24,17 @@ const jwkCoseKeyMap = {
   },
   crv: {
     'P-256': Curve['P-256'],
-    'p-384': Curve['P-384'],
-    'p-521': Curve['P-521'],
+    'P-384': Curve['P-384'],
+    'P-521': Curve['P-521'],
     X25519: Curve.X25519,
     Ed25519: Curve.Ed25519,
     Ed448: Curve.Ed448,
   },
   alg: {
     EdDSA: SignatureAlgorithm.EdDSA,
+    // RFC 9864 § 2.2: JOSE and COSE use the same names for the fully-specified EdDSA algorithms.
+    Ed25519: SignatureAlgorithm.Ed25519,
+    Ed448: SignatureAlgorithm.Ed448,
     ES256: SignatureAlgorithm.ES256,
     ES384: SignatureAlgorithm.ES384,
     ES512: SignatureAlgorithm.ES512,
@@ -60,18 +63,33 @@ const jwkCoseKeyMap = {
     unwrapKey: KeyOps.UnwrapKey,
     deriveKey: KeyOps.DeriveKey,
     deriveBits: KeyOps.DeriveBits,
-    mACCreate: KeyOps.MACCreate,
-    mACVerify: KeyOps.MACVerify,
   },
 }
 
-const coseKeyJwkMap = swapNestedMap(jwkCoseKeyMap)
+const swappedJwkCoseKeyMap = swapNestedMap(jwkCoseKeyMap)
+
+// RFC 9864 § 2.1: the JOSE ECDSA algorithms are fully specified, so the fully-specified COSE ECDSA
+// algorithms convert to the same JWA names. They are kept out of `jwkCoseKeyMap`, so that a JWA
+// `ES256` converts to the COSE `ES256` (-7) and not to `ESP256` (-9).
+const coseKeyJwkMap: typeof swappedJwkCoseKeyMap = {
+  ...swappedJwkCoseKeyMap,
+  alg: {
+    ...swappedJwkCoseKeyMap.alg,
+    [SignatureAlgorithm.ESP256]: 'ES256',
+    [SignatureAlgorithm.ESP384]: 'ES384',
+    [SignatureAlgorithm.ESP512]: 'ES512',
+  },
+}
+
+// JWK has no MAC key operations: a MAC key uses sign and verify (RFC 7517 Section 4.3, RFC 9052 Table 5)
+const jwkMacKeyOps: Record<string, KeyOps> = { sign: KeyOps.MacCreate, verify: KeyOps.MacVerify }
+const coseMacKeyOps: Record<number, string> = { [KeyOps.MacCreate]: 'sign', [KeyOps.MacVerify]: 'verify' }
 
 export const jwkCoseOptionsMap: Record<string, keyof CoseKeyOptions> = {
   kty: 'keyType',
   kid: 'keyId',
   alg: 'algorithm',
-  keyOps: 'keyOps',
+  key_ops: 'keyOps',
   baseIv: 'baseIv',
   crv: 'curve',
   x: 'x',
@@ -88,9 +106,14 @@ export const jwkToCoseKey = {
   crv: (crv?: unknown) => jwkCoseKeyMap.crv[crv as keyof (typeof jwkCoseKeyMap)['crv']] ?? crv,
   alg: (alg?: unknown) => jwkCoseKeyMap.alg[alg as keyof (typeof jwkCoseKeyMap)['alg']] ?? alg,
   kid: (kid?: unknown) => kid,
-  keyOps: (keyOps?: unknown) =>
+  key_ops: (keyOps?: unknown, jwk?: Record<string, unknown>) =>
     Array.isArray(keyOps)
-      ? keyOps?.map((ko) => jwkCoseKeyMap.keyOps[ko as keyof (typeof jwkCoseKeyMap)['keyOps']] ?? ko)
+      ? keyOps.map(
+          (ko) =>
+            (jwk?.kty === 'oct' ? jwkMacKeyOps[ko] : undefined) ??
+            jwkCoseKeyMap.keyOps[ko as keyof (typeof jwkCoseKeyMap)['keyOps']] ??
+            ko
+        )
       : undefined,
   x: (s?: unknown) => (s && typeof s === 'string' ? base64url.decode(s) : undefined),
   y: (s?: unknown) => (s && typeof s === 'string' ? base64url.decode(s) : undefined),
@@ -103,7 +126,7 @@ export const coseKeyToJwkClaim = {
   keyId: (keyId: unknown) => keyId,
   algorithm: (algorithm?: SignatureAlgorithm | MacAlgorithm) => (algorithm ? coseKeyJwkMap.alg[algorithm] : undefined),
   keyOps: (keyOps?: unknown) =>
-    keyOps && Array.isArray(keyOps) ? keyOps.map((ko) => coseKeyJwkMap.keyOps[ko]) : undefined,
+    keyOps && Array.isArray(keyOps) ? keyOps.map((ko) => coseMacKeyOps[ko] ?? coseKeyJwkMap.keyOps[ko]) : undefined,
   baseIv: (baseIv?: unknown) => baseIv,
   curve: (curve?: Curve) => (curve ? coseKeyJwkMap.crv[curve] : undefined),
   x: (x?: Uint8Array) => (x ? base64url.encode(x) : undefined),

@@ -12,6 +12,11 @@ function isMergeableObject(val: unknown): val is Array<unknown> | Record<string,
   )
 }
 
+function hasOwn(val: object, key: string | number) {
+  // biome-ignore lint/suspicious/noPrototypeBuiltins: `Object.hasOwn` is not in the ES2020 lib this package targets
+  return Object.prototype.hasOwnProperty.call(val, key)
+}
+
 export function deepMerge(source: Array<unknown> | object, target: Array<unknown> | object): Array<unknown> | object {
   let newTarget = target
 
@@ -30,7 +35,8 @@ export function deepMerge(source: Array<unknown> | object, target: Array<unknown
 
   for (const [key, val] of Object.entries(source)) {
     if (isMergeableObject(val)) {
-      const targetVal = (newTarget as Record<string, unknown>)[key]
+      // Only own properties, so a claim such as `constructor` does not resolve to a member of `Object.prototype`
+      const targetVal = hasOwn(newTarget, key) ? (newTarget as Record<string, unknown>)[key] : undefined
       if (targetVal !== undefined && targetVal !== DcqlNotDisclosed && !isMergeableObject(targetVal)) {
         throw new DcqlError({
           message: 'target value provided to deepMerge is neither an array or object.',
@@ -54,7 +60,7 @@ function setValue(target: any, key: string, value: any) {
   if (Array.isArray(newTarget)) {
     const index = Number(key)
     newTarget = Array.from({ length: Math.max(newTarget.length, index + 1) }, (_, i) =>
-      i in newTarget ? newTarget[i] : DcqlNotDisclosed
+      hasOwn(newTarget, i) ? newTarget[i] : DcqlNotDisclosed
     )
     newTarget[index] = value
   } else if (Object.getPrototypeOf(newTarget) === Object.prototype) {

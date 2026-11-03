@@ -7,7 +7,7 @@
 /**
  * Commitment type OIDs as per RFC 5035.
  */
-export enum CommitmentOIDs {
+export enum CommitmentOids {
   /** Proof of origin */
   proofOfOrigin = 'urn:oid:1.2.840.113549.1.9.16.6.1',
   /** Proof of receipt */
@@ -25,7 +25,7 @@ export enum CommitmentOIDs {
 /**
  * JAdES baseline profiles as per ETSI TS 119 182-1.
  */
-export enum JAdESProfile {
+export enum JadesProfile {
   /** Basic - Baseline: basic signature format */
   B_B = 'B-B',
   /** Basic with Time: signatures with timestamp */

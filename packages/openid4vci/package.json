@@ -1,6 +1,6 @@
 {
   "name": "@openid4vc/openid4vci",
-  "version": "0.8.2",
+  "version": "0.9.2",
   "description": "OpenID for Verifiable Credential Issuance (OpenID4VCI) implementation",
   "files": [
     "dist"
@@ -41,6 +41,7 @@
     "@owf/identity-common": "workspace:^",
     "@openid4vc/oauth2": "workspace:^",
     "@openid4vc/utils": "workspace:^",
+    "@owf/jose": "workspace:^",
     "zod": "catalog:"
   }
 }

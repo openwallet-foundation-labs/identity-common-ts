@@ -1,7 +1,7 @@
-import { zHttpMethod, zHttpsUrl, zNumericDate } from '@openid4vc/utils'
+import { zHttpMethod, zHttpsUrl } from '@openid4vc/utils'
+import { zNonEmptyString, zNumericDate, zTyp } from '@owf/identity-common'
+import { zJwk, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
-import { zJwk } from '../common/jwk/z-jwk'
-import { zJwtHeader, zJwtPayload } from '../common/jwt/z-jwt'
 
 export const zDpopJwtPayload = z
   .object({
@@ -9,10 +9,10 @@ export const zDpopJwtPayload = z
     iat: zNumericDate,
     htu: zHttpsUrl,
     htm: zHttpMethod,
-    jti: z.string(),
+    jti: zNonEmptyString,
 
     // Only required when presenting in combination with access token
-    ath: z.optional(z.string()),
+    ath: z.optional(zNonEmptyString),
   })
   .loose()
 export type DpopJwtPayload = z.infer<typeof zDpopJwtPayload>
@@ -20,7 +20,7 @@ export type DpopJwtPayload = z.infer<typeof zDpopJwtPayload>
 export const zDpopJwtHeader = z
   .object({
     ...zJwtHeader.shape,
-    typ: z.literal('dpop+jwt'),
+    typ: zTyp('dpop+jwt'),
     jwk: zJwk,
   })
   .loose()

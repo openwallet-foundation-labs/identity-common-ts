@@ -8,6 +8,7 @@ import {
 } from '@owf/x509'
 import { describe, expect, it } from 'vitest'
 import {
+  AccessCertificateValidationError,
   assembleAccessCertificate,
   type CreateAccessCertificateOptions,
   createAccessCertificate,
@@ -88,7 +89,7 @@ describe('createAccessCertificate', () => {
     expect(cert.crlDistributionPoints).toEqual(['https://ca.example.com/crl'])
     expect(cert.ocspUrls).toEqual(['https://ocsp.example.com'])
 
-    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [] })
+    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, issues: [] })
     expect(await verifyCertificateSignature(cert, CA_CERTIFICATE_PEM, webCryptoVerifier)).toBe(true)
   })
 
@@ -138,7 +139,7 @@ describe('createAccessCertificate', () => {
     expect(ac.certificate.subject.rfc4514).toBe(
       'CN=Erika Mustermann,SERIALNUMBER=IDCDE-T22000129,SN=Mustermann,GN=Erika,C=DE'
     )
-    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, errors: [], warnings: [] })
+    expect(validateAccessCertificate(ac, { now: NOW })).toEqual({ valid: true, issues: [] })
   })
 
   it('supports signers that return DER encoded ECDSA signatures', async () => {
@@ -207,6 +208,28 @@ describe('createAccessCertificate', () => {
       await expect(
         createAccessCertificate({ ...options, subject: { ...options.subject, organizationIdentifier: 'VATGR-123' } })
       ).rejects.toThrow(/"EL" for Greece/)
+    })
+
+    it('reports every invalid option as an issue with a path into the options', async () => {
+      const options = await legalPersonOptions()
+      const error = await createAccessCertificate({
+        ...options,
+        cpsUri: '',
+        contact: {},
+        subject: { ...options.subject, countryName: 'Germany' },
+      }).catch((error) => error)
+      expect(error).toBeInstanceOf(AccessCertificateValidationError)
+      expect(
+        (error as AccessCertificateValidationError).issues.map(({ code, path, requirement }) => ({
+          code,
+          path,
+          requirement,
+        }))
+      ).toEqual([
+        { code: 'missing_cps_uri', path: ['cpsUri'], requirement: 'GEN-6.6.1-06' },
+        { code: 'missing_contact', path: ['contact'], requirement: 'GEN-6.6.1-07' },
+        { code: 'invalid_country_name', path: ['subject', 'countryName'], requirement: undefined },
+      ])
     })
 
     it('requires an ISO 3166-1 country code', async () => {

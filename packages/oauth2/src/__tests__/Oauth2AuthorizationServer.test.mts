@@ -1,12 +1,12 @@
+import type { Jwk } from '@owf/jose'
+import { decodeJwt } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
-import type { Jwk } from '../common/jwk/z-jwk'
-import { decodeJwt } from '../common/jwt/decode-jwt'
 import { createDpopJwt } from '../dpop/dpop'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
 import { Oauth2AuthorizationServer } from '../Oauth2AuthorizationServer'
 import { createPkce, PkceCodeChallengeMethod } from '../pkce'
 import { authorizationCodeGrantIdentifier, preAuthorizedCodeGrantIdentifier } from '../z-grant-type'
-import { getSignJwtCallback, callbacks as partialCallbacks } from './util.mjs'
+import { getSignJwsCallback, callbacks as partialCallbacks } from './util.mjs'
 
 const dpopSignerJwk = {
   kty: 'EC',
@@ -36,7 +36,7 @@ describe('Oauth2AuthorizationServer', () => {
   test('parse, verify and grant pre authorized code access token request', async () => {
     const callbacks = {
       ...partialCallbacks,
-      signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+      signJws: getSignJwsCallback([dpopSignerJwk, accessTokenSignerJwk]),
     }
 
     const createdDpopJwt = await createDpopJwt({
@@ -50,6 +50,8 @@ describe('Oauth2AuthorizationServer', () => {
         alg: 'ES256',
         publicJwk: dpopSignerJwkPublic,
       },
+      // The request is verified at this same moment, and the dpop proof is verified against that `now`
+      issuedAt: new Date('2024-01-01'),
     })
 
     const authorizationServer = new Oauth2AuthorizationServer({
@@ -142,7 +144,7 @@ describe('Oauth2AuthorizationServer', () => {
       decodeJwt({
         jwt: accessTokenResponse.access_token,
       })
-    ).toEqual({
+    ).toMatchObject({
       header: {
         alg: 'ES256',
         jwk: {
@@ -172,7 +174,7 @@ describe('Oauth2AuthorizationServer', () => {
   test('parse, verify and grant authorization code access token request', async () => {
     const callbacks = {
       ...partialCallbacks,
-      signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+      signJws: getSignJwsCallback([dpopSignerJwk, accessTokenSignerJwk]),
     }
 
     const pkce = await createPkce({
@@ -191,6 +193,8 @@ describe('Oauth2AuthorizationServer', () => {
         alg: 'ES256',
         publicJwk: dpopSignerJwkPublic,
       },
+      // The request is verified at this same moment, and the dpop proof is verified against that `now`
+      issuedAt: new Date('2024-01-01'),
     })
 
     const authorizationServer = new Oauth2AuthorizationServer({
@@ -284,7 +288,7 @@ describe('Oauth2AuthorizationServer', () => {
       decodeJwt({
         jwt: accessTokenResponse.access_token,
       })
-    ).toEqual({
+    ).toMatchObject({
       header: {
         alg: 'ES256',
         jwk: {

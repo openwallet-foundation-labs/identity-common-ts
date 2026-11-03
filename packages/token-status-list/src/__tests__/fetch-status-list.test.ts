@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fetchStatusList } from '../fetch-status-list'
-import { SLException } from '../status-list-exception'
+import { StatusListError } from '../status-list-error'
 import { StatusListMediaTypes } from '../types'
 
 const fetcherWithContentType = (contentType: string, body: BodyInit = 'a.b.c'): typeof fetch =>
@@ -28,12 +28,42 @@ describe('fetchStatusList', () => {
     expect(statusList).toStrictEqual(new Uint8Array([1, 2, 3]))
   })
 
+  it.each([
+    {
+      acceptedFormats: undefined,
+      accept: `${StatusListMediaTypes.StatusListJwt}, ${StatusListMediaTypes.StatusListCwt};q=0.9`,
+    },
+    {
+      acceptedFormats: ['cwt', 'jwt'] as const,
+      accept: `${StatusListMediaTypes.StatusListCwt}, ${StatusListMediaTypes.StatusListJwt};q=0.9`,
+    },
+    { acceptedFormats: ['cwt'] as const, accept: StatusListMediaTypes.StatusListCwt },
+    {
+      acceptedFormats: ['cwt', 'cwt', 'jwt'] as const,
+      accept: `${StatusListMediaTypes.StatusListCwt}, ${StatusListMediaTypes.StatusListJwt};q=0.9`,
+    },
+  ])('should prefer the first of $acceptedFormats in the Accept header', async ({ acceptedFormats, accept }) => {
+    let sentAccept: string | null = null
+    const customFetcher = (async (_uri: string, init?: RequestInit) => {
+      sentAccept = new Headers(init?.headers).get('Accept')
+      return new Response('a.b.c', { status: 200, headers: { 'Content-Type': StatusListMediaTypes.StatusListJwt } })
+    }) as unknown as typeof fetch
+
+    await fetchStatusList({
+      uri: 'https://example.org/statuslists/1',
+      customFetcher,
+      acceptedFormats: acceptedFormats ? [...acceptedFormats] : undefined,
+    })
+
+    expect(sentAccept).toBe(accept)
+  })
+
   it('should throw when the content type is not a status list media type', async () => {
     await expect(
       fetchStatusList({
         uri: 'https://example.org/statuslists/1',
         customFetcher: fetcherWithContentType('application/json'),
       })
-    ).rejects.toThrow(SLException)
+    ).rejects.toThrow(StatusListError)
   })
 })

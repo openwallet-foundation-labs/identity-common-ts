@@ -15,7 +15,7 @@ import {
   type UnprotectedHeaders,
 } from '@owf/cose'
 import { StatusList } from '../status-list'
-import { SLException } from '../status-list-exception'
+import { StatusListError } from '../status-list-error'
 import { type BitsPerStatus, StatusListMediaTypes } from '../types'
 import { StatusListCbor } from './status-list-cbor'
 import { StatusListCwtProtectedHeaders } from './status-list-cwt-headers'
@@ -112,7 +112,7 @@ export class StatusListCwt extends Cwt<StatusListCwtPayload, StatusListCwtProtec
   /**
    * Decodes a status list CWT from a tagged COSE_Sign1 (tag 18) or COSE_Mac0 (tag 17) token.
    *
-   * @throws SLException if the token is not a COSE token, has a detached payload, or the
+   * @throws StatusListError if the token is not a COSE token, has a detached payload, or the
    *   payload is not a valid status list CWT payload. The underlying error is available on
    *   the `details` property.
    */
@@ -129,7 +129,7 @@ export class StatusListCwt extends Cwt<StatusListCwtPayload, StatusListCwtProtec
       } as unknown as CwtStructures<T>) as T
     } catch (error) {
       if (error instanceof CwtDetachedPayloadError) {
-        throw new SLException(
+        throw new StatusListError(
           'Cwt does not contain payload, detached payload is not supported for status list CWT',
           error
         )
@@ -137,13 +137,13 @@ export class StatusListCwt extends Cwt<StatusListCwtPayload, StatusListCwtProtec
 
       if (error instanceof CwtPayloadDecodeError) {
         const cause = error.cause
-        throw new SLException(
+        throw new StatusListError(
           `Unable to decode status list CWT payload: ${cause instanceof Error ? cause.message : String(cause)}`,
           error
         )
       }
 
-      throw new SLException(
+      throw new StatusListError(
         `Unable to decode status list CWT: ${error instanceof Error ? error.message : String(error)}`,
         error
       )
@@ -157,7 +157,7 @@ export class StatusListCwt extends Cwt<StatusListCwtPayload, StatusListCwtProtec
    * the issuer's if the token verifies.
    *
    * @throws CoseInvalidSignatureError if the signature or authentication tag does not verify.
-   * @throws SLException if the claims or the status at `idx` do not.
+   * @throws StatusListError if the claims or the status at `idx` do not.
    */
   public override async verify(
     { idx, ...options }: CwtVerifyOptions<StatusListCwtPayload> & { idx?: number },

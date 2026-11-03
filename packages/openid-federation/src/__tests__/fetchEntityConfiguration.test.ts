@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   createEntityConfiguration,
   type EntityConfigurationClaimsOptions,
-  entityConfigurationClaimsSchema,
   fetchEntityConfiguration,
+  zEntityConfigurationClaims,
 } from '../entityConfiguration'
 import type { SignCallback, VerifyCallback } from '../utils'
 import { mockGet, setupMockServer } from './utils/mockServer'
@@ -40,7 +40,7 @@ describe('fetch entity configuration', () => {
       verifyJwtCallback,
     })
 
-    expect(fetchedEntityConfiguration).toStrictEqual(entityConfigurationClaimsSchema.parse(claims))
+    expect(fetchedEntityConfiguration).toStrictEqual(zEntityConfigurationClaims.parse(claims))
 
     mockedResponse.done()
   })
@@ -75,7 +75,7 @@ describe('fetch entity configuration', () => {
       verifyJwtCallback,
     })
 
-    expect(fetchedEntityConfiguration).toStrictEqual(entityConfigurationClaimsSchema.parse(claims))
+    expect(fetchedEntityConfiguration).toStrictEqual(zEntityConfigurationClaims.parse(claims))
 
     mockedResponse.done()
   })

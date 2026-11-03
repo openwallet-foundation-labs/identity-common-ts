@@ -1,6 +1,6 @@
 {
   "name": "@owf/eudi-tl",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Parse and verify ETSI TS 119 612 XML Trusted Lists, exposing normalized trust anchors",
   "files": [
     "dist"
@@ -46,7 +46,7 @@
     "@peculiar/asn1-x509": "catalog:",
     "@xmldom/xmldom": "^0.9.12",
     "xadesjs": "^2.6.8",
-    "xpath": "^0.0.35",
+    "xpath": "^0.0.36",
     "zod": "catalog:"
   }
 }

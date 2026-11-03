@@ -1,14 +1,16 @@
-import { base64 } from '@owf/identity-common'
+import { base64, ValidationError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
   ACTIVE_SERVICE_STATUSES,
+  assertValidTrustedList,
   getPointerSigningCertificates,
   getTrustAnchors,
   parseTrustedList,
   ServiceStatus,
   ServiceType,
-  TrustedListParseException,
-  TSLType,
+  TrustedListParseError,
+  TrustedListValidationError,
+  TslType,
   validateTrustedList,
 } from '../index'
 import {
@@ -30,8 +32,10 @@ describe('parseTrustedList', () => {
     const tl = parseTrustedList(UNSIGNED_TSL_XML)
     expect(validateTrustedList(tl).valid).toBe(true)
 
-    expect(tl.tslType).toBe(TSLType.EUgeneric)
+    expect(tl.tslType).toBe(TslType.EUgeneric)
     expect(tl.schemeOperatorName).toBe('Test Scheme Operator') // 'en' entry preferred
+    // the list's own territory, not the one of a pointer
+    expect(tl.schemeTerritory).toBe('ES')
     expect(tl.sequenceNumber).toBe(42)
     expect(tl.listIssueDateTime).toBe('2025-01-15T00:00:00Z')
     expect(tl.nextUpdate).toBe('2025-07-15T00:00:00Z')
@@ -71,7 +75,7 @@ describe('parseTrustedList', () => {
     expect(tl.pointersToOtherLists).toHaveLength(2)
     expect(tl.pointersToOtherLists?.[0]).toEqual({
       location: 'https://ec.europa.eu/tools/lotl/eu-lotl.xml',
-      tslType: TSLType.EUlistofthelists,
+      tslType: TslType.EUlistofthelists,
       schemeTerritory: 'EU',
       digitalIdentities: [
         {
@@ -100,7 +104,19 @@ describe('parseTrustedList', () => {
   })
 
   it('rejects XML whose root is not a TrustServiceStatusList', () => {
-    expect(() => parseTrustedList('<root/>')).toThrow(TrustedListParseException)
+    expect(() => parseTrustedList('<root/>')).toThrow(TrustedListParseError)
+  })
+
+  it('throws the issues of a list that does not conform, as a validation error', () => {
+    let error: unknown
+    try {
+      assertValidTrustedList({})
+    } catch (thrown) {
+      error = thrown
+    }
+    expect(error).toBeInstanceOf(TrustedListValidationError)
+    expect(error).toBeInstanceOf(ValidationError)
+    expect((error as TrustedListValidationError).issues).toEqual(validateTrustedList({}).issues)
   })
 })
 

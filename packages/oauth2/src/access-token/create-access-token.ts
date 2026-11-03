@@ -1,10 +1,7 @@
-import { addSecondsToDate, dateToSeconds, encodeToBase64Url, parseWithErrorHandling } from '@openid4vc/utils'
+import { addSecondsToDate } from '@openid4vc/utils'
+import { base64url, dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
+import { calculateJwkThumbprint, type Jwk, type JwsSigner, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
-import { HashAlgorithm } from '../callbacks'
-import { calculateJwkThumbprint } from '../common/jwk/jwk-thumbprint'
-import type { Jwk } from '../common/jwk/z-jwk'
-import { jwtHeaderFromJwtSigner } from '../common/jwt/decode-jwt'
-import type { JwtSigner } from '../common/jwt/z-jwt'
 import {
   type AccessTokenProfileJwtHeader,
   type AccessTokenProfileJwtPayload,
@@ -13,7 +10,7 @@ import {
 } from './z-access-token-jwt'
 
 export interface CreateAccessTokenOptions {
-  callbacks: Pick<CallbackContext, 'signJwt' | 'generateRandom' | 'hash'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'generateRandom' | 'hash'>
 
   /**
    * public dpop jwk key. Will be encoded as jwk thumbprint in the `cnf.jkt` claim.
@@ -42,7 +39,7 @@ export interface CreateAccessTokenOptions {
   /**
    * Signer of the access token
    */
-  signer: JwtSigner
+  signer: JwsSigner
 
   /**
    * Number of seconds after which the token will expire
@@ -78,7 +75,7 @@ export interface CreateAccessTokenOptions {
  */
 export async function createAccessTokenJwt(options: CreateAccessTokenOptions) {
   const header = parseWithErrorHandling(zAccessTokenProfileJwtHeader, {
-    ...jwtHeaderFromJwtSigner(options.signer),
+    ...jwsHeaderFromSigner(options.signer),
     typ: 'at+jwt',
   } satisfies AccessTokenProfileJwtHeader)
 
@@ -88,7 +85,7 @@ export async function createAccessTokenJwt(options: CreateAccessTokenOptions) {
   // value instead of the object when an object literal in a ternary branch contains an `await`.
   const dpopJkt = options.dpop
     ? await calculateJwkThumbprint({
-        hashAlgorithm: HashAlgorithm.Sha256,
+        hashAlgorithm: 'sha-256',
         hashCallback: options.callbacks.hash,
         jwk: options.dpop.jwk,
       })
@@ -99,7 +96,7 @@ export async function createAccessTokenJwt(options: CreateAccessTokenOptions) {
     exp: dateToSeconds(addSecondsToDate(now, options.expiresInSeconds)),
     aud: options.audience,
     iss: options.authorizationServer,
-    jti: encodeToBase64Url(await options.callbacks.generateRandom(32)),
+    jti: base64url.encode(await options.callbacks.generateRandom(32)),
     client_id: options.clientId,
     sub: options.subject,
     scope: options.scope,
@@ -107,10 +104,7 @@ export async function createAccessTokenJwt(options: CreateAccessTokenOptions) {
     ...options.additionalPayload,
   } satisfies AccessTokenProfileJwtPayload)
 
-  const { jwt } = await options.callbacks.signJwt(options.signer, {
-    header,
-    payload,
-  })
+  const { jwt } = await signJwt({ header, payload, signer: options.signer, signJwsCallback: options.callbacks.signJws })
 
   return {
     jwt,

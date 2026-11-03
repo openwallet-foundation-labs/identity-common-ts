@@ -6,7 +6,7 @@ import { z } from 'zod'
  * one entity are merged here. A standard list may identify a service by subject
  * name and/or key identifier without embedding the full certificate.
  */
-export const DigitalIdentitySchema = z.object({
+export const zDigitalIdentity = z.object({
   /** base64-encoded DER of the certificate, when embedded (`X509Certificate`). */
   certificate: z.string().optional(),
   /** `X509SubjectName`, when present. */
@@ -18,21 +18,21 @@ export const DigitalIdentitySchema = z.object({
    */
   subjectKeyIdentifier: z.string().optional(),
 })
-export type DigitalIdentity = z.infer<typeof DigitalIdentitySchema>
+export type DigitalIdentity = z.infer<typeof zDigitalIdentity>
 
 /** A past status entry for a service (`ServiceHistoryInstance`). */
-export const ServiceHistoryInstanceSchema = z.object({
+export const zServiceHistoryInstance = z.object({
   serviceTypeIdentifier: z.string().optional(),
   serviceStatus: z.string(),
   statusStartingTime: z.string().optional(),
 })
-export type ServiceHistoryInstance = z.infer<typeof ServiceHistoryInstanceSchema>
+export type ServiceHistoryInstance = z.infer<typeof zServiceHistoryInstance>
 
 /**
  * A trust service (TSPService) entry: its type, status, digital identities,
  * qualifiers, and status history.
  */
-export const TrustedListServiceSchema = z.object({
+export const zTrustedListService = z.object({
   /** `ServiceTypeIdentifier` URI. */
   serviceTypeIdentifier: z.string(),
   /** Current `ServiceStatus` URI. */
@@ -40,23 +40,23 @@ export const TrustedListServiceSchema = z.object({
   /** Human-readable service name, if present. */
   serviceName: z.string().optional(),
   /** One entry per `ServiceDigitalIdentity`. */
-  digitalIdentities: z.array(DigitalIdentitySchema),
+  digitalIdentities: z.array(zDigitalIdentity),
   /** Qualifier URIs from `Qualifications/QualificationElement/Qualifiers`. */
   qualifiers: z.array(z.string()).optional(),
   /** Prior status entries from `ServiceHistory`. */
-  history: z.array(ServiceHistoryInstanceSchema).optional(),
+  history: z.array(zServiceHistoryInstance).optional(),
 })
-export type TrustedListService = z.infer<typeof TrustedListServiceSchema>
+export type TrustedListService = z.infer<typeof zTrustedListService>
 
 /** A Trust Service Provider (TSP) and the services it operates. */
-export const TrustServiceProviderSchema = z.object({
+export const zTrustServiceProvider = z.object({
   name: z.string().optional(),
-  services: z.array(TrustedListServiceSchema),
+  services: z.array(zTrustedListService),
 })
-export type TrustServiceProvider = z.infer<typeof TrustServiceProviderSchema>
+export type TrustServiceProvider = z.infer<typeof zTrustServiceProvider>
 
 /** A pointer to another trusted list (`OtherTSLPointer`), e.g. the EU LOTL. */
-export const TrustedListPointerSchema = z.object({
+export const zTrustedListPointer = z.object({
   /** `TSLLocation` URL. */
   location: z.string(),
   /** Pointed-to list `TSLType`, when advertised. */
@@ -70,27 +70,29 @@ export const TrustedListPointerSchema = z.object({
    * the certificate(s) of its scheme operator, so a verifier that trusts the
    * LOTL does not need to pin each national list separately.
    */
-  digitalIdentities: z.array(DigitalIdentitySchema).default([]),
+  digitalIdentities: z.array(zDigitalIdentity).default([]),
 })
-export type TrustedListPointer = z.infer<typeof TrustedListPointerSchema>
+export type TrustedListPointer = z.infer<typeof zTrustedListPointer>
 
 /** A parsed ETSI TS 119 612 Trusted List (`TrustServiceStatusList`). */
-export const TrustedListSchema = z.object({
+export const zTrustedList = z.object({
   /** `TSLType` URI. */
   tslType: z.string().optional(),
   /** `SchemeOperatorName` (English name when available). */
   schemeOperatorName: z.string().optional(),
+  /** `SchemeTerritory`, the country code of the list (e.g. `ES`), or `EU` for the LOTL. */
+  schemeTerritory: z.string().optional(),
   /** `TSLSequenceNumber`. */
   sequenceNumber: z.number().optional(),
   /** `ListIssueDateTime` (ISO 8601). */
   listIssueDateTime: z.string().optional(),
   /** `NextUpdate` (ISO 8601), when present. */
   nextUpdate: z.string().optional(),
-  providers: z.array(TrustServiceProviderSchema),
+  providers: z.array(zTrustServiceProvider),
   /** `PointersToOtherTSL` entries (e.g. the EU LOTL). Not followed by v1. */
-  pointersToOtherLists: z.array(TrustedListPointerSchema).optional(),
+  pointersToOtherLists: z.array(zTrustedListPointer).optional(),
 })
-export type TrustedList = z.infer<typeof TrustedListSchema>
+export type TrustedList = z.infer<typeof zTrustedList>
 
 /**
  * A flattened trust anchor: one digital identity with the service context it was
@@ -98,7 +100,7 @@ export type TrustedList = z.infer<typeof TrustedListSchema>
  * emission consume — the ETSI TS 119 612 counterpart of a `@owf/eudi-lote`
  * TrustedEntity service certificate.
  */
-export const TrustAnchorSchema = z.object({
+export const zTrustAnchor = z.object({
   /** base64 DER certificate, when the identity embeds one. */
   certificate: z.string().optional(),
   subjectName: z.string().optional(),
@@ -107,4 +109,4 @@ export const TrustAnchorSchema = z.object({
   serviceStatus: z.string(),
   providerName: z.string().optional(),
 })
-export type TrustAnchor = z.infer<typeof TrustAnchorSchema>
+export type TrustAnchor = z.infer<typeof zTrustAnchor>

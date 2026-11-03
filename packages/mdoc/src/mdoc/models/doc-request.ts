@@ -3,13 +3,13 @@ import { z } from 'zod'
 import { ItemsRequest } from './items-request'
 import { ReaderAuth, type ReaderAuthEncodedStructure } from './reader-auth'
 
-const docRequestSchema = typedMap([
+const zDocRequest = typedMap([
   ['itemsRequest', z.instanceof(ItemsRequest)],
   ['readerAuth', z.instanceof(ReaderAuth).exactOptional()],
 ] as const)
 
-export type DocRequestDecodedStructure = z.output<typeof docRequestSchema>
-export type DocRequestEncodedStructure = z.input<typeof docRequestSchema>
+export type DocRequestDecodedStructure = z.output<typeof zDocRequest>
+export type DocRequestEncodedStructure = z.input<typeof zDocRequest>
 
 export type DocRequestOptions = {
   itemsRequest: ItemsRequest
@@ -18,7 +18,7 @@ export type DocRequestOptions = {
 
 export class DocRequest extends CborStructure<DocRequestEncodedStructure, DocRequestDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(docRequestSchema.in, docRequestSchema.out, {
+    return z.codec(zDocRequest.in, zDocRequest.out, {
       decode: (input) => {
         const map: DocRequestDecodedStructure = TypedMap.fromMap(input)
 
