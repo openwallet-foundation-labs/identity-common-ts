@@ -53,6 +53,13 @@ export function unsignedCompactJws(header: unknown, payload: unknown, signature 
   return `${encode(header)}.${encode(payload)}.${signature}`
 }
 
+/** Matches a `JoseValidationError` with an issue of `code` at `path`. */
+export const validationIssue = (path: Array<string | number>, code: JoseValidationIssue['code']) =>
+  expect.objectContaining({
+    name: JoseValidationError.name,
+    issues: expect.arrayContaining([expect.objectContaining({ code, path })]),
+  })
+
 /** Matches a `JoseValidationError` with an issue of `code` at `claim`, with `message` when given. */
 export const claimIssue = (claim: string, code: JoseValidationIssue['code'], message?: string) =>
   expect.objectContaining({
