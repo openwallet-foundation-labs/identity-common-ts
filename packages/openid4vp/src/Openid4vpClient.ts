@@ -23,6 +23,14 @@ export interface Openid4vpClientOptions {
    * Callbacks required for the openid4vp client
    */
   callbacks: Omit<CallbackContext, 'generateRandom' | 'clientAuthentication'>
+
+  /**
+   * Default allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of signed request objects.
+   * A per-call `allowedSkewInSeconds` takes precedence, including `0`.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export class Openid4vpClient {
@@ -35,7 +43,11 @@ export class Openid4vpClient {
   public async resolveOpenid4vpAuthorizationRequest(
     options: Omit<ResolveOpenid4vpAuthorizationRequestOptions, 'callbacks'>
   ) {
-    return resolveOpenid4vpAuthorizationRequest({ ...options, callbacks: this.options.callbacks })
+    return resolveOpenid4vpAuthorizationRequest({
+      ...options,
+      callbacks: this.options.callbacks,
+      allowedSkewInSeconds: options.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
+    })
   }
 
   public async createOpenid4vpAuthorizationResponse<

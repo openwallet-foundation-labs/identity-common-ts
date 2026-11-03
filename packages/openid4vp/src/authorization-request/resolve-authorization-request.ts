@@ -1,5 +1,5 @@
 import { type CallbackContext, Oauth2Error, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import z from 'zod'
 import {
   type ParsedClientIdentifier,
@@ -39,6 +39,19 @@ export interface ResolveOpenid4vpAuthorizationRequestOptions {
   responseMode: ExpectedResponseMode
 
   callbacks: Pick<CallbackContext, 'verifyJws' | 'decryptJwe' | 'getX509CertificateMetadata' | 'fetch' | 'hash'>
+
+  /**
+   * Date to verify the `exp`, `nbf` and `iat` of a signed request object against. If not provided the
+   * current date will be used.
+   */
+  now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of a signed request object.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export type ResolvedOpenid4vpAuthorizationRequest = {
@@ -80,6 +93,8 @@ export async function resolveOpenid4vpAuthorizationRequest(
       wallet,
       // For IAE/DC API only request is allowed
       allowRequestUri: options.responseMode.type === 'direct_post',
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
 
     authorizationRequestPayload = parseWithErrorHandling(

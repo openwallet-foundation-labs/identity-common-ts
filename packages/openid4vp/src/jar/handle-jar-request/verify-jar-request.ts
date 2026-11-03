@@ -7,10 +7,12 @@ import {
   validateJarRequestParams,
   zJarRequestObjectPayload,
 } from '@openid4vc/oauth2'
+import { isJwtTyp, validationErrorMessage } from '@owf/identity-common'
 import {
   type DecodeJwtResult,
   decodeJwt,
   decodeJwtHeader,
+  JoseValidationError,
   JoseVerificationError,
   type Jwk,
   type JwsSigner,
@@ -25,6 +27,10 @@ import { isOpenid4vpResponseModeDcApi } from '../../authorization-request/z-auth
 import { isOpenid4vpResponseModeIae } from '../../authorization-request/z-authorization-request-iae'
 import { zOpenid4vpAuthorizationRequestPayload } from '../../authorization-request/z-authorization-request-payload'
 import { getOpenid4vpClientId } from '../../client-identifier-prefix/parse-client-identifier-prefix'
+import {
+  type VerifiedVerifierAttestation,
+  verifyVerifierAttestation,
+} from '../../client-identifier-prefix/verifier-attestation'
 import {
   type ClientIdPrefix,
   type UniformClientIdPrefix,
@@ -54,6 +60,19 @@ export interface VerifyJarRequestOptions {
     metadata?: WalletMetadata
     nonce?: string
   }
+
+  /**
+   * Date to verify the `exp`, `nbf` and `iat` of the request object against. If not provided the
+   * current date will be used.
+   */
+  now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export interface VerifiedJarRequest {
@@ -62,6 +81,9 @@ export interface VerifiedJarRequest {
   decryptionJwk?: Jwk
   signer: JwsSignerWithJwk
   jwt: DecodeJwtResult<undefined, typeof zJarRequestObjectPayload>
+
+  /** The verified Verifier Attestation JWT, when the client identifier prefix is `verifier_attestation` */
+  verifierAttestation?: VerifiedVerifierAttestation
 }
 
 /**
@@ -119,9 +141,11 @@ export async function verifyJarRequest(options: VerifyJarRequestOptions): Promis
   }
 
   try {
-    const { authorizationRequestPayload, signer, jwt } = await verifyJarRequestObject({
+    const { authorizationRequestPayload, signer, jwt, verifierAttestation } = await verifyJarRequestObject({
       decryptedRequestObject,
       callbacks,
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
     if (!authorizationRequestPayload.client_id) {
       throw new Oauth2ServerErrorResponseError({
@@ -157,6 +181,7 @@ export async function verifyJarRequest(options: VerifyJarRequestOptions): Promis
       authorizationRequestPayload,
       signer,
       decryptionJwk,
+      verifierAttestation,
     }
   } catch (error) {
     throw withUnverifiedAuthorizationRequest(error, decryptedRequestObject)
@@ -179,7 +204,16 @@ function withUnverifiedAuthorizationRequest(error: unknown, requestObject: strin
             },
             { cause: error, internalMessage: error.message }
           )
-        : undefined
+        : // e.g. a request object that is expired or not yet valid
+          error instanceof JoseValidationError
+          ? new Oauth2ServerErrorResponseError(
+              {
+                error: Oauth2ErrorCodes.InvalidRequestObject,
+                error_description: validationErrorMessage('The request object is not valid.', error.issues),
+              },
+              { cause: error, internalMessage: error.message }
+            )
+          : undefined
   if (!serverError) return error
 
   let payload: unknown
@@ -222,14 +256,17 @@ async function decryptJarRequest(options: { jwe: string; callbacks: Pick<Callbac
 async function verifyJarRequestObject(options: {
   decryptedRequestObject: string
   callbacks: Pick<CallbackContext, 'verifyJws'>
+  now?: Date
+  allowedSkewInSeconds?: number
 }) {
   const { decryptedRequestObject, callbacks } = options
 
   const jwt = decodeJwt({ jwt: decryptedRequestObject, payloadSchema: zJarRequestObjectPayload })
 
   let jwtSigner: JwsSigner
+  let verifierAttestation: VerifiedVerifierAttestation | undefined
 
-  const { clientIdPrefix } = getOpenid4vpClientId({
+  const { clientIdPrefix, clientIdIdentifier } = getOpenid4vpClientId({
     responseMode: jwt.payload.response_mode,
     clientId: jwt.payload.client_id,
     legacyClientIdScheme: jwt.payload.client_id_scheme,
@@ -243,8 +280,8 @@ async function verifyJarRequestObject(options: {
     origin: [], // no signing allowed
     redirect_uri: [], // no signing allowed
 
-    // Not 100% sure which one are allowed?
-    verifier_attestation: ['did', 'federation', 'jwk', 'x5c', 'custom'],
+    // Handled separately
+    verifier_attestation: [],
 
     x509_san_dns: ['x5c'],
     x509_san_uri: ['x5c'],
@@ -269,6 +306,19 @@ async function verifyJarRequestObject(options: {
       trustChain: jwt.payload.trust_chain,
       kid: jwt.header.kid,
     }
+  } else if (clientIdPrefix === 'verifier_attestation') {
+    const redirectUri = jwt.payload.redirect_uri
+    verifierAttestation = await verifyVerifierAttestation({
+      verifierAttestationJwt: jwt.header.jwt,
+      clientIdIdentifier,
+      redirectUri: typeof redirectUri === 'string' ? redirectUri : undefined,
+      callbacks,
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
+    })
+
+    // OpenID4VP 1.0 Section 5.9.3: the request is signed with the key in the `cnf` claim of the attestation
+    jwtSigner = { method: 'jwk', alg: jwt.header.alg, publicJwk: verifierAttestation.payload.cnf.jwk }
   } else {
     jwtSigner = jwsSignerFromHeader({
       header: jwt.header,
@@ -281,11 +331,13 @@ async function verifyJarRequestObject(options: {
     verifyJwsCallback: callbacks.verifyJws,
     jwt,
     signer: jwtSigner,
+    now: options.now,
+    skewSeconds: options.allowedSkewInSeconds,
   })
 
   // biome-ignore lint/suspicious/noExplicitAny: no explanation
   const version = parseAuthorizationRequestVersion(jwt.payload as any)
-  if (jwt.header.typ !== signedAuthorizationRequestJwtHeaderTyp && version >= 24) {
+  if (!isJwtTyp(jwt.header.typ, signedAuthorizationRequestJwtHeaderTyp) && version >= 24) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequestObject,
       error_description: `Invalid Jar Request Object typ header. Expected "oauth-authz-req+jwt", received "${jwt.header.typ}".`,
@@ -296,5 +348,6 @@ async function verifyJarRequestObject(options: {
     signer,
     jwt,
     authorizationRequestPayload: jwt.payload,
+    verifierAttestation,
   }
 }

@@ -94,7 +94,15 @@ z.object({ exp: z.number(), iat: z.number() }).superRefine((payload, ctx) => {
 
 When an assert or parse function finds an error, it throws the validation error of its package, e.g. `RegistrationCertificateValidationError`, with the `issues` of the validation. It extends `ValidationError`, so `instanceof ValidationError` catches the validation errors of every package, and `validationErrorMessage` builds its message.
 
-`parseWithErrorHandling(schema, value, message)` parses without `codes` and throws a `ValidationError` with the issues. The message lists the errors with their path, never the parsed value.
+`parseWithSchema` returns a `SchemaParseResult`: `{ success: true, data }` or `{ success: false, issues }`. `parseWithErrorHandling(schema, value, message)` parses without `codes` and throws a `ValidationError` with the issues. The message lists the errors with their path, never the parsed value. A union that no member matches lists its members as numbered options, each with its errors. Give the members a label, e.g. the version of a specification, with `unionParams`:
+
+```typescript
+import { unionParams } from '@owf/identity-common'
+
+const zMetadata = z.union([zMetadataV1, zMetadataDraft11], unionParams('Invalid metadata', ['version 1.0', 'draft 11']))
+```
+
+`zTyp('dpop+jwt')` validates a JOSE `typ` header and `isJwtTyp(typ, 'dpop+jwt')` compares one. Both accept the `typ` in any casing and with the `application/` prefix (RFC 7515 Section 4.1.9), so compare a parsed `typ` with `isJwtTyp`, not with `===`.
 
 ## Related Packages
 

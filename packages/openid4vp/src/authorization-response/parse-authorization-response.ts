@@ -21,6 +21,19 @@ export interface ParseOpenid4vpAuthorizationResponseOptions {
   callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJws'>
 
   origin?: string
+
+  /**
+   * Date to verify the `exp`, `nbf` and `iat` of a JARM response against. If not provided the current date
+   * will be used.
+   */
+  now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of a JARM response.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export type ParsedOpenid4vpAuthorizationResponse = ValidateOpenid4vpAuthorizationResponseResult & {
@@ -44,6 +57,8 @@ export async function parseOpenid4vpAuthorizationResponse(
   })
   if (authorizationResponse.response) {
     return parseJarmAuthorizationResponse({
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
       jarmResponseJwt: authorizationResponse.response as string,
       callbacks,
       authorizationRequestPayload,

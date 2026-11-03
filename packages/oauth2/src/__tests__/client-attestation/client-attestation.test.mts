@@ -1,7 +1,6 @@
 import { calculateJwkThumbprint, decodeJwt, type Jwk, signJwt } from '@owf/jose'
 import * as jose from 'jose'
 import { beforeAll, describe, expect, test } from 'vitest'
-import { HashAlgorithm } from '../../callbacks'
 import {
   createClientAttestationJwt,
   verifyClientAttestation,
@@ -184,7 +183,7 @@ describe('Client (Wallet) Attestation', () => {
           clientAttestation,
           clientAttestationPopJwt: await signClientAttestationPopJwt('oauth-client-attestation+jwt'),
         })
-      ).rejects.toThrow(`Expected the media type to be 'oauth-client-attestation-pop+jwt' at "typ"`)
+      ).rejects.toThrow(`typ: typ must be oauth-client-attestation-pop+jwt (invalid_typ)`)
     })
   })
 
@@ -220,7 +219,7 @@ describe('Client (Wallet) Attestation', () => {
           callbacks,
           clientAttestationJwt: await signClientAttestationJwt('oauth-client-attestation-pop+jwt'),
         })
-      ).rejects.toThrow(`Expected the media type to be 'oauth-client-attestation+jwt' at "typ"`)
+      ).rejects.toThrow(`typ: typ must be oauth-client-attestation+jwt (invalid_typ)`)
     })
 
     test('returns the jwk thumbprint of the cnf key', async () => {
@@ -228,7 +227,7 @@ describe('Client (Wallet) Attestation', () => {
 
       expect(confirmationJwkThumbprint).toEqual(
         await calculateJwkThumbprint({
-          hashAlgorithm: HashAlgorithm.Sha256,
+          hashAlgorithm: 'sha-256',
           hashCallback: callbacks.hash,
           jwk: instance.publicJwk,
         })

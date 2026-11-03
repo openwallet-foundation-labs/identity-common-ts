@@ -7,7 +7,7 @@ import {
   zAuthorizationServerMetadata,
 } from '@openid4vc/oauth2'
 
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import type { Openid4vciVersion } from '../version'
 import {
   type CredentialIssuerMetadataSigned,
@@ -60,6 +60,14 @@ export interface ResolveIssuerMetadataOptions {
    * current time will be used
    */
   now?: Date
+
+  /**
+   * Only used for verifying signed issuer metadata. Allowed clock skew in seconds for the `exp`, `nbf`
+   * and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export interface IssuerMetadataResult {
@@ -94,6 +102,7 @@ export async function resolveIssuerMetadata(
     callbacks: options?.callbacks,
     signedMetadata: options?.signedMetadata,
     now: options?.now,
+    allowedSkewInSeconds: options?.allowedSkewInSeconds,
   })
   if (!credentialIssuerMetadataWithDraftVersion) {
     throw new Oauth2Error(`Well known credential issuer metadata for issuer '${credentialIssuer}' not found.`)

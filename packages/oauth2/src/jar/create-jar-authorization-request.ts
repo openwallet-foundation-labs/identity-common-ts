@@ -1,4 +1,5 @@
-import { addSecondsToDate, dateToSeconds } from '@openid4vc/utils'
+import { addSecondsToDate } from '@openid4vc/utils'
+import { dateToSeconds } from '@owf/identity-common'
 import { type JweEncryptor, type Jwk, type JwsSigner, type JwtPayload, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import type { JarAuthorizationRequest } from './z-jar-authorization-request'

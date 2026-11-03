@@ -1,4 +1,4 @@
-import { encodeToBase64Url, parseWithErrorHandling } from '@openid4vc/utils'
+import { base64url, parseWithErrorHandling } from '@owf/identity-common'
 import { type CreateAccessTokenOptions, createAccessTokenJwt } from './access-token/create-access-token'
 import {
   type CreateAccessTokenResponseOptions,
@@ -57,15 +57,13 @@ export interface Oauth2AuthorizationServerOptions {
   callbacks: Omit<CallbackContext, 'decryptJwe' | 'encryptJwe'>
 
   /**
-   * Default allowed clock skew in seconds for DPoP and client attestation verification.
+   * Default allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of request objects, client
+   * attestation and client attestation PoP JWTs and DPoP proofs, including the `maxProofAgeSeconds` check of
+   * DPoP proofs.
    *
-   * Applied to the `exp`, `nbf` and `iat` checks of client attestation and client attestation PoP JWTs and of
-   * DPoP proofs, and to the `iat` checks of DPoP proofs against `maxProofAgeSeconds`.
+   * A per-call `allowedSkewInSeconds` takes precedence, including `0`.
    *
-   * A per-call `allowedSkewInSeconds` in the client attestation or DPoP options takes precedence, including `0`.
-   *
-   * If not provided, the `exp`, `nbf` and `iat` checks allow a skew of 30 seconds, and the checks against
-   * `maxProofAgeSeconds` allow none.
+   * @default 30
    */
   allowedSkewInSeconds?: number
 }
@@ -181,7 +179,7 @@ export class Oauth2AuthorizationServer {
         typeof options.refreshToken === 'string'
           ? options.refreshToken
           : options.refreshToken
-            ? encodeToBase64Url(await this.options.callbacks.generateRandom(32))
+            ? base64url.encode(await this.options.callbacks.generateRandom(32))
             : undefined,
       callbacks: this.options.callbacks,
       expiresInSeconds: options.expiresInSeconds,
@@ -211,8 +209,8 @@ export class Oauth2AuthorizationServer {
     return verifyPushedAuthorizationRequest({
       ...options,
       callbacks: this.options.callbacks,
-      clientAttestation: this.withDefaultSkew(options.clientAttestation),
-      dpop: this.withDefaultSkew(options.dpop),
+      // also the default of the DPoP proof and the client attestation
+      allowedSkewInSeconds: options.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
     })
   }
 

@@ -1,15 +1,16 @@
-import { dateToSeconds, type FetchHeaders, parseWithErrorHandling } from '@openid4vc/utils'
-import { IdentityError } from '@owf/identity-common'
+import type { FetchHeaders } from '@openid4vc/utils'
+import { dateToSeconds, IdentityError, parseWithErrorHandling } from '@owf/identity-common'
 import {
   calculateJwkThumbprint,
   decodeJwt,
+  JoseInvalidArgumentError,
   type JwsSigner,
   jwsHeaderFromSigner,
   signJwt,
   verifyJwt,
   zCompactJwt,
 } from '@owf/jose'
-import { type CallbackContext, HashAlgorithm } from '../callbacks'
+import type { CallbackContext } from '../callbacks'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { Oauth2Error } from '../error/Oauth2Error'
 import { Oauth2ServerErrorResponseError } from '../error/Oauth2ServerErrorResponseError'
@@ -87,7 +88,7 @@ export async function verifyClientAttestationJwt(options: VerifyClientAttestatio
   }
 
   const confirmationJwkThumbprint = await calculateJwkThumbprint({
-    hashAlgorithm: HashAlgorithm.Sha256,
+    hashAlgorithm: 'sha-256',
     hashCallback: options.callbacks.hash,
     jwk: payload.cnf.jwk,
   })
@@ -172,7 +173,7 @@ export async function createClientAttestationJwt(options: CreateClientAttestatio
     // `iss` was removed from the Client Attestation JWT in draft 08. Only include it when a
     // legacy `issuer` is explicitly provided.
     ...(options.issuer ? { iss: options.issuer } : {}),
-    iat: dateToSeconds(options.issuedAt),
+    iat: dateToSeconds(options.issuedAt ?? new Date()),
     exp: dateToSeconds(options.expiresAt),
     sub: options.clientId,
     cnf: options.confirmation,
@@ -290,8 +291,9 @@ export async function verifyClientAttestation({
       clientAttestationPop,
     }
   } catch (error) {
-    // Covers Oauth2Error, the jose errors and a ValidationError for a malformed client attestation
-    if (error instanceof IdentityError) {
+    // Covers Oauth2Error, the jose errors and a ValidationError for a malformed client attestation. A wrong
+    // option, such as a negative skew, is a mistake of the server, not of the client.
+    if (error instanceof IdentityError && !(error instanceof JoseInvalidArgumentError)) {
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidClient,

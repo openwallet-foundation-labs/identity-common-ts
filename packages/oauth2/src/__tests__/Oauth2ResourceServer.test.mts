@@ -384,6 +384,38 @@ describe('Oauth2ResourceServer', () => {
     expect(jwksRequestCount).toEqual(1)
   })
 
+  test('applies its allowed skew to the access token, and a per-call one takes precedence', async () => {
+    const { jwt } = await createAccessTokenJwt({
+      audience: 'https://resource-server.com',
+      authorizationServer: authorizationServerMetadata.issuer,
+      callbacks: { ...callbacks, signJws: getSignJwsCallback([accessTokenSignerJwk]) },
+      expiresInSeconds: 300,
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: accessTokenSignerJwkPublic },
+      subject: 'pre-auth-code',
+      now: new Date('2024-10-01T00:00:00Z'),
+    })
+    const verify = (resourceServer: Oauth2ResourceServer, allowedSkewInSeconds?: number) =>
+      resourceServer.verifyResourceRequest({
+        authorizationServers: [authorizationServerMetadata],
+        request: {
+          method: 'POST',
+          url: 'https://resource-server.com/endpoint',
+          headers: new Headers({ Authorization: `Bearer ${jwt}` }),
+        },
+        // 10 seconds after the token expired
+        now: new Date('2024-10-01T00:05:10Z'),
+        resourceServer: 'https://resource-server.com',
+        allowedSkewInSeconds,
+      })
+    const getJwks = () => ({ keys: [accessTokenSignerJwkPublic] })
+    const withDefault = new Oauth2ResourceServer({ callbacks: { ...callbacks, getJwks } })
+    const withoutSkew = new Oauth2ResourceServer({ callbacks: { ...callbacks, getJwks }, allowedSkewInSeconds: 0 })
+
+    await expect(verify(withDefault)).resolves.toBeDefined()
+    await expect(verify(withoutSkew)).rejects.toThrow('(expired)')
+    await expect(verify(withoutSkew, 30)).resolves.toBeDefined()
+  })
+
   describe('token introspection', () => {
     const firstAuthorizationServer = {
       issuer: 'https://first-authorization-server.com',
@@ -464,6 +496,54 @@ describe('Oauth2ResourceServer', () => {
       expect(tokenPayload.sub).toEqual('pre-auth-code')
       expect(authorizationServer).toEqual(secondAuthorizationServer.issuer)
     })
+
+    test.each([
+      ['for another resource server', 'https://other-resource-server.com', new Date('2024-10-01')],
+      ['that is expired', 'https://resource-server.com', new Date('2024-10-02')],
+    ])('rejects a jwt access token %s without introspecting it', async (_description, audience, now) => {
+      let introspectionCount = 0
+      server.resetHandlers(
+        http.post(firstAuthorizationServer.introspection_endpoint, () => {
+          introspectionCount++
+          return HttpResponse.json({ active: true, sub: 'pre-auth-code' })
+        })
+      )
+
+      const accessTokenSigner = { method: 'jwk', alg: 'ES256', publicJwk: accessTokenSignerJwkPublic } as const
+      const { jwt } = await createAccessTokenJwt({
+        audience,
+        authorizationServer: firstAuthorizationServer.issuer,
+        callbacks: { ...callbacks, signJws: getSignJwsCallback([accessTokenSignerJwk]) },
+        expiresInSeconds: 300,
+        signer: accessTokenSigner,
+        subject: 'pre-auth-code',
+        now: new Date('2024-10-01'),
+      })
+
+      const resourceServer = new Oauth2ResourceServer({
+        callbacks: {
+          ...callbacks,
+          fetch,
+          clientAuthentication: () => {},
+          getJwks: () => ({ keys: [accessTokenSignerJwkPublic] }),
+        },
+      })
+      await expect(
+        resourceServer.verifyResourceRequest({
+          authorizationServers: [
+            { ...firstAuthorizationServer, jwks_uri: 'https://first-authorization-server.com/jwks' },
+          ],
+          request: {
+            method: 'POST',
+            url: 'https://resource-server.com/endpoint',
+            headers: new Headers({ Authorization: `Bearer ${jwt}` }),
+          },
+          now,
+          resourceServer: 'https://resource-server.com',
+        })
+      ).rejects.toMatchObject({ wwwAuthenticateHeaders: [expect.objectContaining({ error: 'invalid_token' })] })
+      expect(introspectionCount).toBe(0)
+    })
   })
 
   describe('access token typ', () => {
@@ -521,7 +601,7 @@ describe('Oauth2ResourceServer', () => {
       }).catch((e) => e)
 
       expect(error).toBeInstanceOf(JoseValidationError)
-      expect(error.message).toContain(`Expected the media type to be 'at+jwt' at "typ"`)
+      expect(error.message).toContain(`typ: typ must be at+jwt (invalid_typ)`)
     })
   })
 })

@@ -1,14 +1,7 @@
 export { arrayEqualsIgnoreOrder } from './array'
 export { getGlobalConfig, type Oid4vcTsConfig, setGlobalConfig } from './config'
 export { ContentType, isContentType, isResponseContentType } from './content-type'
-export { addSecondsToDate, dateToSeconds } from './date'
-export {
-  decodeBase64,
-  decodeUtf8String,
-  encodeToBase64,
-  encodeToBase64Url,
-  encodeToUtf8String,
-} from './encoding'
+export { addSecondsToDate } from './date'
 export { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
 export { JsonParseError } from './error/JsonParseError'
 export { Openid4vcBaseError } from './error/Openid4vcBaseError'
@@ -24,25 +17,21 @@ export {
 } from './globals'
 export { isObject, mergeDeep } from './object'
 export {
-  type BaseSchema,
   type InferOutputUnion,
   parseIfJson,
-  parseWithErrorHandling,
   stringToJsonWithErrorHandling,
 } from './parse'
 export { joinUriParts } from './path'
-export type { NonEmptyArray, Optional, OrPromise, Simplify, StringWithAutoCompletion } from './type'
+export type { NonEmptyArray, Optional, Simplify, StringWithAutoCompletion } from './type'
 export { getQueryParams, objectToQueryParams } from './url'
 export {
   type HttpMethod,
-  isJwtTyp,
   zDataUrl,
   zHttpMethod,
   zHttpsUrl,
   zInteger,
   zIs,
   zStringToJson,
-  zTyp,
 } from './validation'
 export {
   encodeWwwAuthenticateHeader,

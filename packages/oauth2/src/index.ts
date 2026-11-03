@@ -9,10 +9,8 @@ export {
 // The jwt parsing and verification errors are raised by `@owf/jose`, so they are exported here as well.
 export {
   JoseAlgorithmNotAllowedError,
-  JoseClaimVerificationError,
-  type JoseClaimVerificationReason,
-  JoseCriticalHeaderError,
   JoseError,
+  JoseInvalidArgumentError,
   JoseNotSupportedError,
   JoseParseError,
   JoseSignatureVerificationError,
@@ -87,12 +85,10 @@ export type {
   GenerateRandomCallback,
   GetAuthorizationServerMetadataCallback,
   GetJwksCallback,
-  HashCallback,
   SignJwsCallback,
   VerifyDataIntegrityProofCallback,
   VerifyJwsCallback,
 } from './callbacks'
-export { HashAlgorithm } from './callbacks'
 export {
   type CreateClientAttestationJwtOptions,
   createClientAttestationJwt,

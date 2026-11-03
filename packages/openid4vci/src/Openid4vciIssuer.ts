@@ -1,12 +1,14 @@
 import {
   type CallbackContext,
+  JoseInvalidArgumentError,
+  JoseValidationError,
   JoseVerificationError,
   Oauth2AuthorizationServer,
   Oauth2ErrorCodes,
   Oauth2ServerErrorResponseError,
   type VerifyClientAttestationOptions,
 } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import { type CreateCredentialOfferOptions, createCredentialOffer } from './credential-offer/credential-offer'
 import {
   type CreateCredentialResponseOptions,
@@ -72,10 +74,27 @@ export interface Openid4vciIssuerOptions {
    * Callbacks required for the openid4vc issuer.
    */
   callbacks: Omit<CallbackContext, 'decryptJwe'> & Partial<Pick<CallbackContext, 'decryptJwe'>>
+
+  /**
+   * Default allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of proofs, key attestations,
+   * wallet attestations, DPoP proofs and request objects. A per-call `allowedSkewInSeconds` takes precedence,
+   * including `0`.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export class Openid4vciIssuer {
   public constructor(private options: Openid4vciIssuerOptions) {}
+
+  private withDefaultSkew<T extends { allowedSkewInSeconds?: number }>(options: T): T
+  private withDefaultSkew<T extends { allowedSkewInSeconds?: number }>(options: T | undefined): T | undefined
+  private withDefaultSkew<T extends { allowedSkewInSeconds?: number }>(options: T | undefined) {
+    if (!options) return undefined
+
+    return { ...options, allowedSkewInSeconds: options.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds }
+  }
 
   public getCredentialIssuerMetadataDraft11(credentialIssuerMetadata: CredentialIssuerMetadata) {
     return parseWithErrorHandling(zCredentialIssuerMetadataWithDraft11, credentialIssuerMetadata)
@@ -139,7 +158,13 @@ export class Openid4vciIssuer {
   public async verifyCredentialRequestJwtProof(
     options: Pick<
       VerifyCredentialRequestJwtProofOptions,
-      'clientId' | 'jwt' | 'now' | 'expectedNonce' | 'nonceExpiresAt' | 'keyAttestationsRequired'
+      | 'clientId'
+      | 'jwt'
+      | 'now'
+      | 'allowedSkewInSeconds'
+      | 'expectedNonce'
+      | 'nonceExpiresAt'
+      | 'keyAttestationsRequired'
     > & {
       issuerMetadata: IssuerMetadataResult
     }
@@ -153,15 +178,20 @@ export class Openid4vciIssuer {
         jwt: options.jwt,
         clientId: options.clientId,
         now: options.now,
+        allowedSkewInSeconds: options.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
         keyAttestationsRequired: options.keyAttestationsRequired,
       })
     } catch (error) {
+      // A wrong option, such as a negative skew, is a mistake of the issuer, not of the proof
+      if (error instanceof JoseInvalidArgumentError) throw error
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidProof,
           error_description:
             // TODO: error should have a internalErrorMessage and a publicErrorMessage
-            error instanceof JoseVerificationError || error instanceof Openid4vciError
+            error instanceof JoseVerificationError ||
+            error instanceof JoseValidationError ||
+            error instanceof Openid4vciError
               ? error.message
               : 'Invalid proof',
         },
@@ -181,7 +211,12 @@ export class Openid4vciIssuer {
   public async verifyCredentialRequestAttestationProof(
     options: Pick<
       VerifyCredentialRequestAttestationProofOptions,
-      'keyAttestationJwt' | 'expectedNonce' | 'nonceExpiresAt' | 'now' | 'keyAttestationsRequired'
+      | 'keyAttestationJwt'
+      | 'expectedNonce'
+      | 'nonceExpiresAt'
+      | 'now'
+      | 'allowedSkewInSeconds'
+      | 'keyAttestationsRequired'
     > & {
       issuerMetadata: IssuerMetadataResult
     }
@@ -193,15 +228,20 @@ export class Openid4vciIssuer {
         keyAttestationJwt: options.keyAttestationJwt,
         nonceExpiresAt: options.nonceExpiresAt,
         now: options.now,
+        allowedSkewInSeconds: options.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
         keyAttestationsRequired: options.keyAttestationsRequired,
       })
     } catch (error) {
+      // A wrong option, such as a negative skew, is a mistake of the issuer, not of the proof
+      if (error instanceof JoseInvalidArgumentError) throw error
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidProof,
           error_description:
             // TODO: error should have a internalErrorMessage and a publicErrorMessage
-            error instanceof JoseVerificationError || error instanceof Openid4vciError
+            error instanceof JoseVerificationError ||
+            error instanceof JoseValidationError ||
+            error instanceof Openid4vciError
               ? error.message
               : 'Invalid proof',
         },
@@ -317,6 +357,7 @@ export class Openid4vciIssuer {
   public async verifyWalletAttestation(options: Omit<VerifyClientAttestationOptions, 'callbacks'>) {
     return new Oauth2AuthorizationServer({
       callbacks: this.options.callbacks,
+      allowedSkewInSeconds: this.options.allowedSkewInSeconds,
     }).verifyClientAttestation(options)
   }
 
@@ -350,7 +391,9 @@ export class Openid4vciIssuer {
   ) {
     return verifyInteractiveAuthorizationInitialRequest({
       callbacks: this.options.callbacks,
-      ...options,
+      ...this.withDefaultSkew(options),
+      clientAttestation: this.withDefaultSkew(options.clientAttestation),
+      dpop: this.withDefaultSkew(options.dpop),
     })
   }
 

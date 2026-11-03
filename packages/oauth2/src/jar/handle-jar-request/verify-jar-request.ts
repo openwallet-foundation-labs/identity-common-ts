@@ -1,13 +1,6 @@
 import { ContentType, createFetcher, type Fetch, zHttpsUrl } from '@openid4vc/utils'
-import {
-  decodeJwt,
-  type JwsSigner,
-  type JwsSignerWithJwk,
-  verifyJwt,
-  zCompactJwe,
-  zCompactJwt,
-  zJoseType,
-} from '@owf/jose'
+import { createAcceptHeader, zTyp } from '@owf/identity-common'
+import { decodeJwt, type JwsSigner, type JwsSignerWithJwk, verifyJwt, zCompactJwe, zCompactJwt } from '@owf/jose'
 import type { CallbackContext } from '../../callbacks'
 import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
 import { Oauth2ServerErrorResponseError } from '../../error/Oauth2ServerErrorResponseError'
@@ -46,6 +39,13 @@ export interface VerifyJarRequestOptions {
    * current date will be used.
    */
   now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export interface ParsedJarRequest {
@@ -95,7 +95,7 @@ export async function parseJarRequest(options: ParsedJarRequestOptions): Promise
  * @returns The verified authorization request parameters and metadata
  */
 export async function verifyJarRequest(options: VerifyJarRequestOptions): Promise<VerifiedJarRequest> {
-  const { jarRequestParams, authorizationRequestJwt, callbacks, jwtSigner, now } = options
+  const { jarRequestParams, authorizationRequestJwt, callbacks, jwtSigner, now, allowedSkewInSeconds } = options
 
   /* Encryption is not supported */
   const requestObjectIsEncrypted = zCompactJwe.safeParse(authorizationRequestJwt).success
@@ -119,6 +119,7 @@ export async function verifyJarRequest(options: VerifyJarRequestOptions): Promis
     callbacks,
     jwtSigner,
     now,
+    allowedSkewInSeconds,
   })
   if (!authorizationRequestPayload.client_id) {
     throw new Oauth2ServerErrorResponseError({
@@ -155,7 +156,7 @@ async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetc
   const response = await createFetcher(fetch)(requestUri, {
     method: 'get',
     headers: {
-      Accept: `${ContentType.OauthAuthorizationRequestJwt}, ${ContentType.Jwt};q=0.9, text/plain`,
+      Accept: createAcceptHeader([ContentType.OauthAuthorizationRequestJwt, ContentType.Jwt, 'text/plain']),
       'Content-Type': ContentType.XWwwFormUrlencoded,
     },
   }).catch(() => {
@@ -175,15 +176,16 @@ async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetc
   return await response.text()
 }
 
-const zJarRequestObjectTyp = zJoseType([signedAuthorizationRequestJwtHeaderTyp, jwtAuthorizationRequestJwtHeaderTyp])
+const zJarRequestObjectTyp = zTyp(signedAuthorizationRequestJwtHeaderTyp, jwtAuthorizationRequestJwtHeaderTyp)
 
 async function verifyJarRequestObject(options: {
   authorizationRequestJwt: string
   callbacks: Pick<CallbackContext, 'verifyJws'>
   jwtSigner: JwsSigner
   now?: Date
+  allowedSkewInSeconds?: number
 }) {
-  const { authorizationRequestJwt, callbacks, jwtSigner, now } = options
+  const { authorizationRequestJwt, callbacks, jwtSigner, now, allowedSkewInSeconds } = options
 
   const jwt = decodeJwt({ jwt: authorizationRequestJwt, payloadSchema: zJarRequestObjectPayload })
 
@@ -192,6 +194,7 @@ async function verifyJarRequestObject(options: {
     jwt,
     signer: jwtSigner,
     now,
+    skewSeconds: allowedSkewInSeconds,
   })
 
   // Some existing deployments may alternatively be using both type

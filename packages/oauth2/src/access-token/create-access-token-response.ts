@@ -1,4 +1,4 @@
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import { type AccessTokenResponse, zAccessTokenResponse } from './z-access-token'
 

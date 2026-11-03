@@ -1,3 +1,4 @@
+import { zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 import {
   zCredentialConfigurationSupportedClaimsDraft14,
@@ -29,7 +30,7 @@ export type LegacySdJwtVcFormatIdentifier = z.infer<typeof zLegacySdJwtVcFormatI
  * implementations accordingly.
  */
 export const zLegacySdJwtVcCredentialIssuerMetadataV1 = zCredentialConfigurationSupportedCommon.extend({
-  vct: z.string(),
+  vct: zNonEmptyString,
   format: zLegacySdJwtVcFormatIdentifier,
   order: z.optional(z.array(z.string())),
   credential_signing_alg_values_supported: z.array(z.string()).optional(),
@@ -47,7 +48,7 @@ export const zLegacySdJwtVcCredentialIssuerMetadataV1 = zCredentialConfiguration
  * implementations accordingly.
  */
 export const zLegacySdJwtVcCredentialIssuerMetadataDraft14 = zCredentialConfigurationSupportedCommonDraft15.extend({
-  vct: z.string(),
+  vct: zNonEmptyString,
   format: zLegacySdJwtVcFormatIdentifier,
   claims: z.optional(zCredentialConfigurationSupportedClaimsDraft14),
   order: z.optional(z.array(z.string())),
@@ -61,7 +62,7 @@ export const zLegacySdJwtVcCredentialIssuerMetadataDraft14 = zCredentialConfigur
  */
 export const zLegacySdJwtVcCredentialRequestFormatDraft14 = z.object({
   format: zLegacySdJwtVcFormatIdentifier,
-  vct: z.string(),
+  vct: zNonEmptyString,
   claims: z.optional(zCredentialConfigurationSupportedClaimsDraft14),
   credential_definition: z.optional(z.never()),
 })

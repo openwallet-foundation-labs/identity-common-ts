@@ -1,5 +1,5 @@
 import { IdentityError } from '@owf/identity-common'
-import type { Jwk } from '@owf/jose'
+import { JoseInvalidArgumentError, type Jwk } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import {
   type VerifiedClientAttestationJwt,
@@ -428,8 +428,9 @@ async function verifyAccessTokenRequestClientAttestationDpop(
       allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
   } catch (error) {
-    // Covers Oauth2Error, the jose errors and a ValidationError for a malformed client attestation
-    if (error instanceof IdentityError) {
+    // Covers Oauth2Error, the jose errors and a ValidationError for a malformed client attestation. A wrong
+    // option, such as a negative skew, is a mistake of the server, not of the client.
+    if (error instanceof IdentityError && !(error instanceof JoseInvalidArgumentError)) {
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidClient,

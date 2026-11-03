@@ -67,6 +67,14 @@ export interface Openid4vciClientOptions {
    */
   callbacks: Omit<CallbackContext, 'verifyJws' | 'encryptJwe'> &
     Partial<Pick<CallbackContext, 'verifyJws' | 'encryptJwe'>>
+
+  /**
+   * Default allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of signed credential issuer
+   * metadata. A per-call `allowedSkewInSeconds` takes precedence, including `0`.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export class Openid4vciClient {
@@ -90,11 +98,12 @@ export class Openid4vciClient {
 
   public async resolveIssuerMetadata(
     credentialIssuer: string,
-    options?: Pick<ResolveIssuerMetadataOptions, 'signedMetadata'>
+    options?: Pick<ResolveIssuerMetadataOptions, 'signedMetadata' | 'allowedSkewInSeconds'>
   ): Promise<IssuerMetadataResult> {
     return resolveIssuerMetadata(credentialIssuer, {
       callbacks: this.options.callbacks,
       signedMetadata: options?.signedMetadata,
+      allowedSkewInSeconds: options?.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
     })
   }
 

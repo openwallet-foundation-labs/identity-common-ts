@@ -1,5 +1,5 @@
 import { type CallbackContext, isJwkInSet } from '@openid4vc/oauth2'
-import { dateToSeconds, parseWithErrorHandling } from '@openid4vc/utils'
+import { dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
 import { decodeJwt, type JwsSigner, jwsHeaderFromSigner, signJwt, verifyJwt } from '@owf/jose'
 import { Openid4vciError } from '../../../error/Openid4vciError'
 import {
@@ -63,7 +63,7 @@ export async function createCredentialRequestJwtProof(
   const payload = parseWithErrorHandling(zCredentialRequestJwtProofTypePayload, {
     nonce: options.nonce,
     aud: options.credentialIssuer,
-    iat: dateToSeconds(options.issuedAt),
+    iat: dateToSeconds(options.issuedAt ?? new Date()),
     iss: options.clientId,
   } satisfies CredentialRequestJwtProofTypePayload)
 
@@ -130,6 +130,13 @@ export interface VerifyCredentialRequestJwtProofOptions {
   now?: Date
 
   /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of the proof and its `key_attestation`.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
+
+  /**
    * The `key_attestations_required` value of the `jwt` proof type from the credential configuration in the
    * credential issuer metadata. If provided, the proof MUST contain a `key_attestation` that meets these
    * requirements.
@@ -168,6 +175,7 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
     expectedAudience: options.credentialIssuer,
     expectedIssuer: options.clientId,
     now: options.now,
+    skewSeconds: options.allowedSkewInSeconds,
   })
 
   let keyAttestationResult: VerifyKeyAttestationJwtReturn | undefined
@@ -178,6 +186,7 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
       keyAttestationJwt: header.key_attestation,
       use: 'proof_type.jwt',
       now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
       keyAttestationsRequired: options.keyAttestationsRequired,
     })
 

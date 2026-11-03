@@ -1,4 +1,4 @@
-import { dateToSeconds, encodeToBase64Url, parseWithErrorHandling } from '@openid4vc/utils'
+import { base64url, dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
 import { decodeJwt, type JwsSignerJwk, signJwt, verifyJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import { Oauth2Error } from '../error/Oauth2Error'
@@ -235,7 +235,7 @@ export async function createClientAttestationPopJwt(options: CreateClientAttesta
   const payload = parseWithErrorHandling(zClientAttestationPopJwtPayload, {
     aud: options.authorizationServer,
     iat: dateToSeconds(options.issuedAt ?? new Date()),
-    jti: encodeToBase64Url(await options.callbacks.generateRandom(32)),
+    jti: base64url.encode(await options.callbacks.generateRandom(32)),
     challenge: options.challenge ?? options.nonce,
     ...options.additionalPayload,
   } satisfies ClientAttestationPopJwtPayload)

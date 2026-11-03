@@ -22,6 +22,15 @@ export interface VerifyPushedAuthorizationRequestOptions extends VerifyAuthoriza
     jwt: string
     signer: JwsSigner
   }
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of the request object, the DPoP
+   * proof and the client attestation. A `dpop.allowedSkewInSeconds` or `clientAttestation.allowedSkewInSeconds`
+   * takes precedence for that one.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export async function verifyPushedAuthorizationRequest(
@@ -35,10 +44,17 @@ export async function verifyPushedAuthorizationRequest(
       callbacks: options.callbacks,
       jwtSigner: options.authorizationRequestJwt.signer,
       now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
   }
 
-  const { clientAttestation, dpop } = await verifyAuthorizationRequest(options)
+  const withSkew = <T extends { allowedSkewInSeconds?: number }>(nested: T | undefined) =>
+    nested && { ...nested, allowedSkewInSeconds: nested.allowedSkewInSeconds ?? options.allowedSkewInSeconds }
+  const { clientAttestation, dpop } = await verifyAuthorizationRequest({
+    ...options,
+    dpop: withSkew(options.dpop),
+    clientAttestation: withSkew(options.clientAttestation),
+  })
 
   return {
     dpop,

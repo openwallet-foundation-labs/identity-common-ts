@@ -1,10 +1,11 @@
+import { zNonEmptyString } from '@owf/identity-common'
 import { zJwtPayload } from '@owf/jose'
 import { z } from 'zod'
 
 export const zJarRequestObjectPayload = z
   .object({
     ...zJwtPayload.shape,
-    client_id: z.string(),
+    client_id: zNonEmptyString,
   })
   .loose()
 export type JarRequestObjectPayload = z.infer<typeof zJarRequestObjectPayload>

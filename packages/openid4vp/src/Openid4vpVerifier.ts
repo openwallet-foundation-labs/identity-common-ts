@@ -25,6 +25,14 @@ export interface Openid4vpVerifierOptions {
    * Callbacks required for the openid4vp verifier
    */
   callbacks: Omit<CallbackContext, 'generateRandom' | 'clientAuthentication'>
+
+  /**
+   * Default allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of JARM responses. A per-call
+   * `allowedSkewInSeconds` takes precedence, including `0`.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export class Openid4vpVerifier {
@@ -41,7 +49,10 @@ export class Openid4vpVerifier {
   }
 
   public parseOpenid4vpAuthorizationResponse(options: ParseOpenid4vpAuthorizationResponseOptions) {
-    return parseOpenid4vpAuthorizationResponse(options)
+    return parseOpenid4vpAuthorizationResponse({
+      ...options,
+      allowedSkewInSeconds: options.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
+    })
   }
 
   public validateOpenid4vpAuthorizationResponsePayload(options: ValidateOpenid4vpAuthorizationResponseOptions) {

@@ -4,8 +4,8 @@ import {
   Headers,
   InvalidFetchResponseError,
   objectToQueryParams,
-  parseWithErrorHandling,
 } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import { Oauth2Error } from '../error/Oauth2Error'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'

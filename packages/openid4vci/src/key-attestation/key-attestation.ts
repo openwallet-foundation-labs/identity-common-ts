@@ -1,5 +1,6 @@
 import type { CallbackContext } from '@openid4vc/oauth2'
-import { dateToSeconds, parseWithErrorHandling, type StringWithAutoCompletion } from '@openid4vc/utils'
+import type { StringWithAutoCompletion } from '@openid4vc/utils'
+import { dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
 import { decodeJwt, type Jwk, type JwsSigner, jwsHeaderFromSigner, signJwt, verifyJwt } from '@owf/jose'
 import { Openid4vciError } from '../error/Openid4vciError'
 import {
@@ -85,7 +86,7 @@ export async function createKeyAttestationJwt(options: CreateKeyAttestationJwtOp
   } satisfies KeyAttestationJwtHeader)
 
   const payload = parseWithErrorHandling(zKeyAttestationJwtPayloadForUse(options.use), {
-    iat: dateToSeconds(options.issuedAt),
+    iat: dateToSeconds(options.issuedAt ?? new Date()),
     exp: options.expiresAt ? dateToSeconds(options.expiresAt) : undefined,
     nonce: options.nonce,
     attested_keys: options.attestedKeys,
@@ -154,6 +155,13 @@ export interface VerifyKeyAttestationJwtOptions {
   now?: Date
 
   /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
+
+  /**
    * The `key_attestations_required` value of the proof type from the credential configuration in the
    * credential issuer metadata. If provided, the key attestation is verified against these requirements.
    */
@@ -183,6 +191,7 @@ export async function verifyKeyAttestationJwt(options: VerifyKeyAttestationJwtOp
     errorMessage: 'Error verifying key attestation jwt',
     expectedNonce: options.expectedNonce,
     now: options.now,
+    skewSeconds: options.allowedSkewInSeconds,
   })
 
   verifyKeyAttestationRequirements({

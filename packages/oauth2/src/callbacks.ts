@@ -1,13 +1,6 @@
-import type { Fetch, OrPromise } from '@openid4vc/utils'
-import type {
-  DecryptJweCallback,
-  EncryptJweCallback,
-  HashCallback,
-  Jwk,
-  JwkSet,
-  SignJwsCallback,
-  VerifyJwsCallback,
-} from '@owf/jose'
+import type { Fetch } from '@openid4vc/utils'
+import type { Hasher, OrPromise } from '@owf/identity-common'
+import type { DecryptJweCallback, EncryptJweCallback, Jwk, JwkSet, SignJwsCallback, VerifyJwsCallback } from '@owf/jose'
 import type { ClientAuthenticationCallback } from './client-authentication'
 import type { AuthorizationServerMetadata } from './metadata/authorization-server/z-authorization-server-metadata'
 
@@ -15,8 +8,6 @@ export type {
   DecryptJweCallback,
   DecryptJweCallbackOptions,
   EncryptJweCallback,
-  /** Callback used for operations that require hashing */
-  HashCallback,
   JweEncryptor,
   /**
    * Signs the signing input of a jws: the caller resolves the key from the signer, signs the bytes,
@@ -26,15 +17,6 @@ export type {
   /** Verifies the signature over the signing input of a jws, and decides whether the key is trusted. */
   VerifyJwsCallback,
 } from '@owf/jose'
-export {
-  /**
-   * Supported hashing algorithms
-   *
-   * Based on https://www.iana.org/assignments/named-information/named-information.xhtml
-   */
-  HashAlgorithm,
-} from '@owf/jose'
-
 export type GenerateRandomCallback = (byteLength: number) => OrPromise<Uint8Array>
 
 export type VerifyDataIntegrityProofCallback = (
@@ -118,7 +100,7 @@ export interface CallbackContext {
   /**
    * Hash callback used for e.g. dpop and pkce
    */
-  hash: HashCallback
+  hash: Hasher
 
   /**
    * Sign jws callback, used for signing every Json Web Token this library produces.

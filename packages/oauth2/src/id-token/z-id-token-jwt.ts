@@ -1,4 +1,4 @@
-import { zNumericDate } from '@owf/identity-common'
+import { zNonEmptyString, zNumericDate } from '@owf/identity-common'
 import { zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
 
@@ -12,9 +12,9 @@ export type IdTokenJwtHeader = z.infer<typeof zIdTokenJwtHeader>
 export const zIdTokenJwtPayload = z
   .object({
     ...zJwtPayload.shape,
-    iss: z.string(),
-    sub: z.string(),
-    aud: z.union([z.string(), z.array(z.string())]),
+    iss: zNonEmptyString,
+    sub: zNonEmptyString,
+    aud: z.union([zNonEmptyString, z.array(zNonEmptyString)]),
     exp: zNumericDate,
     iat: zNumericDate,
     auth_time: zNumericDate.optional(),

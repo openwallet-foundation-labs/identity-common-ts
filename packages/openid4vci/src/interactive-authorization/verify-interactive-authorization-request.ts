@@ -31,6 +31,13 @@ export interface VerifyInteractiveAuthorizationInitialRequestOptions
     jwt: string
     signer: JwsSigner
   }
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of the request object.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 /**
@@ -79,6 +86,7 @@ export async function verifyInteractiveAuthorizationInitialRequest(
       callbacks: options.callbacks,
       jwtSigner: options.interactiveAuthorizationRequestJwt.signer,
       now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
   }
 

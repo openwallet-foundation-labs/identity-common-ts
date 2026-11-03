@@ -1,4 +1,5 @@
 import { URL, zHttpsUrl, zStringToJson } from '@openid4vc/utils'
+import { zNonEmptyString } from '@owf/identity-common'
 import { z } from 'zod'
 import { zClientMetadata } from '../models/z-client-metadata'
 import { zVerifierAttestations } from '../models/z-verifier-attestations'
@@ -6,15 +7,15 @@ import { zVerifierAttestations } from '../models/z-verifier-attestations'
 export const zOpenid4vpAuthorizationRequest = z
   .object({
     response_type: z.literal('vp_token'),
-    client_id: z.string(),
+    client_id: zNonEmptyString,
     redirect_uri: zHttpsUrl.optional(),
     response_uri: zHttpsUrl.optional(),
     request_uri: zHttpsUrl.optional(),
     request_uri_method: z.optional(z.string()),
     response_mode: z.enum(['direct_post', 'direct_post.jwt']).optional(),
-    nonce: z.string(),
-    wallet_nonce: z.string().optional(),
-    scope: z.string().optional(),
+    nonce: zNonEmptyString,
+    wallet_nonce: zNonEmptyString.optional(),
+    scope: zNonEmptyString.optional(),
     presentation_definition: z
       .record(z.string(), z.any())
       // for backwards compat

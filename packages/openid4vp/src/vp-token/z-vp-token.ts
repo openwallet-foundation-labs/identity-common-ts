@@ -1,3 +1,4 @@
+import { unionParams } from '@owf/identity-common'
 import { z } from 'zod'
 
 const zVpTokenPresentationEntry = z.union([z.string(), z.record(z.string(), z.any())], {
@@ -26,5 +27,8 @@ export const zVpTokenDcql = z.record(
 )
 export type VpTokenDcql = z.infer<typeof zVpTokenDcql>
 
-export const zVpToken = zVpTokenDcql.or(zVpTokenPex)
+export const zVpToken = z.union(
+  [zVpTokenDcql, zVpTokenPex],
+  unionParams('Invalid vp_token', ['DCQL', 'Presentation Exchange'])
+)
 export type VpToken = z.infer<typeof zVpToken>

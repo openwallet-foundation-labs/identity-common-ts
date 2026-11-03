@@ -1,5 +1,5 @@
 import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import z from 'zod'
 import { attestationProofTypeIdentifier } from '../formats/proof-type/attestation/z-attestation-proof-type'
 import { diVpProofTypeIdentifier } from '../formats/proof-type/di-vp/z-di-vp-proof-type'

@@ -34,10 +34,32 @@ yarn add @openid4vc/openid4vp
 import { Openid4vpClient, Openid4vpVerifier } from '@openid4vc/openid4vp'
 ```
 
+`Openid4vpClient` and `Openid4vpVerifier` take an `allowedSkewInSeconds`, the clock skew for the `exp`, `nbf` and `iat` checks of the JWTs they verify, 30 seconds by default. A method that takes `allowedSkewInSeconds` itself overrides it.
+
+### Trust in signers
+
+The `verifyJws` callback verifies each signature and decides whether its signer is trusted. A JWT that carries its key as `jwk` or `x5c` in its header only proves that it was signed with that key, so the callback checks the key or certificate against what the wallet or verifier trusts.
+
+For a request with the `verifier_attestation` client identifier prefix (OpenID4VP 1.0 Section 5.9.3), the wallet verifies the Verifier Attestation JWT with `verifyVerifierAttestation`, and the request object with the key in its `cnf` claim. The callback decides whether it trusts the issuer of the attestation. Recognize the attestation with `isJwtTyp` of `@owf/identity-common`, as the `typ` is accepted in any casing and with the `application/` prefix:
+
+```ts
+import { isJwtTyp } from '@owf/identity-common'
+
+const verifyJws: VerifyJwsCallback = async (signer, context) => {
+  if (isJwtTyp(context.protectedHeader.typ, 'verifier-attestation+jwt') && !isTrustedAttestationIssuer(signer)) {
+    return { verified: false }
+  }
+  return verifyWithWebCrypto(signer, context)
+}
+```
+
+A signed JARM response (`direct_post.jwt`) can carry its key as `jwk` or `x5c` too. Its `issuer` in the result of `verifyJarmAuthorizationResponse` is only as trusted as the callback makes it.
+
 ## Dependencies
 
 - [@openid4vc/oauth2](https://www.npmjs.com/package/@openid4vc/oauth2)
 - [@openid4vc/utils](https://www.npmjs.com/package/@openid4vc/utils)
+- [@owf/identity-common](https://www.npmjs.com/package/@owf/identity-common)
 - [@owf/jose](https://www.npmjs.com/package/@owf/jose)
 - [zod](https://www.npmjs.com/package/zod)
 

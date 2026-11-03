@@ -14,9 +14,8 @@ import {
   Headers,
   InvalidFetchResponseError,
   objectToQueryParams,
-  parseWithErrorHandling,
 } from '@openid4vc/utils'
-import { ValidationError } from '@owf/identity-common'
+import { parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import { Openid4vciClientInteractiveAuthorizationError } from '../error/Openid4vciClientInteractiveAuthorizationError'
 import {
   type InteractiveAuthorizationFollowUpRequest,
@@ -180,7 +179,7 @@ export async function sendInteractiveAuthorizationRequest(options: SendInteracti
       }
 
       if (!result.success) {
-        throw new ValidationError('Error validating interactive authorization response', result.error)
+        throw new ValidationError('Error validating interactive authorization response', result.issues)
       }
 
       const dpopNonce = extractDpopNonceFromHeaders(response.headers) ?? undefined

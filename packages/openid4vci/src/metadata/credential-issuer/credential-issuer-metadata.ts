@@ -1,6 +1,6 @@
 import { type CallbackContext, fetchWellKnownMetadata, Oauth2Error } from '@openid4vc/oauth2'
-import { ContentType, joinUriParts, parseWithErrorHandling, URL } from '@openid4vc/utils'
-import { IdentityError } from '@owf/identity-common'
+import { ContentType, joinUriParts, URL } from '@openid4vc/utils'
+import { IdentityError, parseWithErrorHandling } from '@owf/identity-common'
 import { type DecodeJwtResult, decodeJwt, type JwsSignerWithJwk, verifyJwt, zCompactJwt } from '@owf/jose'
 import type { CredentialFormatIdentifier } from '../../formats/credential'
 import type { Openid4vciVersion } from '../../version'
@@ -44,6 +44,14 @@ export interface FetchCredentialIssuerMetadataOptions {
    * current time will be used
    */
   now?: Date
+
+  /**
+   * Only used for verifying signed issuer metadata. Allowed clock skew in seconds for the `exp`, `nbf`
+   * and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export interface CredentialIssuerMetadataSigned {
@@ -110,6 +118,8 @@ export async function fetchCredentialIssuerMetadata(
 
   let result = null
   let firstError = null
+  // The url that served the metadata, for the error messages
+  let metadataUrl = wellKnownMetadataUrl
 
   try {
     result = await fetchWellKnownMetadata(wellKnownMetadataUrl, zResponse, {
@@ -129,6 +139,7 @@ export async function fetchCredentialIssuerMetadata(
   // If the metadata is not available at the new URL, fetch it at the legacy URL
   // The legacy url is the same if no subpath is used by the issuer
   if (!result && legacyWellKnownMetadataUrl !== wellKnownMetadataUrl) {
+    metadataUrl = legacyWellKnownMetadataUrl
     try {
       result = await fetchWellKnownMetadata(legacyWellKnownMetadataUrl, zResponse, {
         fetch: options?.callbacks?.fetch,
@@ -161,17 +172,13 @@ export async function fetchCredentialIssuerMetadata(
     })
     const { payload } = decodedJwt
 
-    if (payload.sub !== credentialIssuer) {
-      throw new Oauth2Error(
-        `The 'sub' parameter '${payload.sub}' in the signed well known credential issuer metadata at '${wellKnownMetadataUrl}' does not match the provided credential issuer '${credentialIssuer}'.`
-      )
-    }
-
     const verifyResult = await verifyJwt({
       jwt: decodedJwt,
       verifyJwsCallback: options.callbacks.verifyJws,
       now: options.now,
-      errorMessage: 'signed credential issuer metadata jwt verification failed',
+      skewSeconds: options.allowedSkewInSeconds,
+      expectedSubject: credentialIssuer,
+      errorMessage: `Verification of the signed credential issuer metadata at '${metadataUrl}' failed`,
     })
 
     const issuerMetadata = parseWithErrorHandling(
@@ -197,7 +204,7 @@ export async function fetchCredentialIssuerMetadata(
     issuerMetadataWithVersion.credentialIssuerMetadata.credential_issuer !== credentialIssuer
   ) {
     throw new Oauth2Error(
-      `The 'credential_issuer' parameter '${issuerMetadataWithVersion.credentialIssuerMetadata.credential_issuer}' in the well known credential issuer metadata at '${wellKnownMetadataUrl}' does not match the provided credential issuer '${credentialIssuer}'.`
+      `The 'credential_issuer' parameter '${issuerMetadataWithVersion.credentialIssuerMetadata.credential_issuer}' in the well known credential issuer metadata at '${metadataUrl}' does not match the provided credential issuer '${credentialIssuer}'.`
     )
   }
 

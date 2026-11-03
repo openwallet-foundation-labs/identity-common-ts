@@ -1,4 +1,4 @@
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import { decodeJwt } from '@owf/jose'
 import z from 'zod'
 import {

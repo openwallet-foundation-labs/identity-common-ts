@@ -2,7 +2,7 @@ import { base64url, parseWithSchema, stringToBytes, ValidationError, zTyp } from
 import { describe, expect, it } from 'vitest'
 import z from 'zod'
 import { JoseValidationError } from '../error'
-import { zJwsAlg } from '../jwa/z-alg'
+import { zJweAlg, zJwsAlg } from '../jwa/z-alg'
 import { zX5cCertificate } from '../jwk/z-x5c'
 import { assertCriticalHeaderParameters } from '../jws/critical-headers'
 import { parseJws } from '../jws/parse-jws'
@@ -48,6 +48,7 @@ describe('a JWS whose header does not validate', () => {
 describe('the codes of the jose schemas', () => {
   it.each(['none', 'NONE'])('reports alg %s as invalid_value', (alg) => {
     expect(codesOf(zJwsAlg, alg)).toEqual([{ code: 'invalid_value', path: [] }])
+    expect(codesOf(zJweAlg, alg)).toEqual([{ code: 'invalid_value', path: [] }])
   })
 
   it('reports a certificate that is not standard base64 as invalid_format base64', () => {

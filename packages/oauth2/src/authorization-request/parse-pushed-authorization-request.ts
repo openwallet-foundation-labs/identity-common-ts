@@ -1,5 +1,4 @@
-import { parseWithErrorHandling } from '@openid4vc/utils'
-import { formatZodError } from '@owf/identity-common'
+import { parseWithErrorHandling, parseWithSchema, validationErrorMessage } from '@owf/identity-common'
 import { decodeJwt } from '@owf/jose'
 import z from 'zod'
 import type { CallbackContext } from '../callbacks'
@@ -63,11 +62,14 @@ export async function parsePushedAuthorizationRequest(
     })
     const jwt = decodeJwt({ jwt: parsedJar.authorizationRequestJwt })
 
-    const parsedAuthorizationRequest = zAuthorizationRequest.safeParse(jwt.payload)
+    const parsedAuthorizationRequest = parseWithSchema(zAuthorizationRequest, jwt.payload)
     if (!parsedAuthorizationRequest.success) {
       throw new Oauth2ServerErrorResponseError({
         error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: `Invalid authorization request. Could not parse jar request payload.\n${formatZodError(parsedAuthorizationRequest.error)}`,
+        error_description: validationErrorMessage(
+          'Invalid authorization request. Could not parse jar request payload.',
+          parsedAuthorizationRequest.issues
+        ),
       })
     }
 

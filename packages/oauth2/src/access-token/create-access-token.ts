@@ -1,7 +1,7 @@
-import { addSecondsToDate, dateToSeconds, encodeToBase64Url, parseWithErrorHandling } from '@openid4vc/utils'
+import { addSecondsToDate } from '@openid4vc/utils'
+import { base64url, dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
 import { calculateJwkThumbprint, type Jwk, type JwsSigner, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
-import { HashAlgorithm } from '../callbacks'
 import {
   type AccessTokenProfileJwtHeader,
   type AccessTokenProfileJwtPayload,
@@ -85,7 +85,7 @@ export async function createAccessTokenJwt(options: CreateAccessTokenOptions) {
   // value instead of the object when an object literal in a ternary branch contains an `await`.
   const dpopJkt = options.dpop
     ? await calculateJwkThumbprint({
-        hashAlgorithm: HashAlgorithm.Sha256,
+        hashAlgorithm: 'sha-256',
         hashCallback: options.callbacks.hash,
         jwk: options.dpop.jwk,
       })
@@ -96,7 +96,7 @@ export async function createAccessTokenJwt(options: CreateAccessTokenOptions) {
     exp: dateToSeconds(addSecondsToDate(now, options.expiresInSeconds)),
     aud: options.audience,
     iss: options.authorizationServer,
-    jti: encodeToBase64Url(await options.callbacks.generateRandom(32)),
+    jti: base64url.encode(await options.callbacks.generateRandom(32)),
     client_id: options.clientId,
     sub: options.subject,
     scope: options.scope,

@@ -1,9 +1,9 @@
-import { zJwsAlg } from '@owf/jose'
+import { zJweAlg, zJwsAlg } from '@owf/jose'
 import { z } from 'zod'
 
 export const zJarmServerMetadata = z.object({
   authorization_signing_alg_values_supported: z.array(zJwsAlg),
-  authorization_encryption_alg_values_supported: z.array(zJwsAlg),
+  authorization_encryption_alg_values_supported: z.array(zJweAlg),
   authorization_encryption_enc_values_supported: z.array(z.string()),
 })
 

@@ -57,7 +57,7 @@ export async function requestClientAttestationChallenge(options: RequestClientAt
   }
 
   if (!result.success) {
-    throw new ValidationError('Error validating client attestation challenge response', result.error)
+    throw new ValidationError('Error validating client attestation challenge response', result.issues)
   }
 
   return {

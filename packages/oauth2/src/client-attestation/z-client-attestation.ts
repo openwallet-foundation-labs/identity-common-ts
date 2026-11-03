@@ -1,6 +1,6 @@
 import { zHttpsUrl } from '@openid4vc/utils'
-import { zNumericDate } from '@owf/identity-common'
-import { zJoseType, zJwk, zJwtHeader, zJwtPayload } from '@owf/jose'
+import { zNonEmptyString, zNumericDate, zTyp } from '@owf/identity-common'
+import { zJwk, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
 
 export const zOauthClientAttestationHeader = z.literal('OAuth-Client-Attestation')
@@ -9,7 +9,7 @@ export const oauthClientAttestationHeader = zOauthClientAttestationHeader.value
 export const zClientAttestationJwtPayload = z
   .object({
     ...zJwtPayload.shape,
-    sub: z.string(),
+    sub: zNonEmptyString,
     exp: zNumericDate,
     cnf: z
       .object({
@@ -27,7 +27,7 @@ export type ClientAttestationJwtPayload = z.infer<typeof zClientAttestationJwtPa
 export const zClientAttestationJwtHeader = z
   .object({
     ...zJwtHeader.shape,
-    typ: zJoseType('oauth-client-attestation+jwt'),
+    typ: zTyp('oauth-client-attestation+jwt'),
   })
   .loose()
 
@@ -41,7 +41,7 @@ export const zOauthClientAttestationChallengeHeader = z.literal('OAuth-Client-At
 export const oauthClientAttestationChallengeHeader = zOauthClientAttestationChallengeHeader.value
 
 // draft 09 §6.1: response body of the authorization server's `challenge_endpoint`.
-export const zClientAttestationChallengeResponse = z.object({ attestation_challenge: z.string() }).loose()
+export const zClientAttestationChallengeResponse = z.object({ attestation_challenge: zNonEmptyString }).loose()
 export type ClientAttestationChallengeResponse = z.infer<typeof zClientAttestationChallengeResponse>
 
 export const zClientAttestationPopJwtPayload = z
@@ -49,12 +49,12 @@ export const zClientAttestationPopJwtPayload = z
     ...zJwtPayload.shape,
     aud: z.union([zHttpsUrl, z.array(zHttpsUrl)]),
 
-    jti: z.string(),
+    jti: zNonEmptyString,
 
     // `challenge` (draft 06+) replaced `nonce`. Both are accepted on verification; `nonce`
     // is retained only for backwards compatibility with <= draft 05 PoP JWTs.
-    challenge: z.optional(z.string()),
-    nonce: z.optional(z.string()),
+    challenge: z.optional(zNonEmptyString),
+    nonce: z.optional(zNonEmptyString),
   })
   .loose()
 export type ClientAttestationPopJwtPayload = z.infer<typeof zClientAttestationPopJwtPayload>
@@ -62,7 +62,7 @@ export type ClientAttestationPopJwtPayload = z.infer<typeof zClientAttestationPo
 export const zClientAttestationPopJwtHeader = z
   .object({
     ...zJwtHeader.shape,
-    typ: zJoseType('oauth-client-attestation-pop+jwt'),
+    typ: zTyp('oauth-client-attestation-pop+jwt'),
   })
   .loose()
 export type ClientAttestationPopJwtHeader = z.infer<typeof zClientAttestationPopJwtHeader>

@@ -1,5 +1,5 @@
 import { Oauth2Error } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling, unionParams, zNonEmptyString } from '@owf/identity-common'
 import { zJwsAlg } from '@owf/jose'
 import { z } from 'zod'
 
@@ -13,9 +13,9 @@ export type JarmSignOnlyClientMetadata = z.infer<typeof zJarmSignOnlyClientMetad
 
 export const zJarmEncryptOnlyClientMetadata = z.object({
   authorization_signed_response_alg: z.optional(z.never()),
-  authorization_encrypted_response_alg: z.string(),
+  authorization_encrypted_response_alg: zNonEmptyString,
 
-  authorization_encrypted_response_enc: z.optional(z.string()),
+  authorization_encrypted_response_enc: z.optional(zNonEmptyString),
 })
 export type JarmEncryptOnlyClientMetadata = z.infer<typeof zJarmEncryptOnlyClientMetadata>
 
@@ -42,7 +42,10 @@ export type JarmClientMetadata = z.infer<typeof zJarmClientMetadata>
 
 export const zJarmClientMetadataParsed = zJarmClientMetadata.transform((client_metadata) => {
   const parsedClientMeta = parseWithErrorHandling(
-    z.union([zJarmEncryptOnlyClientMetadata, zJarmSignOnlyClientMetadata, zJarmSignEncryptClientMetadata]),
+    z.union(
+      [zJarmEncryptOnlyClientMetadata, zJarmSignOnlyClientMetadata, zJarmSignEncryptClientMetadata],
+      unionParams('Invalid JARM client metadata', ['encrypted', 'signed', 'signed and encrypted'])
+    ),
     client_metadata,
     'Invalid jarm client metadata.'
   )

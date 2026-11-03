@@ -1,23 +1,91 @@
+import { parseWithSchema } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
-import { zCredentialRequest, zCredentialRequestDraft11To14 } from '../../credential-request/z-credential-request'
+import {
+  zCredentialRequest,
+  zCredentialRequestDraft11To14,
+  zCredentialRequestDraft14To11,
+} from '../../credential-request/z-credential-request'
+import { zCredentialRequestCommon } from '../../credential-request/z-credential-request-common'
+
+const compactJwt = 'eyJhbGciOiJFUzI1NiJ9.e30.c2ln'
 
 describe('Credential Request', () => {
-  test('error when both proof and proofs are defined', () => {
-    const parseResult = zCredentialRequest.safeParse({
+  // OpenID4VCI draft 14 Section 7.2: proof and proofs MUST NOT both be present
+  test('rejects proof together with proofs as not_allowed at proofs', () => {
+    const parseResult = parseWithSchema(zCredentialRequest, {
       format: 'vc+sd-jwt',
       vct: 'some-vct',
       extra_prop: 'should-stay',
       proof: {
         proof_type: 'jwt',
-        jwt: 'ey.ey.S',
+        jwt: compactJwt,
       },
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: [compactJwt],
       },
     })
 
-    expect(parseResult.success).toBe(false)
-    expect(JSON.stringify(parseResult.error)).includes("Both 'proof' and 'proofs' are defined. Only one is allowed")
+    expect(parseResult).toMatchObject({
+      success: false,
+      issues: [
+        {
+          code: 'invalid_value',
+          context: {
+            // The draft 11 branch fails on the proofs check alone
+            branches: expect.arrayContaining([
+              [
+                expect.objectContaining({
+                  code: 'not_allowed',
+                  path: ['proofs'],
+                  message: "Both 'proof' and 'proofs' are defined. Only one is allowed",
+                }),
+              ],
+            ]),
+          },
+        },
+      ],
+    })
+  })
+
+  // OpenID4VCI 1.0 Section 8.2: proofs contains exactly one parameter named as the proof type
+  test('rejects proofs without a proof type as too_small at proofs', () => {
+    expect(parseWithSchema(zCredentialRequestCommon, { proofs: {} })).toMatchObject({
+      success: false,
+      issues: [{ code: 'too_small', path: ['proofs'], context: { minimum: 1 } }],
+    })
+  })
+
+  test('rejects proofs with two proof types as too_big at proofs', () => {
+    expect(
+      parseWithSchema(zCredentialRequestCommon, { proofs: { jwt: [compactJwt], attestation: [compactJwt] } })
+    ).toMatchObject({
+      success: false,
+      issues: [{ code: 'too_big', path: ['proofs'], context: { maximum: 1 } }],
+    })
+  })
+
+  // OpenID4VCI 1.0 Section 8.2: the value of the proof type is a non-empty array
+  test.each(['jwt', 'attestation', 'some_other_proof_type'])(
+    'rejects proofs with an empty %s array as too_small',
+    (proofType) => {
+      expect(parseWithSchema(zCredentialRequestCommon, { proofs: { [proofType]: [] } })).toMatchObject({
+        success: false,
+        issues: [{ code: 'too_small', path: ['proofs', proofType], context: { minimum: 1, origin: 'array' } }],
+      })
+    }
+  )
+
+  test('rejects credential_identifier in a draft 11 credential request as not_allowed', () => {
+    expect(
+      parseWithSchema(zCredentialRequestDraft14To11, {
+        format: 'vc+sd-jwt',
+        vct: 'some-vct',
+        credential_identifier: 'some',
+      })
+    ).toMatchObject({
+      success: false,
+      issues: [{ code: 'not_allowed', path: ['credential_identifier'] }],
+    })
   })
 
   test('valid when both format and credential_identifier are defined', () => {

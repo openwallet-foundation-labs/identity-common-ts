@@ -5,6 +5,16 @@
 '@openid4vc/openid4vp': minor
 ---
 
-BREAKING: `@openid4vc/utils` no longer exports `ValidationError`, `formatZodError` and `zNumericDate`: import them from `@owf/identity-common`. The `@openid4vc` packages throw the `ValidationError` of `@owf/identity-common`, which extends `IdentityError` rather than `Openid4vcBaseError`, and the default message of `parseWithErrorHandling` no longer includes the data that failed to validate.
+**Breaking:** `@openid4vc/utils` drops its copies of the `@owf/identity-common` helpers, `ValidationError`, `zNumericDate` and its `buffer` dependency:
 
-The `@openid4vc` packages no longer configure zod globally with `z.config` when they are imported.
+| Removed from `@openid4vc/utils` | Use from `@owf/identity-common` |
+| --- | --- |
+| `decodeUtf8String`, `encodeToUtf8String` | `stringToBytes`, `bytesToString` |
+| `encodeToBase64Url`, `encodeToBase64` | `base64url.encode`, `base64.encode` |
+| `decodeBase64` | `base64.decode` or `base64url.decode` |
+| `dateToSeconds` | `dateToSeconds` |
+| `OrPromise`, `isJwtTyp`, `zTyp`, `parseWithErrorHandling`, `BaseSchema`, `ValidationError`, `zNumericDate` | the same names |
+
+**Breaking:** the `@openid4vc` packages throw the `ValidationError` of `@owf/identity-common`, with `issues` instead of `zodError`. `formatZodError` is removed. The `result` of a `ZodFetcher` and the `*Result` fields of the `@openid4vc/openid4vci` responses are a `SchemaParseResult` with `issues`.
+
+`isContentType` and `isResponseContentType` compare the media type only. The packages no longer call `z.config` on import.

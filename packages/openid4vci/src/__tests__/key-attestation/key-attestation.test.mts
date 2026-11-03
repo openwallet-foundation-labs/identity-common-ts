@@ -105,7 +105,35 @@ describe('Key Attestation', () => {
           keyAttestationJwt: await signKeyAttestationJwt('openid4vci-proof+jwt'),
           use: 'proof_type.jwt',
         })
-      ).rejects.toThrow(`Expected the media type to be 'key-attestation+jwt', 'keyattestation+jwt' at "typ"`)
+      ).rejects.toThrow(`typ: typ must be key-attestation+jwt or keyattestation+jwt (invalid_typ)`)
+    })
+  })
+
+  describe('allowedSkewInSeconds', () => {
+    const now = new Date('2026-01-01T00:00:00Z')
+
+    const verify = async (allowedSkewInSeconds?: number) =>
+      verifyKeyAttestationJwt({
+        callbacks: { verifyJws: callbacks.verifyJws },
+        keyAttestationJwt: await createKeyAttestationJwt({
+          callbacks: { signJws },
+          attestedKeys: [attested.publicJwk],
+          issuedAt: new Date(now.getTime() - 100 * 1000),
+          expiresAt: new Date(now.getTime() - 10 * 1000),
+          use: 'proof_type.jwt',
+          signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+        }),
+        use: 'proof_type.jwt',
+        now,
+        allowedSkewInSeconds,
+      })
+
+    test('accepts a key attestation that expired 10 seconds ago with the default skew', async () => {
+      await expect(verify()).resolves.toBeDefined()
+    })
+
+    test('rejects a key attestation that expired 10 seconds ago with an allowed skew of 0', async () => {
+      await expect(verify(0)).rejects.toThrow(/exp: .* \(expired\)/)
     })
   })
 

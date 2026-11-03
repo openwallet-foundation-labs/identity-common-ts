@@ -1,5 +1,5 @@
-import { type Fetch, joinUriParts, parseWithErrorHandling, URL } from '@openid4vc/utils'
-import { IdentityError } from '@owf/identity-common'
+import { type Fetch, joinUriParts, URL } from '@openid4vc/utils'
+import { IdentityError, parseWithErrorHandling } from '@owf/identity-common'
 import type { CallbackContext } from '../../callbacks'
 import { Oauth2Error } from '../../error/Oauth2Error'
 import { fetchWellKnownMetadata } from '../fetch-well-known-metadata'

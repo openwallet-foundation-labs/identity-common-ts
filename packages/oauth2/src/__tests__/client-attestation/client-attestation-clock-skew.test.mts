@@ -103,6 +103,39 @@ describe('Client attestation clock skew', () => {
     test('rejects a PoP with nbf 10 seconds in the future when 5 seconds of skew are allowed', async () => {
       await expect(verify(await createPopWithNbfAhead(10), 5)).rejects.toMatchObject(invalidClient)
     })
+
+    test('applies the top-level skew to the client attestation and the DPoP proof', async () => {
+      const request = { headers: new Headers(), method: 'POST', url: 'https://server.com/par' } as const
+      const verifyWithTopLevelSkew = async (proofs: { dpopAhead?: number; popAhead?: number }) =>
+        verifyPushedAuthorizationRequest({
+          authorizationServerMetadata,
+          authorizationRequest: { client_id: 'wallet' },
+          request,
+          callbacks,
+          now,
+          allowedSkewInSeconds: 0,
+          dpop: {
+            required: true,
+            jwt: await createDpopJwt({
+              callbacks: { ...callbacks, signJws },
+              request,
+              issuedAt: new Date((nowInSeconds + (proofs.dpopAhead ?? 0)) * 1000),
+              signer: { method: 'jwk', alg: 'ES256', publicJwk: instance.publicJwk },
+            }),
+          },
+          clientAttestation: {
+            required: true,
+            clientAttestationJwt,
+            clientAttestationPopJwt: await createPopWithNbfAhead(proofs.popAhead ?? 0),
+          },
+        })
+
+      await expect(verifyWithTopLevelSkew({})).resolves.toBeDefined()
+      await expect(verifyWithTopLevelSkew({ popAhead: 2 })).rejects.toMatchObject(invalidClient)
+      await expect(verifyWithTopLevelSkew({ dpopAhead: 2 })).rejects.toMatchObject({
+        errorResponse: { error: 'invalid_dpop_proof' },
+      })
+    })
   })
 
   describe('access token request', () => {

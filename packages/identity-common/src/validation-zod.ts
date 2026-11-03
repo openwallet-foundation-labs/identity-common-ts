@@ -74,11 +74,16 @@ const zodLocaleError = z.locales.en().localeError
 
 /**
  * The English messages of zod without their prefix, e.g. `Invalid input: `, as the code of the
- * issue says it. Pass it per parse as `error`. A message the schema sets wins over it.
+ * issue says it, and with `expected to not be defined` for a value that must be absent. Pass it per
+ * parse as `error`. A message the schema sets wins over it.
  */
 export const zodErrorMap: z.core.$ZodErrorMap = (issue) => {
   const message = zodLocaleError(issue)
-  return (typeof message === 'string' ? message : message?.message)?.replace(ZOD_MESSAGE_PREFIX, '')
+  const text = (typeof message === 'string' ? message : message?.message)?.replace(ZOD_MESSAGE_PREFIX, '')
+  // `never` and `undefined` mean the value must be absent, which is the `not_allowed` code
+  return issue.code === 'invalid_type' && (issue.expected === 'never' || issue.expected === 'undefined')
+    ? text?.replace(/^expected (never|undefined)\b/, 'expected to not be defined')
+    : text
 }
 
 /** What zod expected instead of an absent value, e.g. `string`, when it says so */
@@ -211,21 +216,53 @@ export function schemaIssueToValidationIssue<
 function unionFields(
   issue: z.core.$ZodIssueInvalidUnion,
   options: { codes?: Readonly<Record<string, string>> }
-): { message?: string; context?: { branches: ValidationIssue[][] } } {
+): { message?: string; context?: { branches: ValidationIssue[][]; labels?: string[] } } {
   if (!issue.errors.length) return {}
   const branches = issue.errors.map((branch) =>
     branch.map((member) => schemaIssueToValidationIssue({ ...member, path: [...issue.path, ...member.path] }, options))
   )
   const types = branches.map((branch) =>
-    branch.length === 1 && branch[0].code === SCHEMA_VALIDATION_CODES.INVALID_TYPE && !branch[0].path[issue.path.length]
+    branch.length === 1 &&
+    branch[0].code === SCHEMA_VALIDATION_CODES.INVALID_TYPE &&
+    branch[0].path.length === issue.path.length
       ? (branch[0].context as unknown as { expected: string }).expected
       : undefined
   )
+  const labels = (issue as { [UNION_LABELS]?: string[] })[UNION_LABELS]
   return {
-    ...(types.every(Boolean) ? { message: `expected ${types.join(' or ')}` } : {}),
-    context: { branches },
+    // Only zod's generic message is replaced, not one the schema sets
+    ...(types.every(Boolean) && issue.message === 'Invalid input' ? { message: `expected ${types.join(' or ')}` } : {}),
+    context: { branches, ...(labels ? { labels: [...labels] } : {}) },
   }
 }
+
+/** The key under which {@link unionParams} puts the labels of the members on the issue of a union */
+const UNION_LABELS = 'unionLabels'
+
+/**
+ * The params of a union whose members have a label, e.g. the version of a specification each one
+ * implements. The issue of a value that no member matches has `message`, and the message of a
+ * validation error names each member by its label.
+ *
+ * @example
+ * ```typescript
+ * z.union([zMetadataV1, zMetadataDraft11], unionParams('Invalid metadata', ['version 1.0', 'draft 11']))
+ * ```
+ */
+export function unionParams(message: string, labels?: readonly string[]) {
+  return {
+    error: (issue: z.core.$ZodRawIssue) => {
+      // zod copies the own properties of the issue into the one it reports, so the labels reach the conversion
+      if (labels && issue.code === 'invalid_union') Object.assign(issue, { [UNION_LABELS]: labels })
+      return message
+    },
+  }
+}
+
+/** The result of {@link parseWithSchema}: the parsed value, or the issues of the value that does not validate */
+export type SchemaParseResult<Output, Issue = ValidationIssueOf<CommonValidationCode | SchemaValidationCode>> =
+  | { success: true; data: Output }
+  | { success: false; issues: Issue[] }
 
 /**
  * Parse a value with a zod schema, with the issues as validation issues of a validator with
@@ -239,9 +276,7 @@ export function parseWithSchema<
   schema: Schema,
   value: unknown,
   options: { codes?: Readonly<Record<string, Code>> } = {}
-):
-  | { success: true; data: z.output<Schema> }
-  | { success: false; issues: ValidationIssueOf<Code | SchemaValidationCode, Contexts>[] } {
+): SchemaParseResult<z.output<Schema>, ValidationIssueOf<Code | SchemaValidationCode, Contexts>> {
   const result = schema.safeParse(value, { reportInput: true, error: zodErrorMap })
   if (result.success) return { success: true, data: result.data }
   return {
@@ -273,17 +308,22 @@ export function parseWithErrorHandling<Schema extends z.ZodType>(
 /**
  * A `typ` header that is one of the expected media types, compared with {@link isJwtTyp} and kept as
  * received. Any other value gives an `invalid_typ` issue with the expected and the actual value as context.
+ * The input is typed as the expected values, the output as a `string`, as it may be in another casing or
+ * have the `application/` prefix: compare it with {@link isJwtTyp}.
  *
  * @see https://www.rfc-editor.org/rfc/rfc8725#section-3.11
  */
 export function zTyp<const Typ extends string>(...expected: [Typ, ...Typ[]]) {
-  return z.custom<Typ>().superRefine((typ, ctx) => {
-    if (expected.some((type) => isJwtTyp(typ, type))) return
-    const expectedText = expected.join(' or ')
-    addValidationIssue(ctx, {
-      code: VALIDATION_CODES.INVALID_TYP,
-      message: typ === undefined ? `typ is missing, it must be ${expectedText}` : `typ must be ${expectedText}`,
-      context: { expected, actual: typ },
+  return z
+    .custom<Typ>()
+    .superRefine((typ, ctx) => {
+      if (expected.some((type) => isJwtTyp(typ, type))) return
+      const expectedText = expected.join(' or ')
+      addValidationIssue(ctx, {
+        code: VALIDATION_CODES.INVALID_TYP,
+        message: typ === undefined ? `typ is missing, it must be ${expectedText}` : `typ must be ${expectedText}`,
+        context: { expected, actual: typ },
+      })
     })
-  })
+    .transform((typ): string => typ)
 }

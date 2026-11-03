@@ -1,6 +1,6 @@
 import { zHttpsUrl } from '@openid4vc/utils'
-import { zNumericDate } from '@owf/identity-common'
-import { zCompactJwt, zJoseType, zJwtHeader, zJwtPayload } from '@owf/jose'
+import { addValidationIssue, zNumericDate, zTyp } from '@owf/identity-common'
+import { zCompactJwt, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
 
 export const zJwtProofTypeIdentifier = z.literal('jwt')
@@ -15,15 +15,35 @@ export const zCredentialRequestProofJwt = z.object({
 export const zCredentialRequestJwtProofTypeHeader = zJwtHeader
   .extend({
     key_attestation: z.optional(zCompactJwt),
-    typ: zJoseType('openid4vci-proof+jwt'),
+    typ: zTyp('openid4vci-proof+jwt'),
   })
   .loose()
-  .refine(({ kid, jwk }) => jwk === undefined || kid === undefined, {
-    message: `Both 'jwk' and 'kid' are defined. Only one is allowed`,
-  })
-  .refine(({ trust_chain, kid }) => !trust_chain || kid !== undefined, {
-    message: `When 'trust_chain' is provided, 'kid' is required`,
-  })
+  .superRefine(refineJwtProofKeyHeaders)
+
+/**
+ * The key headers of a proof or key attestation JWT: `jwk` and `kid` are mutually exclusive,
+ * and `trust_chain` requires `kid`
+ */
+export function refineJwtProofKeyHeaders(
+  { kid, jwk, trust_chain }: { kid?: string; jwk?: unknown; trust_chain?: unknown },
+  ctx: z.RefinementCtx
+) {
+  if (jwk !== undefined && kid !== undefined) {
+    addValidationIssue(ctx, {
+      code: 'not_allowed',
+      path: ['jwk'],
+      message: `Both 'jwk' and 'kid' are defined. Only one is allowed`,
+    })
+  }
+  if (trust_chain && kid === undefined) {
+    addValidationIssue(ctx, {
+      code: 'missing_value',
+      path: ['kid'],
+      message: `When 'trust_chain' is provided, 'kid' is required`,
+      context: { expected: 'string' },
+    })
+  }
+}
 
 export type CredentialRequestJwtProofTypeHeader = z.infer<typeof zCredentialRequestJwtProofTypeHeader>
 

@@ -6,7 +6,9 @@ import {
   type ResourceRequestResponseOk,
   resourceRequest,
 } from '@openid4vc/oauth2'
-import { ContentType, isResponseContentType, parseWithErrorHandling } from '@openid4vc/utils'
+import { ContentType, isResponseContentType } from '@openid4vc/utils'
+import { parseWithErrorHandling, parseWithSchema, type SchemaParseResult } from '@owf/identity-common'
+import type z from 'zod'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import {
   type NotificationEvent,
@@ -65,7 +67,7 @@ export interface SendNotificationResponseNotOk extends ResourceRequestResponseNo
    * If this is defined it means the response was JSON and we tried to parse it as
    * a notification error response. It may be successful or it may not be.
    */
-  notificationErrorResponseResult?: ReturnType<typeof zNotificationErrorResponse.safeParse>
+  notificationErrorResponseResult?: SchemaParseResult<z.output<typeof zNotificationErrorResponse>>
 }
 
 export async function sendNotification(
@@ -105,7 +107,7 @@ export async function sendNotification(
 
   if (!resourceResponse.ok) {
     const notificationErrorResponseResult = isResponseContentType(ContentType.Json, resourceResponse.response)
-      ? zNotificationErrorResponse.safeParse(await resourceResponse.response.clone().json())
+      ? parseWithSchema(zNotificationErrorResponse, await resourceResponse.response.clone().json())
       : undefined
 
     return {

@@ -1,5 +1,6 @@
 import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { parseWithErrorHandling, stringToJsonWithErrorHandling } from '@openid4vc/utils'
+import { stringToJsonWithErrorHandling } from '@openid4vc/utils'
+import { addValidationIssue, parseWithErrorHandling } from '@owf/identity-common'
 import {
   decodeJwt,
   decodeJwtHeader,
@@ -32,10 +33,14 @@ export enum JarmMode {
  * The header of a signed response has to identify the key that signed it: by the `jwk` or `x5c` it
  * carries, or otherwise by its `kid`, which is resolved together with the `iss` of the response.
  */
-const zSignedJarmAuthorizationResponseHeader = zJwtHeader.refine(
-  ({ kid, jwk, x5c }) => kid !== undefined || jwk !== undefined || x5c !== undefined,
-  { message: `The header must identify the signing key with a 'kid', 'jwk' or 'x5c' parameter` }
-)
+const zSignedJarmAuthorizationResponseHeader = zJwtHeader.superRefine(({ kid, jwk, x5c }, ctx) => {
+  if (kid !== undefined || jwk !== undefined || x5c !== undefined) return
+  addValidationIssue(ctx, {
+    code: 'missing_value',
+    message: `The header must identify the signing key with a 'kid', 'jwk' or 'x5c' parameter`,
+    context: { expected: `'kid', 'jwk' or 'x5c'` },
+  })
+})
 
 /** Why the signature of a signed response was not accepted, as reported in the error response. */
 function signatureVerificationErrorDescription(error: unknown) {
@@ -114,6 +119,19 @@ export interface VerifyJarmAuthorizationResponseOptions {
   expectedClientId: string
 
   callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJws'>
+
+  /**
+   * Date to verify the `exp`, `nbf` and `iat` of a JARM response against. If not provided the current date
+   * will be used.
+   */
+  now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of a JARM response.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export type VerifiedJarmAuthorizationResponse = Awaited<ReturnType<typeof verifyJarmAuthorizationResponse>>
@@ -123,6 +141,8 @@ export type VerifiedJarmAuthorizationResponse = Awaited<ReturnType<typeof verify
  * * The decryption key should be resolvable using the the protected header's 'kid' field
  * * The signature verification jwk should be resolvable using the jws protected header's 'jwk' or 'x5c' field, or
  *   otherwise its 'kid' field and the payload's 'iss' field.
+ * * A `jwk` or `x5c` in the header only proves that the response was signed with that key: the `verifyJws`
+ *   callback decides whether it trusts the signer, and so whether the returned `issuer` can be relied on.
  *
  * @throws Oauth2ServerErrorResponseError with error `invalid_request` when the response cannot be decrypted, its
  *   signature does not verify, or its `aud`, `exp`, `nbf` or `iat` is not valid. When `@owf/jose` rejected the
@@ -196,6 +216,8 @@ export async function verifyJarmAuthorizationResponse(options: VerifyJarmAuthori
   jarmAuthorizationResponseValidate({
     expectedClientId,
     authorizationResponse: jarmAuthorizationResponse,
+    now: options.now,
+    allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
   const type: JarmMode =
     requestDataIsEncrypted && responseIsSigned

@@ -3,7 +3,8 @@ import {
   type CreateJarAuthorizationRequestOptions,
   createJarAuthorizationRequest,
 } from '@openid4vc/oauth2'
-import { objectToQueryParams, parseWithErrorHandling, URL, URLSearchParams } from '@openid4vc/utils'
+import { objectToQueryParams, URL, URLSearchParams } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import {
   validateOpenid4vpAuthorizationRequestPayload,
   type WalletVerificationOptions,

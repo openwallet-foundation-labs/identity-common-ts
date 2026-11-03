@@ -612,9 +612,9 @@ describe('Interactive Authorization Endpoint - Server', () => {
     // Test that client attestation headers can be provided
     // The actual verification would happen in verifyInteractiveAuthorizationRequest
     const attestationJwt =
-      'eyJhbGciOiJFUzI1NiIsInR5cCI6Im9hdXRoLWNsaWVudC1hdHRlc3RhdGlvbitqd3QifQ.eyJpc3MiOiJodHRwczovL2F0dGVzdGF0aW9uLXByb3ZpZGVyLmNvbSIsInN1YiI6InRlc3QtY2xpZW50IiwiaWF0IjoxNjk1MDAwMDAwLCJleHAiOjE2OTUwMDM2MDB9.signature'
+      'eyJhbGciOiJFUzI1NiIsInR5cCI6Im9hdXRoLWNsaWVudC1hdHRlc3RhdGlvbitqd3QifQ.eyJpc3MiOiJodHRwczovL2F0dGVzdGF0aW9uLXByb3ZpZGVyLmNvbSIsInN1YiI6InRlc3QtY2xpZW50IiwiaWF0IjoxNjk1MDAwMDAwLCJleHAiOjE2OTUwMDM2MDB9.sig'
     const popJwt =
-      'eyJhbGciOiJFUzI1NiIsInR5cCI6Im9hdXRoLWNsaWVudC1hdHRlc3RhdGlvbi1wb3Arand0In0.eyJpc3MiOiJ0ZXN0LWNsaWVudCIsImF1ZCI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJpYXQiOjE2OTUwMDAwMDAsImV4cCI6MTY5NTAwMDMwMCwianRpIjoiYWJjMTIzIn0.signature'
+      'eyJhbGciOiJFUzI1NiIsInR5cCI6Im9hdXRoLWNsaWVudC1hdHRlc3RhdGlvbi1wb3Arand0In0.eyJpc3MiOiJ0ZXN0LWNsaWVudCIsImF1ZCI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJpYXQiOjE2OTUwMDAwMDAsImV4cCI6MTY5NTAwMDMwMCwianRpIjoiYWJjMTIzIn0.sig'
 
     const parsed = await openid4vciIssuer.parseInteractiveAuthorizationRequest({
       request: {

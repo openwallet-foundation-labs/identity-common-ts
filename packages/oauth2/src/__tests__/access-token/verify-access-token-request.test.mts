@@ -7,7 +7,6 @@ import {
   verifyPreAuthorizedCodeAccessTokenRequest,
   verifyRefreshTokenAccessTokenRequest,
 } from '../../access-token/verify-access-token-request'
-import { HashAlgorithm } from '../../callbacks'
 import { createClientAttestationJwt } from '../../client-attestation/client-attestation'
 import { createClientAttestationPopJwt } from '../../client-attestation/client-attestation-pop'
 import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
@@ -974,7 +973,7 @@ describe('Verify client instance key of Access Token Request', () => {
     const confirmationJwkThumbprint = first.clientAttestation?.clientAttestation.confirmationJwkThumbprint
     expect(confirmationJwkThumbprint).toEqual(
       await calculateJwkThumbprint({
-        hashAlgorithm: HashAlgorithm.Sha256,
+        hashAlgorithm: 'sha-256',
         hashCallback: callbacks.hash,
         jwk: instance.publicJwk,
       })

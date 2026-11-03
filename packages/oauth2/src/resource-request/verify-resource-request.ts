@@ -1,9 +1,13 @@
 import { Openid4vcBaseError } from '@openid4vc/utils'
 import { IdentityError, ValidationError } from '@owf/identity-common'
-import { JoseParseError, type Jwk } from '@owf/jose'
+import { decodeJwt, JoseInvalidArgumentError, JoseParseError, type Jwk } from '@owf/jose'
 import { introspectToken } from '../access-token/introspect-token'
 import { SupportedAuthenticationScheme, verifyJwtProfileAccessToken } from '../access-token/verify-access-token'
-import type { AccessTokenProfileJwtPayload } from '../access-token/z-access-token-jwt'
+import {
+  type AccessTokenProfileJwtPayload,
+  zAccessTokenProfileJwtHeader,
+  zAccessTokenProfileJwtPayload,
+} from '../access-token/z-access-token-jwt'
 import type { TokenIntrospectionResponse } from '../access-token/z-token-introspection'
 import type { CallbackContext } from '../callbacks'
 import type { RequestLike } from '../common/z-common'
@@ -46,6 +50,14 @@ export interface VerifyResourceRequestOptions {
   dpop?: DpopVerificationOptions
 
   now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of the access token and the
+   * DPoP proof. A `dpop.allowedSkewInSeconds` takes precedence for the DPoP proof.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export async function verifyResourceRequest(options: VerifyResourceRequestOptions) {
@@ -84,31 +96,35 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
     )
   }
 
-  // We first perform the usual Bearer authentication verification
-  // Try to parse and verify it as an jwt profile access token
-  const verificationResult = await verifyJwtProfileAccessToken({
-    accessToken,
-    callbacks: options.callbacks,
-    authorizationServers: options.authorizationServers,
-    resourceServer: options.resourceServer,
-    now: options.now,
-  }).catch((error) => {
-    // It's ok if we couldn't parse it as a JWT -- it means it's probably an opaque token
-    if (error instanceof JoseParseError || error instanceof ValidationError) return null
-
-    // The message of an error raised while fetching from the authorization server, such as its JWKS,
-    // holds what that server responded with, which is not for the client: it gets a generic description
-    const errorMessage =
-      error instanceof IdentityError && !(error instanceof Openid4vcBaseError) ? error.message : 'Invalid access token'
-    throw new Oauth2ResourceUnauthorizedError(
-      `Error occurred during verification of jwt profile access token: ${error.message}`,
-      {
-        scheme,
-        error: Oauth2ErrorCodes.InvalidToken,
-        error_description: errorMessage,
-      }
-    )
-  })
+  // A token that is not a jwt profile access token is probably an opaque token, which is introspected below.
+  // One that is must verify: an expired one, or one for another resource server, does not get to be introspected.
+  const verificationResult = isOpaqueAccessToken(accessToken)
+    ? null
+    : await verifyJwtProfileAccessToken({
+        accessToken,
+        callbacks: options.callbacks,
+        authorizationServers: options.authorizationServers,
+        resourceServer: options.resourceServer,
+        now: options.now,
+        allowedSkewInSeconds: options.allowedSkewInSeconds,
+      }).catch((error) => {
+        if (error instanceof JoseInvalidArgumentError) throw error
+        // The message of an error raised while fetching from the authorization server, such as its JWKS,
+        // holds what that server responded with, which is not for the client: it gets a generic description
+        const errorMessage =
+          error instanceof IdentityError && !(error instanceof Openid4vcBaseError)
+            ? error.message
+            : 'Invalid access token'
+        throw new Oauth2ResourceUnauthorizedError(
+          `Error occurred during verification of jwt profile access token: ${error.message}`,
+          {
+            scheme,
+            error: Oauth2ErrorCodes.InvalidToken,
+            error_description: errorMessage,
+          },
+          { cause: error }
+        )
+      })
 
   let tokenPayload: AccessTokenProfileJwtPayload | TokenIntrospectionResponse | undefined = verificationResult?.payload
   let authorizationServer = verificationResult?.authorizationServer
@@ -194,11 +210,12 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
         expectedJwkThumbprint: tokenPayload.cnf?.jkt,
         allowedSigningAlgs: authorizationServer.dpop_signing_alg_values_supported,
         maxProofAgeSeconds: options.dpop?.maxProofAgeSeconds,
-        allowedSkewInSeconds: options.dpop?.allowedSkewInSeconds,
+        allowedSkewInSeconds: options.dpop?.allowedSkewInSeconds ?? options.allowedSkewInSeconds,
         assertJtiUniqueness: options.dpop?.assertJtiUniqueness,
       })
       dpopJwk = decodedDpopJwt.header.jwk
     } catch (error) {
+      if (error instanceof JoseInvalidArgumentError) throw error
       const errorMessage = error instanceof IdentityError ? error.message : 'Error verifying DPoP jwt'
       throw new Oauth2ResourceUnauthorizedError(
         `Error occurred during verification of jwt profile access token: ${error instanceof Error ? error.message : error}`,
@@ -206,7 +223,8 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
           scheme,
           error: Oauth2ErrorCodes.InvalidDpopProof,
           error_description: errorMessage,
-        }
+        },
+        { cause: error }
       )
     }
   }
@@ -217,5 +235,19 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
     scheme,
     accessToken,
     authorizationServer: authorizationServer.issuer,
+  }
+}
+
+/** Whether the access token does not decode as a JWT profile access token (RFC 9068) */
+function isOpaqueAccessToken(accessToken: string) {
+  try {
+    decodeJwt({
+      jwt: accessToken,
+      headerSchema: zAccessTokenProfileJwtHeader,
+      payloadSchema: zAccessTokenProfileJwtPayload,
+    })
+    return false
+  } catch (error) {
+    return error instanceof JoseParseError || error instanceof ValidationError
   }
 }

@@ -28,6 +28,13 @@ export interface VerifyJwtProfileAccessTokenOptions {
   now?: Date
 
   /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
+
+  /**
    * Identifier of the resource server
    */
   resourceServer: string
@@ -43,7 +50,8 @@ export interface VerifyJwtProfileAccessTokenOptions {
  *
  * @throws {@link ValidationError} if the JWT header or payload does not align with JWT Profile rules
  * @throws {@link JoseParseError} if the jwt is not a valid jwt format, or the jwt header/payload cannot be parsed as JSON
- * @throws {@link JoseVerificationError} if the JWT verification fails (signature or nbf/exp)
+ * @throws {@link JoseVerificationError} if the signature does not verify
+ * @throws {@link JoseValidationError} if a claim does not verify, e.g. an expired token or one for another audience
  */
 export async function verifyJwtProfileAccessToken(options: VerifyJwtProfileAccessTokenOptions) {
   const decodedJwt = decodeJwt({
@@ -80,6 +88,7 @@ export async function verifyJwtProfileAccessToken(options: VerifyJwtProfileAcces
     verifyJwsCallback: options.callbacks.verifyJws,
     errorMessage: 'Error during verification of access token jwt.',
     now: options.now,
+    skewSeconds: options.allowedSkewInSeconds,
     expectedAudience: options.resourceServer,
   })
 

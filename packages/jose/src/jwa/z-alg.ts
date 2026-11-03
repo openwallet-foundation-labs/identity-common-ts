@@ -13,8 +13,13 @@ export const zJwsAlg = zNonEmptyString.superRefine((alg, ctx) => {
   }
 })
 
-/** A JWE `alg` (key management algorithm) value. @see https://www.rfc-editor.org/rfc/rfc7516#section-4.1.1 */
-export const zJweAlg = zNonEmptyString
+/**
+ * A JWE `alg` (key management algorithm) value. `none` is not one (RFC 7518 Section 4.1), so it is
+ * rejected in any casing, as for a JWS.
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc7516#section-4.1.1
+ */
+export const zJweAlg = zJwsAlg
 
 /** A JWE `enc` (content encryption algorithm) value. @see https://www.rfc-editor.org/rfc/rfc7516#section-4.1.2 */
 export const zJweEnc = zNonEmptyString

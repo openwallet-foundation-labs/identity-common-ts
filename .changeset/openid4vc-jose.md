@@ -4,7 +4,7 @@
 '@openid4vc/openid4vp': minor
 ---
 
-BREAKING: the JWT handling is built on `@owf/jose`, and `@openid4vc/oauth2` no longer exports its JWK, JWA, JWS and JWT helpers. Import them from `@owf/jose`:
+**Breaking:** JWT handling is built on `@owf/jose`. `@openid4vc/oauth2` no longer exports its JWK, JWA, JWS and JWT helpers:
 
 | Removed from `@openid4vc/oauth2` | Import from `@owf/jose` |
 | --- | --- |
@@ -17,17 +17,8 @@ BREAKING: the JWT handling is built on `@owf/jose`, and `@openid4vc/oauth2` no l
 | `jwaSignatureAlgorithmToFullySpecifiedCoseAlgorithm`, `fullySpecifiedCoseAlgorithmToJwaSignatureAlgorithm` | `jwaSignatureAlgorithmToCoseAlgorithm`, `coseAlgorithmToJwaSignatureAlgorithm` |
 | `jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray`, `fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray` | `jwaSignatureAlgorithmsToCoseAlgorithms`, `coseAlgorithmsToJwaSignatureAlgorithms` |
 
-BREAKING: the `signJwt` and `verifyJwt` callbacks of the `CallbackContext` are replaced by `signJws` and `verifyJws`, and the `SignJwtCallback` and `VerifyJwtCallback` types by `SignJwsCallback` and `VerifyJwsCallback`. They sign or verify the signing input the library computed rather than a whole JWT, and report the public key they used, for example `signJws: async (signer, { signingInputBytes }) => ({ signature, signerJwk })` with the signature base64url encoded. A callback can therefore no longer add header parameters.
+**Breaking:** the `CallbackContext` callbacks `signJwt` and `verifyJwt` are replaced by `signJws` and `verifyJws` (`SignJwsCallback`, `VerifyJwsCallback`). They sign or verify the signing input and return the public key they used. `hash` is a `Hasher` of `@owf/identity-common` that gets the algorithm as `'sha-256'`. The `HashAlgorithm` enum and `HashCallback` type are removed.
 
-BREAKING: `verifyJwt` of `@owf/jose` takes the compact JWT or the result of `decodeJwt` as `jwt`, instead of `compact`, `header` and `payload`, and `verifyJwsCallback` instead of `verifyJwtCallback`. `allowedSkewInSeconds` is `skewSeconds`, and `skipTimeBasedValidation` is replaced by `checkExpirationTime`, `checkNotBefore` and `checkIssuedAt`.
+**Breaking:** `verifyJwt` takes `jwt` (compact or decoded), `verifyJwsCallback` and `skewSeconds`. `checkExpirationTime`, `checkNotBefore` and `checkIssuedAt` replace `skipTimeBasedValidation`.
 
-JWTs are verified more strictly:
-
-- Claims are verified with a default clock skew of 30 seconds instead of 0, a token issued in the future is rejected, and a token is rejected at exactly its `exp`. This changes the default `allowedSkewInSeconds` of client attestation verification from 0 to 30 seconds.
-- An `expectedAudience` rejects a token without `aud`.
-- `none` in any casing, a registered algorithm in another casing such as `hs256`, and the symmetric `HS256`, `HS384` and `HS512` are rejected, and the key that verified the signature must fit the algorithm.
-- A header that identifies the signer in more than one way, such as `x5c` next to `jwk`, is rejected, and a DID in `kid` must be exactly the DID in `iss`.
-- `verifyJwtProfileAccessToken` and `verifyIdTokenJwt` no longer fall back to the only key of the JWKS when the `kid` of the token is not in it.
-- A header or payload in standard base64, with padding or with invalid UTF-8, an empty signature, an invalid registered claim, a `jwk` or `cnf.jwk` with private key material, and a `crit` parameter that is not understood are rejected.
-
-A token signed with a `custom` signer that has a `kid` now carries that `kid` in its header.
+**Breaking:** JWTs are verified more strictly. The default skew is 30 seconds instead of 0, also for client attestations. A token issued in the future, a token at its `exp`, a missing `aud` when one is expected, `none`, `HS256`/`HS384`/`HS512` and miscased algorithms are rejected. A header must identify its signer in one way only, and a DID in `kid` must be the `iss`. The JWKS no longer falls back to its only key for an unknown `kid`. Parts that are not base64url, private keys in `jwk` or `cnf.jwk`, and a `crit` that is not understood are rejected.

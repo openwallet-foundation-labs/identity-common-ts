@@ -1,4 +1,4 @@
-import { preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
+import { JoseInvalidArgumentError, preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
 import { addSecondsToDate, ContentType } from '@openid4vc/utils'
 import { type JwsSigner, signJwt } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
@@ -466,8 +466,81 @@ describe('Openid4vciIssuer', () => {
         })
         .catch((e) => e)
 
-      expect(error.errorResponse).toEqual({ error: 'invalid_proof', error_description: 'Invalid proof' })
-      expect(error.cause.message).toContain(`Expected the media type to be 'openid4vci-proof+jwt' at "typ"`)
+      expect(error.errorResponse).toEqual({
+        error: 'invalid_proof',
+        error_description: 'Invalid JWS protected header\n  - typ: typ must be openid4vci-proof+jwt (invalid_typ)',
+      })
+    })
+
+    test('rejects a jwt proof with another nonce as invalid_proof, saying which claim failed', async () => {
+      const error = await issuer
+        .verifyCredentialRequestJwtProof({
+          expectedNonce: 'other-nonce',
+          issuerMetadata,
+          jwt: await signJwtProof({ header: { typ: 'openid4vci-proof+jwt', jwk: credentialRequestProofJwkPublic } }),
+        })
+        .catch((e) => e)
+
+      expect(error.errorResponse).toMatchObject({
+        error: 'invalid_proof',
+        error_description: expect.stringContaining('(claim_value_mismatch)'),
+      })
+      expect(error.errorResponse.error_description).toContain('nonce')
+    })
+  })
+
+  describe('verifyCredentialRequestJwtProof allowedSkewInSeconds', () => {
+    const now = new Date('2026-01-01T00:00:00Z')
+    const issuerWithoutSkew = new Openid4vciIssuer({
+      callbacks: { ...callbacks, signJws: getSignJwsCallback([]) },
+      allowedSkewInSeconds: 0,
+    })
+
+    const jwtIssuedIn10Seconds = () =>
+      createCredentialRequestJwtProof({
+        callbacks: { ...callbacks, signJws: getSignJwsCallback([credentialRequestProofJwk]) },
+        credentialIssuer: credentialIssuerMetadata.credential_issuer,
+        issuedAt: addSecondsToDate(now, 10),
+        signer: { method: 'jwk', alg: 'ES256', publicJwk: credentialRequestProofJwkPublic },
+        nonce: 'some-nonce',
+      })
+
+    test('uses the allowedSkewInSeconds of the issuer', async () => {
+      const error = await issuerWithoutSkew
+        .verifyCredentialRequestJwtProof({
+          expectedNonce: 'some-nonce',
+          issuerMetadata,
+          jwt: await jwtIssuedIn10Seconds(),
+          now,
+        })
+        .catch((e) => e)
+
+      expect(error.errorResponse.error).toEqual('invalid_proof')
+      expect(error.cause.message).toMatch(/iat: .* \(not_yet_valid\)/)
+    })
+
+    test('a per-call allowedSkewInSeconds takes precedence over the one of the issuer', async () => {
+      await expect(
+        issuerWithoutSkew.verifyCredentialRequestJwtProof({
+          expectedNonce: 'some-nonce',
+          issuerMetadata,
+          jwt: await jwtIssuedIn10Seconds(),
+          now,
+          allowedSkewInSeconds: 30,
+        })
+      ).resolves.toBeDefined()
+    })
+
+    test('throws a negative allowedSkewInSeconds as the mistake of the issuer, not as an invalid proof', async () => {
+      await expect(
+        issuerWithoutSkew.verifyCredentialRequestJwtProof({
+          expectedNonce: 'some-nonce',
+          issuerMetadata,
+          jwt: await jwtIssuedIn10Seconds(),
+          now,
+          allowedSkewInSeconds: -1,
+        })
+      ).rejects.toBeInstanceOf(JoseInvalidArgumentError)
     })
   })
 })

@@ -1,18 +1,24 @@
 import { zHttpsUrl } from '@openid4vc/utils'
+import { addValidationIssue, zNonEmptyString } from '@owf/identity-common'
 import { z } from 'zod'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { Oauth2ServerErrorResponseError } from '../error/Oauth2ServerErrorResponseError'
 
 export const zJarAuthorizationRequest = z
   .object({
-    request: z.optional(z.string()),
+    request: z.optional(zNonEmptyString),
     request_uri: z.optional(zHttpsUrl),
-    client_id: z.optional(z.string()),
+    client_id: z.optional(zNonEmptyString),
   })
   .loose()
   // Without this, any object matches and a non-JAR request that fails its own schema passes as JAR in a union
-  .refine((request) => request.request !== undefined || request.request_uri !== undefined, {
-    message: 'request or request_uri must be present',
+  .superRefine((request, ctx) => {
+    if (request.request !== undefined || request.request_uri !== undefined) return
+    addValidationIssue(ctx, {
+      code: 'missing_value',
+      message: 'request or request_uri must be present',
+      context: { expected: 'request or request_uri' },
+    })
   })
 export type JarAuthorizationRequest = z.infer<typeof zJarAuthorizationRequest>
 

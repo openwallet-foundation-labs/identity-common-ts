@@ -1,4 +1,4 @@
-import { formatZodError } from '@owf/identity-common'
+import { parseWithSchema, validationErrorMessage } from '@owf/identity-common'
 import {
   type ParseAuthorizationRequestResult,
   parseAuthorizationRequest,
@@ -26,13 +26,17 @@ export interface ParseAuthorizationChallengeRequestResult extends ParseAuthoriza
 export function parseAuthorizationChallengeRequest(
   options: ParseAuthorizationChallengeRequestOptions
 ): ParseAuthorizationChallengeRequestResult {
-  const parsedAuthorizationChallengeRequest = zAuthorizationChallengeRequest.safeParse(
+  const parsedAuthorizationChallengeRequest = parseWithSchema(
+    zAuthorizationChallengeRequest,
     options.authorizationChallengeRequest
   )
   if (!parsedAuthorizationChallengeRequest.success) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: `Error occurred during validation of authorization challenge request.\n${formatZodError(parsedAuthorizationChallengeRequest.error)}`,
+      error_description: validationErrorMessage(
+        'Error occurred during validation of authorization challenge request.',
+        parsedAuthorizationChallengeRequest.issues
+      ),
     })
   }
 

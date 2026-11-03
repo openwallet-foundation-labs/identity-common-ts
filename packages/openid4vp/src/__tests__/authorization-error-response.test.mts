@@ -1,4 +1,4 @@
-import { encodeToBase64Url } from '@openid4vc/utils'
+import { base64urlEncode } from '@owf/identity-common'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
@@ -58,7 +58,7 @@ describe('resolveOpenid4vpAuthorizationRequest errors', () => {
     const error = await resolveOpenid4vpAuthorizationRequest({
       authorizationRequestPayload: {
         ...authenticatedRequest,
-        transaction_data: [encodeToBase64Url(JSON.stringify({ type: 'payment' }))],
+        transaction_data: [base64urlEncode(JSON.stringify({ type: 'payment' }))],
       },
       callbacks,
       responseMode: { type: 'direct_post' },
@@ -132,7 +132,7 @@ describe('resolveOpenid4vpAuthorizationRequest errors', () => {
   })
 
   test('throws an Openid4vpAuthorizationRequestError with the unverified request when the request object signature is invalid', async () => {
-    const encode = (value: object) => encodeToBase64Url(JSON.stringify(value))
+    const encode = (value: object) => base64urlEncode(JSON.stringify(value))
     const requestObject = `${encode({ alg: 'ES256', typ: 'oauth-authz-req+jwt', x5c: ['MAA='] })}.${encode({
       ...authenticatedRequest,
       client_id: 'x509_san_dns:example.com',

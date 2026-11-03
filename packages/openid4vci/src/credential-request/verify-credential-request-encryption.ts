@@ -1,5 +1,6 @@
 import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { decodeJwtHeader, zCompactJwe, zJwsAlg } from '@owf/jose'
+import { zNonEmptyString } from '@owf/identity-common'
+import { decodeJwtHeader, zCompactJwe, zJweAlg, zJweEnc } from '@owf/jose'
 import z from 'zod'
 import type {
   CredentialIssuerMetadata,
@@ -8,9 +9,9 @@ import type {
 
 const zCredentialRequestJweHeader = z
   .object({
-    kid: z.string().min(1),
-    alg: zJwsAlg,
-    enc: z.string(),
+    kid: zNonEmptyString,
+    alg: zJweAlg,
+    enc: zJweEnc,
     zip: z.string().optional(),
     crit: z.array(z.string()).optional(),
   })

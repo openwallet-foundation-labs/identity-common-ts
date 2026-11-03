@@ -1,4 +1,4 @@
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import { Openid4vpAuthorizationResponseError } from './Openid4vpAuthorizationResponseError'
 import { zOpenid4vpAuthorizationErrorResponse, zOpenid4vpAuthorizationResponse } from './z-authorization-response'
 

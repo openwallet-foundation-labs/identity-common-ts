@@ -17,7 +17,7 @@ CI installs with `--frozen-lockfile`, so commit `pnpm-lock.yaml` with every depe
 ## Platform and crypto
 
 - Packages never depend on global crypto. It is provided as a callback. `@owf/crypto` is the exception: it is a crypto implementation based on Web Crypto that callers can pass in.
-- No Node.js APIs (`Buffer`, `fs`, `node:*`) in package source. Use `Uint8Array` and the encoding helpers of `@owf/identity-common`. `@openid4vc/utils` still uses `Buffer`; don't copy it.
+- No Node.js APIs (`Buffer`, `fs`, `node:*`) in package source. Use `Uint8Array` and the encoding helpers of `@owf/identity-common`.
 - In `oauth2`, `openid4vci`, `openid4vp` and `openid4vc-utils`, import `URL`, `URLSearchParams`, `fetch`, `Response` and `Headers` from `@openid4vc/utils`. Biome enforces this.
 - Web APIs can only be used if they're supported in Node.JS (the versions this repo supports), React Native (at least the last few versions), and Browsers (should be a good tradeoff in compatibility, we don't have to support IE, but also not only the latest Chrome)
 

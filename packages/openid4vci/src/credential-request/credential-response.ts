@@ -1,5 +1,5 @@
 import type { CallbackContext } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import type { JweEncryptor } from '@owf/jose'
 import { Openid4vciError } from '../error/Openid4vciError'
 import type { ParseCredentialRequestReturn } from './parse-credential-request-payload'

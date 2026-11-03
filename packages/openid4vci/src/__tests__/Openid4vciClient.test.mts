@@ -3,8 +3,7 @@ import {
   clientAuthenticationAnonymous,
   preAuthorizedCodeGrantIdentifier,
 } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
-import { ValidationError } from '@owf/identity-common'
+import { parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import { decodeJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'

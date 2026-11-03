@@ -1,3 +1,4 @@
+import { zNonEmptyString } from '@owf/identity-common'
 import { z } from 'zod'
 import type { Openid4vpJarAuthorizationRequest } from '../jar/z-jar-authorization-request'
 import { type Openid4vpAuthorizationRequest, zOpenid4vpAuthorizationRequest } from './z-authorization-request'
@@ -17,7 +18,7 @@ export const zOpenid4vpAuthorizationRequestDcApi = zOpenid4vpAuthorizationReques
     verifier_info: true,
   })
   .extend({
-    client_id: z.optional(z.string()),
+    client_id: z.optional(zNonEmptyString),
     expected_origins: z.array(z.string()).optional(),
     response_mode: zOpenid4vpResponseModeDcApi,
 

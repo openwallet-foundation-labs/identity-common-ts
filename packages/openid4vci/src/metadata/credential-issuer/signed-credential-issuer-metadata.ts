@@ -1,5 +1,5 @@
 import type { CallbackContext } from '@openid4vc/oauth2'
-import { dateToSeconds, parseWithErrorHandling } from '@openid4vc/utils'
+import { dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
 import { type JwsSigner, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import type { CredentialIssuerMetadata } from './z-credential-issuer-metadata'
 import {
@@ -58,7 +58,7 @@ export async function createSignedCredentialIssuerMetadataJwt(
   const payload = parseWithErrorHandling(zSignedCredentialIssuerMetadataPayload, {
     ...options.credentialIssuerMetadata,
     sub: options.credentialIssuerMetadata.credential_issuer,
-    iat: dateToSeconds(options.issuedAt),
+    iat: dateToSeconds(options.issuedAt ?? new Date()),
     exp: options.expiresAt ? dateToSeconds(options.expiresAt) : undefined,
     iss: options.issuer,
     ...options.additionalPayload,

@@ -1,5 +1,5 @@
 import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import { decodeJwtHeader, zCompactJwe, zCompactJwt } from '@owf/jose'
 import z from 'zod'
 import type { Openid4vpAuthorizationRequest } from '../authorization-request/z-authorization-request'
@@ -17,6 +17,19 @@ export interface ParseJarmAuthorizationResponseOptions {
   callbacks: Pick<CallbackContext, 'decryptJwe' | 'verifyJws'>
 
   expectedClientId: string
+
+  /**
+   * Date to verify the `exp`, `nbf` and `iat` of a JARM response against. If not provided the current date
+   * will be used.
+   */
+  now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of a JARM response.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export async function parseJarmAuthorizationResponse(
@@ -35,6 +48,8 @@ export async function parseJarmAuthorizationResponse(
     callbacks,
     expectedClientId,
     authorizationRequestPayload,
+    now: options.now,
+    allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
 
   const { header: jarmHeader } = decodeJwtHeader({

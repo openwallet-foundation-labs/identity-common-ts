@@ -4,6 +4,7 @@ import {
   preAuthorizedCodeGrantIdentifier,
 } from '@openid4vc/oauth2'
 import { zHttpsUrl } from '@openid4vc/utils'
+import { unionParams, zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 
 const zTxCode = z
@@ -20,14 +21,14 @@ export const zCredentialOfferGrants = z
   .object({
     authorization_code: z
       .object({
-        issuer_state: z.string().optional(),
+        issuer_state: zNonEmptyString.optional(),
         authorization_server: zHttpsUrl.optional(),
       })
       .loose()
       .optional(),
     [preAuthorizedCodeGrantIdentifier]: z
       .object({
-        'pre-authorized_code': z.string(),
+        'pre-authorized_code': zNonEmptyString,
         tx_code: zTxCode.optional(),
         authorization_server: zHttpsUrl.optional(),
       })
@@ -44,7 +45,7 @@ export type CredentialOfferAuthorizationCodeGrant = CredentialOfferGrants[Author
 const zCredentialOfferObjectDraft14 = z
   .object({
     credential_issuer: zHttpsUrl,
-    credential_configuration_ids: z.array(z.string()),
+    credential_configuration_ids: z.array(zNonEmptyString),
     grants: z.optional(zCredentialOfferGrants),
   })
   .loose()
@@ -64,7 +65,7 @@ export const zCredentialOfferObjectDraft11To14 = z
 
         [preAuthorizedCodeGrantIdentifier]: z
           .object({
-            'pre-authorized_code': z.string(),
+            'pre-authorized_code': zNonEmptyString,
             user_pin_required: z.optional(z.boolean()),
           })
           .loose()
@@ -101,9 +102,12 @@ export const zCredentialOfferObjectDraft11To14 = z
   })
   .pipe(zCredentialOfferObjectDraft14)
 
-export const zCredentialOfferObject = z.union([
-  // First prioritize draft 14 (and 13)
-  zCredentialOfferObjectDraft14,
-  // Then try parsing draft 11 and transform into draft 14
-  zCredentialOfferObjectDraft11To14,
-])
+export const zCredentialOfferObject = z.union(
+  [
+    // First prioritize draft 14 (and 13)
+    zCredentialOfferObjectDraft14,
+    // Then try parsing draft 11 and transform into draft 14
+    zCredentialOfferObjectDraft11To14,
+  ],
+  unionParams('Invalid credential offer', ['OpenID4VCI 1.0 or drafts 13 to 15', 'OpenID4VCI draft 11'])
+)

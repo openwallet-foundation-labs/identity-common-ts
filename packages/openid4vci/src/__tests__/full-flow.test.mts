@@ -1,7 +1,6 @@
 import {
   authorizationCodeGrantIdentifier,
   clientAuthenticationClientAttestationJwt,
-  HashAlgorithm,
   Oauth2AuthorizationServer,
   Oauth2Client,
   Oauth2ResourceServer,
@@ -10,7 +9,8 @@ import {
   SupportedAuthenticationScheme,
   SupportedClientAuthenticationMethod,
 } from '@openid4vc/oauth2'
-import { addSecondsToDate, ContentType, decodeUtf8String, encodeToBase64Url, type HttpMethod } from '@openid4vc/utils'
+import { addSecondsToDate, ContentType, type HttpMethod } from '@openid4vc/utils'
+import { base64url } from '@owf/identity-common'
 import { calculateJwkThumbprint, type Jwk, type JwkSet } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -289,7 +289,7 @@ describe('Full E2E test', () => {
           jti: expect.any(String),
           cnf: {
             jkt: await calculateJwkThumbprint({
-              hashAlgorithm: HashAlgorithm.Sha256,
+              hashAlgorithm: 'sha-256',
               hashCallback: callbacks.hash,
               jwk: dpopJwkPublic as Jwk,
             }),
@@ -548,7 +548,7 @@ describe('Full E2E test', () => {
 
         expect(verifiedParRequest.dpop?.jwkThumbprint).toEqual(
           await calculateJwkThumbprint({
-            hashAlgorithm: HashAlgorithm.Sha256,
+            hashAlgorithm: 'sha-256',
             hashCallback: callbacks.hash,
             jwk: dpopJwkPublic,
           })
@@ -666,9 +666,7 @@ describe('Full E2E test', () => {
           grant: parsedAccessTokenRequest.grant,
           accessTokenRequest: parsedAccessTokenRequest.accessTokenRequest,
           pkce: {
-            codeChallenge: encodeToBase64Url(
-              callbacks.hash(decodeUtf8String('some-code-verifier'), HashAlgorithm.Sha256)
-            ),
+            codeChallenge: base64url.encode(callbacks.hash('some-code-verifier', 'sha-256')),
             codeChallengeMethod: PkceCodeChallengeMethod.S256,
             codeVerifier: parsedAccessTokenRequest.pkceCodeVerifier,
           },
@@ -683,7 +681,7 @@ describe('Full E2E test', () => {
             required: true,
             allowedSigningAlgs: authorizationServerMetadata.dpop_signing_alg_values_supported,
             expectedJwkThumbprint: await calculateJwkThumbprint({
-              hashAlgorithm: HashAlgorithm.Sha256,
+              hashAlgorithm: 'sha-256',
               hashCallback: callbacks.hash,
               jwk: dpopJwk as Jwk,
             }),
@@ -733,7 +731,7 @@ describe('Full E2E test', () => {
           jti: expect.any(String),
           cnf: {
             jkt: await calculateJwkThumbprint({
-              hashAlgorithm: HashAlgorithm.Sha256,
+              hashAlgorithm: 'sha-256',
               hashCallback: callbacks.hash,
               jwk: dpop?.jwk as Jwk,
             }),
@@ -874,9 +872,7 @@ describe('Full E2E test', () => {
         : undefined,
     })
     expect(pkce).toStrictEqual({
-      codeChallenge: encodeToBase64Url(
-        callbacks.hash(decodeUtf8String(pkce?.codeVerifier as string), HashAlgorithm.Sha256)
-      ),
+      codeChallenge: base64url.encode(callbacks.hash(pkce?.codeVerifier as string, 'sha-256')),
       codeChallengeMethod: 'S256',
       codeVerifier: expect.any(String),
     })

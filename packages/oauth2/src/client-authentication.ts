@@ -1,5 +1,5 @@
 import type { ContentType, FetchHeaders, HttpMethod } from '@openid4vc/utils'
-import { decodeUtf8String, encodeToBase64Url } from '@openid4vc/utils'
+import { base64, stringToBytes } from '@owf/identity-common'
 import type { JwsSignerJwk } from '@owf/jose'
 import { decodeJwt } from '@owf/jose'
 import type { CallbackContext } from './callbacks'
@@ -209,7 +209,10 @@ export function clientAuthenticationClientSecretBasic(
   options: ClientAuthenticationClientSecretBasicOptions
 ): ClientAuthenticationCallback {
   return ({ headers }) => {
-    const authorization = encodeToBase64Url(decodeUtf8String(`${options.clientId}:${options.clientSecret}`))
+    // The client id and secret are form-urlencoded (RFC 6749 section 2.3.1), so a `:` in the client id can't
+    // split the pair, and then base64 encoded with padding, not base64url (RFC 7617 section 2)
+    const credentials = `${encodeURIComponent(options.clientId)}:${encodeURIComponent(options.clientSecret)}`
+    const authorization = base64.encode(stringToBytes(credentials))
     headers.set('Authorization', `Basic ${authorization}`)
   }
 }

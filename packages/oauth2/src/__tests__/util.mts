@@ -1,8 +1,8 @@
 import crypto, { webcrypto } from 'node:crypto'
-import { decodeBase64, encodeToBase64Url, encodeToUtf8String } from '@openid4vc/utils'
+import { base64url, bytesToString } from '@owf/identity-common'
 import { calculateJwkThumbprint, type Jwk } from '@owf/jose'
 import * as jose from 'jose'
-import { type CallbackContext, HashAlgorithm, type SignJwsCallback, type VerifyJwsCallback } from '../callbacks'
+import type { CallbackContext, SignJwsCallback, VerifyJwsCallback } from '../callbacks'
 import { clientAuthenticationNone } from '../client-authentication'
 
 // Needed for Node 18 support with jose6. We can soon drop node18 support.
@@ -49,7 +49,7 @@ const subtleAlgorithm = (alg: string): AlgorithmIdentifier | EcdsaParams | RsaPs
 /** The public jwk a signer identifies, for the signer methods these tests use. */
 function publicJwkForSigner(signer: Parameters<SignJwsCallback>[0], jwks: Jwk[]): Jwk {
   if (signer.method === 'did') {
-    return JSON.parse(encodeToUtf8String(decodeBase64(signer.didUrl.split('#')[0].replace('did:jwk:', ''))))
+    return JSON.parse(bytesToString(base64url.decode(signer.didUrl.split('#')[0].replace('did:jwk:', ''))))
   }
 
   if (signer.method === 'jwk') {
@@ -83,7 +83,11 @@ export function getVerifyJwsCallback({ publicJwks }: { publicJwks?: Jwk[] } = {}
 }
 
 export const callbacks = {
-  hash: (data, alg) => crypto.createHash(alg.replace('-', '').toLowerCase()).update(data).digest(),
+  hash: (data, alg) =>
+    crypto
+      .createHash(alg.replace('-', '').toLowerCase())
+      .update(typeof data === 'string' ? data : new Uint8Array(data))
+      .digest(),
   generateRandom: (bytes) => crypto.randomBytes(bytes),
   clientAuthentication: clientAuthenticationNone({
     clientId: 'some-random-client-id',
@@ -109,14 +113,14 @@ export const getSignJwsCallback = (privateJwks: Jwk[]): SignJwsCallback => {
 
     const jwkThumbprint = await calculateJwkThumbprint({
       jwk,
-      hashAlgorithm: HashAlgorithm.Sha256,
+      hashAlgorithm: 'sha-256',
       hashCallback: callbacks.hash,
     })
 
     const privateJwk = await Promise.all(
       privateJwks.map(async (jwk) =>
         (await calculateJwkThumbprint({
-          hashAlgorithm: HashAlgorithm.Sha256,
+          hashAlgorithm: 'sha-256',
           hashCallback: callbacks.hash,
           jwk,
         })) === jwkThumbprint
@@ -136,7 +140,7 @@ export const getSignJwsCallback = (privateJwks: Jwk[]): SignJwsCallback => {
       signingInputBytes as Uint8Array<ArrayBuffer>
     )
 
-    return { signature: encodeToBase64Url(new Uint8Array(signature)), signerJwk: jwk }
+    return { signature: base64url.encode(new Uint8Array(signature)), signerJwk: jwk }
   }
 }
 

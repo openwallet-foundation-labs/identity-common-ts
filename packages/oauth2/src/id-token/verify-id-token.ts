@@ -23,6 +23,13 @@ export interface VerifyIdTokenJwtOptions {
   now?: Date
 
   /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
+
+  /**
    * Authorization server metadata
    */
   authorizationServer: AuthorizationServerMetadata
@@ -79,6 +86,7 @@ export async function verifyIdTokenJwt(options: VerifyIdTokenJwtOptions) {
     verifyJwsCallback: options.callbacks.verifyJws,
     errorMessage: 'Error during verification of id token jwt.',
     now: options.now,
+    skewSeconds: options.allowedSkewInSeconds,
     expectedAudience: options.clientId,
     expectedIssuer: options.authorizationServer.issuer,
     expectedNonce: options.expectedNonce,

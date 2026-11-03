@@ -1,5 +1,4 @@
-import { dateToSeconds } from '@openid4vc/utils'
-import { ValidationError } from '@owf/identity-common'
+import { nowInSeconds, ValidationError } from '@owf/identity-common'
 import { JoseValidationError, signJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -89,7 +88,7 @@ describe('Issuer info metadata', () => {
       payload: {
         ...credentialIssuerMetadata,
         sub: credentialIssuerMetadata.credential_issuer,
-        iat: dateToSeconds(),
+        iat: nowInSeconds(),
         issuer_info: [{ format: 'registration_cert', data: 'registration-certificate-jwt', credential_ids: [] }],
       },
     })

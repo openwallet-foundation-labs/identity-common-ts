@@ -5,7 +5,8 @@ import {
   Oauth2ErrorCodes,
   Oauth2ServerErrorResponseError,
 } from '@openid4vc/oauth2'
-import { addSecondsToDate, dateToSeconds, encodeToBase64Url } from '@openid4vc/utils'
+import { addSecondsToDate } from '@openid4vc/utils'
+import { base64urlEncode, dateToSeconds } from '@owf/identity-common'
 import type { Jwk, JwkSet, JwsSigner } from '@owf/jose'
 import type { Openid4vpAuthorizationRequest } from '../authorization-request/z-authorization-request'
 import type { Openid4vpAuthorizationRequestDcApi } from '../authorization-request/z-authorization-request-dc-api'
@@ -247,8 +248,8 @@ export async function createOpenid4vpAuthorizationResponse<
       ? {
           method: 'jwk',
           publicJwk: encJwk,
-          apu: jarm.encryption.nonce ? encodeToBase64Url(jarm.encryption.nonce) : undefined,
-          apv: encodeToBase64Url(authorizationRequestPayload.nonce),
+          apu: jarm.encryption.nonce ? base64urlEncode(jarm.encryption.nonce) : undefined,
+          apv: base64urlEncode(authorizationRequestPayload.nonce),
           alg,
           enc,
         }

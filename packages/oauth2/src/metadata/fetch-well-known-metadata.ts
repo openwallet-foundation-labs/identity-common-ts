@@ -1,5 +1,5 @@
-import { type BaseSchema, ContentType, createZodFetcher, type Fetch, InvalidFetchResponseError } from '@openid4vc/utils'
-import { ValidationError } from '@owf/identity-common'
+import { ContentType, createZodFetcher, type Fetch, InvalidFetchResponseError } from '@openid4vc/utils'
+import { type BaseSchema, ValidationError } from '@owf/identity-common'
 import type z from 'zod'
 
 export interface FetchWellKnownMetadataOptions {
@@ -50,7 +50,7 @@ export async function fetchWellKnownMetadata<Schema extends BaseSchema>(
   }
 
   if (!result?.success) {
-    throw new ValidationError(`Validation of metadata from '${wellKnownMetadataUrl}' failed`, result?.error)
+    throw new ValidationError(`Validation of metadata from '${wellKnownMetadataUrl}' failed`, result?.issues ?? [])
   }
 
   return result.data

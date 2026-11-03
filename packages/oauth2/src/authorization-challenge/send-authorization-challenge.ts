@@ -4,9 +4,8 @@ import {
   Headers,
   InvalidFetchResponseError,
   objectToQueryParams,
-  parseWithErrorHandling,
 } from '@openid4vc/utils'
-import { ValidationError } from '@owf/identity-common'
+import { parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
 import { authorizationServerRequestWithDpopRetry } from '../dpop/dpop-retry'
@@ -187,7 +186,7 @@ export async function sendAuthorizationChallengeRequest(options: SendAuthorizati
       }
 
       if (!result.success) {
-        throw new ValidationError('Error validating authorization challenge response', result.error)
+        throw new ValidationError('Error validating authorization challenge response', result.issues)
       }
 
       const dpopNonce = extractDpopNonceFromHeaders(response.headers) ?? undefined
