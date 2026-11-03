@@ -1,5 +1,5 @@
-import { ContentType, Headers } from '@openid4vc/utils'
-import { ValidationError } from '@owf/identity-common'
+import { Headers } from '@openid4vc/utils'
+import { CommonMediaTypes, ValidationError } from '@owf/identity-common'
 import type { Jwk } from '@owf/jose'
 import { decodeJwt } from '@owf/jose'
 import * as jose from 'jose'
@@ -86,7 +86,7 @@ describe('Client Attestation challenge', () => {
         http.post(mockAuthorizationServerMetadata.challenge_endpoint as string, () =>
           HttpResponse.json(
             { attestation_challenge: 'challenge-abc' },
-            { headers: { 'Content-Type': ContentType.Json } }
+            { headers: { 'Content-Type': CommonMediaTypes.Json } }
           )
         )
       )
@@ -111,7 +111,7 @@ describe('Client Attestation challenge', () => {
     test('throws a ValidationError when the response body is invalid', async () => {
       server.resetHandlers(
         http.post(mockAuthorizationServerMetadata.challenge_endpoint as string, () =>
-          HttpResponse.json({ not_a_challenge: true }, { headers: { 'Content-Type': ContentType.Json } })
+          HttpResponse.json({ not_a_challenge: true }, { headers: { 'Content-Type': CommonMediaTypes.Json } })
         )
       )
 
@@ -136,7 +136,7 @@ describe('Client Attestation challenge', () => {
         url: mockAuthorizationServerMetadata.token_endpoint,
         method: 'POST',
         headers,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         body: {},
       })
 
@@ -155,7 +155,7 @@ describe('Client Attestation challenge', () => {
         url: mockAuthorizationServerMetadata.token_endpoint,
         method: 'POST',
         headers,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         body: {},
         attestationChallenge: 'server-challenge',
       })
@@ -219,14 +219,14 @@ describe('Client Attestation challenge', () => {
               {
                 status: 400,
                 headers: {
-                  'Content-Type': ContentType.Json,
+                  'Content-Type': CommonMediaTypes.Json,
                   [oauthClientAttestationChallengeHeader]: 'retry-challenge',
                 },
               }
             )
           }
 
-          return HttpResponse.json(mockResponse, { headers: { 'Content-Type': ContentType.Json } })
+          return HttpResponse.json(mockResponse, { headers: { 'Content-Type': CommonMediaTypes.Json } })
         })
       )
 
@@ -261,7 +261,7 @@ describe('Client Attestation challenge', () => {
         http.post(mockAuthorizationServerMetadata.token_endpoint, () =>
           HttpResponse.json(mockResponse, {
             headers: {
-              'Content-Type': ContentType.Json,
+              'Content-Type': CommonMediaTypes.Json,
               [oauthClientAttestationChallengeHeader]: 'next-challenge',
             },
           })

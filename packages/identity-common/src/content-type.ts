@@ -8,6 +8,15 @@
  * an exact string match.
  */
 
+/** Media types that are not specific to one specification. */
+export const CommonMediaTypes = {
+  XWwwFormUrlencoded: 'application/x-www-form-urlencoded',
+  Json: 'application/json',
+  JwkSet: 'application/jwk-set+json',
+  Jwt: 'application/jwt',
+  Html: 'text/html',
+} as const
+
 /**
  * Extract the normalized media type (`type/subtype`) from a `Content-Type` header
  * value, dropping any parameters and lowercasing the result.

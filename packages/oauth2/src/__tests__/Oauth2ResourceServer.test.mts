@@ -1,4 +1,4 @@
-import { ContentType } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
 import { JoseValidationError, type Jwk, type JwkSet, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -55,7 +55,7 @@ describe('Oauth2ResourceServer', () => {
     server.resetHandlers(
       http.get(authorizationServerMetadata.jwks_uri, () =>
         HttpResponse.json({ keys: [accessTokenSignerJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       )
     )
@@ -141,7 +141,7 @@ describe('Oauth2ResourceServer', () => {
     server.resetHandlers(
       http.get(authorizationServerMetadata.jwks_uri, () =>
         HttpResponse.json({ keys: [accessTokenSignerJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       )
     )
@@ -229,7 +229,7 @@ describe('Oauth2ResourceServer', () => {
       http.get(authorizationServerMetadata.jwks_uri, () => {
         jwksRequestCount++
         return HttpResponse.json({ keys: [accessTokenSignerJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       })
     )
@@ -285,7 +285,7 @@ describe('Oauth2ResourceServer', () => {
       http.get(authorizationServerMetadata.jwks_uri, () => {
         jwksRequestCount++
         return HttpResponse.json({ keys: [accessTokenSignerJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       })
     )
@@ -339,7 +339,7 @@ describe('Oauth2ResourceServer', () => {
       http.get(authorizationServerMetadata.jwks_uri, () => {
         jwksRequestCount++
         return HttpResponse.json({ keys: [accessTokenSignerJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       })
     )

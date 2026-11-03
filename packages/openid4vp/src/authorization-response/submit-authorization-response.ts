@@ -1,5 +1,6 @@
 import { type CallbackContext, Oauth2Error } from '@openid4vc/oauth2'
-import { ContentType, createFetcher, objectToQueryParams } from '@openid4vc/utils'
+import { createFetcher, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
 import type { Openid4vpAuthorizationRequest } from '../authorization-request/z-authorization-request'
 import { jarmAuthorizationResponseSend } from '../jarm/jarm-authorization-response-send'
 import type { Openid4vpAuthorizationErrorResponse, Openid4vpAuthorizationResponse } from './z-authorization-response'
@@ -35,7 +36,7 @@ export async function submitOpenid4vpAuthorizationResponse(options: SubmitOpenid
     method: 'POST',
     body: encodedResponse.toString(),
     headers: {
-      'Content-Type': ContentType.XWwwFormUrlencoded,
+      'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
     },
   })
 

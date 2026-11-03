@@ -1,6 +1,5 @@
 export { arrayEqualsIgnoreOrder } from './array'
 export { getGlobalConfig, type Oid4vcTsConfig, setGlobalConfig } from './config'
-export { ContentType } from './content-type'
 export { addSecondsToDate } from './date'
 export { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
 export { JsonParseError } from './error/JsonParseError'

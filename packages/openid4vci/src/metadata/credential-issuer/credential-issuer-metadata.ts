@@ -1,6 +1,6 @@
 import { type CallbackContext, fetchWellKnownMetadata, Oauth2Error } from '@openid4vc/oauth2'
-import { ContentType, joinUriParts, URL } from '@openid4vc/utils'
-import { IdentityError, parseWithErrorHandling } from '@owf/identity-common'
+import { joinUriParts, URL } from '@openid4vc/utils'
+import { CommonMediaTypes, IdentityError, parseWithErrorHandling } from '@owf/identity-common'
 import { type DecodeJwtResult, decodeJwt, type JwsSignerWithJwk, verifyJwt, zCompactJwt } from '@owf/jose'
 import type { CredentialFormatIdentifier } from '../../formats/credential'
 import type { Openid4vciVersion } from '../../version'
@@ -93,10 +93,10 @@ export async function fetchCredentialIssuerMetadata(
 
   const signedMetadata = options?.signedMetadata ?? (options?.callbacks?.verifyJws ? 'preferred' : 'disallowed')
   const acceptedContentTypeBySignedMetadata = {
-    required: [ContentType.Jwt],
-    preferred: [ContentType.Jwt, ContentType.Json],
-    disallowed: [ContentType.Json],
-  } satisfies Record<typeof signedMetadata, [ContentType, ...ContentType[]]>
+    required: [CommonMediaTypes.Jwt],
+    preferred: [CommonMediaTypes.Jwt, CommonMediaTypes.Json],
+    disallowed: [CommonMediaTypes.Json],
+  } satisfies Record<typeof signedMetadata, [string, ...string[]]>
 
   // The value determines the Accept header, so we only allow the supported values
   if (signedMetadata !== 'required' && signedMetadata !== 'preferred' && signedMetadata !== 'disallowed') {
@@ -111,7 +111,7 @@ export async function fetchCredentialIssuerMetadata(
     )
   }
 
-  const acceptedContentType: [ContentType, ...ContentType[]] = acceptedContentTypeBySignedMetadata[signedMetadata]
+  const acceptedContentType: [string, ...string[]] = acceptedContentTypeBySignedMetadata[signedMetadata]
 
   // Either unsigned metadata or signed JWT
   const zResponse = zCredentialIssuerMetadataWithDraftVersion.or(zCompactJwt)

@@ -9,7 +9,6 @@ import {
   preAuthorizedCodeGrantIdentifier,
 } from '@openid4vc/oauth2'
 import {
-  ContentType,
   createZodFetcher,
   type Fetch,
   getQueryParams,
@@ -19,6 +18,7 @@ import {
 } from '@openid4vc/utils'
 import {
   base64url,
+  CommonMediaTypes,
   parseWithErrorHandling,
   parseWithSchema,
   type SchemaParseResult,
@@ -58,22 +58,24 @@ export async function resolveCredentialOffer(
     const fetchWithZod = createZodFetcher(options?.fetch)
 
     const credentialOfferUri = parsedQueryParams.credential_offer_uri
-    const { response, result } = await fetchWithZod(zCredentialOfferObject, ContentType.Json, credentialOfferUri).catch(
-      (error) => {
-        // The body of a successful response is the offer, which the fetch errors would put in their message
-        if (error instanceof InvalidFetchResponseError) {
-          throw new InvalidFetchResponseError(
-            `The credential offer from '${credentialOfferUri}' has content type '${error.response.headers.get('Content-Type')}', expected '${ContentType.Json}'`,
-            '',
-            error.response
-          )
-        }
-        if (error instanceof SyntaxError) {
-          throw new Oauth2Error(`The credential offer from '${credentialOfferUri}' is not valid JSON`)
-        }
-        throw error
+    const { response, result } = await fetchWithZod(
+      zCredentialOfferObject,
+      CommonMediaTypes.Json,
+      credentialOfferUri
+    ).catch((error) => {
+      // The body of a successful response is the offer, which the fetch errors would put in their message
+      if (error instanceof InvalidFetchResponseError) {
+        throw new InvalidFetchResponseError(
+          `The credential offer from '${credentialOfferUri}' has content type '${error.response.headers.get('Content-Type')}', expected '${CommonMediaTypes.Json}'`,
+          '',
+          error.response
+        )
       }
-    )
+      if (error instanceof SyntaxError) {
+        throw new Oauth2Error(`The credential offer from '${credentialOfferUri}' is not valid JSON`)
+      }
+      throw error
+    })
     if (!response.ok || !result) {
       throw new InvalidFetchResponseError(
         `Fetching credential offer from '${parsedQueryParams.credential_offer_uri}' resulted in an unsuccessful response with status '${response.status}'`,

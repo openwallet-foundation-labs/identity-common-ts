@@ -173,6 +173,7 @@ export {
   signedAuthorizationRequestJwtHeaderTyp,
   zJarRequestObjectPayload,
 } from './jar/z-jar-request-object'
+export { Oauth2MediaTypes } from './media-types'
 export {
   fetchAuthorizationServerMetadata,
   getAuthorizationServerMetadataFromList,

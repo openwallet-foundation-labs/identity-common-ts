@@ -1,4 +1,4 @@
-import { ContentType } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
@@ -55,7 +55,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain('scope=read+write')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -89,7 +89,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).not.toContain('scope=')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -122,7 +122,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain('resource=https%3A%2F%2Fapi.example.com')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -152,7 +152,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
           },
           {
             status: 400,
-            headers: { 'Content-Type': ContentType.Json },
+            headers: { 'Content-Type': CommonMediaTypes.Json },
           }
         )
       })
@@ -206,7 +206,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain('custom_param=custom_value')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -244,7 +244,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain('resource=https%3A%2F%2Fapi.example.com')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -283,7 +283,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain(`client_secret=${clientSecret}`)
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -334,7 +334,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).not.toContain('client_secret=')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )

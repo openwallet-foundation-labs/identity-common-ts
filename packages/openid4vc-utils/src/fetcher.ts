@@ -1,6 +1,11 @@
-import { createAcceptHeader, isMediaType, parseWithSchema, type SchemaParseResult } from '@owf/identity-common'
+import {
+  CommonMediaTypes,
+  createAcceptHeader,
+  isMediaType,
+  parseWithSchema,
+  type SchemaParseResult,
+} from '@owf/identity-common'
 import type z from 'zod'
-import { ContentType } from './content-type'
 import { FetchError } from './error/FetchError'
 import { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
 import { type Fetch, Headers, URLSearchParams } from './globals'
@@ -11,7 +16,7 @@ import { type Fetch, Headers, URLSearchParams } from './globals'
  */
 export type ZodFetcher = <Schema extends z.ZodTypeAny>(
   schema: Schema,
-  expectedContentType: ContentType | ContentType[],
+  expectedContentType: string | string[],
   ...args: Parameters<Fetch>
 ) => Promise<{ response: Awaited<ReturnType<Fetch>>; result?: SchemaParseResult<z.infer<Schema>> }>
 
@@ -82,9 +87,8 @@ export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
       )
     }
 
-    if (
-      isMediaType(response.headers.get('Content-Type'), [ContentType.OauthAuthorizationRequestJwt, ContentType.Jwt])
-    ) {
+    // A compact JWT is text, not JSON (RFC 7519 Section 1)
+    if (isMediaType(response.headers.get('Content-Type'), CommonMediaTypes.Jwt)) {
       return {
         response,
         result: response.ok ? parseWithSchema(schema, await response.text()) : undefined,

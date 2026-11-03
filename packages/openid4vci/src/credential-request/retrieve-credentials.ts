@@ -7,9 +7,10 @@ import {
   resourceRequest,
   type zOauth2ErrorResponse,
 } from '@openid4vc/oauth2'
-import { ContentType, type FetchResponse, stringToJsonWithErrorHandling } from '@openid4vc/utils'
+import { type FetchResponse, stringToJsonWithErrorHandling } from '@openid4vc/utils'
 import {
   addValidationIssue,
+  CommonMediaTypes,
   isMediaType,
   parseWithErrorHandling,
   parseWithSchema,
@@ -55,7 +56,7 @@ async function handleCredentialResponse<T, Schema extends z.ZodType<T>>(options:
   const { response, decryptJwe, credentialResponseEncryption, schema, responseType } = options
 
   // Check if the response is encrypted (Content-Type: application/jwt)
-  if (isMediaType(response.headers.get('Content-Type'), ContentType.Jwt)) {
+  if (isMediaType(response.headers.get('Content-Type'), CommonMediaTypes.Jwt)) {
     const jwe = await response.clone().text()
     const decryptResult = await decryptJwe(jwe, { jwk: credentialResponseEncryption?.jwk })
 
@@ -85,7 +86,7 @@ async function handleCredentialResponse<T, Schema extends z.ZodType<T>>(options:
   }
 
   // Try to parse the response (non-encrypted)
-  const parseResult = isMediaType(response.headers.get('Content-Type'), ContentType.Json)
+  const parseResult = isMediaType(response.headers.get('Content-Type'), CommonMediaTypes.Json)
     ? parseWithSchema(schema, await response.clone().json())
     : undefined
 
@@ -328,7 +329,7 @@ async function retrieveCredentials(
   if (!resourceResponse.ok) {
     const credentialErrorResponseResult = isMediaType(
       resourceResponse.response.headers.get('Content-Type'),
-      ContentType.Json
+      CommonMediaTypes.Json
     )
       ? parseWithSchema(zCredentialErrorResponse, await resourceResponse.response.clone().json())
       : undefined
@@ -438,7 +439,7 @@ export async function retrieveDeferredCredentials(
   if (!resourceResponse.ok) {
     const deferredCredentialErrorResponseResult = isMediaType(
       resourceResponse.response.headers.get('Content-Type'),
-      ContentType.Json
+      CommonMediaTypes.Json
     )
       ? parseWithSchema(zCredentialErrorResponse, await resourceResponse.response.clone().json())
       : undefined
@@ -504,7 +505,7 @@ async function encodeCredentialRequest(options: {
   callbacks: RetrieveCredentialsBaseOptions['callbacks']
   issuerMetadata: IssuerMetadataResult
   credentialRequestEncryption?: CredentialRequestEncryption
-}): Promise<{ contentType: ContentType; body: string }> {
+}): Promise<{ contentType: string; body: string }> {
   const supported = options.issuerMetadata.credentialIssuer.credential_request_encryption
   const responseEncryptionRequested = options.credentialRequest.credential_response_encryption !== undefined
   const responseEncryptionRequired =
@@ -539,7 +540,7 @@ async function encodeCredentialRequest(options: {
 
   if (!shouldEncrypt) {
     return {
-      contentType: ContentType.Json,
+      contentType: CommonMediaTypes.Json,
       body: JSON.stringify(credentialRequest),
     }
   }
@@ -600,7 +601,7 @@ async function encodeCredentialRequest(options: {
   const { jwe } = await encryptJwe(encryptor, JSON.stringify(credentialRequest))
 
   return {
-    contentType: ContentType.Jwt,
+    contentType: CommonMediaTypes.Jwt,
     body: jwe,
   }
 }

@@ -8,14 +8,8 @@ import {
   type RequestDpopOptions,
   zOauth2ErrorResponse,
 } from '@openid4vc/oauth2'
-import {
-  ContentType,
-  createZodFetcher,
-  Headers,
-  InvalidFetchResponseError,
-  objectToQueryParams,
-} from '@openid4vc/utils'
-import { parseWithErrorHandling, ValidationError } from '@owf/identity-common'
+import { createZodFetcher, Headers, InvalidFetchResponseError, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import { Openid4vciClientInteractiveAuthorizationError } from '../error/Openid4vciClientInteractiveAuthorizationError'
 import {
   type InteractiveAuthorizationFollowUpRequest,
@@ -142,12 +136,12 @@ export async function sendInteractiveAuthorizationRequest(options: SendInteracti
       const headers = new Headers({
         ...dpopHeaders,
         ...options.additionalHeaders,
-        'Content-Type': ContentType.XWwwFormUrlencoded,
+        'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
       })
 
       const { response, result } = await fetchWithZod(
         zInteractiveAuthorizationResponse,
-        ContentType.Json,
+        CommonMediaTypes.Json,
         interactiveAuthorizationEndpoint,
         {
           method: 'POST',

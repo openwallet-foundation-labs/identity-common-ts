@@ -1,11 +1,5 @@
-import {
-  ContentType,
-  createZodFetcher,
-  Headers,
-  InvalidFetchResponseError,
-  objectToQueryParams,
-} from '@openid4vc/utils'
-import { parseWithErrorHandling, ValidationError } from '@owf/identity-common'
+import { createZodFetcher, Headers, InvalidFetchResponseError, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import {
   authorizationServerRequestWithClientAttestationChallengeRetry,
@@ -259,7 +253,7 @@ async function retrieveAccessToken(options: RetrieveAccessTokenOptions): Promise
             : undefined
 
           const headers = new Headers({
-            'Content-Type': ContentType.XWwwFormUrlencoded,
+            'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
             ...dpopHeaders,
           })
 
@@ -269,14 +263,14 @@ async function retrieveAccessToken(options: RetrieveAccessTokenOptions): Promise
             method: 'POST',
             authorizationServerMetadata: options.authorizationServerMetadata,
             body: accessTokenRequest,
-            contentType: ContentType.XWwwFormUrlencoded,
+            contentType: CommonMediaTypes.XWwwFormUrlencoded,
             headers,
             attestationChallenge,
           })
 
           const { response, result } = await fetchWithZod(
             zAccessTokenResponse,
-            ContentType.Json,
+            CommonMediaTypes.Json,
             options.authorizationServerMetadata.token_endpoint,
             {
               body: objectToQueryParams(accessTokenRequest).toString(),

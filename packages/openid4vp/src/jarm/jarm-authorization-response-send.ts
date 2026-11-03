@@ -1,5 +1,6 @@
 import { type CallbackContext, Oauth2Error } from '@openid4vc/oauth2'
-import { ContentType, createFetcher, URL } from '@openid4vc/utils'
+import { createFetcher, URL } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
 
 interface JarmAuthorizationResponseSendOptions {
   authorizationRequestPayload: {
@@ -29,7 +30,7 @@ async function handleDirectPostJwt(
 ) {
   const response = await createFetcher(callbacks.fetch)(responseEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': ContentType.XWwwFormUrlencoded },
+    headers: { 'Content-Type': CommonMediaTypes.XWwwFormUrlencoded },
     body: `response=${responseJwt}`,
   })
 

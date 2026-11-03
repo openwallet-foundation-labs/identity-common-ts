@@ -1,9 +1,10 @@
-import { ContentType, createFetcher, type Fetch, zHttpsUrl } from '@openid4vc/utils'
-import { createAcceptHeader, zTyp } from '@owf/identity-common'
+import { createFetcher, type Fetch, zHttpsUrl } from '@openid4vc/utils'
+import { CommonMediaTypes, createAcceptHeader, zTyp } from '@owf/identity-common'
 import { decodeJwt, type JwsSigner, type JwsSignerWithJwk, verifyJwt, zCompactJwe, zCompactJwt } from '@owf/jose'
 import type { CallbackContext } from '../../callbacks'
 import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
 import { Oauth2ServerErrorResponseError } from '../../error/Oauth2ServerErrorResponseError'
+import { Oauth2MediaTypes } from '../../media-types'
 import { type JarAuthorizationRequest, validateJarRequestParams } from '../z-jar-authorization-request'
 import {
   type JarRequestObjectPayload,
@@ -156,8 +157,8 @@ async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetc
   const response = await createFetcher(fetch)(requestUri, {
     method: 'get',
     headers: {
-      Accept: createAcceptHeader([ContentType.OauthAuthorizationRequestJwt, ContentType.Jwt, 'text/plain']),
-      'Content-Type': ContentType.XWwwFormUrlencoded,
+      Accept: createAcceptHeader([Oauth2MediaTypes.AuthorizationRequestJwt, CommonMediaTypes.Jwt, 'text/plain']),
+      'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
     },
   }).catch(() => {
     throw new Oauth2ServerErrorResponseError({

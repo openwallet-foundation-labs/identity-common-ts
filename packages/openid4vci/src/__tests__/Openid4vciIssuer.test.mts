@@ -1,5 +1,6 @@
 import { JoseInvalidArgumentError, preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
-import { addSecondsToDate, ContentType } from '@openid4vc/utils'
+import { addSecondsToDate } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
 import { type JwsSigner, signJwt } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
 import { callbacks, getSignJwsCallback } from '../../../oauth2/src/__tests__/util.mjs'
@@ -105,7 +106,7 @@ describe('Openid4vciIssuer', () => {
           credential_configuration_id: 'not-offered',
           proof: { proof_type: 'jwt', jwt: 'ey.ey.S' },
         },
-        contentType: ContentType.Json,
+        contentType: CommonMediaTypes.Json,
       })
     ).rejects.toMatchObject(
       expect.objectContaining({

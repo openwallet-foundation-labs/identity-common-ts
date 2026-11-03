@@ -1,4 +1,5 @@
-import { ContentType, Headers } from '@openid4vc/utils'
+import { Headers } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
 import type { Jwk } from '@owf/jose'
 import { decodeJwt, signJwt } from '@owf/jose'
 import * as jose from 'jose'
@@ -74,7 +75,7 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
         url: authorizationServerMetadata.token_endpoint,
         method: 'POST',
         headers,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         body: {},
       })
 
@@ -102,7 +103,7 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
         url: authorizationServerMetadata.token_endpoint,
         method: 'POST',
         headers,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         body: {},
         attestationChallenge: 'server-challenge',
       })

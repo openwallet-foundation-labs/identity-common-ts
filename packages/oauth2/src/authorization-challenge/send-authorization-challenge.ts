@@ -1,11 +1,5 @@
-import {
-  ContentType,
-  createZodFetcher,
-  Headers,
-  InvalidFetchResponseError,
-  objectToQueryParams,
-} from '@openid4vc/utils'
-import { parseWithErrorHandling, ValidationError } from '@owf/identity-common'
+import { createZodFetcher, Headers, InvalidFetchResponseError, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
 import { authorizationServerRequestWithDpopRetry } from '../dpop/dpop-retry'
@@ -139,7 +133,7 @@ export async function sendAuthorizationChallengeRequest(options: SendAuthorizati
 
       const headers = new Headers({
         ...dpopHeaders,
-        'Content-Type': ContentType.XWwwFormUrlencoded,
+        'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
       })
 
       // Apply client authentication
@@ -148,13 +142,13 @@ export async function sendAuthorizationChallengeRequest(options: SendAuthorizati
         method: 'POST',
         authorizationServerMetadata: options.authorizationServerMetadata,
         body: authorizationChallengeRequest,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         headers,
       })
 
       const { response, result } = await fetchWithZod(
         zAuthorizationChallengeResponse,
-        ContentType.Json,
+        CommonMediaTypes.Json,
         authorizationChallengeEndpoint,
         {
           method: 'POST',
