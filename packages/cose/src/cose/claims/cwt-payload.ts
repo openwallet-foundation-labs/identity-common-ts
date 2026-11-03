@@ -167,15 +167,20 @@ export type VerifyCwtClaimsOptions = {
    */
   requiredClaims?: ReadonlyArray<RegisteredCwtClaimKey | number | string>
 
-  /** The value(s) `iss` (1) is accepted with. Not checked when the token carries no `iss`. */
+  /**
+   * The value(s) `iss` (1) is accepted with.
+   *
+   * A token that does not carry the claim at all is rejected too: a claim that is absent does not
+   * hold the value the caller said it expects.
+   */
   expectedIssuer?: string | string[]
 
-  /** The value(s) `sub` (2) is accepted with. Not checked when the token carries no `sub`. */
+  /** The value(s) `sub` (2) is accepted with. See {@link expectedIssuer} for an absent claim. */
   expectedSubject?: string | string[]
 
   /**
    * The value(s) `aud` (3) is accepted with. The token is accepted when any of its audiences is
-   * one of these. Not checked when the token carries no `aud`.
+   * one of these. See {@link expectedIssuer} for an absent claim.
    */
   expectedAudience?: string | string[]
 
@@ -401,9 +406,18 @@ function verifyClaimMatches(
   expected: string | string[] | undefined,
   keyLabels?: Record<string | number, unknown>
 ) {
-  if (value === undefined || expected === undefined) return
+  if (expected === undefined) return
 
   const expectedValues = asArray(expected)
+
+  // An absent claim is a mismatch rather than something to skip: a token that does not say who
+  // issued it is not a token issued by the expected issuer.
+  if (value === undefined) {
+    throw new CwtClaimVerificationError(
+      `The token has no ${claimLabel(key, keyLabels)} claim, which is required to match the expected value ${quoted(expectedValues)}`
+    )
+  }
+
   if (!expectedValues.includes(value)) {
     throw new CwtClaimVerificationError(
       `The ${claimLabel(key, keyLabels)} claim '${value}' does not match the expected value ${quoted(expectedValues)}`
@@ -417,10 +431,18 @@ function verifyAudienceMatches(
   expected: string | string[] | undefined,
   keyLabels?: Record<string | number, unknown>
 ) {
-  if (audience === undefined || expected === undefined) return
+  if (expected === undefined) return
+
+  const expectedValues = asArray(expected)
+
+  // See `verifyClaimMatches`: a token carrying no audience is not a token for this audience.
+  if (audience === undefined) {
+    throw new CwtClaimVerificationError(
+      `The token has no ${claimLabel(RegisteredCwtClaimKey.Audience, keyLabels)} claim, which is required to match the expected value ${quoted(expectedValues)}`
+    )
+  }
 
   const audiences = asArray(audience)
-  const expectedValues = asArray(expected)
 
   if (!audiences.some((value) => expectedValues.includes(value))) {
     throw new CwtClaimVerificationError(

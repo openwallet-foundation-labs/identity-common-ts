@@ -81,8 +81,6 @@ export class DcqlError extends IdentityError {
   }) {
     const cause = getCauseFromUnknown(opts.cause)
     super(opts.message ?? cause?.message ?? opts.code)
-    // IdentityError sets its own prototype, this restores the one of the subclass
-    Object.setPrototypeOf(this, new.target.prototype)
 
     this.code = opts.code
     this.name = 'DcqlError'

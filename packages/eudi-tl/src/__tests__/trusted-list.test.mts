@@ -1,4 +1,4 @@
-import { base64 } from '@owf/identity-common'
+import { base64, ValidationError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
   ACTIVE_SERVICE_STATUSES,
@@ -107,7 +107,7 @@ describe('parseTrustedList', () => {
     expect(() => parseTrustedList('<root/>')).toThrow(TrustedListParseError)
   })
 
-  it('throws the issues of a list that does not conform, as a parse error', () => {
+  it('throws the issues of a list that does not conform, as a validation error', () => {
     let error: unknown
     try {
       assertValidTrustedList({})
@@ -115,7 +115,7 @@ describe('parseTrustedList', () => {
       error = thrown
     }
     expect(error).toBeInstanceOf(TrustedListValidationError)
-    expect(error).toBeInstanceOf(TrustedListParseError)
+    expect(error).toBeInstanceOf(ValidationError)
     expect((error as TrustedListValidationError).issues).toEqual(validateTrustedList({}).issues)
   })
 })

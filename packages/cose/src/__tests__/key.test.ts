@@ -26,8 +26,7 @@ describe('cose key', () => {
         // @ts-expect-error
         x: 'should be uint8array',
       })
-    ).toThrow(`Error decoding CoseKey
-✖ Expected Uint8Array, received string at "X (-2)"`)
+    ).toThrow('Error decoding CoseKey\n  - X (-2): expected Uint8Array, received string')
   })
 
   test('create ec key instance with public key', () => {

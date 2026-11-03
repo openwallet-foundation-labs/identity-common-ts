@@ -1,3 +1,5 @@
+import { IdentityError } from './identity-error'
+
 /**
  * A common shape for the outcome of a validation, so the validators of different packages
  * can be consumed the same way, for example to show which element of a parsed document
@@ -20,6 +22,11 @@ export interface ValidationIssue<Code extends string = string, Context = unknown
    * indices. Empty when the issue concerns the value as a whole.
    */
   path: (string | number)[]
+  /**
+   * `path` as a reader knows it, of the same length, e.g. `ExpirationTime (4)` where the path
+   * has the CBOR key `4`. The message of a validation error uses it instead of `path`.
+   */
+  pathLabels?: (string | number)[]
   message: string
   /** Requirement identifier of the specification the validator implements, e.g. `GEN-6.6.1-05` */
   requirement?: string
@@ -58,8 +65,8 @@ export type CommonValidationCode = (typeof VALIDATION_CODES)[keyof typeof VALIDA
  * only have these codes or one of the validator, never a code of the schema library.
  */
 export const SCHEMA_VALIDATION_CODES = {
-  /** A required value is missing */
-  MISSING: 'missing',
+  /** A required value is missing, with the `expected` value as context, e.g. `string` */
+  MISSING_VALUE: 'missing_value',
   /** A value is present that must not be */
   NOT_ALLOWED: 'not_allowed',
   /** A value has the wrong type, with the `expected` type as context, e.g. `string` or `int` */
@@ -85,13 +92,16 @@ export interface ValidationIssueContexts {
   expired: { expiredAt: Date }
   not_yet_valid: { validFrom: Date }
   expires_before_issued: { issuedAt: Date; expiresAt: Date }
+  missing_value: { expected: string }
   invalid_type: { expected: string }
-  invalid_value: { allowed?: unknown[] }
+  /** `branches` has the issues of each member of a union that none of them matches */
+  invalid_value: { allowed?: unknown[]; branches?: ValidationIssue[][] }
   invalid_format: { format: string }
   /** `origin` is what is measured: `number`, `string` for its length, `array` for its items, ... */
   too_small: { minimum: number; inclusive: boolean; origin: string }
   too_big: { maximum: number; inclusive: boolean; origin: string }
-  unrecognized_keys: { keys: string[] }
+  /** The keys as in the value, e.g. the numbers of a CBOR map */
+  unrecognized_keys: { keys: (string | number)[] }
 }
 
 /** The fields of an issue besides its code and context */
@@ -179,12 +189,15 @@ export function toValidationResult<Issue extends ValidationIssue>(issues: Issue[
 
 /**
  * The message of an error thrown for a failed validation: the given message, followed by
- * the errors among the issues with their path
+ * the errors among the issues with their path and code, each on an indented line of its own
  */
 export function validationErrorMessage(message: string, issues: readonly ValidationIssue[]): string {
   const errors = issues.filter((issue) => issue.severity === 'error')
-  const lines = errors.map((issue) => (issue.path.length ? `${issue.path.join('.')}: ${issue.message}` : issue.message))
-  return lines.length ? `${message}\n${lines.join('\n')}` : message
+  const lines = errors.map((issue) => {
+    const path = issue.pathLabels ?? issue.path
+    return `${path.length ? `${path.join('.')}: ` : ''}${issue.message} (${issue.code})`
+  })
+  return lines.length ? `${message}\n${lines.map((line) => `  - ${line}`).join('\n')}` : message
 }
 
 /** The issues with their path below the given one, e.g. `payload` for those of a JWT payload */
@@ -192,5 +205,22 @@ export function prefixIssuePaths<Issue extends ValidationIssue>(
   prefix: string | number,
   issues: readonly Issue[]
 ): Issue[] {
-  return issues.map((issue) => ({ ...issue, path: [prefix, ...issue.path] }))
+  return issues.map((issue) => ({
+    ...issue,
+    path: [prefix, ...issue.path],
+    ...(issue.pathLabels ? { pathLabels: [prefix, ...issue.pathLabels] } : {}),
+  }))
+}
+
+/**
+ * Thrown when a value does not validate, with the `issues` of the validation. The message
+ * lists the errors among them, see {@link validationErrorMessage}.
+ */
+export class ValidationError<Issue extends ValidationIssue = ValidationIssue> extends IdentityError {
+  readonly issues: Issue[]
+
+  constructor(message: string, issues: Issue[]) {
+    super(validationErrorMessage(message, issues))
+    this.issues = issues
+  }
 }

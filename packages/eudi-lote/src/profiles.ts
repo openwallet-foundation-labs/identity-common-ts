@@ -87,7 +87,12 @@ function checkDigitalIdentity(
   ctx: z.RefinementCtx<LoteDocument>
 ) {
   if (!hasDigitalIdentity(identity)) {
-    addValidationIssue(ctx, { code: 'missing', message: 'At least one digital identity type must be provided', path })
+    addValidationIssue(ctx, {
+      code: 'missing_value',
+      message: 'At least one digital identity type must be provided',
+      path,
+      context: { expected: 'X509Certificates, X509SubjectNames, PublicKeyValues, X509SKIs or OtherIds' },
+    })
   }
   identity.X509Certificates?.forEach((certificate, index) => {
     const certificatePath = [...path, 'X509Certificates', index.toString()]
@@ -306,9 +311,10 @@ const trustedEntitiesListRefinement =
 
         if (!uri) {
           addValidationIssue(ctx, {
-            code: 'missing',
+            code: 'missing_value',
             message: `Each TrustedEntityInformation.TEInformationURI must contain at least one URI starting with ${informationUriPrefix}`,
             path: [...trustedEntityPath, 'TrustedEntityInformation', 'TEInformationURI'],
+            context: { expected: `a URI starting with ${informationUriPrefix}` },
           })
         } else {
           const rest = uri.uriValue.substring(informationUriPrefix.length)

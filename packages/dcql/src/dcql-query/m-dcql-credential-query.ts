@@ -24,9 +24,10 @@ function checkClaimIds(credentialQuery: { claims?: { id?: string }[]; claim_sets
     if (id === undefined) {
       if (credentialQuery.claim_sets) {
         addDcqlIssue(ctx, {
-          code: 'missing',
+          code: 'missing_value',
           path: ['claims', index, 'id'],
           message: 'A claim needs an id when the credential query has claim_sets',
+          context: { expected: 'string' },
         })
       }
       return

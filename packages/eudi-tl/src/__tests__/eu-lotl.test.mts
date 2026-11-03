@@ -10,8 +10,8 @@ import {
   EU_LOTL_SIGNING_CERTIFICATES,
   getEuLotlTrustAnchors,
   loadEuLotl,
-  TrustedListParseError,
   TrustedListSignatureError,
+  TrustedListValidationError,
   verifyEuLotlSignature,
 } from '../index'
 import { SIGNED_TSL_XML, SIGNER_CERT_BASE64 } from './fixtures.mjs'
@@ -81,7 +81,7 @@ describe('loadEuLotl', () => {
     // Pinning the fixture's own signer isolates the profile check from the
     // signature check: the signature is fine, the TSLType is EUgeneric.
     await expect(loadEuLotl(SIGNED_TSL_XML, { trustAnchors: [base64.decode(SIGNER_CERT_BASE64)] })).rejects.toThrow(
-      TrustedListParseError
+      TrustedListValidationError
     )
   })
 })

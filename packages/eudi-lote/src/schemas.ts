@@ -248,11 +248,12 @@ export const zPolicyOrLegalNoticeList = z.array(zPolicyOrLegalNotice).superRefin
   items.forEach((item, index) => {
     if (item[key] === undefined) {
       addValidationIssue(ctx, {
-        code: 'missing',
+        code: 'missing_value',
         message: first
           ? `Every item has a LoTEPolicy, or every item has a LoTELegalNotice: this one has no ${key}`
           : 'An item needs LoTEPolicy or LoTELegalNotice',
         path: [index],
+        context: { expected: first ? key : 'LoTEPolicy or LoTELegalNotice' },
       })
     }
   })
@@ -317,7 +318,11 @@ export const zCompatPolicyOrLegalNoticeList = z
       })
       .superRefine((item, ctx) => {
         if (item.LoTEPolicy !== undefined || item.LoTELegalNotice !== undefined) return
-        addValidationIssue(ctx, { code: 'missing', message: 'An item needs LoTEPolicy or LoTELegalNotice' })
+        addValidationIssue(ctx, {
+          code: 'missing_value',
+          message: 'An item needs LoTEPolicy or LoTELegalNotice',
+          context: { expected: 'LoTEPolicy or LoTELegalNotice' },
+        })
       })
   )
   .min(1)

@@ -140,10 +140,10 @@ describe('checkOverAsking', () => {
 
   it('reports the issues of a query that is not a DCQL query', () => {
     expect(codesAndPaths(checkOverAsking({ credential: [] }, registered))).toEqual([
-      { severity: 'error', code: 'missing', path: ['credentials'] },
+      { severity: 'error', code: 'missing_value', path: ['credentials'] },
     ])
     expect(codesAndPaths(checkOverAsking(sdJwtQuery([{ id: 'no_path' }]), registered))).toEqual([
-      { severity: 'error', code: 'missing', path: ['credentials', 0, 'claims', 0, 'path'] },
+      { severity: 'error', code: 'missing_value', path: ['credentials', 0, 'claims', 0, 'path'] },
     ])
     const pid = sdJwtQuery([{ path: ['given_name'] }]).credentials[0]
     expect(codesAndPaths(checkOverAsking({ credentials: [pid, pid] }, registered))).toEqual([

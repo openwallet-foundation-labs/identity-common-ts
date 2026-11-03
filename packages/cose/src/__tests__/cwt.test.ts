@@ -1,4 +1,4 @@
-import { hex } from '@owf/identity-common'
+import { hex, ValidationError } from '@owf/identity-common'
 import { Tag } from 'cbor-x'
 import { describe, expect, test } from 'vitest'
 import z from 'zod'
@@ -418,6 +418,18 @@ describe('Extending Cwt for a specific cwt type', () => {
     expect(() => ExampleCwt.fromToken(token)).toThrow(CwtPayloadDecodeError)
     // The inherited registered claim names survive the extension
     expect(() => ExampleCwt.fromToken(token)).toThrow(/Subject \(2\)/)
+  })
+
+  test('should reject a token whose headers lack a label the cwt type requires with a ValidationError', async () => {
+    // `profile` (65001) is required by ExampleProtectedHeaders, but a plain CWT does not need it
+    const cwt = Cwt.create({
+      protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256]]),
+      payload: CwtPayload.create({ subject: 'coap://light.example' }),
+    })
+    const token = await cwt.signAndEncode({ signingKey: signKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)
+
+    expect(() => ExampleCwt.fromToken(token)).toThrow(ValidationError)
+    expect(() => ExampleCwt.fromToken(token)).toThrow(/Profile \(65001\)/)
   })
 
   test('should name a claim the cwt type adds in a validation error', () => {

@@ -66,15 +66,13 @@ A validator collects its issues with `ValidationIssues`, which checks that each 
 
 | Code | When | Context |
 | --- | --- | --- |
-| `missing` | a required value is absent | |
+| `missing_value` | a required value is absent | `expected`, e.g. `string` |
 | `not_allowed` | a value is present that must not be | |
 | `invalid_type` | a value has the wrong type | `expected`, e.g. `string` or `int` |
-| `invalid_value` | a value is not one of the allowed ones, or matches none of the forms of a union | `allowed`, when the schema lists them |
+| `invalid_value` | a value is not one of the allowed ones, or matches none of the forms of a union | `allowed`, when the schema lists them, and `branches`, the issues of each form of a union |
 | `invalid_format` | a string does not have the format | `format`, e.g. `url` |
 | `too_small`, `too_big` | a number, length or number of items is out of range | `minimum` or `maximum`, `inclusive`, `origin` |
-| `unrecognized_keys` | an object has members the schema does not allow | `keys` |
-
-zod's `custom` code never reaches the issues. A custom issue needs a code of the validator (`codes`) or of `SCHEMA_VALIDATION_CODES`. Without one, `parseWithSchema` throws, as the schema has a check the validator does not list. `zTyp` is a zod schema for a `typ` header that reports an `invalid_typ` issue.
+| `unrecognized_keys` | an object or map has members the schema does not allow | `keys`, as in the value |
 
 ```typescript
 import { addValidationIssue, ValidationIssues } from '@owf/identity-common'
@@ -94,7 +92,9 @@ z.object({ exp: z.number(), iat: z.number() }).superRefine((payload, ctx) => {
 })
 ```
 
-When an assert or parse function finds an error, it throws the validation error of its package, e.g. `RegistrationCertificateValidationError`, with the `issues` of the validation. It extends the error of the package, e.g. `RegistrationCertificateError`, and `validationErrorMessage` builds its message.
+When an assert or parse function finds an error, it throws the validation error of its package, e.g. `RegistrationCertificateValidationError`, with the `issues` of the validation. It extends `ValidationError`, so `instanceof ValidationError` catches the validation errors of every package, and `validationErrorMessage` builds its message.
+
+`parseWithErrorHandling(schema, value, message)` parses without `codes` and throws a `ValidationError` with the issues. The message lists the errors with their path, never the parsed value.
 
 ## Related Packages
 

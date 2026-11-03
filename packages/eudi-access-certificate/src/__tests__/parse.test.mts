@@ -1,9 +1,8 @@
-import { VALIDATION_CODES, type ValidationSeverity } from '@owf/identity-common'
+import { VALIDATION_CODES, ValidationError, type ValidationSeverity } from '@owf/identity-common'
 import { parseCertificate, verifyCertificateSignature, X509Error } from '@owf/x509'
 import { describe, expect, it } from 'vitest'
 import {
   type AccessCertificate,
-  AccessCertificateError,
   AccessCertificateValidationError,
   type AccessCertificateValidationResult,
   ACCESS_CERTIFICATE_VALIDATION_CODES as CODES,
@@ -187,7 +186,7 @@ describe('validateAccessCertificate', () => {
       }
     })()
     expect(error).toBeInstanceOf(AccessCertificateValidationError)
-    expect(error).toBeInstanceOf(AccessCertificateError)
+    expect(error).toBeInstanceOf(ValidationError)
     expect((error as AccessCertificateValidationError).issues).toEqual(
       validateAccessCertificate(parseAccessCertificate(CA_CERTIFICATE_PEM), { now: NOW }).issues
     )

@@ -1,15 +1,25 @@
-// biome-ignore format: no explanation
-class CoseError extends Error {
+import { IdentityError, ValidationError } from '@owf/identity-common'
+
+/**
+ * Base error class for the COSE structures in this package.
+ *
+ * Extends `IdentityError` so that a caller can catch every error raised by the identity-common
+ * packages in one place.
+ */
+export class CoseError extends IdentityError {
   // NOTE: declared explicitly rather than passing `{ cause }` to `super`, as the
   // project targets ES2020 and `Error.cause` was only added in ES2022.
   public readonly cause?: unknown
 
-  constructor(message: string = new.target.name, options?: { cause?: unknown }) {
-    super(message)
+  constructor(message: string = new.target.name, options?: { cause?: unknown; details?: unknown }) {
+    super(message, options?.details)
     this.name = new.target.name
     this.cause = options?.cause
   }
 }
+
+/** A COSE or CBOR structure does not match its schema, with the `issues` of the validation */
+export class CoseValidationError extends ValidationError {}
 
 export class CoseUnsupportedMacError extends CoseError {}
 export class CoseInvalidSignatureError extends CoseError {}

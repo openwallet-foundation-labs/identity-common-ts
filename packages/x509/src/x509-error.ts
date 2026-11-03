@@ -6,7 +6,6 @@ import { IdentityError } from '@owf/identity-common'
 export class X509Error extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
-    Object.setPrototypeOf(this, X509Error.prototype)
     this.name = 'X509Error'
   }
 }

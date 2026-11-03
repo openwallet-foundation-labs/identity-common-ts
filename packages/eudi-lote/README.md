@@ -271,7 +271,7 @@ Removes an entity by name.
 
 #### `validateLote(lote, { mode? }): ValidationResult`
 
-Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns `{ valid, issues }`, where each issue has a `severity`, a `code`, a `path` into the document and a `message`. Schema issues have a code of `SCHEMA_VALIDATION_CODES` from `@owf/identity-common`, such as `missing` or `invalid_value`, and the profile checks one of `LOTE_VALIDATION_CODES`. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
+Validates a LoTE document against the ETSI TS 119 602 v1.1.1 JSON schema. Returns `{ valid, issues }`, where each issue has a `severity`, a `code`, a `path` into the document and a `message`. Schema issues have a code of `SCHEMA_VALIDATION_CODES` from `@owf/identity-common`, such as `missing_value` or `invalid_value`, and the profile checks one of `LOTE_VALIDATION_CODES`. With `mode: 'compat'`, it also accepts a `LoTELegalNotice` that is an array of localized URIs, and `PolicyOrLegalNotice` items that have both keys.
 
 When valid, the result has the document as `lote`: a `LoteDocument`, or a `CompatLoteDocument` in compat mode. A `CompatLoteDocument` is not a `LoteDocument`, as its `LoTELegalNotice` can be an array.
 
@@ -286,7 +286,7 @@ The rules of the EU lists (2-letter country codes, non-empty names, at least one
 
 #### `assertValidLote(lote, { mode? }): asserts lote is LoteDocument`
 
-Type assertion that throws `LoteValidationError`, a `LoteError` with the `issues` of `validateLote`, if the LoTE document is invalid. In compat mode it asserts a `CompatLoteDocument`.
+Type assertion that throws `LoteValidationError`, a `ValidationError` of `@owf/identity-common` with the `issues` of `validateLote`, if the LoTE document is invalid. In compat mode it asserts a `CompatLoteDocument`.
 
 #### `validateLoteProfile(lote, profile: LoteProfile | LoteProfile[], options?): ValidationResult`
 

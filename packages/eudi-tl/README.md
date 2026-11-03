@@ -218,7 +218,7 @@ CAs. Narrow further with your own `ProfileRule` when you need to.
 All failures throw a subclass of `TrustedListError`:
 
 - `TrustedListParseError` — the XML is not a well-formed TS 119 612 list
-- `TrustedListValidationError` — a `TrustedListParseError` for a list that does
+- `TrustedListValidationError` — a `ValidationError` of `@owf/identity-common` for a list that does
   not conform to the schema or a profile, with the `issues` of the validation
 - `TrustedListSignatureError` — the signature is missing, invalid, or not
   signed by a pinned trust anchor. Treat this as fail-closed.
