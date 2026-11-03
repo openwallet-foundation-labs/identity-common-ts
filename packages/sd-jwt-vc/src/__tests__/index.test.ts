@@ -416,6 +416,42 @@ describe('Revocation', () => {
     }
   })
 
+  test('safeVerify fetches neither the status list nor the type metadata of a credential that failed verification', async () => {
+    const statusListFetcher = vi.fn(async () => statusListJWT)
+    const vctFetcher = vi.fn(async () => ({ vct }))
+    const sdjwtWithFetchers = new SDJwtVcInstance({
+      verifier,
+      hasher: digest,
+      statusListFetcher,
+      loadTypeMetadataFormat: true,
+      vctFetcher,
+    })
+    // Signed with a key the verifier does not trust, so the URIs in it are chosen by whoever signed it
+    const { privateKey: untrustedKey } = Crypto.generateKeyPairSync('ed25519')
+    const untrustedIssuer = new SDJwtVcInstance({
+      signer: async (data: string) => Crypto.sign(null, Buffer.from(data), untrustedKey).toString('base64url'),
+      signAlg: 'EdDSA',
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+    })
+    const credential = await untrustedIssuer.issue({
+      iat,
+      iss,
+      vct: 'http://169.254.169.254/latest/meta-data/',
+      status: { status_list: { uri: 'http://10.0.0.1/admin', idx: 0 } },
+    })
+
+    const result = await sdjwtWithFetchers.safeVerify(credential)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.map((e) => e.code)).toEqual(['INVALID_JWT_SIGNATURE'])
+    }
+    expect(statusListFetcher).not.toHaveBeenCalled()
+    expect(vctFetcher).not.toHaveBeenCalled()
+  })
+
   test('Test with a revoked credential but status verification disabled', async () => {
     const claims = {
       firstname: 'John',

@@ -216,7 +216,8 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
   /**
    * Safe verification that collects all errors instead of failing fast.
    * Returns a result object with either the verified data or an array of all errors.
-   * This includes SD-JWT-VC specific validations like status and VCT metadata.
+   * This includes SD-JWT-VC specific validations like status and VCT metadata. The status and the VCT metadata are
+   * only fetched and checked when the SD-JWT-VC itself was verified.
    *
    * @param encodedSDJwt - The encoded SD-JWT-VC to verify
    * @param options - Verification options
@@ -256,7 +257,7 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
         result = { ...result, payload: signedPayload }
       }
     } else {
-      // Try to extract payload even if verification failed for status/vct checks
+      // Extract the payload even though verification failed, to report protected claims with disclosable parts too
       try {
         const { payload, header } = await SDJwt.extractJwt<Record<string, unknown>, SdJwtVcPayload>(encodedSDJwt)
         if (payload) {
@@ -280,8 +281,9 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
       }
     }
 
-    // Verify status (if payload is available)
-    if (result) {
+    // The claims of an SD-JWT-VC that failed verification are not the issuer's, so their status list and vct URIs
+    // are not fetched: anyone could make the verifier send requests to a URL of their choice.
+    if (result && baseResult.success) {
       try {
         await this.verifyStatus(result, options)
       } catch (e) {
@@ -301,7 +303,7 @@ export class SDJwtVcInstance<T = unknown> extends SDJwtInstance<SdJwtVcPayload, 
           const resolvedTypeMetadata = await this.fetchVct(result)
           if (result) {
             result.typeMetadata = resolvedTypeMetadata
-            if (resolvedTypeMetadata && baseResult.success) {
+            if (resolvedTypeMetadata) {
               result.typeMetadataVerification = await this.checkTypeMetadata(
                 await this.decodeForTypeMetadata(encodedSDJwt),
                 resolvedTypeMetadata,
