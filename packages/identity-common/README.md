@@ -104,6 +104,8 @@ const zMetadata = z.union([zMetadataV1, zMetadataDraft11], unionParams('Invalid 
 
 `zTyp('dpop+jwt')` validates a JOSE `typ` header and `isJwtTyp(typ, 'dpop+jwt')` compares one. Both accept the `typ` in any casing and with the `application/` prefix (RFC 7515 Section 4.1.9), so compare a parsed `typ` with `isJwtTyp`, not with `===`.
 
+`isMediaType(contentType, 'application/json')` compares a `Content-Type` value with one or more media types, ignoring casing and parameters (RFC 9110 Section 8.3), so `application/json; charset=utf-8` matches and `application/json-seq` does not. `extractMediaType` returns the normalized `type/subtype`, and `createAcceptHeader` builds an `Accept` header with quality values in order of preference.
+
 ## Related Packages
 
 This package is part of the Identity Common TypeScript project:

@@ -17,4 +17,4 @@
 
 **Breaking:** the `@openid4vc` packages throw the `ValidationError` of `@owf/identity-common`, with `issues` instead of `zodError`. `formatZodError` is removed. The `result` of a `ZodFetcher` and the `*Result` fields of the `@openid4vc/openid4vci` responses are a `SchemaParseResult` with `issues`.
 
-`isContentType` and `isResponseContentType` compare the media type only. The packages no longer call `z.config` on import.
+The packages no longer call `z.config` on import.
