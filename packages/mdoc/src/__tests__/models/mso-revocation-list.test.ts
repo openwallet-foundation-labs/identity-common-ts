@@ -7,6 +7,9 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, expect, suite, test } from 'vitest'
 import {
   CoseKey,
+  IdentifierList,
+  IdentifierListCwt,
+  MediaTypes as IdentifierListMediaTypes,
   InvalidRevocationListError,
   InvalidSignatureError,
   ProtectedHeaders,
@@ -17,6 +20,7 @@ import {
   UnableToExtractX5ChainFromJwtError,
   UnprotectedHeaders,
   UnprotectedX5ChainNotBoundError,
+  verifyIdentifierListToken,
   verifyStatusListToken,
 } from '../..'
 import { INVALID_CERTIFICATE, ISSUER_CERTIFICATE, ISSUER_PRIVATE_KEY_JWK } from '../config'
@@ -410,5 +414,78 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
     expect(accept).toBe(`${MediaTypes.StatusListCwt}, ${MediaTypes.StatusListJwt};q=0.9`)
     expect(result.statusListCwt).toBeDefined()
     expect(result.statusListJwt).toBeUndefined()
+  })
+})
+
+// RFC 9864 § 2.1: ESP256 (-9) is ECDSA with P-256 and SHA-256, the fully-specified form of ES256.
+// The Multipaz test issuer signs its identifier list with it.
+suite('revocation lists signed with ESP256', () => {
+  const server = setupServer()
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+  afterEach(() => server.resetHandlers())
+  afterAll(() => server.close())
+
+  const signingKey = CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK)
+  const algorithm = SignatureAlgorithm.ESP256
+  const expirationTime = new Date(Date.now() + 3_600_000)
+
+  const serve = (uri: string, token: Uint8Array, contentType: string) =>
+    server.use(
+      http.get(uri, () => new HttpResponse(new Uint8Array(token), { headers: { 'Content-Type': contentType } }))
+    )
+
+  test('Verify an identifier list CWT signed with ESP256', async () => {
+    const uri = 'https://example.org/identifier-list/esp256'
+    const identifierListCwt = new IdentifierListCwt({
+      payload: {
+        identifierList: IdentifierList.create({ identifiers: [new Uint8Array([0x01])] }),
+        uri,
+        expirationTime,
+      },
+      protectedHeaders: new Map<number, unknown>([
+        [RegisteredCwtHeaderClaimKey.Algorithm, algorithm],
+        [RegisteredCwtHeaderClaimKey.X5Chain, [certificate]],
+      ]),
+    })
+    serve(
+      uri,
+      await identifierListCwt.signAndEncode({ signingKey, algorithm }, { sign: mdocContext.cose.sign1.sign }),
+      IdentifierListMediaTypes.IdentifierListCwt
+    )
+
+    const { identifierListCwt: verified, chain } = await verifyIdentifierListToken(
+      { identifierListInfo: { uri, id: new Uint8Array([0xab, 0xcd]) }, trustedCertificates: [certificate] },
+      mdocContext
+    )
+
+    expect(verified.algorithm).toBe(SignatureAlgorithm.ESP256)
+    expect(chain?.[0]).toEqual(certificate)
+  })
+
+  test('Verify a status list CWT signed with ESP256', async () => {
+    const uri = 'https://example.org/status-list/esp256'
+    const idx = 3
+    const statusListCwt = new StatusListCwt({
+      payload: { statusList: new StatusList(new Array(10).fill(StatusType.Valid), 2), subject: uri, expirationTime },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.Algorithm, algorithm],
+          [RegisteredCwtHeaderClaimKey.X5Chain, [certificate]],
+        ]),
+      }),
+    })
+    serve(
+      uri,
+      await statusListCwt.signAndEncode({ signingKey, algorithm }, { sign: mdocContext.cose.sign1.sign }),
+      MediaTypes.StatusListCwt
+    )
+
+    const { statusListCwt: verified } = await verifyStatusListToken(
+      { statusListInfo: { uri, idx }, trustedCertificates: [certificate] },
+      mdocContext
+    )
+
+    expect(verified?.algorithm).toBe(SignatureAlgorithm.ESP256)
+    expect(verified?.payload.statusList.getStatus(idx)).toBe(StatusType.Valid)
   })
 })
