@@ -55,6 +55,17 @@ export const VALIDATION_CODES = {
   NOT_YET_VALID: 'not_yet_valid',
   /** The validity period ends at or before it starts, e.g. `exp` is at or before `iat` */
   EXPIRES_BEFORE_ISSUED: 'expires_before_issued',
+  /** A claim the verifier requires is missing, e.g. `aud` when an audience is expected */
+  CLAIM_MISSING: 'claim_missing',
+  /** A claim is not one of the values the verifier expects, e.g. `aud` or `nonce` */
+  CLAIM_VALUE_MISMATCH: 'claim_value_mismatch',
+  /**
+   * `crit` is invalid: in the unprotected header, or listing a registered header parameter or one
+   * the header does not contain (RFC 7515 section 4.1.11)
+   */
+  INVALID_CRIT: 'invalid_crit',
+  /** `crit` lists a header parameter the recipient does not understand (RFC 7515 section 4.1.11) */
+  UNSUPPORTED_CRIT: 'unsupported_crit',
 } as const
 
 /** A code of {@link VALIDATION_CODES} */
@@ -92,6 +103,10 @@ export interface ValidationIssueContexts {
   expired: { expiredAt: Date }
   not_yet_valid: { validFrom: Date }
   expires_before_issued: { issuedAt: Date; expiresAt: Date }
+  claim_value_mismatch: { expected: unknown[]; actual: unknown }
+  /** The header parameter that `crit` lists, when the issue is about one */
+  invalid_crit: { parameter?: string }
+  unsupported_crit: { parameter: string; understood: string[] }
   missing_value: { expected: string }
   invalid_type: { expected: string }
   /** `branches` has the issues of each member of a union that none of them matches */
@@ -114,11 +129,16 @@ type ValidationContextOf<Code, Contexts> = Code extends keyof Contexts
     ? ValidationIssueContexts[Code]
     : undefined
 
-/** The code of an issue with the context of that code, which is required when the code has one */
+/**
+ * The code of an issue with the context of that code, which is required when the code has one
+ * with a required member
+ */
 type CodeWithContext<Code extends string, Contexts> = {
   [C in Code]: { code: C } & (ValidationContextOf<C, Contexts> extends undefined
     ? { context?: undefined }
-    : { context: ValidationContextOf<C, Contexts> })
+    : object extends ValidationContextOf<C, Contexts>
+      ? { context?: ValidationContextOf<C, Contexts> }
+      : { context: ValidationContextOf<C, Contexts> })
 }[Code]
 
 /**
@@ -222,5 +242,18 @@ export class ValidationError<Issue extends ValidationIssue = ValidationIssue> ex
   constructor(message: string, issues: Issue[]) {
     super(validationErrorMessage(message, issues))
     this.issues = issues
+  }
+
+  /**
+   * The first issue with `code`, typed by its code, or `undefined` when there is none
+   *
+   * @example
+   * ```typescript
+   * const expired = error.findIssue('expired')
+   * if (expired) console.log(expired.context.expiredAt)
+   * ```
+   */
+  findIssue<Code extends Issue['code']>(code: Code): (Issue & { code: Code }) | undefined {
+    return this.issues.find((issue): issue is Issue & { code: Code } => issue.code === code)
   }
 }

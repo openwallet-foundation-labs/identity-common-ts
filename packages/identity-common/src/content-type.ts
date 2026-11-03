@@ -25,6 +25,19 @@ export const extractMediaType = (contentType: string | undefined | null): string
 }
 
 /**
+ * Whether `value` is the JOSE `typ` (or `cty`) for the media type `typ`, as RFC 7515 section 4.1.9
+ * compares them: in any casing, and with the `application/` prefix optional on either side, so
+ * `kb+jwt` and `application/kb+jwt` are the same. Unlike a `Content-Type`, a `typ` has no
+ * parameters, so `kb+jwt; charset=utf-8` does not match.
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc7515#section-4.1.9
+ */
+export const isJwtTyp = (value: unknown, typ: string): boolean => {
+  const normalize = (type: string) => type.toLowerCase().replace(/^application\//, '')
+  return typeof value === 'string' && normalize(value) === normalize(typ)
+}
+
+/**
  * Compare a `Content-Type` header value against one or more expected media types,
  * ignoring casing and any parameters on either side.
  *

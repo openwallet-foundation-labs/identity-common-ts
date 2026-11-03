@@ -1,3 +1,4 @@
+import { addValidationIssue, zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 import { zX5c } from './z-x5c'
 
@@ -23,47 +24,47 @@ export const jwkPrivateMembers = ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth', 'k'] a
  */
 export const zJwk = z
   .object({
-    kty: z.string(),
+    kty: zNonEmptyString,
 
     // Common parameters
-    use: z.string().optional(),
-    key_ops: z.array(z.string()).optional(),
-    alg: z.string().optional(),
-    kid: z.string().optional(),
-    x5u: z.string().optional(),
+    use: zNonEmptyString.optional(),
+    key_ops: z.array(zNonEmptyString).optional(),
+    alg: zNonEmptyString.optional(),
+    kid: zNonEmptyString.optional(),
+    x5u: zNonEmptyString.optional(),
     x5c: zX5c.optional(),
-    x5t: z.string().optional(),
-    'x5t#S256': z.string().optional(),
+    x5t: zNonEmptyString.optional(),
+    'x5t#S256': zNonEmptyString.optional(),
     ext: z.boolean().optional(),
 
     // EC and OKP
-    crv: z.string().optional(),
-    x: z.string().optional(),
-    y: z.string().optional(),
+    crv: zNonEmptyString.optional(),
+    x: zNonEmptyString.optional(),
+    y: zNonEmptyString.optional(),
 
     // RSA
-    n: z.string().optional(),
-    e: z.string().optional(),
+    n: zNonEmptyString.optional(),
+    e: zNonEmptyString.optional(),
 
     // Private and symmetric key material
-    d: z.string().optional(),
-    p: z.string().optional(),
-    q: z.string().optional(),
-    dp: z.string().optional(),
-    dq: z.string().optional(),
-    qi: z.string().optional(),
+    d: zNonEmptyString.optional(),
+    p: zNonEmptyString.optional(),
+    q: zNonEmptyString.optional(),
+    dp: zNonEmptyString.optional(),
+    dq: zNonEmptyString.optional(),
+    qi: zNonEmptyString.optional(),
     oth: z
       .array(
         z
           .object({
-            r: z.string().optional(),
-            d: z.string().optional(),
-            t: z.string().optional(),
+            r: zNonEmptyString.optional(),
+            d: zNonEmptyString.optional(),
+            t: zNonEmptyString.optional(),
           })
           .loose()
       )
       .optional(),
-    k: z.string().optional(),
+    k: zNonEmptyString.optional(),
   })
   .loose()
 
@@ -77,15 +78,14 @@ export type Jwk = z.infer<typeof zJwk>
  * public key is expected, and so that a private key is never accidentally serialized into a token.
  */
 export const zPublicJwk = zJwk.superRefine((jwk, ctx) => {
-  const privateMembers = jwkPrivateMembers.filter((member) => jwk[member] !== undefined)
-  if (privateMembers.length === 0) return
-
-  ctx.addIssue({
-    code: 'custom',
-    message: `Expected a public jwk, but the jwk contains the private key member(s) ${privateMembers
-      .map((member) => `'${member}'`)
-      .join(', ')}`,
-  })
+  for (const member of jwkPrivateMembers) {
+    if (jwk[member] === undefined) continue
+    addValidationIssue(ctx, {
+      code: 'not_allowed',
+      path: [member],
+      message: `Expected a public jwk, but the jwk contains the private key member '${member}'`,
+    })
+  }
 })
 
 export type PublicJwk = z.infer<typeof zPublicJwk>

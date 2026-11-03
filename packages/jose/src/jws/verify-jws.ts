@@ -1,11 +1,10 @@
-import { stringToBytes } from '@owf/identity-common'
+import { parseWithErrorHandling, stringToBytes } from '@owf/identity-common'
 import type { VerifyJwsCallback } from '../callbacks'
-import { JoseAlgorithmNotAllowedError, JoseSignatureVerificationError } from '../error'
+import { JoseAlgorithmNotAllowedError, JoseSignatureVerificationError, JoseValidationError } from '../error'
 import { isJwaSignatureAlgorithmCaseVariant, isSymmetricSignatureAlgorithm } from '../jwa/algorithms'
 import { assertKeyAllowedForSignatureAlgorithm } from '../jwa/key-compatibility'
 import { zJwsAlg } from '../jwa/z-alg'
 import { zJwk } from '../jwk/z-jwk'
-import { parseWithErrorHandling } from '../utils/zod'
 import type { ParsedJws } from './parse-jws'
 import type { JwsSigner, JwsSignerMethod, JwsSignerWithJwk } from './signer'
 import { jwsSignerFromHeader } from './signer'
@@ -179,7 +178,12 @@ export async function verifyJwsSignature(options: VerifyJwsSignatureOptions): Pr
   // it. A JWS that was not parsed by `parseJws` does not come with that header: its own is validated.
   const protectedHeader =
     options.jws.registeredProtectedHeader ??
-    parseWithErrorHandling(zJwsProtectedHeader, options.jws.protectedHeader, 'Invalid JWS protected header')
+    parseWithErrorHandling(
+      zJwsProtectedHeader,
+      options.jws.protectedHeader,
+      'Invalid JWS protected header',
+      JoseValidationError
+    )
   const alg = protectedHeader.alg
 
   assertJwsAlgorithmAllowed({

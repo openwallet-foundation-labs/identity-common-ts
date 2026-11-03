@@ -262,6 +262,25 @@ describe('zod', () => {
     ])
     expect(issuesOf(schema, {})[0].message).toBe('typ is missing, it must be dc+sd-jwt or vc+sd-jwt')
   })
+
+  it.each(['kb+jwt', 'KB+JWT', 'application/kb+jwt', 'Application/KB+JWT'])(
+    'should accept typ %s as the JOSE media type kb+jwt, and keep it as received',
+    (typ) => {
+      expect(z.object({ typ: zTyp('kb+jwt') }).parse({ typ })).toEqual({ typ })
+      expect(z.object({ typ: zTyp('application/kb+jwt') }).parse({ typ })).toEqual({ typ })
+    }
+  )
+
+  // RFC 7515 section 4.1.9: a typ is a media type name, it has no parameters as a Content-Type does
+  it('should reject a typ with media type parameters', () => {
+    expect(issuesOf(z.object({ typ: zTyp('kb+jwt') }), { typ: 'kb+jwt; charset=utf-8' })[0].code).toBe('invalid_typ')
+  })
+
+  it('should report a typ that is not a string as invalid_typ', () => {
+    expect(issuesOf(z.object({ typ: zTyp('kb+jwt') }), { typ: 1 })).toMatchObject([
+      { code: 'invalid_typ', path: ['typ'], context: { expected: ['kb+jwt'], actual: 1 } },
+    ])
+  })
 })
 
 describe('pathLabels', () => {
@@ -351,7 +370,7 @@ describe('parseWithErrorHandling', () => {
       name: z.string().refine((name) => name === 'a', 'must be a'),
       typ: zTyp('JWT'),
     })
-    expect(() => parseWithErrorHandling(schema, { name: 'b', typ: 'jwt' })).toThrow(
+    expect(() => parseWithErrorHandling(schema, { name: 'b', typ: 'at+jwt' })).toThrow(
       expect.objectContaining({
         issues: [
           { severity: 'error', code: 'invalid_value', path: ['name'], message: 'must be a', context: {} },

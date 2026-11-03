@@ -1,33 +1,8 @@
-import { base64 } from '@owf/identity-common'
+import { addValidationIssue, base64 } from '@owf/identity-common'
 import z from 'zod'
-
-/**
- * Standard base64 (RFC 4648 section 4): the base64 alphabet, padded with '=' to a multiple of 4
- * characters.
- */
-const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
 /** The identifier octet of a DER SEQUENCE, which is what a certificate is encoded as. */
 const DER_SEQUENCE_TAG = 0x30
-
-/** Why `value` is not standard base64, or `undefined` when it is. */
-function standardBase64Issue(value: string): string | undefined {
-  if (value === '') return 'it is empty'
-  if (/\s/.test(value)) return 'it contains whitespace'
-  if (/[-_]/.test(value)) return `it contains '-' or '_', which are base64url characters`
-  if (/[^A-Za-z0-9+/=]/.test(value)) return 'it contains a character outside the base64 alphabet'
-  if (!BASE64.test(value)) {
-    return `its '=' padding is wrong: base64 is padded with at most two '=' at its end, to a multiple of 4 characters`
-  }
-
-  // The last character before the padding also holds bits that encode no byte. Decoding ignores them,
-  // so they have to be zero for a certificate to have one encoding rather than several.
-  if (base64.encode(base64.decode(value)) !== value) {
-    return 'it is not the canonical encoding of its bytes: the bits after the last byte are not zero'
-  }
-
-  return undefined
-}
 
 /**
  * Why `bytes` are not exactly one DER SEQUENCE, or `undefined` when they are.
@@ -73,9 +48,9 @@ function derSequenceIssue(bytes: Uint8Array): string | undefined {
  * One certificate of an `x5c` parameter: the standard base64 (RFC 4648 section 4, not base64url) of a
  * DER encoded PKIX certificate.
  *
- * Only the encoding is checked: that the value is canonical standard base64 — no base64url
- * characters, no whitespace, '=' padding to a multiple of 4 characters — and that it decodes to
- * exactly one DER SEQUENCE with a definite, minimally encoded length, which is the outer structure
+ * Only the encoding is checked: that the value is standard base64 — no base64url characters, no
+ * whitespace, '=' padding to a multiple of 4 characters — and that it decodes to exactly one DER
+ * SEQUENCE with a definite, minimally encoded length, which is the outer structure
  * of every certificate. The certificate itself is not parsed. Whether it is a valid X.509
  * certificate, whether the chain is in order and chains to a trusted root, and whether the first
  * certificate holds the key that signed is decided where the chain is validated: in the
@@ -84,24 +59,21 @@ function derSequenceIssue(bytes: Uint8Array): string | undefined {
  * @see https://www.rfc-editor.org/rfc/rfc7515#section-4.1.6
  * @see https://www.rfc-editor.org/rfc/rfc7517#section-4.7
  */
-export const zX5cCertificate = z.string().superRefine((value, ctx) => {
-  const base64Issue = standardBase64Issue(value)
-  if (base64Issue) {
-    ctx.addIssue({
-      code: 'custom',
-      message: `Expected a certificate in standard base64 (RFC 4648 section 4), but ${base64Issue}`,
-    })
-    return
-  }
+export const zX5cCertificate = z
+  .base64({ message: 'Expected a certificate in standard base64 (RFC 4648 section 4)' })
+  .superRefine((value, ctx) => {
+    // zod runs the refinement also when the value is not base64
+    if (!z.core.regexes.base64.test(value)) return
 
-  const derIssue = derSequenceIssue(base64.decode(value))
-  if (derIssue) {
-    ctx.addIssue({
-      code: 'custom',
-      message: `Expected a DER encoded certificate, but the decoded bytes are not a single DER SEQUENCE: ${derIssue}`,
-    })
-  }
-})
+    const derIssue = derSequenceIssue(base64.decode(value))
+    if (derIssue) {
+      addValidationIssue(ctx, {
+        code: 'invalid_format',
+        message: `Expected a DER encoded certificate, but the decoded bytes are not a single DER SEQUENCE: ${derIssue}`,
+        context: { format: 'der' },
+      })
+    }
+  })
 
 /**
  * An `x5c` (X.509 certificate chain) parameter: one or more certificates, each validated with

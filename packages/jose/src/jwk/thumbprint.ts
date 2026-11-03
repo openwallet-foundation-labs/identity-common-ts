@@ -1,7 +1,12 @@
-import { base64url, stringToBytes } from '@owf/identity-common'
+import {
+  base64url,
+  type HashAlgorithm,
+  type Hasher,
+  parseWithErrorHandling,
+  zNonEmptyString,
+} from '@owf/identity-common'
 import z from 'zod'
-import type { HashAlgorithm, HashCallback } from '../hash'
-import { parseWithErrorHandling } from '../utils/zod'
+import { JoseValidationError } from '../error'
 import type { Jwk } from './z-jwk'
 
 /**
@@ -18,23 +23,23 @@ export const zJwkThumbprintComponents = z
   .discriminatedUnion('kty', [
     z.object({
       kty: z.literal('EC'),
-      crv: z.string(),
-      x: z.string(),
-      y: z.string(),
+      crv: zNonEmptyString,
+      x: zNonEmptyString,
+      y: zNonEmptyString,
     }),
     z.object({
       kty: z.literal('OKP'),
-      crv: z.string(),
-      x: z.string(),
+      crv: zNonEmptyString,
+      x: zNonEmptyString,
     }),
     z.object({
       kty: z.literal('RSA'),
-      e: z.string(),
-      n: z.string(),
+      e: zNonEmptyString,
+      n: zNonEmptyString,
     }),
     z.object({
       kty: z.literal('oct'),
-      k: z.string(),
+      k: zNonEmptyString,
     }),
   ])
   .transform((jwk) => {
@@ -53,8 +58,8 @@ export interface CalculateJwkThumbprintOptions {
   /** The hashing algorithm to use. RFC 7638 registers SHA-256 as the default. */
   hashAlgorithm: HashAlgorithm
 
-  /** The hash callback used to compute the digest. */
-  hashCallback: HashCallback
+  /** The hash callback used to compute the digest, e.g. `hasher` of `@owf/crypto`. */
+  hashCallback: Hasher
 }
 
 /**
@@ -67,10 +72,11 @@ export async function calculateJwkThumbprint(options: CalculateJwkThumbprintOpti
   const components = parseWithErrorHandling(
     zJwkThumbprintComponents,
     options.jwk,
-    `Unable to calculate the thumbprint of the jwk. Either the 'kty' is not supported, or a member required for the thumbprint is missing`
+    `Unable to calculate the thumbprint of the jwk. Either the 'kty' is not supported, or a member required for the thumbprint is missing`,
+    JoseValidationError
   )
 
-  return base64url.encode(await options.hashCallback(stringToBytes(JSON.stringify(components)), options.hashAlgorithm))
+  return base64url.encode(await options.hashCallback(JSON.stringify(components), options.hashAlgorithm))
 }
 
 /**

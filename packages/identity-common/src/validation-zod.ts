@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isJwtTyp } from './content-type'
 import { IdentityCommonError } from './identity-common-error'
 import {
   type CommonValidationCode,
@@ -19,6 +20,18 @@ export type BaseSchema = z.ZodType<any, any, any>
 export const zNumericDate = z.number({
   error: 'expected a NumericDate, the number of seconds since 1970-01-01T00:00:00Z',
 })
+
+/**
+ * A string that is not empty. Use it for a string unless the specification allows it to be empty.
+ */
+export const zNonEmptyString = z.string().min(1, { message: 'Expected a non-empty string' })
+
+/**
+ * A base64url encoded value without padding, as used everywhere in JOSE.
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc7515#section-2
+ */
+export const zBase64Url = z.base64url({ message: 'Expected an unpadded base64url encoded string' })
 
 /** What `addValidationIssue` puts in the `params` of a custom zod issue */
 interface ValidationIssueParams {
@@ -239,26 +252,36 @@ export function parseWithSchema<
 
 /**
  * Parse a value with a zod schema, throwing a {@link ValidationError} with its issues, see
- * {@link schemaIssueToValidationIssue}, when it does not validate. The value is not part of
- * the message, as it may be confidential.
+ * {@link schemaIssueToValidationIssue}, when it does not validate. Pass `ErrorClass` to throw
+ * the validation error of a package, e.g. `JoseValidationError`. The value is not part of the
+ * message, as it may be confidential.
  */
 export function parseWithErrorHandling<Schema extends z.ZodType>(
   schema: Schema,
   value: unknown,
-  message = 'Error validating structure'
+  message = 'Error validating structure',
+  ErrorClass: new (
+    message: string,
+    issues: ValidationIssueOf<CommonValidationCode | SchemaValidationCode>[]
+  ) => ValidationError = ValidationError
 ): z.output<Schema> {
   const result = parseWithSchema(schema, value)
-  if (!result.success) throw new ValidationError(message, result.issues)
+  if (!result.success) throw new ErrorClass(message, result.issues)
   return result.data
 }
 
 /**
- * A `typ` header that is one of the expected media types. Any other value gives an
- * `invalid_typ` issue with the expected and the actual value as context.
+ * A `typ` header that is one of the expected media types, compared as JOSE media types: casing
+ * and an `application/` prefix on either side are ignored, see {@link isJwtTyp}.
+ * Any other value gives an `invalid_typ` issue with the expected and the actual value as context.
+ *
+ * The value is not normalized, so a header keeps the `typ` as it was received.
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc8725#section-3.11
  */
 export function zTyp<const Typ extends string>(...expected: [Typ, ...Typ[]]) {
   return z.custom<Typ>().superRefine((typ, ctx) => {
-    if (expected.includes(typ)) return
+    if (expected.some((type) => isJwtTyp(typ, type))) return
     const expectedText = expected.join(' or ')
     addValidationIssue(ctx, {
       code: VALIDATION_CODES.INVALID_TYP,

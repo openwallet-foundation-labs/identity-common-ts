@@ -1,10 +1,11 @@
-import { IdentityError } from '@owf/identity-common'
+import { IdentityError, ValidationError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
-  JoseClaimVerificationError,
   JoseError,
   JoseInvalidArgumentError,
   JoseParseError,
+  JoseValidationError,
+  type JoseValidationIssue,
   JoseVerificationError,
 } from '../error'
 
@@ -19,7 +20,36 @@ describe('errors', () => {
   })
 
   it('is named after the class it is', () => {
-    expect(new JoseClaimVerificationError('expired').name).toBe('JoseClaimVerificationError')
+    expect(new JoseValidationError('expired', []).name).toBe('JoseValidationError')
+  })
+
+  it('reports a validation error as a ValidationError of @owf/identity-common, with its issues', () => {
+    const issue: JoseValidationIssue = {
+      severity: 'error',
+      code: 'invalid_typ',
+      path: ['typ'],
+      message: 'typ must be kb+jwt',
+      context: { expected: ['kb+jwt'], actual: 'JWT' },
+    }
+    const error = new JoseValidationError('Invalid JWS protected header', [issue])
+
+    expect(error).toBeInstanceOf(ValidationError)
+    expect(error).toBeInstanceOf(IdentityError)
+    expect(error).not.toBeInstanceOf(JoseError)
+    expect(error.issues).toEqual([issue])
+    expect(error.message).toBe('Invalid JWS protected header\n  - typ: typ must be kb+jwt (invalid_typ)')
+  })
+
+  it('finds the issue of a claim that does not verify by its code, typed by the code', () => {
+    const expiredAt = new Date(0)
+    const error = new JoseValidationError('The token is expired', [
+      { severity: 'error', code: 'invalid_typ', path: ['typ'], message: 'typ', context: { expected: [], actual: 1 } },
+      { severity: 'error', code: 'expired', path: ['exp'], message: 'expired', context: { expiredAt } },
+    ])
+
+    expect(error).not.toBeInstanceOf(JoseVerificationError)
+    expect(error.findIssue('expired')?.context.expiredAt).toBe(expiredAt)
+    expect(error.findIssue('claim_value_mismatch')).toBeUndefined()
   })
 
   it('keeps the cause', () => {

@@ -1,4 +1,4 @@
-import z from 'zod'
+import { addValidationIssue, zNonEmptyString } from '@owf/identity-common'
 
 /**
  * A JWS `alg` value.
@@ -10,19 +10,16 @@ import z from 'zod'
  * @see https://www.rfc-editor.org/rfc/rfc7515#section-4.1.1
  * @see https://www.rfc-editor.org/rfc/rfc8725#section-3.2
  */
-export const zJwsAlg = z
-  .string()
-  // An empty string is not an algorithm identifier, registered or otherwise
-  .min(1)
-  .refine(
-    // `None`, `NONE`, ... are not registered values either, but a case-insensitive comparison
-    // somewhere downstream should not be able to turn one into an unsecured token.
-    (alg) => alg.toLowerCase() !== 'none',
-    { message: `alg value may not be 'none'` }
-  )
+export const zJwsAlg = zNonEmptyString.superRefine((alg, ctx) => {
+  // `None`, `NONE`, ... are not registered values either, but a case-insensitive comparison
+  // somewhere downstream should not be able to turn one into an unsecured token.
+  if (alg.toLowerCase() === 'none') {
+    addValidationIssue(ctx, { code: 'invalid_value', message: `alg value may not be 'none'` })
+  }
+})
 
 /** A JWE `alg` (key management algorithm) value. @see https://www.rfc-editor.org/rfc/rfc7516#section-4.1.1 */
-export const zJweAlg = z.string()
+export const zJweAlg = zNonEmptyString
 
 /** A JWE `enc` (content encryption algorithm) value. @see https://www.rfc-editor.org/rfc/rfc7516#section-4.1.2 */
-export const zJweEnc = z.string()
+export const zJweEnc = zNonEmptyString

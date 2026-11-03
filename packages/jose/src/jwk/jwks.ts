@@ -1,6 +1,5 @@
+import type { Hasher } from '@owf/identity-common'
 import { JoseSignerError } from '../error'
-import type { HashCallback } from '../hash'
-import { HashAlgorithm } from '../hash'
 import { isSameJsonValue } from '../utils/object'
 import { calculateJwkThumbprint, zJwkThumbprintComponents } from './thumbprint'
 import type { Jwk, JwkSet } from './z-jwk'
@@ -84,16 +83,16 @@ export async function isJwkInSet({
 }: {
   jwk: Jwk
   jwks: ReadonlyArray<Jwk>
-  hashCallback: HashCallback
+  hashCallback: Hasher
 }): Promise<boolean> {
-  const thumbprint = await calculateJwkThumbprint({ jwk, hashAlgorithm: HashAlgorithm.Sha256, hashCallback })
+  const thumbprint = await calculateJwkThumbprint({ jwk, hashAlgorithm: 'sha-256', hashCallback })
 
   for (const jwkFromSet of jwks) {
     if (!zJwkThumbprintComponents.safeParse(jwkFromSet).success) continue
 
     const thumbprintFromSet = await calculateJwkThumbprint({
       jwk: jwkFromSet,
-      hashAlgorithm: HashAlgorithm.Sha256,
+      hashAlgorithm: 'sha-256',
       hashCallback,
     })
 

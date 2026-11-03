@@ -16,8 +16,9 @@ export interface JwsCallbackContext {
    * The exact bytes the signature is computed over, as a string:
    * `BASE64URL(protected) || '.' || payload`.
    *
-   * ASCII, except for an unencoded payload (RFC 7797, `b64` false) that is detached or in a JSON
-   * serialization: that is in it as it is, and {@link signingInputBytes} holds its UTF-8 encoding.
+   * ASCII, unless the payload is unencoded (RFC 7797, `b64` false) and detached or in a JSON
+   * serialization: the payload is then included without encoding, and {@link signingInputBytes}
+   * holds the UTF-8 encoding of the whole signing input.
    *
    * @see https://www.rfc-editor.org/rfc/rfc7515#section-5.1
    * @see https://www.rfc-editor.org/rfc/rfc7797#section-3
@@ -85,11 +86,6 @@ export type SignJwsCallback = (
 
   /**
    * The public key the signature was created with.
-   *
-   * Required, because a caller has no other way to learn which key actually signed — openid4vci
-   * compares it against the `attested_keys` of a key attestation. A signer that holds only a handle
-   * on the key, such as a key id in a remote KMS or a certificate, resolves the key rather than
-   * leaving it out.
    */
   signerJwk: Jwk
 }>

@@ -1,10 +1,8 @@
-import { base64url, stringToBytes } from '@owf/identity-common'
+import { base64url, parseWithErrorHandling, stringToBytes, zBase64Url } from '@owf/identity-common'
 import type { SignJwsCallback } from '../callbacks'
-import { JoseInvalidArgumentError, JoseParseError } from '../error'
+import { JoseInvalidArgumentError, JoseParseError, JoseValidationError } from '../error'
 import type { Jwk } from '../jwk/z-jwk'
 import { decodeUnencodedPayload, encodeBase64UrlJson, unencodedCompactPayloadIssue } from '../utils/encoding'
-import { zBase64Url } from '../utils/z-common'
-import { parseWithErrorHandling } from '../utils/zod'
 import { assertCriticalHeaderParameters, isPayloadBase64UrlEncoded } from './critical-headers'
 import type { JwsSigner } from './signer'
 import { zJwsProtectedHeader } from './z-jws'
@@ -60,7 +58,7 @@ export interface SignCompactJwsResult {
  * so that what is signed is what ends up in the token.
  *
  * @throws JoseValidationError if the protected header is not a valid JWS header.
- * @throws JoseCriticalHeaderError if `crit` is invalid.
+ * @throws JoseValidationError with an `invalid_crit` issue if `crit` is invalid.
  * @throws JoseNotSupportedError if the payload is unencoded (`b64` is false) and not valid UTF-8.
  * @throws JoseParseError if the payload is unencoded, is not detached, and contains a character that
  *   RFC 7797 does not allow in a compact serialization: a '.', or anything outside printable ASCII.
@@ -71,7 +69,8 @@ export async function signCompactJws(options: SignCompactJwsOptions): Promise<Si
   const protectedHeader = parseWithErrorHandling(
     zJwsProtectedHeader,
     options.protectedHeader,
-    'Unable to sign the JWS, invalid header'
+    'Unable to sign the JWS, invalid header',
+    JoseValidationError
   )
 
   // A producer understands the parameters it marks critical itself, so only the structural rules

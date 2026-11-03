@@ -1,19 +1,14 @@
+import { type Hasher, parseWithSchema, stringToBytes } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import { JoseSignerError } from '../error'
-import { HashAlgorithm, type HashCallback } from '../hash'
 import { extractJwkFromJwkSet, isJwkInSet } from '../jwk/jwks'
 import { calculateJwkThumbprint, calculateJwkThumbprintUri } from '../jwk/thumbprint'
 import { zPublicJwk } from '../jwk/z-jwk'
 
-const hashCallback: HashCallback = async (data, alg) => {
-  const algorithms: Record<HashAlgorithm, string> = {
-    [HashAlgorithm.Sha256]: 'SHA-256',
-    [HashAlgorithm.Sha384]: 'SHA-384',
-    [HashAlgorithm.Sha512]: 'SHA-512',
-  }
-
-  return new Uint8Array(await globalThis.crypto.subtle.digest(algorithms[alg], data as Uint8Array<ArrayBuffer>))
-}
+const hashCallback: Hasher = async (data, alg) =>
+  new Uint8Array(
+    await globalThis.crypto.subtle.digest(alg.toUpperCase(), typeof data === 'string' ? stringToBytes(data) : data)
+  )
 
 describe('calculateJwkThumbprint', () => {
   // The example key and its thumbprint from RFC 7638 section 3.1
@@ -28,7 +23,7 @@ describe('calculateJwkThumbprint', () => {
   it('matches the RFC 7638 test vector', async () => {
     const thumbprint = await calculateJwkThumbprint({
       jwk: rsaJwk,
-      hashAlgorithm: HashAlgorithm.Sha256,
+      hashAlgorithm: 'sha-256',
       hashCallback,
     })
 
@@ -41,14 +36,14 @@ describe('calculateJwkThumbprint', () => {
     expect(
       await calculateJwkThumbprint({
         jwk: withoutOptionalMembers,
-        hashAlgorithm: HashAlgorithm.Sha256,
+        hashAlgorithm: 'sha-256',
         hashCallback,
       })
     ).toBe('NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs')
   })
 
   it('builds a thumbprint URI as defined in RFC 9278', async () => {
-    const uri = await calculateJwkThumbprintUri({ jwk: rsaJwk, hashAlgorithm: HashAlgorithm.Sha256, hashCallback })
+    const uri = await calculateJwkThumbprintUri({ jwk: rsaJwk, hashAlgorithm: 'sha-256', hashCallback })
 
     expect(uri).toBe('urn:ietf:params:oauth:jwk-thumbprint:sha-256:NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs')
   })
@@ -57,7 +52,7 @@ describe('calculateJwkThumbprint', () => {
     await expect(
       calculateJwkThumbprint({
         jwk: { kty: 'EC', crv: 'P-256', x: 'x' },
-        hashAlgorithm: HashAlgorithm.Sha256,
+        hashAlgorithm: 'sha-256',
         hashCallback,
       })
     ).rejects.toThrow('Unable to calculate the thumbprint')
@@ -73,11 +68,23 @@ describe('zPublicJwk', () => {
     const result = zPublicJwk.safeParse({ kty: 'EC', crv: 'P-256', x: 'x', y: 'y', d: 'd' })
 
     expect(result.success).toBe(false)
-    expect(result.error?.issues[0].message).toContain(`private key member(s) 'd'`)
+    expect(result.error?.issues[0].message).toContain(`private key member 'd'`)
+  })
+
+  it('reports each private key member as not_allowed at its path', () => {
+    const result = parseWithSchema(zPublicJwk, { kty: 'RSA', n: 'n', e: 'e', d: 'd', p: 'p' })
+
+    expect(result.success ? [] : result.issues.map(({ code, path }) => ({ code, path }))).toEqual([
+      { code: 'not_allowed', path: ['d'] },
+      { code: 'not_allowed', path: ['p'] },
+    ])
   })
 
   it('rejects a symmetric key', () => {
-    expect(zPublicJwk.safeParse({ kty: 'oct', k: 'k' }).success).toBe(false)
+    expect(parseWithSchema(zPublicJwk, { kty: 'oct', k: 'k' })).toMatchObject({
+      success: false,
+      issues: [{ code: 'not_allowed', path: ['k'] }],
+    })
   })
 })
 

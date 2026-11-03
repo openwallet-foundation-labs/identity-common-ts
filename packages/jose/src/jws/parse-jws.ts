@@ -1,5 +1,5 @@
-import { type BaseSchema, base64url, stringToBytes } from '@owf/identity-common'
-import { JoseParseError } from '../error'
+import { type BaseSchema, base64url, parseWithErrorHandling, stringToBytes, zBase64Url } from '@owf/identity-common'
+import { JoseParseError, JoseValidationError } from '../error'
 import {
   decodeBase64UrlBytes,
   decodeBase64UrlJsonObject,
@@ -8,7 +8,6 @@ import {
 } from '../utils/encoding'
 import { hasOwn } from '../utils/object'
 import type { InferSchemaOrDefaultOutput } from '../utils/zod'
-import { parseWithErrorHandling } from '../utils/zod'
 import { assertCriticalHeaderParameters, isPayloadBase64UrlEncoded } from './critical-headers'
 import {
   type FlattenedJws,
@@ -103,8 +102,9 @@ export interface ParsedJws<
   signature: string
 
   /**
-   * The exact bytes covered by the signature, as a string. ASCII, except for an unencoded payload
-   * (`b64` false) that is detached or in a JSON serialization, which is in it as it is.
+   * The exact bytes covered by the signature, as a string. ASCII, unless the payload is unencoded
+   * (`b64` false) and detached or in a JSON serialization: the payload is then included without
+   * encoding.
    *
    * Taken from the token as received rather than rebuilt from the parsed header, so that what is
    * verified is what was sent, down to the byte. Re-encoding a parsed header would produce different
@@ -131,9 +131,6 @@ interface JwsParts {
   signature: string
   compact?: string
 }
-
-/** The characters base64url encodes with. A part of a compact JWS contains nothing else. */
-const BASE64URL = /^[A-Za-z0-9_-]*$/
 
 /**
  * Whether the encoded protected header of a compact JWS sets `b64` to false, for reporting a JWS of
@@ -167,10 +164,10 @@ function compactJwsParts(jws: string): JwsParts {
   // base64url of it, and `resolvePayload` decodes it according to the header. An empty header is
   // reported by the caller, and an empty payload is how a detached payload is serialized, so its
   // emptiness is not rejected here.
-  if (!BASE64URL.test(parts[0])) {
+  if (!zBase64Url.safeParse(parts[0]).success) {
     throw new JoseParseError('Unable to parse the JWS, the protected header of a compact JWS must be base64url')
   }
-  if (!BASE64URL.test(parts[2])) {
+  if (!zBase64Url.safeParse(parts[2]).success) {
     throw new JoseParseError('Unable to parse the JWS, the signature of a compact JWS must be base64url')
   }
 
@@ -204,7 +201,12 @@ function jsonJwsParts(jws: FlattenedJws | GeneralJws, signatureIndex: number): J
   }
 
   if ('signatures' in jws) {
-    const general = parseWithErrorHandling(zGeneralJws, jws, 'Unable to parse the general JSON serialized JWS')
+    const general = parseWithErrorHandling(
+      zGeneralJws,
+      jws,
+      'Unable to parse the general JSON serialized JWS',
+      JoseValidationError
+    )
     const signature = general.signatures[signatureIndex]
 
     if (!signature) {
@@ -222,7 +224,12 @@ function jsonJwsParts(jws: FlattenedJws | GeneralJws, signatureIndex: number): J
     }
   }
 
-  const flattened = parseWithErrorHandling(zFlattenedJws, jws, 'Unable to parse the flattened JSON serialized JWS')
+  const flattened = parseWithErrorHandling(
+    zFlattenedJws,
+    jws,
+    'Unable to parse the flattened JSON serialized JWS',
+    JoseValidationError
+  )
 
   return {
     serialization: 'flattened',
@@ -250,7 +257,8 @@ function jsonJwsParts(jws: FlattenedJws | GeneralJws, signatureIndex: number): J
  * @throws JoseParseError if the JWS is not well-formed, which includes a compact JWS that carries an
  *   unencoded payload (`b64` is false) with a '.' or a character outside printable ASCII.
  * @throws JoseValidationError if a header does not validate against its schema.
- * @throws JoseCriticalHeaderError if `crit` is invalid or names a parameter that is not understood.
+ * @throws JoseValidationError with an `invalid_crit` or `unsupported_crit` issue if `crit` is invalid
+ * or names a parameter that is not understood.
  * @throws JoseNotSupportedError if the payload is unencoded (`b64` is false) and not valid UTF-8.
  */
 export function parseJws<
@@ -288,19 +296,22 @@ export function parseJws<
   const registeredHeader = parseWithErrorHandling(
     zJwsProtectedHeader,
     protectedHeaderJson,
-    'Invalid JWS protected header'
+    'Invalid JWS protected header',
+    JoseValidationError
   )
   const protectedHeader = parseWithErrorHandling(
     options.protectedHeaderSchema ?? zJwsProtectedHeader,
     protectedHeaderJson,
-    'Invalid JWS protected header'
+    'Invalid JWS protected header',
+    JoseValidationError
   )
 
   const unprotectedHeader = parts.unprotectedHeader
     ? parseWithErrorHandling(
         options.unprotectedHeaderSchema ?? zJwsUnprotectedHeader,
         parts.unprotectedHeader,
-        'Invalid JWS unprotected header'
+        'Invalid JWS unprotected header',
+        JoseValidationError
       )
     : undefined
 

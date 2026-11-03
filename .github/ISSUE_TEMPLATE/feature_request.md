@@ -14,11 +14,12 @@ A clear and concise description of the feature you'd like to see.
 
 Which package(s) would this feature belong to?
 
-- [ ] `@owf/identity-common` (existing)
+- [ ] `@owf/identity-common`
+- [ ] `@owf/crypto`
 - [ ] `@owf/jose`
-- [ ] `@owf/cose` (planned)
-- [ ] `@owf/x509` (planned)
-- [ ] `@owf/token-status-list` (planned)
+- [ ] `@owf/cose`
+- [ ] `@owf/x509`
+- [ ] `@owf/token-status-list`
 - [ ] `@owf/openid-federation`
 - [ ] `@owf/eudi-*` (EUDI-specific)
 - [ ] `@sd-jwt/core`

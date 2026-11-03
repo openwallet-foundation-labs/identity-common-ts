@@ -1,8 +1,8 @@
+import { addValidationIssue, zBase64Url, zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 import { zJwsAlg } from '../jwa/z-alg'
 import { zPublicJwk } from '../jwk/z-jwk'
 import { zX5c } from '../jwk/z-x5c'
-import { zBase64Url } from '../utils/z-common'
 
 /**
  * The header parameters registered for a JWS.
@@ -12,7 +12,7 @@ import { zBase64Url } from '../utils/z-common'
  * it to require the parameters a profile needs:
  *
  * ```ts
- * const zMyHeader = z.object({ ...zJwsProtectedHeader.shape, typ: zJoseType('my+jwt') }).loose()
+ * const zMyHeader = z.object({ ...zJwsProtectedHeader.shape, typ: zTyp('my+jwt') }).loose()
  * ```
  *
  * @see https://www.rfc-editor.org/rfc/rfc7515#section-4.1
@@ -21,19 +21,19 @@ export const zJwsProtectedHeader = z
   .object({
     alg: zJwsAlg,
 
-    typ: z.string().optional(),
-    cty: z.string().optional(),
+    typ: zNonEmptyString.optional(),
+    cty: zNonEmptyString.optional(),
 
-    kid: z.string().optional(),
+    kid: zNonEmptyString.optional(),
     // A `jwk` in the header is chosen by whoever wrote the token, so it can never carry private key
     // material; see `zPublicJwk`.
     jwk: zPublicJwk.optional(),
-    jku: z.string().optional(),
+    jku: zNonEmptyString.optional(),
 
     x5c: zX5c.optional(),
-    x5u: z.string().optional(),
-    x5t: z.string().optional(),
-    'x5t#S256': z.string().optional(),
+    x5u: zNonEmptyString.optional(),
+    x5t: zBase64Url.min(1).optional(),
+    'x5t#S256': zBase64Url.min(1).optional(),
 
     /**
      * The header parameters that a recipient must understand to accept the JWS.
@@ -43,7 +43,7 @@ export const zJwsProtectedHeader = z
      *
      * @see https://www.rfc-editor.org/rfc/rfc7515#section-4.1.11
      */
-    crit: z.array(z.string().min(1)).min(1).optional(),
+    crit: z.array(zNonEmptyString).min(1).optional(),
 
     /**
      * Whether the payload is base64url encoded in the serialization. `false` means the payload is
@@ -59,7 +59,7 @@ export const zJwsProtectedHeader = z
      *
      * @see https://openid.net/specs/openid-federation-1_0.html
      */
-    trust_chain: z.tuple([z.string()], z.string()).optional(),
+    trust_chain: z.tuple([zNonEmptyString], zNonEmptyString).optional(),
   })
   .loose()
 
@@ -87,8 +87,17 @@ export type JwsUnprotectedHeader = z.infer<typeof zJwsUnprotectedHeader>
  *
  * @see https://www.rfc-editor.org/rfc/rfc7515#section-7.1
  */
-export const zCompactJws = z.string().regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+$/, {
-  message: 'Not a valid compact JWS',
+export const zCompactJws = z.string().superRefine((jws, ctx) => {
+  const parts = jws.split('.')
+  const isCompactJws =
+    parts.length === 3 &&
+    parts[0] !== '' &&
+    parts[2] !== '' &&
+    parts.every((part) => zBase64Url.safeParse(part).success)
+
+  if (!isCompactJws) {
+    addValidationIssue(ctx, { code: 'invalid_format', message: 'Not a valid compact JWS', context: { format: 'jws' } })
+  }
 })
 
 /**
