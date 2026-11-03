@@ -1,5 +1,17 @@
 # @openid4vc/openid4vci
 
+## 0.9.2
+
+### Patch Changes
+
+- 9886bc1: Pass the `credential_response_encryption` JWK to the `decryptJwe` callback when decrypting credential and deferred credential responses, matching how the issuer binds the key when decrypting credential requests.
+- 086982b: Send the `credential_response_encryption` `alg` where the issuer's version expects it: inside the `jwk` for OpenID4VCI 1.0, and next to the `jwk` for draft 14/15. The client now fails before sending the request if neither the `jwk` nor the request has an `alg`.
+- Updated dependencies [410d45a]
+- Updated dependencies [23f227b]
+  - @openid4vc/oauth2@0.9.2
+  - @owf/identity-common@0.7.0
+  - @openid4vc/utils@0.9.2
+
 ## 0.9.1
 
 ### Patch Changes
