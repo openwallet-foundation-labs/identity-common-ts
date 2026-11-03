@@ -9,12 +9,12 @@ import { base64, base64url, decodeJwt, stringToBytes } from '@owf/identity-commo
 import {
   fetchStatusList,
   getListFromStatusListJWT,
-  SLException,
   type StatusList,
   StatusListCwt,
-  StatusListEntryNotValidException,
+  StatusListError,
   type StatusListInfo,
   type StatusListJWTPayload,
+  StatusListEntryNotValidError as TokenStatusListEntryNotValidError,
   verifyStatus,
   verifyStatusListJwtHeader,
 } from '@owf/token-status-list'
@@ -50,7 +50,7 @@ async function asMdlRevocationListError<T>(
   } catch (error) {
     if (error instanceof CoseInvalidSignatureError) throw new invalidSignatureError(error.message)
     if (error instanceof CoseX5ChainNotBoundError) throw new UnprotectedX5ChainNotBoundError(error.message)
-    if (error instanceof SLException) throw new InvalidRevocationListError(error.message)
+    if (error instanceof StatusListError) throw new InvalidRevocationListError(error.message)
     throw error
   }
 }
@@ -230,7 +230,7 @@ async function verifyStatusListJwt(
     try {
       verifyStatus({ token: jwt, idx, uri, now, skewSeconds, checkFreshness, requireExpirationTime: true })
     } catch (error) {
-      if (error instanceof StatusListEntryNotValidException) {
+      if (error instanceof TokenStatusListEntryNotValidError) {
         throw new StatusListEntryNotValidError(error.message, { uri, idx, status: error.status })
       }
       throw error
@@ -380,7 +380,7 @@ export async function verifyStatusListToken(
   try {
     statusListCwt.verifyStatus(idx)
   } catch (error) {
-    if (error instanceof SLException) {
+    if (error instanceof StatusListError) {
       throw new StatusListEntryNotValidError(error.message, {
         uri,
         idx,

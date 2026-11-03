@@ -441,18 +441,18 @@ export async function retrieveDeferredCredentials(
     }
   }
 
-  const deferredResponseSchema = zDeferredCredentialResponse.refine(
+  const zDeferredResponse = zDeferredCredentialResponse.refine(
     (response) => response.credentials || response.transaction_id === options.transactionId,
     {
       message: `Transaction id in deferred credential response does not match transaction id in deferred credential request '${options.transactionId}'`,
     }
   )
 
-  const result = await handleCredentialResponse<DeferredCredentialResponse, typeof deferredResponseSchema>({
+  const result = await handleCredentialResponse<DeferredCredentialResponse, typeof zDeferredResponse>({
     response: resourceResponse.response,
     decryptJwe: options.callbacks.decryptJwe,
     credentialResponseEncryption: options.credentialResponseEncryption,
-    schema: deferredResponseSchema,
+    schema: zDeferredResponse,
     responseType: 'deferred credential response',
   })
 

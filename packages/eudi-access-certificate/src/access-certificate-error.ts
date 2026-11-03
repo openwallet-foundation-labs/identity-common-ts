@@ -1,10 +1,10 @@
-import { IdentityException, validationErrorMessage } from '@owf/identity-common'
+import { IdentityError, validationErrorMessage } from '@owf/identity-common'
 import type { AccessCertificateValidationIssue } from './validate'
 
 /**
  * AccessCertificateError is thrown when an access certificate cannot be parsed or created.
  */
-export class AccessCertificateError extends IdentityException {
+export class AccessCertificateError extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
     Object.setPrototypeOf(this, AccessCertificateError.prototype)

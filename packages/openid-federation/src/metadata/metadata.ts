@@ -11,7 +11,7 @@ import {
   openidRelyingPartyEntityMetadata,
 } from './entity'
 
-export const metadataSchema = z
+export const zMetadata = z
   .object({
     [federationEntityMetadata.identifier]: federationEntityMetadata.schema.optional(),
     [openidRelyingPartyEntityMetadata.identifier]: openidRelyingPartyEntityMetadata.schema.optional(),
@@ -25,4 +25,4 @@ export const metadataSchema = z
   // Entity types not defined here are kept unvalidated, as OpenID Federation allows further entity types.
   .loose()
 
-export type Metadata = z.input<typeof metadataSchema>
+export type Metadata = z.input<typeof zMetadata>

@@ -3,24 +3,24 @@ import { base64urlEncode } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
   DETACHED_MECHANISM_IDS,
-  EtsiUSchema,
   generateSigX5ts,
   generateX5tO,
   generateX5tS256,
-  JAdESException,
+  JAdESError,
   JAdESProfile,
-  ProtectedHeaderForSigningSchema,
-  ProtectedHeaderSchema,
-  SigDSchema,
-  SignAlgSchema,
   Token,
-  UnprotectedHeaderSchema,
   validateProfile,
   verify,
   verifyCompact,
   verifyFlattened,
   verifyGeneral,
-  X5tOSchema,
+  zEtsiU,
+  zProtectedHeader,
+  zProtectedHeaderForSigning,
+  zSigD,
+  zSignAlg,
+  zUnprotectedHeader,
+  zX5tO,
 } from '../index'
 import type { ProtectedHeaderParams, UnprotectedHeaderParams } from '../types'
 
@@ -59,17 +59,17 @@ const timestampValidationData = { xVals: certificateValues, rVals: revocationVal
 
 describe('normative component schemas', () => {
   it('accepts IANA algorithm identifiers instead of a closed local list', () => {
-    expect(SignAlgSchema.safeParse('EdDSA').success).toBe(true)
-    expect(SignAlgSchema.safeParse('').success).toBe(false)
+    expect(zSignAlg.safeParse('EdDSA').success).toBe(true)
+    expect(zSignAlg.safeParse('').success).toBe(false)
   })
 
   it('uses Named Information hash identifiers and reserves SHA-256 for x5t#S256', () => {
-    expect(X5tOSchema.safeParse({ digAlg: 'sha-384', digVal: 'YWJj' }).success).toBe(true)
-    expect(X5tOSchema.safeParse({ digAlg: 'sha-256', digVal: 'YWJj' }).success).toBe(false)
+    expect(zX5tO.safeParse({ digAlg: 'sha-384', digVal: 'YWJj' }).success).toBe(true)
+    expect(zX5tO.safeParse({ digAlg: 'sha-256', digVal: 'YWJj' }).success).toBe(false)
     expect(generateX5tO(certs[0], 'SHA-384').digAlg).toBe('sha-384')
     expect(generateSigX5ts([certs[0], certs[0]], 'SHA-256')[0].digAlg).toBe('sha-256')
     expect(
-      ProtectedHeaderSchema.safeParse({
+      zProtectedHeader.safeParse({
         alg: 'ES256',
         sigX5ts: generateSigX5ts([certs[0], certs[0]], 'SHA-256'),
         iat: claimedAt,
@@ -79,13 +79,13 @@ describe('normative component schemas', () => {
   })
 
   it('enforces the v1.2.1 protected-header invariants', () => {
-    expect(ProtectedHeaderSchema.safeParse(protectedHeader()).success).toBe(true)
-    expect(ProtectedHeaderSchema.safeParse({ ...protectedHeader(), sigT: '2024-01-01T00:00:00Z' }).success).toBe(false)
-    expect(ProtectedHeaderSchema.safeParse({ ...protectedHeader(), iat: undefined }).success).toBe(false)
-    expect(ProtectedHeaderSchema.safeParse({ ...protectedHeader(), x5t: 'YWJj' }).success).toBe(false)
-    expect(ProtectedHeaderForSigningSchema.safeParse(protectedHeader()).success).toBe(true)
+    expect(zProtectedHeader.safeParse(protectedHeader()).success).toBe(true)
+    expect(zProtectedHeader.safeParse({ ...protectedHeader(), sigT: '2024-01-01T00:00:00Z' }).success).toBe(false)
+    expect(zProtectedHeader.safeParse({ ...protectedHeader(), iat: undefined }).success).toBe(false)
+    expect(zProtectedHeader.safeParse({ ...protectedHeader(), x5t: 'YWJj' }).success).toBe(false)
+    expect(zProtectedHeaderForSigning.safeParse(protectedHeader()).success).toBe(true)
     expect(
-      ProtectedHeaderForSigningSchema.safeParse({
+      zProtectedHeaderForSigning.safeParse({
         alg: 'ES256',
         x5c: certs,
         sigT: '2024-01-01T00:00:00Z',
@@ -94,28 +94,24 @@ describe('normative component schemas', () => {
   })
 
   it('models sigD arrays and mechanism-specific constraints', () => {
-    expect(SigDSchema.safeParse({ mId: DETACHED_MECHANISM_IDS.objectByUri, pars: ['/one'] }).success).toBe(true)
+    expect(zSigD.safeParse({ mId: DETACHED_MECHANISM_IDS.objectByUri, pars: ['/one'] }).success).toBe(true)
     expect(
-      SigDSchema.safeParse({
+      zSigD.safeParse({
         mId: DETACHED_MECHANISM_IDS.objectByUriHash,
         pars: ['/one'],
         hashM: 'S256',
         hashV: ['YWJj'],
       }).success
     ).toBe(true)
-    expect(SigDSchema.safeParse({ mId: DETACHED_MECHANISM_IDS.httpHeaders, pars: ['Content-Type'] }).success).toBe(
-      false
-    )
+    expect(zSigD.safeParse({ mId: DETACHED_MECHANISM_IDS.httpHeaders, pars: ['Content-Type'] }).success).toBe(false)
   })
 
   it('allows only non-empty, homogeneous etsiU arrays in the unprotected header', () => {
-    expect(EtsiUSchema.safeParse([{ sigTst: timestamp }]).success).toBe(true)
-    expect(EtsiUSchema.safeParse([base64urlEncode(JSON.stringify({ sigTst: timestamp }))]).success).toBe(true)
-    expect(EtsiUSchema.safeParse([{ sigTst: timestamp }, 'YWJj']).success).toBe(false)
-    expect(UnprotectedHeaderSchema.safeParse({ etsiU: [{ sigTst: timestamp }], kid: 'not-allowed' }).success).toBe(
-      false
-    )
-    expect(EtsiUSchema.safeParse([{ arcTst: timestamp }]).success).toBe(false)
+    expect(zEtsiU.safeParse([{ sigTst: timestamp }]).success).toBe(true)
+    expect(zEtsiU.safeParse([base64urlEncode(JSON.stringify({ sigTst: timestamp }))]).success).toBe(true)
+    expect(zEtsiU.safeParse([{ sigTst: timestamp }, 'YWJj']).success).toBe(false)
+    expect(zUnprotectedHeader.safeParse({ etsiU: [{ sigTst: timestamp }], kid: 'not-allowed' }).success).toBe(false)
+    expect(zEtsiU.safeParse([{ arcTst: timestamp }]).success).toBe(false)
   })
 })
 
@@ -224,7 +220,7 @@ describe('Token and verification', () => {
     await token.sign(await ES256.getSigner(TEST_PRIVATE_KEY))
     expect(() => token.toString()).toThrow('Compact JWS cannot carry')
     expect(token.toJSON().signatures[0].header).toEqual({ etsiU: [{ sigTst: timestamp }] })
-    expect(() => token.setUnprotectedHeader({ etsiU: [], kid: 'bad' } as never)).toThrow(JAdESException)
+    expect(() => token.setUnprotectedHeader({ etsiU: [], kid: 'bad' } as never)).toThrow(JAdESError)
   })
 })
 

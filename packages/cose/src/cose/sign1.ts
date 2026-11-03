@@ -13,35 +13,35 @@ import { CoseCertificateNotFoundError, CoseInvalidAlgorithmError, CosePayloadMus
 import {
   type ProtectedHeaderOptions,
   ProtectedHeaders,
-  protectedHeadersEncodedStructure,
   RegisteredCwtHeaderClaimKey,
   SignatureAlgorithm,
   type UnprotectedHeaderOptions,
   UnprotectedHeaders,
-  unprotectedHeadersStructure,
+  zProtectedHeadersEncoded,
+  zUnprotectedHeaders,
 } from './headers'
 import { type CoseKey, Curve, coseKeyToJwkClaim, KeyType } from './key'
 
-export const sign1EncodedSchema = z.tuple([
+export const zSign1Encoded = z.tuple([
   // protected headers
-  protectedHeadersEncodedStructure,
+  zProtectedHeadersEncoded,
   // unprotected headers
-  unprotectedHeadersStructure,
+  zUnprotectedHeaders,
   // payload
   zUint8Array.nullable(),
   // signature
   zUint8Array,
 ])
 
-export const sign1DecodedSchema = z.object({
+export const zSign1Decoded = z.object({
   protectedHeaders: z.instanceof(ProtectedHeaders),
   unprotectedHeaders: z.instanceof(UnprotectedHeaders),
-  payload: sign1EncodedSchema.def.items[2],
-  signature: sign1EncodedSchema.def.items[3],
+  payload: zSign1Encoded.def.items[2],
+  signature: zSign1Encoded.def.items[3],
 })
 
-export type Sign1EncodedStructure = z.infer<typeof sign1EncodedSchema>
-export type Sign1DecodedStructure = z.infer<typeof sign1DecodedSchema>
+export type Sign1EncodedStructure = z.infer<typeof zSign1Encoded>
+export type Sign1DecodedStructure = z.infer<typeof zSign1Decoded>
 
 const ecdsaCurves = [Curve['P-256'], Curve['P-384'], Curve['P-521']]
 const eddsaCurves = [Curve.Ed25519, Curve.Ed448]
@@ -112,7 +112,7 @@ export class Sign1 extends CborStructure<Sign1EncodedStructure, Sign1DecodedStru
   protected override _tag = Sign1.tag
 
   public static override get encodingSchema() {
-    return z.codec(sign1EncodedSchema, sign1DecodedSchema, {
+    return z.codec(zSign1Encoded, zSign1Decoded, {
       encode: (decoded) => {
         if (decoded.signature.length === 0) {
           throw new Error('Signature has not been set. Required for encoding the sign1 structure')

@@ -3,7 +3,7 @@ import { base64url, decodeJwt, isMediaType } from '@owf/identity-common'
 import type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
 import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
-import { SLException, StatusListEntryNotValidException } from './status-list-exception'
+import { StatusListEntryNotValidError, StatusListError } from './status-list-error'
 import { MediaTypes, type StatusListEntry, StatusType } from './types'
 
 /**
@@ -19,10 +19,10 @@ function decodeJwtPayload<T extends Record<string, unknown>>(jwt: string): T {
  */
 export function createHeaderAndPayload(list: StatusList, payload: JwtPayload, header: StatusListJWTHeaderParameters) {
   if (!payload.sub) {
-    throw new SLException('sub field is required')
+    throw new StatusListError('sub field is required')
   }
   if (!payload.iat) {
-    throw new SLException('iat field is required')
+    throw new StatusListError('iat field is required')
   }
 
   header.typ = JWT_STATUS_LIST_TYPE
@@ -105,37 +105,37 @@ export function verifyStatusListJwtClaims(
   const expirationTime = secondsToDate(payload.exp)
 
   if (subject === undefined) {
-    throw new SLException('The status list token has no subject claim, which is required')
+    throw new StatusListError('The status list token has no subject claim, which is required')
   }
 
   if (subject !== uri) {
-    throw new SLException(`The subject claim '${subject}' must be equal to the uri '${uri}'`)
+    throw new StatusListError(`The subject claim '${subject}' must be equal to the uri '${uri}'`)
   }
 
   if (expirationTime === undefined) {
     if (requireExpirationTime) {
-      throw new SLException('The status list token has no expiration claim, which is required for this profile')
+      throw new StatusListError('The status list token has no expiration claim, which is required for this profile')
     }
     // `exp` is the first instant the token is no longer valid, so a token that expired within the
     // tolerance is still accepted.
   } else if (new Date(expirationTime.getTime() + skewMs) <= now) {
-    throw new SLException(
+    throw new StatusListError(
       `The expiration claim '${expirationTime.toISOString()}' is in the past (compared to '${now.toISOString()}'), and therefore not valid`
     )
   }
 
   if (issuedAt === undefined) {
-    throw new SLException('The status list token has no issued at claim, which is required')
+    throw new StatusListError('The status list token has no issued at claim, which is required')
   }
 
   if (checkFreshness && new Date(issuedAt.getTime() - skewMs) > now) {
-    throw new SLException(
+    throw new StatusListError(
       `The issued at claim '${issuedAt.toISOString()}' is in the future (compared to '${now.toISOString()}'), and therefore not valid`
     )
   }
 
   if (notBefore !== undefined && new Date(notBefore.getTime() - skewMs) > now) {
-    throw new SLException(
+    throw new StatusListError(
       `The not before claim '${notBefore.toISOString()}' is in the future (compared to '${now.toISOString()}'), and therefore not valid`
     )
   }
@@ -161,18 +161,18 @@ export function verifyStatusListJwtHeader<Header extends { typ?: unknown; alg?: 
   header: Header
 ): Header & { alg: string; typ: string } {
   if (typeof header.alg !== 'string' || header.alg.length === 0) {
-    throw new SLException('The status list token has no alg header, which is required')
+    throw new StatusListError('The status list token has no alg header, which is required')
   }
 
   const typ = header.typ
 
   if (typeof typ !== 'string') {
-    throw new SLException('The status list token has no typ header, which is required')
+    throw new StatusListError('The status list token has no typ header, which is required')
   }
 
   const mediaType = typ.includes('/') ? typ : `application/${typ}`
   if (!isMediaType(mediaType, MediaTypes.StatusListJwt)) {
-    throw new SLException(`The typ header '${typ}' must be equal to '${JWT_STATUS_LIST_TYPE}'`)
+    throw new StatusListError(`The typ header '${typ}' must be equal to '${JWT_STATUS_LIST_TYPE}'`)
   }
 
   return header as Header & { alg: string; typ: string }
@@ -182,8 +182,8 @@ export function verifyStatusListJwtHeader<Header extends { typ?: unknown; alg?: 
  * Verify the header and the claims of a `token` and the status of an `idx` in it. The status list is
  * only read once the header and the claims are verified.
  *
- * @throws StatusListEntryNotValidException if the status at `idx` is not Valid.
- * @throws SLException if the header, the claims or the status list itself are not valid.
+ * @throws StatusListEntryNotValidError if the status at `idx` is not Valid.
+ * @throws StatusListError if the header, the claims or the status list itself are not valid.
  *
  * @todo properly validate the JWT with zod + signature
  */
@@ -204,12 +204,12 @@ export function verifyStatus({
       payload.status_list.bits
     )
   } catch (error) {
-    throw Object.assign(new SLException('The status list token has no valid status_list claim'), { cause: error })
+    throw Object.assign(new StatusListError('The status list token has no valid status_list claim'), { cause: error })
   }
 
   const status = statusList.getStatus(idx)
   if (status !== StatusType.Valid) {
-    throw new StatusListEntryNotValidException(
+    throw new StatusListEntryNotValidError(
       `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`,
       { idx, status }
     )

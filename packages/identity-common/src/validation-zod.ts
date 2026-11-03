@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { IdentityCommonException } from './identity-common-exception'
+import { IdentityCommonError } from './identity-common-error'
 import {
   type CommonValidationCode,
   SCHEMA_VALIDATION_CODES,
@@ -73,7 +73,7 @@ function schemaCode(issue: z.core.$ZodIssue): { code: SchemaValidationCode; cont
     default: {
       // A type error when zod adds an issue code, so it gets a mapping
       const unknown: never = issue
-      throw new IdentityCommonException(`Unknown zod issue code '${(unknown as { code: string }).code}'`)
+      throw new IdentityCommonError(`Unknown zod issue code '${(unknown as { code: string }).code}'`)
     }
   }
 }
@@ -86,7 +86,7 @@ function schemaCode(issue: z.core.$ZodIssue): { code: SchemaValidationCode; cont
  * Parse with `reportInput`, as `parseWithSchema` does, to tell a `missing` value from one
  * of an `invalid_type`.
  *
- * @throws IdentityCommonException for a custom issue without a code, or with a code that is
+ * @throws IdentityCommonError for a custom issue without a code, or with a code that is
  * neither one of `codes` nor of {@link SCHEMA_VALIDATION_CODES}: the schema has a check
  * that the validator does not list.
  */
@@ -102,7 +102,7 @@ export function schemaIssueToValidationIssue<Code extends string = never, Contex
   const params = (issue as z.core.$ZodIssueCustom).params as Partial<ValidationIssueParams> | undefined
   const allowed: string[] = [...Object.values<string>(codes), ...Object.values(SCHEMA_VALIDATION_CODES)]
   if (typeof params?.code !== 'string' || !allowed.includes(params.code)) {
-    throw new IdentityCommonException(
+    throw new IdentityCommonError(
       `The schema issue at '${path.join('.')}' has ${params?.code ? `the code '${params.code}', which is not a code of the validator` : 'no validation code'}: ${issue.message}`
     )
   }

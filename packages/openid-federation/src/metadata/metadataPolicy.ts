@@ -8,7 +8,7 @@ import {
   openidRelyingPartyEntityMetadata,
 } from './entity'
 
-export const metadataPolicySchema = z.object({
+export const zMetadataPolicy = z.object({
   [federationEntityMetadata.identifier]: federationEntityMetadata.policySchema.optional(),
   [openidRelyingPartyEntityMetadata.identifier]: openidRelyingPartyEntityMetadata.policySchema.optional(),
   [openIdProviderEntityMetadata.identifier]: openIdProviderEntityMetadata.policySchema.optional(),
@@ -17,4 +17,4 @@ export const metadataPolicySchema = z.object({
   [oauthResourceEntityMetadata.identifier]: oauthResourceEntityMetadata.policySchema.optional(),
 })
 
-export type MetadataPolicy = z.infer<typeof metadataPolicySchema>
+export type MetadataPolicy = z.infer<typeof zMetadataPolicy>

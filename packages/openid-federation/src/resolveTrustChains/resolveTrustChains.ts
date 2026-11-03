@@ -1,7 +1,7 @@
 import type { EntityConfigurationClaims } from '../entityConfiguration'
-import { entityConfigurationJwtSchema } from '../entityConfiguration/entityConfigurationJwt'
+import { zEntityConfigurationJwt } from '../entityConfiguration/entityConfigurationJwt'
 import type { EntityStatementChain, EntityStatementClaims } from '../entityStatement'
-import { entityStatementJwtSchema } from '../entityStatement/entityStatementJwt'
+import { zEntityStatementJwt } from '../entityStatement/entityStatementJwt'
 import { OpenIdFederationError } from '../error/OpenIdFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import type { JsonWebKeySetOptions } from '../jsonWeb'
@@ -195,7 +195,7 @@ export const resolveTrustChainsWithFailures = async (
       pending = (async () => {
         const jwt = await get(addPaths(id, '.well-known', 'openid-federation'))
         const { claims } = validate({
-          schema: entityConfigurationJwtSchema,
+          schema: zEntityConfigurationJwt,
           data: jwt,
           errorMessage: `entity configuration of '${id}' is invalid`,
         })
@@ -288,7 +288,7 @@ export const resolveTrustChainsWithFailures = async (
 
       const jwt = await get(fetchEndpoint, { sub: subject.claims.sub })
       const { claims } = validate({
-        schema: entityStatementJwtSchema,
+        schema: zEntityStatementJwt,
         data: jwt,
         errorMessage: `subordinate statement about '${subject.claims.sub}' issued by '${superior.claims.sub}' is invalid`,
       })

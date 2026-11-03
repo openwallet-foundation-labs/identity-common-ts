@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createEntityConfiguration,
-  entityConfigurationClaimsSchema,
-  fetchEntityConfiguration,
-} from '../entityConfiguration'
-import { createEntityStatement, entityStatementClaimsSchema, fetchEntityStatement } from '../entityStatement'
+import { createEntityConfiguration, fetchEntityConfiguration, zEntityConfigurationClaims } from '../entityConfiguration'
+import { createEntityStatement, fetchEntityStatement, zEntityStatementClaims } from '../entityStatement'
 import type { SignCallback, VerifyCallback } from '../utils'
 import { mockGet, setupMockServer } from './utils/mockServer'
 import { numericDate } from './utils/numericDate'
@@ -63,7 +59,7 @@ describe('End To End', async () => {
       verifyJwtCallback,
     })
 
-    expect(fetchedEntityConfigurationClaims).toStrictEqual(entityConfigurationClaimsSchema.parse(claims))
+    expect(fetchedEntityConfigurationClaims).toStrictEqual(zEntityConfigurationClaims.parse(claims))
 
     mockedResponse.done()
   })
@@ -137,7 +133,7 @@ describe('End To End', async () => {
       verifyJwtCallback,
     })
 
-    expect(fetchedEntityStatementClaims).toStrictEqual(entityStatementClaimsSchema.parse(entityStamentClaims))
+    expect(fetchedEntityStatementClaims).toStrictEqual(zEntityStatementClaims.parse(entityStamentClaims))
 
     for (const mockedResponse of mockedResponses) mockedResponse.done()
   })

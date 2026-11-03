@@ -2,7 +2,7 @@ import Crypto from 'node:crypto'
 import { describe, expect, test } from 'vitest'
 import { Jwt } from '../jwt'
 import type { Signer, Verifier } from '../types'
-import { base64urlEncode, JwtTimeClaimException, SDJWTException } from '../utils'
+import { base64urlEncode, JwtTimeClaimError, SDJWTError } from '../utils'
 
 describe('JWT', () => {
   test('create', async () => {
@@ -86,7 +86,7 @@ describe('JWT', () => {
     try {
       await newJwt.verify(() => false)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SDJWTError)
     }
   })
 
@@ -141,7 +141,7 @@ describe('JWT', () => {
     try {
       jwt.encodeJwt()
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SDJWTError)
     }
   })
 
@@ -159,7 +159,7 @@ describe('JWT', () => {
     try {
       await jwt.sign(testSigner)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SDJWTError)
     }
   })
 
@@ -179,7 +179,7 @@ describe('JWT', () => {
     try {
       await jwt.sign(testSigner)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SDJWTError)
     }
   })
 
@@ -197,7 +197,7 @@ describe('JWT', () => {
     try {
       await jwt.verify(testVerifier)
     } catch (e: unknown) {
-      expect(e).toBeInstanceOf(SDJWTException)
+      expect(e).toBeInstanceOf(SDJWTError)
     }
   })
 
@@ -213,7 +213,7 @@ describe('JWT', () => {
     })
 
     const error = await jwt.verify(testVerifier, { currentDate: 1000 }).catch((e: unknown) => e)
-    expect(error).toBeInstanceOf(JwtTimeClaimException)
+    expect(error).toBeInstanceOf(JwtTimeClaimError)
     expect(error).toMatchObject({
       message: 'Verify Error: JWT is not yet valid',
       code: 'JWT_NOT_YET_VALID',
@@ -233,7 +233,7 @@ describe('JWT', () => {
     })
 
     const error = await jwt.verify(testVerifier, { currentDate: 1000 }).catch((e: unknown) => e)
-    expect(error).toBeInstanceOf(JwtTimeClaimException)
+    expect(error).toBeInstanceOf(JwtTimeClaimError)
     expect(error).toMatchObject({
       message: 'Verify Error: JWT is not yet valid',
       code: 'JWT_NOT_YET_VALID',
@@ -253,10 +253,10 @@ describe('JWT', () => {
     })
 
     const error = await jwt.verify(testVerifier, { currentDate: 1100 }).catch((e: unknown) => e)
-    expect(error).toBeInstanceOf(JwtTimeClaimException)
-    expect(error).toBeInstanceOf(SDJWTException)
+    expect(error).toBeInstanceOf(JwtTimeClaimError)
+    expect(error).toBeInstanceOf(SDJWTError)
     expect(error).toMatchObject({
-      name: 'JwtTimeClaimException',
+      name: 'JwtTimeClaimError',
       message: 'Verify Error: JWT is expired',
       code: 'JWT_EXPIRED',
       details: { claim: 'exp', value: 1000, currentDate: 1100, skewSeconds: 0 },
@@ -270,7 +270,7 @@ describe('JWT', () => {
     })
 
     const error = await jwt.verify(async () => true, { currentDate: 1100, skewSeconds: 30 }).catch((e: unknown) => e)
-    expect((error as JwtTimeClaimException).details).toEqual({
+    expect((error as JwtTimeClaimError).details).toEqual({
       claim: 'exp',
       value: 1000,
       currentDate: 1100,

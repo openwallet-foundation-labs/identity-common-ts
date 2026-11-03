@@ -114,13 +114,13 @@ export async function fetchCredentialIssuerMetadata(
   const acceptedContentType: [ContentType, ...ContentType[]] = acceptedContentTypeBySignedMetadata[signedMetadata]
 
   // Either unsigned metadata or signed JWT
-  const responseSchema = zCredentialIssuerMetadataWithDraftVersion.or(zCompactJwt)
+  const zResponse = zCredentialIssuerMetadataWithDraftVersion.or(zCompactJwt)
 
   let result = null
   let firstError = null
 
   try {
-    result = await fetchWellKnownMetadata(wellKnownMetadataUrl, responseSchema, {
+    result = await fetchWellKnownMetadata(wellKnownMetadataUrl, zResponse, {
       fetch: options?.callbacks?.fetch,
       acceptedContentType,
     })
@@ -136,7 +136,7 @@ export async function fetchCredentialIssuerMetadata(
   // The legacy url is the same if no subpath is used by the issuer
   if (!result && legacyWellKnownMetadataUrl !== wellKnownMetadataUrl) {
     try {
-      result = await fetchWellKnownMetadata(legacyWellKnownMetadataUrl, responseSchema, {
+      result = await fetchWellKnownMetadata(legacyWellKnownMetadataUrl, zResponse, {
         fetch: options?.callbacks?.fetch,
         acceptedContentType,
       })

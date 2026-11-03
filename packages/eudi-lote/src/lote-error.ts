@@ -1,10 +1,10 @@
-import { IdentityException, validationErrorMessage } from '@owf/identity-common'
+import { IdentityError, validationErrorMessage } from '@owf/identity-common'
 import type { LoTEValidationIssue } from './validator'
 
 /**
  * LoTEError is the error of LoTE operations.
  */
-export class LoTEError extends IdentityException {
+export class LoTEError extends IdentityError {
   constructor(message: string, details?: unknown) {
     super(message, details)
     Object.setPrototypeOf(this, LoTEError.prototype)

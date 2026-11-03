@@ -76,7 +76,7 @@ export type SafeVerifyResult<T> =
 
 /**
  * The values a failed `iat`, `nbf`, `exp` or maximum age check compared, in the `details` of a
- * `JwtTimeClaimException`. Times are in seconds since the epoch.
+ * `JwtTimeClaimError`. Times are in seconds since the epoch.
  */
 export type JwtTimeClaimErrorDetails = {
   /** The claim that failed the check. */

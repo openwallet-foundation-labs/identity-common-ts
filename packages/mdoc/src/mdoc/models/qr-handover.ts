@@ -1,12 +1,12 @@
 import z from 'zod'
 import { Handover } from './handover'
 
-const qrHandoverSchema = z.null()
-export type QrHandoverStructure = z.infer<typeof qrHandoverSchema>
+const zQrHandover = z.null()
+export type QrHandoverStructure = z.infer<typeof zQrHandover>
 
 export class QrHandover extends Handover<QrHandoverStructure> {
   public static override get encodingSchema() {
-    return qrHandoverSchema
+    return zQrHandover
   }
 
   public override get requiresReaderKey() {

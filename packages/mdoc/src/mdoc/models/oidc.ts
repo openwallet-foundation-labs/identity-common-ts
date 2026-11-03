@@ -2,22 +2,22 @@ import { CborStructure } from '@owf/cose'
 import { z } from 'zod'
 
 // Oidc = [uint, tstr, tstr] - Array structure
-const oidcEncodedSchema = z.tuple([z.number(), z.string(), z.string()])
+const zOidcEncoded = z.tuple([z.number(), z.string(), z.string()])
 
 // Easier structure for internal usage in class
-const oidcDecodedSchema = z.object({
+const zOidcDecoded = z.object({
   version: z.number(),
   issuerUrl: z.string(),
   serverRetrievalToken: z.string(),
 })
 
-export type OidcEncodedStructure = z.infer<typeof oidcEncodedSchema>
-export type OidcDecodedStructure = z.infer<typeof oidcDecodedSchema>
+export type OidcEncodedStructure = z.infer<typeof zOidcEncoded>
+export type OidcDecodedStructure = z.infer<typeof zOidcDecoded>
 export type OidcOptions = OidcDecodedStructure
 
 export class Oidc extends CborStructure<OidcEncodedStructure, OidcDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(oidcEncodedSchema, oidcDecodedSchema, {
+    return z.codec(zOidcEncoded, zOidcDecoded, {
       decode: ([version, issuerUrl, serverRetrievalToken]) => ({
         version,
         issuerUrl,

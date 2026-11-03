@@ -1,5 +1,5 @@
 import { type EncryptBlock, ff1Encrypt } from './ff1'
-import { SLException } from './status-list-exception'
+import { StatusListError } from './status-list-error'
 
 /** NIST requires FF1's domain to hold at least 1,000,000 values. */
 const MIN_LENGTH = 1_000_000
@@ -57,10 +57,10 @@ export class FeistelStatusListIndexAllocator {
     ctx: FeistelStatusListIndexAllocatorContext
   ): FeistelStatusListIndexAllocator {
     if (!Number.isSafeInteger(length) || length < MIN_LENGTH || length > 0xffffffff) {
-      throw new SLException('length must be an integer between 1,000,000 and 2^32 - 1')
+      throw new StatusListError('length must be an integer between 1,000,000 and 2^32 - 1')
     }
     if (!Number.isSafeInteger(position) || position < 0 || position > length) {
-      throw new SLException('position must be between 0 and length')
+      throw new StatusListError('position must be between 0 and length')
     }
 
     return new FeistelStatusListIndexAllocator({ length, position, tweak }, ctx.encryptBlock)
@@ -68,7 +68,7 @@ export class FeistelStatusListIndexAllocator {
 
   async next(): Promise<number> {
     if (this.position >= this.length) {
-      throw new SLException('No status list indices remain')
+      throw new StatusListError('No status list indices remain')
     }
 
     // Claimed before encrypting, so concurrent calls never get the same position

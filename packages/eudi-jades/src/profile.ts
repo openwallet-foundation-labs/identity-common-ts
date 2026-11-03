@@ -1,7 +1,7 @@
 /** Structural baseline-profile checks from ETSI TS 119 182-1 V1.2.1 clause 6.3. */
 import { base64urlDecodeJson } from '@owf/identity-common'
 import { JAdESProfile } from './constants'
-import { ProtectedHeaderSchema, UnprotectedHeaderSchema } from './schemas'
+import { zProtectedHeader, zUnprotectedHeader } from './schemas'
 import type { ProtectedHeaderParams, UnprotectedHeaderParams } from './types'
 
 export interface ProfileValidationOptions {
@@ -63,10 +63,10 @@ function validateBB(
   unprotectedHeader?: UnprotectedHeaderParams
 ): ProfileValidationResult {
   const missing: string[] = []
-  const protectedResult = ProtectedHeaderSchema.safeParse(header)
+  const protectedResult = zProtectedHeader.safeParse(header)
   if (!protectedResult.success) addSchemaIssues(missing, 'protected.', protectedResult.error.issues)
   if (unprotectedHeader) {
-    const unprotectedResult = UnprotectedHeaderSchema.safeParse(unprotectedHeader)
+    const unprotectedResult = zUnprotectedHeader.safeParse(unprotectedHeader)
     if (!unprotectedResult.success) addSchemaIssues(missing, 'unprotected.', unprotectedResult.error.issues)
   }
   if (header.adoTst) checkBaselineTimestamp(header.adoTst, 'protected.adoTst', missing)

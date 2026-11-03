@@ -10,14 +10,14 @@ import { z } from 'zod'
 // NOTE: idx is `uint` in the spec (unbounded CBOR uint). We constrain to JS
 // safe-integer range here, which is more than enough for real-world status
 // list sizes (Number.MAX_SAFE_INTEGER is ~9 × 10^15).
-const statusListInfoSchema = typedMap([
+const zStatusListInfo = typedMap([
   ['uri', z.string()],
   ['idx', z.number().int().nonnegative()],
   ['certificate', zUint8Array.exactOptional()],
 ])
 
-export type StatusListInfoDecodedStructure = z.output<typeof statusListInfoSchema>
-export type StatusListInfoEncodedStructure = z.input<typeof statusListInfoSchema>
+export type StatusListInfoDecodedStructure = z.output<typeof zStatusListInfo>
+export type StatusListInfoEncodedStructure = z.input<typeof zStatusListInfo>
 
 export type StatusListInfoOptions = {
   uri: string
@@ -27,7 +27,7 @@ export type StatusListInfoOptions = {
 
 export class StatusListInfo extends CborStructure<StatusListInfoEncodedStructure, StatusListInfoDecodedStructure> {
   public static override get encodingSchema() {
-    return statusListInfoSchema
+    return zStatusListInfo
   }
 
   public get uri() {

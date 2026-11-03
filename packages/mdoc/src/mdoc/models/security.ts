@@ -2,15 +2,15 @@ import { CborStructure, DataItem } from '@owf/cose'
 import { z } from 'zod'
 import { EDeviceKey } from './e-device-key'
 
-const securityEncodedSchema = z.tuple([z.number(), z.instanceof(DataItem)])
+const zSecurityEncoded = z.tuple([z.number(), z.instanceof(DataItem)])
 
-const securityDecodedSchema = z.object({
+const zSecurityDecoded = z.object({
   cipherSuiteIdentifier: z.number(),
   eDeviceKey: z.instanceof(EDeviceKey),
 })
 
-export type SecurityEncodedStructure = z.infer<typeof securityEncodedSchema>
-export type SecurityDecodedStructure = z.infer<typeof securityDecodedSchema>
+export type SecurityEncodedStructure = z.infer<typeof zSecurityEncoded>
+export type SecurityDecodedStructure = z.infer<typeof zSecurityDecoded>
 
 export type SecurityOptions = {
   cipherSuiteIdentifier: number
@@ -19,7 +19,7 @@ export type SecurityOptions = {
 
 export class Security extends CborStructure<SecurityEncodedStructure, SecurityDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(securityEncodedSchema, securityDecodedSchema, {
+    return z.codec(zSecurityEncoded, zSecurityDecoded, {
       decode: (input) => ({
         cipherSuiteIdentifier: input[0],
         // biome-ignore lint/suspicious/noExplicitAny: CoseKey encoded structure

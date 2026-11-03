@@ -8,7 +8,7 @@ import {
   type AlternativeDataElementsSetOptions,
 } from './alternative-data-elements-set'
 
-const docRequestInfoSchema = typedMap(
+const zDocRequestInfo = typedMap(
   [
     ['alternativeDataElements', z.array(z.instanceof(AlternativeDataElementsSet)).min(1).exactOptional()],
     ['issuerIdentifiers', z.array(zUint8Array).min(1).exactOptional()],
@@ -20,8 +20,8 @@ const docRequestInfoSchema = typedMap(
   )
 )
 
-export type DocRequestInfoEncodedStructure = z.input<typeof docRequestInfoSchema>
-export type DocRequestInfoDecodedStructure = z.output<typeof docRequestInfoSchema>
+export type DocRequestInfoEncodedStructure = z.input<typeof zDocRequestInfo>
+export type DocRequestInfoDecodedStructure = z.output<typeof zDocRequestInfo>
 
 export type DocRequestInfoOptions = {
   alternativeDataElements?: Array<AlternativeDataElementsSet | AlternativeDataElementsSetOptions>
@@ -47,7 +47,7 @@ export type DocRequestInfoOptions = {
  */
 export class DocRequestInfo extends CborStructure<DocRequestInfoEncodedStructure, DocRequestInfoDecodedStructure> {
   public static override get encodingSchema() {
-    return docRequestInfoSchema
+    return zDocRequestInfo
   }
 
   public get alternativeDataElements() {

@@ -45,7 +45,7 @@ export const cwtPayloadClaimEntries = [
  * Schema for a CWT Claims Set carrying only the registered claims. Additional (application or
  * private use) claims are allowed through untyped.
  */
-export const cwtPayloadSchema = typedMap(cwtPayloadClaimEntries, {
+export const zCwtPayload = typedMap(cwtPayloadClaimEntries, {
   allowAdditionalKeys: true,
   keyLabels: RegisteredCwtClaimKey,
 })
@@ -65,7 +65,7 @@ export type ExtendedCwtPayloadClaimEntries<Entries extends EntriesBase> = Extend
  *
  * @example
  * ```ts
- * const statusListCwtPayloadSchema = extendCwtPayloadClaims(
+ * const zStatusListCwtPayload = extendCwtPayloadClaims(
  *   [
  *     // `sub` is optional in the registered claims, but required for a status list
  *     [RegisteredCwtClaimKey.Subject, z.string()],
@@ -93,8 +93,8 @@ export function extendCwtPayloadClaims<const Entries extends EntriesBase>(
   })
 }
 
-export type CwtPayloadEncodedStructure = z.input<typeof cwtPayloadSchema>
-export type CwtPayloadDecodedStructure = z.output<typeof cwtPayloadSchema>
+export type CwtPayloadEncodedStructure = z.input<typeof zCwtPayload>
+export type CwtPayloadDecodedStructure = z.output<typeof zCwtPayload>
 
 export type CreateCwtPayloadOptions = {
   issuer?: string
@@ -263,7 +263,7 @@ export class CwtPayload<Structure extends AnyTypedMap = CwtPayloadDecodedStructu
   // NOTE: widened to `z.ZodType` so a subtype can override it with its own (structurally unrelated)
   // claims schema without breaking static-side assignability.
   public static override get encodingSchema(): z.ZodType {
-    return cwtPayloadSchema
+    return zCwtPayload
   }
 
   /**

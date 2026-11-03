@@ -17,7 +17,7 @@ import { StatusListCwt } from '../../cbor/status-list-cwt'
 import { StatusListCwtProtectedHeaders } from '../../cbor/status-list-cwt-headers'
 import { StatusListCwtClaimKey, StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
-import { SLException } from '../../status-list-exception'
+import { StatusListError } from '../../status-list-error'
 import { MediaTypes, StatusType } from '../../types'
 import { mac0Context, macKey, sign1Context, signKey } from '../context'
 
@@ -423,7 +423,7 @@ suite('StatusListCwt', () => {
 
       // The base Cwt has no opinion on `typ`, a status list CWT does
       expect(() => Cwt.fromToken(token, { payload: CwtPayload })).not.toThrow()
-      expect(() => StatusListCwt.fromToken(token)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(token)).toThrow(StatusListError)
       expect(() => StatusListCwt.fromToken(token)).toThrow(/application\/statuslist\+cwt/)
     })
   })
@@ -433,7 +433,7 @@ suite('StatusListCwt', () => {
       // Trailing bytes after a complete cbor value, e.g. a wrongly encoded or truncated token
       const token = new Uint8Array([0x0f, 0x74, 0xa1])
 
-      expect(() => StatusListCwt.fromToken(token)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(token)).toThrow(StatusListError)
       expect(() => StatusListCwt.fromToken(token)).toThrow(/Unable to decode status list CWT.*as CBOR/s)
     })
 
@@ -447,7 +447,7 @@ suite('StatusListCwt', () => {
         /decoded an untagged array with 4 elements/,
       ],
     ])('should report that %s is not a cose token, rather than a missing payload', (_name, token, expected) => {
-      expect(() => StatusListCwt.fromToken(token)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(token)).toThrow(StatusListError)
       expect(() => StatusListCwt.fromToken(token)).toThrow(expected)
       // The old behaviour blamed a detached payload for any non-cose input
       expect(() => StatusListCwt.fromToken(token)).not.toThrow(/detached payload/)
@@ -464,7 +464,7 @@ suite('StatusListCwt', () => {
       const notAPayload = cborEncode(new Map([[1, 'not-a-status-list']]))
       const retagged = cborEncode(new Tag([protectedHeaders, unprotectedHeaders, notAPayload, signature], Sign1.tag))
 
-      expect(() => StatusListCwt.fromToken(retagged)).toThrow(SLException)
+      expect(() => StatusListCwt.fromToken(retagged)).toThrow(StatusListError)
       expect(() => StatusListCwt.fromToken(retagged)).toThrow(/Unable to decode status list CWT payload/)
     })
 

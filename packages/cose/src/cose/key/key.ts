@@ -33,7 +33,7 @@ export enum CoseKeyParameter {
 }
 
 // Zod schema for CoseKey validation
-const coseKeySchema = typedMap(
+const zCoseKey = typedMap(
   [
     [CoseKeyParameter.KeyType, z.union([z.enum(KeyType), z.string()])],
     [
@@ -63,8 +63,8 @@ const coseKeySchema = typedMap(
 )
 
 // Infer structure type from Zod schema
-export type CoseKeyDecodedStructure = z.output<typeof coseKeySchema>
-export type CoseKeyEncodedStructure = z.input<typeof coseKeySchema>
+export type CoseKeyDecodedStructure = z.output<typeof zCoseKey>
+export type CoseKeyEncodedStructure = z.input<typeof zCoseKey>
 
 // Manual options type (user-facing API)
 export type CoseKeyOptions = {
@@ -85,7 +85,7 @@ export type CoseKeyOptions = {
 
 export class CoseKey extends CborStructure<CoseKeyEncodedStructure, CoseKeyDecodedStructure> {
   public static override get encodingSchema() {
-    return coseKeySchema
+    return zCoseKey
   }
 
   public get keyType() {

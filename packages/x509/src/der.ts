@@ -5,7 +5,7 @@ import * as asn1js from 'asn1js'
 import { KEY_ALGORITHMS } from './constants'
 import { toArrayBuffer } from './encoding'
 import type { ParsedPublicKey } from './types'
-import { X509Exception } from './x509-exception'
+import { X509Error } from './x509-error'
 
 const CURVES = {
   'P-256': { oid: KEY_ALGORITHMS['P-256'], size: 32 },
@@ -25,7 +25,7 @@ export function parseDer(bytes: Uint8Array | ArrayBuffer): asn1js.AsnType {
   const buffer = bytes instanceof Uint8Array ? toArrayBuffer(bytes) : bytes
   const result = asn1js.fromBER(buffer)
   if (result.offset === -1 || result.offset !== buffer.byteLength) {
-    throw new X509Exception('Invalid DER encoding')
+    throw new X509Error('Invalid DER encoding')
   }
   return result.result
 }
@@ -62,7 +62,7 @@ function integer(bytes: Uint8Array): asn1js.Integer {
 function leftPad(bytes: Uint8Array, length: number): Uint8Array {
   const stripped = stripLeadingZeros(bytes)
   if (stripped.length > length) {
-    throw new X509Exception('Integer does not fit the expected length')
+    throw new X509Error('Integer does not fit the expected length')
   }
   const out = new Uint8Array(length)
   out.set(stripped, length - stripped.length)
@@ -72,7 +72,7 @@ function leftPad(bytes: Uint8Array, length: number): Uint8Array {
 /** Convert an IEEE P1363 (r || s) ECDSA signature to DER. */
 export function ecdsaP1363ToDer(signature: Uint8Array, coordinateLength: number): Uint8Array {
   if (signature.length !== coordinateLength * 2) {
-    throw new X509Exception(
+    throw new X509Error(
       `Expected a ${coordinateLength * 2} byte IEEE P1363 ECDSA signature, got ${signature.length} bytes`
     )
   }
@@ -86,11 +86,11 @@ export function ecdsaP1363ToDer(signature: Uint8Array, coordinateLength: number)
 export function ecdsaDerToP1363(signature: Uint8Array, coordinateLength: number): Uint8Array {
   const seq = parseDer(signature)
   if (!(seq instanceof asn1js.Sequence) || seq.valueBlock.value.length !== 2) {
-    throw new X509Exception('Invalid DER ECDSA signature')
+    throw new X509Error('Invalid DER ECDSA signature')
   }
   const [r, s] = seq.valueBlock.value
   if (!(r instanceof asn1js.Integer) || !(s instanceof asn1js.Integer)) {
-    throw new X509Exception('Invalid DER ECDSA signature')
+    throw new X509Error('Invalid DER ECDSA signature')
   }
   return concatBytes(
     leftPad(new Uint8Array(r.valueBlock.valueHexView), coordinateLength),
@@ -104,12 +104,12 @@ export function ecdsaDerToP1363(signature: Uint8Array, coordinateLength: number)
  */
 export function publicJwkToSpki(jwk: JsonWebKey): Uint8Array {
   if (jwk.d !== undefined || jwk.p !== undefined || jwk.q !== undefined) {
-    throw new X509Exception('The subject public key must not contain private key material')
+    throw new X509Error('The subject public key must not contain private key material')
   }
   if (jwk.kty === 'EC') {
     const curve = CURVES[jwk.crv as CurveName]
     if (!curve || !jwk.x || !jwk.y) {
-      throw new X509Exception(`Unsupported EC public key (crv: ${jwk.crv})`)
+      throw new X509Error(`Unsupported EC public key (crv: ${jwk.crv})`)
     }
     const point = concatBytes(
       new Uint8Array([4]),
@@ -126,7 +126,7 @@ export function publicJwkToSpki(jwk: JsonWebKey): Uint8Array {
     return new Uint8Array(AsnConvert.serialize(spki))
   }
   if (jwk.kty === 'RSA') {
-    if (!jwk.n || !jwk.e) throw new X509Exception('RSA public key requires n and e')
+    if (!jwk.n || !jwk.e) throw new X509Error('RSA public key requires n and e')
     const rsaPublicKey = new asn1js.Sequence({
       value: [integer(base64url.decode(jwk.n)), integer(base64url.decode(jwk.e))],
     })
@@ -136,7 +136,7 @@ export function publicJwkToSpki(jwk: JsonWebKey): Uint8Array {
     })
     return new Uint8Array(AsnConvert.serialize(spki))
   }
-  throw new X509Exception(`Unsupported key type: ${jwk.kty}`)
+  throw new X509Error(`Unsupported key type: ${jwk.kty}`)
 }
 
 /** Describe a SubjectPublicKeyInfo, including a JWK for EC and RSA keys. */

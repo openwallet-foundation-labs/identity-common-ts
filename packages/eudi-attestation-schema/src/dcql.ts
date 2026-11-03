@@ -1,4 +1,4 @@
-import { SchemaMetaException } from './schema-meta-exception'
+import { SchemaMetaError } from './schema-meta-error'
 import type {
   AttestationFormat,
   BuildDcqlFromSchemaMetaOptions,
@@ -300,7 +300,7 @@ export function toDcqlCredentialInput(params: {
     const value = getVct(schemaRef?.meta) ?? getVct(getFirstSchemaMetaByFormat(schemaMeta, format)) ?? schemaMeta.id
 
     if (!value) {
-      throw new SchemaMetaException(`DCQL mapping failed for format '${format}': missing vct value`)
+      throw new SchemaMetaError(`DCQL mapping failed for format '${format}': missing vct value`)
     }
 
     credential.meta = { vct_values: [value] }
@@ -310,7 +310,7 @@ export function toDcqlCredentialInput(params: {
     const value = getDocTypeValue(schemaRef?.meta) ?? getDocTypeValue(getFirstSchemaMetaByFormat(schemaMeta, format))
 
     if (!value) {
-      throw new SchemaMetaException(`DCQL mapping failed for format '${format}': missing doctype_value`)
+      throw new SchemaMetaError(`DCQL mapping failed for format '${format}': missing doctype_value`)
     }
 
     credential.meta = { doctype_value: value }

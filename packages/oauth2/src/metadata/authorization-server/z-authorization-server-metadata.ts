@@ -2,7 +2,7 @@ import { zHttpsUrl } from '@openid4vc/utils'
 import z from 'zod'
 import { zAlgValueNotNone } from '../../common/z-common'
 
-const knownClientAuthenticationMethod = z.enum([
+const zKnownClientAuthenticationMethod = z.enum([
   'client_secret_basic',
   'client_secret_post',
   'attest_jwt_client_auth',
@@ -15,7 +15,7 @@ export const zAuthorizationServerMetadata = z
   .object({
     issuer: zHttpsUrl,
     token_endpoint: zHttpsUrl,
-    token_endpoint_auth_methods_supported: z.optional(z.array(z.union([knownClientAuthenticationMethod, z.string()]))),
+    token_endpoint_auth_methods_supported: z.optional(z.array(z.union([zKnownClientAuthenticationMethod, z.string()]))),
     authorization_endpoint: z.optional(zHttpsUrl),
     jwks_uri: z.optional(zHttpsUrl),
     grant_types_supported: z.optional(z.array(z.string())),
@@ -33,7 +33,7 @@ export const zAuthorizationServerMetadata = z
     // RFC9068
     introspection_endpoint: z.optional(zHttpsUrl),
     introspection_endpoint_auth_methods_supported: z.optional(
-      z.array(z.union([knownClientAuthenticationMethod, z.string()]))
+      z.array(z.union([zKnownClientAuthenticationMethod, z.string()]))
     ),
     introspection_endpoint_auth_signing_alg_values_supported: z.optional(z.array(zAlgValueNotNone)),
 

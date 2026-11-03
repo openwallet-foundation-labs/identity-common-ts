@@ -1,5 +1,5 @@
 import { deflate, inflate } from 'pako'
-import { SLException } from './status-list-exception'
+import { StatusListError } from './status-list-error'
 import type { BitsPerStatus, StatusType } from './types'
 
 /**
@@ -9,7 +9,7 @@ import type { BitsPerStatus, StatusType } from './types'
 function assertStatusValue(value: number, bitsPerStatus: BitsPerStatus, index: number): void {
   const max = 2 ** bitsPerStatus - 1
   if (!Number.isInteger(value) || value < 0 || value > max) {
-    throw new SLException(
+    throw new StatusListError(
       `Status value out of range at index ${index} with value ${value}, expected an integer from 0 to ${max} for ${bitsPerStatus} bits per status`
     )
   }
@@ -27,7 +27,7 @@ export class StatusList {
 
   constructor(statusList: number[], bitsPerStatus: BitsPerStatus, aggregationUri?: string) {
     if (![1, 2, 4, 8].includes(bitsPerStatus)) {
-      throw new SLException('bitsPerStatus must be 1, 2, 4, or 8')
+      throw new StatusListError('bitsPerStatus must be 1, 2, 4, or 8')
     }
     for (let i = 0; i < statusList.length; i++) {
       assertStatusValue(statusList[i], bitsPerStatus, i)

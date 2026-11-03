@@ -22,32 +22,32 @@ export {
 export { verifyResolveAndBuildDcql } from './orchestrator'
 // Resolver
 export { resolveSchemaReferences } from './resolver'
-// Exception
-export { SchemaMetaException } from './schema-meta-exception'
+// Error
+export { SchemaMetaError } from './schema-meta-error'
 // Schemas
 export {
-  AttestationFormatSchema,
   AttestationFormatValues,
-  AttestationLoSSchema,
   AttestationLoSValues,
-  BindingTypeSchema,
   BindingTypeValues,
-  FrameworkTypeSchema,
   FrameworkTypeValues,
-  IssuanceProfileSchema,
-  MsoMdocMetaSchema,
-  Oid4vciClaimDisplaySchema,
-  Oid4vciClaimSchema,
-  Oid4vciCredentialMetadataSchema,
-  Oid4vciDisplaySchema,
-  ProofTypeSchema,
-  SchemaMetaSchema,
-  SchemaURISchema,
-  SdJwtMetaSchema,
-  SdJwtVcTypeMetadataSchema,
-  Sha256SriSchema,
-  StatusMechanismSchema,
-  TrustAuthoritySchema,
+  zAttestationFormat,
+  zAttestationLoS,
+  zBindingType,
+  zFrameworkType,
+  zIssuanceProfile,
+  zMsoMdocMeta,
+  zOid4vciClaim,
+  zOid4vciClaimDisplay,
+  zOid4vciCredentialMetadata,
+  zOid4vciDisplay,
+  zProofType,
+  zSchemaMeta,
+  zSchemaURI,
+  zSdJwtMeta,
+  zSdJwtVcTypeMetadata,
+  zSha256Sri,
+  zStatusMechanism,
+  zTrustAuthority,
 } from './schemas'
 // Signer
 export { signSchemaMeta } from './signer'
@@ -58,12 +58,12 @@ export type {
   TypeMetadataClaim,
 } from './type-metadata'
 export {
-  ClaimSelectiveDisclosureSchema,
   ClaimSelectiveDisclosureValues,
-  ClaimsPathSchema,
   mergeTypeMetadata,
-  TypeMetadataClaimSchema,
-  TypeMetadataSchema,
+  zClaimSelectiveDisclosure,
+  zClaimsPath,
+  zTypeMetadata,
+  zTypeMetadataClaim,
 } from './type-metadata'
 
 // Types

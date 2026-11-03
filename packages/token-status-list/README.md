@@ -261,7 +261,7 @@ const decoded = decodeCWTStatusClaim(encoded)
 | `FeistelStatusListIndexAllocator` | FF1 allocator class with async `next()`, `remaining()`, and `getState()` |
 | `FeistelStatusListIndexAllocatorState` | Restorable FF1 allocator state type |
 | `EncryptBlock` | Type of the `encryptBlock` callback: AES on one 16-byte block |
-| `SLException` | Error class thrown by status-list operations |
+| `StatusListError` | Error class thrown by status-list operations |
 | `StatusTypes` | Constants: `VALID`, `INVALID`, `SUSPENDED`, etc. |
 | `MediaTypes` | MIME types for JWT and CWT status list tokens |
 | `BitsPerStatus` | Type: `1 \| 2 \| 4 \| 8` |
