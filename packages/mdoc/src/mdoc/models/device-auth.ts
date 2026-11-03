@@ -116,11 +116,10 @@ export class DeviceAuth extends CborStructure<DeviceAuthEncodedStructure, Device
 
     if (deviceSignature) {
       try {
-        const verificationResult = await ctx.cose.sign1.verify({
-          toBeVerified: deviceSignature.toBeSigned({ detachedPayload: deviceAuthenticationBytes }),
-          key: deviceKey,
-          signature: deviceSignature.signature,
-        })
+        const verificationResult = await deviceSignature.verifySignature(
+          { key: deviceKey, detachedPayload: deviceAuthenticationBytes },
+          ctx.cose.sign1
+        )
 
         onCheck({
           status: verificationResult ? 'PASSED' : 'FAILED',

@@ -26,6 +26,16 @@ export enum SignatureAlgorithm {
   ES256 = -7,
   ES384 = -35,
   ES512 = -36,
+  /** RFC 9864 § 2.1: ECDSA using P-256 and SHA-256. */
+  ESP256 = -9,
+  /** RFC 9864 § 2.1: ECDSA using P-384 and SHA-384. */
+  ESP384 = -51,
+  /** RFC 9864 § 2.1: ECDSA using P-521 and SHA-512. */
+  ESP512 = -52,
+  /** RFC 9864 § 2.2: EdDSA using the Ed25519 parameter set. */
+  Ed25519 = -19,
+  /** RFC 9864 § 2.2: EdDSA using the Ed448 parameter set. */
+  Ed448 = -53,
   PS256 = -37,
   PS384 = -38,
   PS512 = -39,

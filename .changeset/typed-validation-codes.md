@@ -13,4 +13,4 @@ Validation issues have typed codes with their context, and a failed validation t
 - `createAccessCertificate` reports all invalid options at once, with a path into the options.
 - `checkOverAsking` parses the DCQL query with the `dcql` library. A credential query needs an `id`, and the `namespace`/`claim_name` form of earlier drafts is rejected (OpenID4VP 1.0 section 6).
 
-**Breaking:** `*Exception` is renamed to `*Error` in these packages, e.g. `WRPRCException` to `WRPRCError`. Zod schemas are named `zFoo` instead of `FooSchema`, e.g. `zTrustedList`.
+**Breaking:** `*Exception` is renamed to `*Error` in these packages, e.g. `WRPRCException` to `WRPRCError`. Zod schemas are named `zFoo` instead of `FooSchema`, e.g. `zTrustedList`. `@owf/identity-common` no longer exports `ValidationIssueParams` and `SchemaIssue`: add an issue with a code in a zod refinement with `addValidationIssue`. `schemaIssueToValidationIssue` takes a zod issue.
