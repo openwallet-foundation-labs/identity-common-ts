@@ -4,7 +4,7 @@
 
 `dcql` uses zod instead of valibot, like the other packages, and reports issues as the `ValidationIssue` of `@owf/identity-common`.
 
-Issues have a code of `DCQL_VALIDATION_CODES`, or a schema code of `@owf/identity-common` (`missing_value`, `invalid_type`, …) when the input does not have the structure of the schema. A credential that does not match the query gets, e.g., `claim_missing`, `claim_value_mismatch` or `vct_mismatch`, and the mismatches carry the `expected` and the `actual` value as `context`. An empty array that must not be empty, such as `claims: []`, gives `empty_array`. `DcqlValidationIssue` types these issues, so checking the code narrows the context.
+Issues have a code of `DCQL_VALIDATION_CODES`, or a schema code of `@owf/identity-common` (`missing_value`, `invalid_type`, …) when the input does not have the structure of the schema. A credential that does not match the query gets, e.g., `claims_path_not_found`, `claim_values_mismatch` or `vct_mismatch`, and the mismatches carry the `expected` and the `actual` value as `context`. An empty array that must not be empty, such as `claims: []`, gives `empty_array`. `DcqlValidationIssue` types these issues, so checking the code narrows the context.
 
 `DcqlQuery.parse`, `DcqlPresentation.parse` and `DcqlPresentationResult.parse` throw a `DcqlParseError` with the `issues` of the input. Matching an array claim of a presentation against an empty array no longer throws a `TypeError`.
 

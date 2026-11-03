@@ -414,13 +414,13 @@ describe('dcql-query', () => {
                   issues: [
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['org.iso.7367.1'],
                       message: "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be defined",
                     },
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['org.iso.18013.5.1'],
                       message: "Expected claim 'org.iso.18013.5.1'.'first_name' to be defined",
                     },
@@ -434,7 +434,7 @@ describe('dcql-query', () => {
                   issues: [
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['org.iso.7367.1'],
                       message: "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be defined",
                     },
@@ -447,7 +447,7 @@ describe('dcql-query', () => {
                   issues: [
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['org.iso.18013.5.1'],
                       message: "Expected claim 'org.iso.18013.5.1'.'first_name' to be defined",
                     },

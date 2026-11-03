@@ -157,13 +157,13 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['given_name'],
                         message: "Expected claim 'given_name' to be defined",
                       },
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['family_name'],
                         message: "Expected claim 'family_name' to be defined",
                       },
@@ -202,7 +202,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['given_name'],
                         message: "Expected claim 'given_name' to be defined",
                       },
@@ -215,7 +215,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['family_name'],
                         message: "Expected claim 'family_name' to be defined",
                       },
@@ -305,7 +305,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['tax_id_code'],
                         message: "Expected claim 'tax_id_code' to be defined",
                       },
@@ -358,7 +358,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['tax_id_code'],
                         message: "Expected claim 'tax_id_code' to be defined",
                       },
@@ -460,7 +460,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['tax_id_code'],
                         message: "Expected claim 'tax_id_code' to be defined",
                       },
@@ -513,7 +513,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['tax_id_code'],
                         message: "Expected claim 'tax_id_code' to be defined",
                       },
@@ -625,7 +625,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['tax_id_code'],
                         message: "Expected claim 'tax_id_code' to be defined",
                       },
@@ -678,7 +678,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['tax_id_code'],
                         message: "Expected claim 'tax_id_code' to be defined",
                       },
@@ -802,7 +802,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['tax_id_code'],
                         message: "Expected claim 'tax_id_code' to be defined",
                       },
@@ -855,7 +855,7 @@ describe('DCQL presentation with claim sets', () => {
                     issues: [
                       {
                         severity: 'error',
-                        code: 'claim_missing',
+                        code: 'claims_path_not_found',
                         path: ['tax_id_code'],
                         message: "Expected claim 'tax_id_code' to be defined",
                       },

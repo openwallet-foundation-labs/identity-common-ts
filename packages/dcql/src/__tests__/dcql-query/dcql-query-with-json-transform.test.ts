@@ -303,25 +303,25 @@ describe('DCQL Query With Json Transform', () => {
                   issues: [
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['last_name'],
                       message: "Expected claim 'last_name' to be defined",
                     },
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['first_name'],
                       message: "Expected claim 'first_name' to be defined",
                     },
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['address'],
                       message: "Expected claim 'address'.'street_address' to be defined",
                     },
                     {
                       severity: 'error',
-                      code: 'claim_value_mismatch',
+                      code: 'claim_values_mismatch',
                       path: ['org.iso.7367.1', 'vehicle_holder'],
                       message:
                         "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be 'Timo Glastra' but received 'Martin Auer'",
@@ -339,7 +339,7 @@ describe('DCQL Query With Json Transform', () => {
                   issues: [
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['last_name'],
                       message: "Expected claim 'last_name' to be defined",
                     },
@@ -352,7 +352,7 @@ describe('DCQL Query With Json Transform', () => {
                   issues: [
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['first_name'],
                       message: "Expected claim 'first_name' to be defined",
                     },
@@ -365,7 +365,7 @@ describe('DCQL Query With Json Transform', () => {
                   issues: [
                     {
                       severity: 'error',
-                      code: 'claim_missing',
+                      code: 'claims_path_not_found',
                       path: ['address'],
                       message: "Expected claim 'address'.'street_address' to be defined",
                     },
@@ -378,7 +378,7 @@ describe('DCQL Query With Json Transform', () => {
                   issues: [
                     {
                       severity: 'error',
-                      code: 'claim_value_mismatch',
+                      code: 'claim_values_mismatch',
                       path: ['org.iso.7367.1', 'vehicle_holder'],
                       message:
                         "Expected claim 'org.iso.7367.1'.'vehicle_holder' to be 'Timo Glastra' but received 'Martin Auer'",

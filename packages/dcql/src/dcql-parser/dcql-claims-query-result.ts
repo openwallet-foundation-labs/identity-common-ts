@@ -26,20 +26,20 @@ const formatValue = (value: unknown) => (typeof value === 'string' ? `'${value}'
 const nestedIssue = (issue: z.core.$ZodIssue, path: PropertyKey[]) =>
   ({ ...issue, path: [...path, ...issue.path] }) as z.core.$ZodRawIssue
 
-const claimMissing = (message: string) => () => ({ code: DCQL_VALIDATION_CODES.CLAIM_MISSING, message })
+const claimsPathNotFound = (message: string) => () => ({ code: DCQL_VALIDATION_CODES.CLAIMS_PATH_NOT_FOUND, message })
 
 // An object or array along the claims path pointer, which is missing when the value is of another type
 const zClaimObject = (shape: z.core.$ZodShape, message: string) =>
-  zMatch<Record<string, unknown>>(isObject, claimMissing(message)).pipe(z.object(shape))
-const zClaimArray = (message: string) => zMatch<unknown[]>(Array.isArray, claimMissing(message))
+  zMatch<Record<string, unknown>>(isObject, claimsPathNotFound(message)).pipe(z.object(shape))
+const zClaimArray = (message: string) => zMatch<unknown[]>(Array.isArray, claimsPathNotFound(message))
 
 const getClaimParser = (path: Array<string | number | null>, values?: DcqlClaimsQuery.ClaimValue[]) =>
   z.custom().superRefine((value, ctx) => {
     if (value === undefined || value === DcqlNotDisclosed) {
-      addDcqlIssue(ctx, claimMissing(`Expected claim '${path.join("'.'")}' to be defined`)())
+      addDcqlIssue(ctx, claimsPathNotFound(`Expected claim '${path.join("'.'")}' to be defined`)())
     } else if (values && !values.includes(value as DcqlClaimsQuery.ClaimValue)) {
       addDcqlIssue(ctx, {
-        code: DCQL_VALIDATION_CODES.CLAIM_VALUE_MISMATCH,
+        code: DCQL_VALIDATION_CODES.CLAIM_VALUES_MISMATCH,
         message: `Expected claim ${pathToString(path)} to be ${values.map(formatValue).join(' | ')} but received ${formatValue(value)}`,
         context: { expected: values, actual: value },
       })
@@ -96,7 +96,7 @@ export const getJsonClaimParser = (
         if (!issues[0]) {
           addDcqlIssue(
             ctx,
-            claimMissing(`Expected any element in array ${arrayPath} to match, but the array is empty`)()
+            claimsPathNotFound(`Expected any element in array ${arrayPath} to match, but the array is empty`)()
           )
           return
         }
