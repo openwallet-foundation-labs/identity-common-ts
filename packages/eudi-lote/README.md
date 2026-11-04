@@ -30,9 +30,9 @@ This SDK implements the ETSI TS 119 602 standard for LoTE documents, enabling:
 | [German Wallet Providers](https://trustlists-sandbox.eudihub.de/wallet-provider.jwt) (sandbox) | `LoteProfile.EuWalletProvidersList` | `compat`, `allowedTerritories: ['DE']` |
 | [Norwegian PID Providers](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_pid.jws) (sandbox) | `LoteProfile.EuPidProvidersList` | `compat`, `allowedTerritories: ['NO']` |
 | [Norwegian Access Certificate Authorities](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_aca.jws) (sandbox) | `LoteProfile.EuWrpacProvidersList` | `compat`, `allowedTerritories: ['NO']` |
-| [French PID Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/PIDProviders.jwt) (sandbox) | `LoteProfile.EuPidProvidersList` | `compat` |
-| [French WRPAC Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/WRPACProviders.jwt) (sandbox) | `LoteProfile.EuWrpacProvidersList` | `compat` |
-| [French WRPRC Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/WRPRCProviders.jwt) (sandbox) | `LoteProfile.EuWrprcProvidersList` | `compat` |
+| [French PID Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/PIDProviders.jwt) (sandbox) | `LoteProfile.EuPidProvidersList` | `strict` |
+| [French WRPAC Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/WRPACProviders.jwt) (sandbox) | `LoteProfile.EuWrpacProvidersList` | `strict` |
+| [French WRPRC Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/WRPRCProviders.jwt) (sandbox) | `LoteProfile.EuWrprcProvidersList` | `strict` |
 | [French Pub-EAA Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/PubEAAProviders.jwt) (sandbox) | `LoteProfile.EuPubEaaProvidersList` | `compat` |
 | [Norwegian Wallet Providers](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_wallet.jws) (sandbox) | `EUWalletProvidersList` | Not supported: its trusted entity has no `TrustedEntityServices`, which the JSON schema requires |
 
@@ -316,7 +316,6 @@ Options:
 | A `PolicyOrLegalNotice` item with both `LoTEPolicy` and `LoTELegalNotice` | All, and `validateLote` | The German EUDI Wallet sandbox lists |
 | A `ServiceStatus` of `http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified`, with an optional `StatusStartingTime` | EU PID Providers List | No profile defines this status. The German PID Providers List sets it |
 | A `SchemeTerritory` other than `EU` | All | Only the values passed in `allowedTerritories`, such as `['DE']` |
-| A trusted entity without the `http://uri.etsi.org/19602/ListOfTrustedEntities/<type>/CC` URI | All with that URI | TS 119 602 D to H require it. The French sandbox lists leave it out. When present, `CC` must still be a 2-letter code |
 | The `http://uri.etsi.org/19602/ListOfTrustedEntities/PubEAAProvider/CC` URI in `TEInformationURI` | EU Pub-EAA Providers List | TS 119 602 H.2 puts it in `TEAddress.TEElectronicAddress`. The EC Pub-EAA Providers List puts it in `TEInformationURI`, as the other profiles do |
 | No `HistoricalInformationPeriod` | EU Pub-EAA Providers List | TS 119 602 H requires it with value `65535`. The French sandbox list leaves it out. Any other value is still rejected |
 

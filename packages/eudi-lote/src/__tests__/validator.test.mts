@@ -1114,28 +1114,17 @@ describe('LoTE Validator', () => {
       }
     })
 
-    it('should accept the French sandbox lists only in compat mode', () => {
-      // TS 119 602 D.2, F.2 and G.2: TEInformationURI contains http://uri.etsi.org/19602/ListOfTrustedEntities/<type>/CC
-      for (const [jwt, profile, type] of [
-        [FrenchSandboxPIDProvidersJWT, LoteProfile.EuPidProvidersList, 'PIDProvider'],
-        [FrenchSandboxWRPACProvidersJWT, LoteProfile.EuWrpacProvidersList, 'WRPACProvider'],
-        [FrenchSandboxWRPRCProvidersJWT, LoteProfile.EuWrprcProvidersList, 'WRPRCProvider'],
+    it('should accept the French sandbox PID, WRPAC and WRPRC lists in strict mode', () => {
+      for (const [jwt, profile] of [
+        [FrenchSandboxPIDProvidersJWT, LoteProfile.EuPidProvidersList],
+        [FrenchSandboxWRPACProvidersJWT, LoteProfile.EuWrpacProvidersList],
+        [FrenchSandboxWRPRCProvidersJWT, LoteProfile.EuWrprcProvidersList],
       ] as const) {
-        const lote = decodeJwt(jwt).payload
-        const prefix = `http://uri.etsi.org/19602/ListOfTrustedEntities/${type}/`
-
-        expect(validateLoteProfile(lote, profile).issues).toEqual([
-          {
-            severity: 'error',
-            code: 'missing_value',
-            path: ['LoTE', 'TrustedEntitiesList', '0', 'TrustedEntityInformation', 'TEInformationURI'],
-            message: `Profile ${profile}: Each TrustedEntityInformation.TEInformationURI must contain at least one URI starting with ${prefix}`,
-            context: { expected: `a URI starting with ${prefix}` },
-          },
-        ])
-        expect(validateLoteProfile(lote, profile, { mode: 'compat' })).toMatchObject({ valid: true, issues: [] })
+        expect(validateLoteProfile(decodeJwt(jwt).payload, profile)).toMatchObject({ valid: true, issues: [] })
       }
+    })
 
+    it('should accept the French sandbox Pub-EAA list only in compat mode', () => {
       // TS 119 602 H.1: HistoricalInformationPeriod shall be present with value 65535
       const pubEaa = decodeJwt(FrenchSandboxPubEAAProvidersJWT).payload
       expect(validateLoteProfile(pubEaa, LoteProfile.EuPubEaaProvidersList).issues).toEqual([
@@ -1153,16 +1142,7 @@ describe('LoTE Validator', () => {
       })
     })
 
-    it('should still check a present TEInformationURI country code and HistoricalInformationPeriod in compat mode', () => {
-      const pid = decodeJwt<any, LoteDocument>(FrenchSandboxPIDProvidersJWT).payload
-      pid.LoTE.TrustedEntitiesList?.[0].TrustedEntityInformation.TEInformationURI?.push({
-        lang: 'en',
-        uriValue: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PIDProvider/FRA',
-      })
-      expect(
-        validateLoteProfile(pid, LoteProfile.EuPidProvidersList, { mode: 'compat' }).issues.map((issue) => issue.code)
-      ).toEqual(['invalid_format'])
-
+    it('should still reject a HistoricalInformationPeriod other than 65535 in compat mode', () => {
       const pubEaa = decodeJwt<any, LoteDocument>(FrenchSandboxPubEAAProvidersJWT).payload
       pubEaa.LoTE.ListAndSchemeInformation.HistoricalInformationPeriod = 0
       expect(

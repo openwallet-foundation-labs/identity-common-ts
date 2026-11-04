@@ -330,15 +330,14 @@ const trustedEntitiesListRefinement =
         const uri = locations[uriKey].find(hasPrefix)
         const uriPath = [...trustedEntityPath, 'TrustedEntityInformation', ...uriKey.split('.')]
 
-        // The French sandbox lists leave this URI out
-        if (!uri && mode === 'strict') {
+        if (!uri) {
           addValidationIssue(ctx, {
             code: 'missing_value',
             message: `Each TrustedEntityInformation.${uriKey} must contain at least one URI starting with ${informationUriPrefix}`,
             path: uriPath,
             context: { expected: `a URI starting with ${informationUriPrefix}` },
           })
-        } else if (uri) {
+        } else {
           const rest = uri.uriValue.substring(informationUriPrefix.length)
           if (rest.length !== 2) {
             addValidationIssue(ctx, {
