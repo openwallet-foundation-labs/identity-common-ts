@@ -155,9 +155,12 @@ function getDocumentLoteType(loteDocument: unknown): string | undefined {
  * @param profile - The profile(s) to validate against
  * @param options.mode - `strict` (the default) validates the list exactly as the profile defines it.
  * `compat` also accepts the deviations of lists in use that don't change who is trusted: the
- * `PolicyOrLegalNotice` that `validateLote` accepts in compat mode, and on a PID Providers List
- * a `ServiceStatus` of `http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified` with a
- * `StatusStartingTime`.
+ * `PolicyOrLegalNotice` that `validateLote` accepts in compat mode, a trusted entity without the
+ * `http://uri.etsi.org/19602/ListOfTrustedEntities/<type>/CC` URI, on a PID Providers List a
+ * `ServiceStatus` of `http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified` with a
+ * `StatusStartingTime`, and on a Pub-EAA Providers List no `HistoricalInformationPeriod` and the
+ * `http://uri.etsi.org/19602/ListOfTrustedEntities/PubEAAProvider/CC` URI in `TEInformationURI` instead
+ * of `TEAddress.TEElectronicAddress` (TS 119 602 H.2).
  *
  * A valid Pub-EAA Providers List can list a service as
  * `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn` (TS 119 602 H): don't trust it.

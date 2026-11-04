@@ -21,7 +21,7 @@ import {
   zTrustedEntity,
   zTrustedEntityService,
 } from './schemas'
-import type { PostalAddress, ServiceDigitalIdentity } from './types'
+import type { LocalizedUri, PostalAddress, ServiceDigitalIdentity } from './types'
 import type { LoteValidationCode } from './validator'
 
 /** The context of an empty string where the profile needs a value */
@@ -189,13 +189,16 @@ type ListAndSchemeInformationRefinementOptions = {
 }
 
 const listAndSchemeInformationRefinement =
-  ({
-    allowedTerritories = ['EU'],
-    schemeTypeCommunityRulesUri,
-    historicalInformationPeriod,
-    requireNoHistoricalInformationPeriod,
-    requireNoPointersToOtherLote,
-  }: ListAndSchemeInformationRefinementOptions) =>
+  (
+    {
+      allowedTerritories = ['EU'],
+      schemeTypeCommunityRulesUri,
+      historicalInformationPeriod,
+      requireNoHistoricalInformationPeriod,
+      requireNoPointersToOtherLote,
+    }: ListAndSchemeInformationRefinementOptions,
+    mode: LoteValidationMode
+  ) =>
   ({ LoTE }: LoteDocument, ctx: z.RefinementCtx<LoteDocument>) => {
     const info = LoTE.ListAndSchemeInformation
     const path = ['LoTE', 'ListAndSchemeInformation']
@@ -230,7 +233,13 @@ const listAndSchemeInformationRefinement =
       })
     }
 
-    if (historicalInformationPeriod !== undefined && info.HistoricalInformationPeriod !== historicalInformationPeriod) {
+    // The French sandbox Pub-EAA Providers List leaves it out
+    const acceptMissingPeriod = mode === 'compat' && info.HistoricalInformationPeriod === undefined
+    if (
+      historicalInformationPeriod !== undefined &&
+      info.HistoricalInformationPeriod !== historicalInformationPeriod &&
+      !acceptMissingPeriod
+    ) {
       ctx.addIssue({
         code: 'invalid_value',
         values: [historicalInformationPeriod],
@@ -287,12 +296,14 @@ const listAndSchemeInformationRefinement =
 type TrustedEntitiesListRefinementOptions = {
   serviceTypeIdentifiers: readonly [string, ...string[]]
   informationUriPrefix?: string
+  /** The URI with `informationUriPrefix` goes in TEAddress.TEElectronicAddress instead of TEInformationURI */
+  informationUriInAddress?: boolean
   /** The ServiceStatus schema of the profile in each mode */
   serviceStatus: Record<LoteValidationMode, z.ZodType<string | undefined>>
 }
 
 const trustedEntitiesListRefinement =
-  ({ informationUriPrefix }: TrustedEntitiesListRefinementOptions) =>
+  ({ informationUriPrefix, informationUriInAddress }: TrustedEntitiesListRefinementOptions, mode: LoteValidationMode) =>
   ({ LoTE }: LoteDocument, ctx: z.RefinementCtx<LoteDocument>) => {
     LoTE.TrustedEntitiesList?.forEach((entity, index) => {
       const trustedEntityPath = ['LoTE', 'TrustedEntitiesList', index.toString()]
@@ -305,25 +316,36 @@ const trustedEntitiesListRefinement =
       )
 
       if (informationUriPrefix) {
-        const uri = entity.TrustedEntityInformation.TEInformationURI?.find(({ uriValue }) =>
-          uriValue.startsWith(informationUriPrefix)
-        )
+        const information = entity.TrustedEntityInformation
+        const locations = {
+          'TEAddress.TEElectronicAddress': information.TEAddress.TEElectronicAddress,
+          TEInformationURI: information.TEInformationURI ?? [],
+        }
+        // The EC Pub-EAA Providers List has it in TEInformationURI, where the other profiles put it
+        const keys: (keyof typeof locations)[] = informationUriInAddress
+          ? ['TEAddress.TEElectronicAddress', ...(mode === 'compat' ? (['TEInformationURI'] as const) : [])]
+          : ['TEInformationURI']
+        const hasPrefix = ({ uriValue }: LocalizedUri) => uriValue.startsWith(informationUriPrefix)
+        const uriKey = keys.find((key) => locations[key].some(hasPrefix)) ?? keys[0]
+        const uri = locations[uriKey].find(hasPrefix)
+        const uriPath = [...trustedEntityPath, 'TrustedEntityInformation', ...uriKey.split('.')]
 
-        if (!uri) {
+        // The French sandbox lists leave this URI out
+        if (!uri && mode === 'strict') {
           addValidationIssue(ctx, {
             code: 'missing_value',
-            message: `Each TrustedEntityInformation.TEInformationURI must contain at least one URI starting with ${informationUriPrefix}`,
-            path: [...trustedEntityPath, 'TrustedEntityInformation', 'TEInformationURI'],
+            message: `Each TrustedEntityInformation.${uriKey} must contain at least one URI starting with ${informationUriPrefix}`,
+            path: uriPath,
             context: { expected: `a URI starting with ${informationUriPrefix}` },
           })
-        } else {
+        } else if (uri) {
           const rest = uri.uriValue.substring(informationUriPrefix.length)
           if (rest.length !== 2) {
             addValidationIssue(ctx, {
               code: 'invalid_format',
               context: { format: `${informationUriPrefix} followed by an ISO 3166-1 alpha-2 country code` },
               message: `URI starting with ${informationUriPrefix} must be followed by a 2-letter country code`,
-              path: [...trustedEntityPath, 'TrustedEntityInformation', 'TEInformationURI'],
+              path: uriPath,
             })
           }
         }
@@ -498,6 +520,8 @@ export const profileDefinitions = {
         'http://uri.etsi.org/19602/SvcType/PubEAA/Revocation',
       ],
       informationUriPrefix: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PubEAAProvider/',
+      // TS 119 602 H.2: in TEAddress, unlike the other profiles
+      informationUriInAddress: true,
       // A withdrawn Pub-EAA provider stays listed: only a notified one is trusted
       serviceStatus: {
         strict: pubEaaServiceStatus,
@@ -569,8 +593,8 @@ export const createProfileSchema = <const D extends ProfileDefinition, M extends
           .optional(),
       }),
     })
-    .superRefine(listAndSchemeInformationRefinement({ ...list, allowedTerritories }))
-    .superRefine(trustedEntitiesListRefinement(entities))
+    .superRefine(listAndSchemeInformationRefinement({ ...list, allowedTerritories }, mode))
+    .superRefine(trustedEntitiesListRefinement(entities, mode))
 }
 
 export const zEuPidProvidersList = createProfileSchema(profileDefinitions.EuPidProvidersList)

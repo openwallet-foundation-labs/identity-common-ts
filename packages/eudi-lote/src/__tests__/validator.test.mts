@@ -8,11 +8,15 @@ import {
   LoteValidationError,
   validateLote,
 } from '../index'
-import { LOTE_TYPES } from '../profiles'
-import type { CompatLoteDocument, LoteDocument } from '../types'
+import { LOTE_TYPES, type LoteValidationMode } from '../profiles'
+import type { CompatLoteDocument, LocalizedUri, LoteDocument, TrustedEntityInformation } from '../types'
 import { LoteProfile, type LoteProfileDocument, type ValidationResult, validateLoteProfile } from '../validator'
 import {
   EUPIDProvidersJWT,
+  FrenchSandboxPIDProvidersJWT,
+  FrenchSandboxPubEAAProvidersJWT,
+  FrenchSandboxWRPACProvidersJWT,
+  FrenchSandboxWRPRCProvidersJWT,
   GermanPIDProvidersJWT,
   GermanSandboxWalletProvidersJWT,
   LP26PIDProvidersEmptyJWT,
@@ -762,11 +766,61 @@ describe('LoTE Validator', () => {
       expect(result.valid).toBe(true)
     })
 
-    it('should validate against EuPubEaaProvidersList profile', () => {
-      const { payload: lote } = decodeJwt(PubEAAProvidersJWT)
-      const result = validateLoteProfile(lote, LoteProfile.EuPubEaaProvidersList)
+    it('should accept the EC Pub-EAA Providers List only in compat mode', () => {
+      const lote = decodeJwt<any, LoteDocument>(PubEAAProvidersJWT).payload
 
-      expect(result.valid).toBe(true)
+      // TS 119 602 H.2 puts the URI in TEAddress. The EC list puts it in TEInformationURI.
+      expect(
+        validateLoteProfile(lote, LoteProfile.EuPubEaaProvidersList).issues.map(({ code, path }) => ({
+          code,
+          path: path.join('.'),
+        }))
+      ).toEqual(
+        (lote.LoTE.TrustedEntitiesList ?? []).map((_, index) => ({
+          code: 'missing_value',
+          path: `LoTE.TrustedEntitiesList.${index}.TrustedEntityInformation.TEAddress.TEElectronicAddress`,
+        }))
+      )
+      expect(validateLoteProfile(lote, LoteProfile.EuPubEaaProvidersList, { mode: 'compat' })).toMatchObject({
+        valid: true,
+        issues: [],
+      })
+    })
+
+    it('should take the Pub-EAA provider country URI from TEAddress, and in compat mode from TEInformationURI', () => {
+      const issues = (
+        move: (information: TrustedEntityInformation, uri: LocalizedUri) => void,
+        mode?: LoteValidationMode
+      ) => {
+        const lote = decodeJwt<any, LoteDocument>(PubEAAProvidersJWT).payload
+        lote.LoTE.TrustedEntitiesList = lote.LoTE.TrustedEntitiesList?.slice(0, 1)
+        const information = lote.LoTE.TrustedEntitiesList?.[0].TrustedEntityInformation
+        const uris = information?.TEInformationURI ?? []
+        const [uri] = uris.splice(
+          uris.findIndex(({ uriValue }) => uriValue.includes('/PubEAAProvider/')),
+          1
+        )
+        if (information && uri) move(information, uri)
+        return validateLoteProfile(lote, LoteProfile.EuPubEaaProvidersList, { mode }).issues.map(({ code, path }) => ({
+          code,
+          path: path.join('.'),
+        }))
+      }
+      const entity = 'LoTE.TrustedEntitiesList.0.TrustedEntityInformation'
+      const toAddress = (information: TrustedEntityInformation, uri: LocalizedUri) =>
+        information.TEAddress.TEElectronicAddress.push(uri)
+      const toInformationUri = (information: TrustedEntityInformation, uri: LocalizedUri) =>
+        information.TEInformationURI?.push({ ...uri, uriValue: `${uri.uriValue}T` })
+
+      expect(issues(toAddress)).toEqual([])
+      expect(issues(() => {})).toEqual([{ code: 'missing_value', path: `${entity}.TEAddress.TEElectronicAddress` }])
+      expect(issues((information, uri) => toAddress(information, { ...uri, uriValue: `${uri.uriValue}T` }))).toEqual([
+        { code: 'invalid_format', path: `${entity}.TEAddress.TEElectronicAddress` },
+      ])
+      // Compat mode also checks the country code of a URI in TEInformationURI
+      expect(issues(toInformationUri, 'compat')).toEqual([
+        { code: 'invalid_format', path: `${entity}.TEInformationURI` },
+      ])
     })
 
     it('should validate an EC list without trusted entities against EuPidProvidersList profile', () => {
@@ -796,6 +850,12 @@ describe('LoTE Validator', () => {
       const lote = JSON.parse(json) as LoteDocument
       if (kind === 'PubEAA') {
         lote.LoTE.ListAndSchemeInformation.HistoricalInformationPeriod = 65535
+        // TS 119 602 H.2: the country URI is in TEAddress
+        for (const { TrustedEntityInformation: information } of lote.LoTE.TrustedEntitiesList ?? []) {
+          const uris = information.TEInformationURI ?? []
+          const index = uris.findIndex(({ uriValue }) => uriValue.includes('/PubEAAProvider/'))
+          information.TEAddress.TEElectronicAddress.push(...uris.splice(index, 1))
+        }
         for (const service of lote.LoTE.TrustedEntitiesList?.flatMap((e) => e.TrustedEntityServices) ?? []) {
           service.ServiceInformation.ServiceStatus = 'http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified'
         }
@@ -1052,6 +1112,64 @@ describe('LoTE Validator', () => {
           issues: [],
         })
       }
+    })
+
+    it('should accept the French sandbox lists only in compat mode', () => {
+      // TS 119 602 D.2, F.2 and G.2: TEInformationURI contains http://uri.etsi.org/19602/ListOfTrustedEntities/<type>/CC
+      for (const [jwt, profile, type] of [
+        [FrenchSandboxPIDProvidersJWT, LoteProfile.EuPidProvidersList, 'PIDProvider'],
+        [FrenchSandboxWRPACProvidersJWT, LoteProfile.EuWrpacProvidersList, 'WRPACProvider'],
+        [FrenchSandboxWRPRCProvidersJWT, LoteProfile.EuWrprcProvidersList, 'WRPRCProvider'],
+      ] as const) {
+        const lote = decodeJwt(jwt).payload
+        const prefix = `http://uri.etsi.org/19602/ListOfTrustedEntities/${type}/`
+
+        expect(validateLoteProfile(lote, profile).issues).toEqual([
+          {
+            severity: 'error',
+            code: 'missing_value',
+            path: ['LoTE', 'TrustedEntitiesList', '0', 'TrustedEntityInformation', 'TEInformationURI'],
+            message: `Profile ${profile}: Each TrustedEntityInformation.TEInformationURI must contain at least one URI starting with ${prefix}`,
+            context: { expected: `a URI starting with ${prefix}` },
+          },
+        ])
+        expect(validateLoteProfile(lote, profile, { mode: 'compat' })).toMatchObject({ valid: true, issues: [] })
+      }
+
+      // TS 119 602 H.1: HistoricalInformationPeriod shall be present with value 65535
+      const pubEaa = decodeJwt(FrenchSandboxPubEAAProvidersJWT).payload
+      expect(validateLoteProfile(pubEaa, LoteProfile.EuPubEaaProvidersList).issues).toEqual([
+        {
+          severity: 'error',
+          code: 'invalid_value',
+          path: ['LoTE', 'ListAndSchemeInformation', 'HistoricalInformationPeriod'],
+          message: 'Profile EuPubEaaProvidersList: HistoricalInformationPeriod must be 65535',
+          context: { allowed: [65535] },
+        },
+      ])
+      expect(validateLoteProfile(pubEaa, LoteProfile.EuPubEaaProvidersList, { mode: 'compat' })).toMatchObject({
+        valid: true,
+        issues: [],
+      })
+    })
+
+    it('should still check a present TEInformationURI country code and HistoricalInformationPeriod in compat mode', () => {
+      const pid = decodeJwt<any, LoteDocument>(FrenchSandboxPIDProvidersJWT).payload
+      pid.LoTE.TrustedEntitiesList?.[0].TrustedEntityInformation.TEInformationURI?.push({
+        lang: 'en',
+        uriValue: 'http://uri.etsi.org/19602/ListOfTrustedEntities/PIDProvider/FRA',
+      })
+      expect(
+        validateLoteProfile(pid, LoteProfile.EuPidProvidersList, { mode: 'compat' }).issues.map((issue) => issue.code)
+      ).toEqual(['invalid_format'])
+
+      const pubEaa = decodeJwt<any, LoteDocument>(FrenchSandboxPubEAAProvidersJWT).payload
+      pubEaa.LoTE.ListAndSchemeInformation.HistoricalInformationPeriod = 0
+      expect(
+        validateLoteProfile(pubEaa, LoteProfile.EuPubEaaProvidersList, { mode: 'compat' }).issues.map((issue) =>
+          issue.path.join('.')
+        )
+      ).toEqual(['LoTE.ListAndSchemeInformation.HistoricalInformationPeriod'])
     })
 
     // Expected to fail: its trusted entity has no TrustedEntityServices, which the TS 119 602 JSON schema requires
