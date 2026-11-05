@@ -1,6 +1,8 @@
+import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { parseWithErrorHandling } from '@owf/identity-common'
 import { decodeJwt } from '@owf/jose'
 import z from 'zod'
+import { getOpenid4vpClientId } from '../client-identifier-prefix/parse-client-identifier-prefix'
 import {
   isJarAuthorizationRequest,
   type Openid4vpJarAuthorizationRequest,
@@ -98,6 +100,13 @@ export function parseOpenid4vpAuthorizationRequest(
   }
 
   if (isOpenid4vpAuthorizationRequestDcApi(parsedRequest)) {
+    if (provided === 'uri') {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: `An authorization request with response_mode '${parsedRequest.response_mode}' must be passed as a JSON object, not as a URI.`,
+      })
+    }
+
     return {
       type: 'openid4vp_dc_api',
       provided,
@@ -110,6 +119,21 @@ export function parseOpenid4vpAuthorizationRequest(
       type: 'openid4vp_iae',
       provided,
       params: parsedRequest,
+    }
+  }
+
+  if (provided === 'uri') {
+    const { clientIdPrefix } = getOpenid4vpClientId({
+      clientId: parsedRequest.client_id,
+      legacyClientIdScheme: parsedRequest.client_id_scheme,
+      responseMode: parsedRequest.response_mode,
+    })
+
+    if (clientIdPrefix !== 'pre-registered' && clientIdPrefix !== 'redirect_uri') {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: `An unsigned authorization request passed as a URI must use the 'pre-registered' or 'redirect_uri' client identifier prefix, but client_id '${parsedRequest.client_id}' uses '${clientIdPrefix}'. Pass a signed request in 'request' or 'request_uri' instead.`,
+      })
     }
   }
 
