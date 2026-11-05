@@ -1085,9 +1085,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
     })
 
     expect(result.authorizationRequestPayload).toEqual(authorizationRequestPayload)
-    expect(result.authorizationRequest).toContain('openid4vp://')
-    expect(result.authorizationRequest).toContain('response_mode=iae_post')
-    expect(result.authorizationRequest).toContain('response_type=vp_token')
+    expect(result.authorizationRequest).toEqual(authorizationRequestPayload)
     expect(result.jar).toBeUndefined()
   })
 
@@ -1119,7 +1117,10 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
 
     expect(result.jar).toBeDefined()
     expect(result.jar?.authorizationRequestJwt).toBeDefined()
-    expect(result.authorizationRequest).toContain('request=')
+    expect(result.authorizationRequest).toEqual({
+      client_id: 'issuer-client',
+      request: result.jar?.authorizationRequestJwt,
+    })
 
     // Verify JWT contains expected_url
     if (result.jar) {

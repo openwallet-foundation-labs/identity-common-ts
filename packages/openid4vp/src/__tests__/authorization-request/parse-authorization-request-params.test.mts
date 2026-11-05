@@ -1,4 +1,3 @@
-import { Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { describe, expect, test } from 'vitest'
 import { parseOpenid4vpAuthorizationRequest } from '../../authorization-request/parse-authorization-request-params.js'
 
@@ -40,58 +39,7 @@ describe('Parse Authorization Request Params', () => {
   const uriRequest = (params: Record<string, string>) =>
     `openid4vp://?${new URLSearchParams({ response_type: 'vp_token', nonce: 'nonce', ...params }).toString()}`
 
-  test('parses an unsigned uri request with a redirect_uri client id', () => {
-    expect(
-      parseOpenid4vpAuthorizationRequest({
-        authorizationRequest: uriRequest({
-          client_id: 'redirect_uri:https://verifier.example.com/cb',
-          response_mode: 'direct_post',
-          response_uri: 'https://verifier.example.com/cb',
-        }),
-      })
-    ).toMatchObject({ type: 'openid4vp', provided: 'uri' })
-  })
-
-  test('parses an unsigned uri request with a legacy redirect_uri client_id_scheme', () => {
-    expect(
-      parseOpenid4vpAuthorizationRequest({
-        authorizationRequest: uriRequest({
-          client_id: 'https://verifier.example.com/cb',
-          client_id_scheme: 'redirect_uri',
-          response_mode: 'direct_post',
-          response_uri: 'https://verifier.example.com/cb',
-        }),
-      })
-    ).toMatchObject({ type: 'openid4vp', provided: 'uri' })
-  })
-
-  test('rejects an unsigned uri request with a client id prefix that requires a signed request (OpenID4VP 1.0 Section 5.9.3)', () => {
-    expect(() =>
-      parseOpenid4vpAuthorizationRequest({
-        authorizationRequest: uriRequest({
-          client_id: 'x509_san_dns:verifier.example.com',
-          response_mode: 'direct_post',
-          response_uri: 'https://verifier.example.com/cb',
-        }),
-      })
-    ).toThrow(Oauth2ServerErrorResponseError)
-  })
-
-  test('accepts the same request with a client id prefix that requires signing when passed as an object', () => {
-    expect(
-      parseOpenid4vpAuthorizationRequest({
-        authorizationRequest: {
-          response_type: 'vp_token',
-          nonce: 'nonce',
-          client_id: 'x509_san_dns:verifier.example.com',
-          response_mode: 'direct_post',
-          response_uri: 'https://verifier.example.com/cb',
-        },
-      })
-    ).toMatchObject({ type: 'openid4vp', provided: 'params' })
-  })
-
-  test('rejects a DC API request passed as a uri (OpenID4VP 1.0 Appendix A.2)', () => {
+  test('rejects a DC API request passed as a uri (OpenID4VP 1.0 Appendix A.3)', () => {
     expect(() =>
       parseOpenid4vpAuthorizationRequest({
         authorizationRequest: uriRequest({
@@ -102,7 +50,20 @@ describe('Parse Authorization Request Params', () => {
     ).toThrow(/must be passed as a JSON object/)
   })
 
-  test('parses a DC API request passed as an object (OpenID4VP 1.0 Appendix A.2)', () => {
+  test('rejects an IAE request passed as a uri (OpenID4VCI 1.1 Section 6.2.1.1)', () => {
+    expect(() =>
+      parseOpenid4vpAuthorizationRequest({
+        authorizationRequest: uriRequest({
+          client_id: 'issuer-client',
+          response_mode: 'iae_post',
+          expected_url: 'https://issuer.example.com/iae',
+          dcql_query: JSON.stringify({ credentials: [] }),
+        }),
+      })
+    ).toThrow(/must be passed as a JSON object/)
+  })
+
+  test('parses a DC API request passed as an object (OpenID4VP 1.0 Appendix A.3)', () => {
     expect(
       parseOpenid4vpAuthorizationRequest({
         authorizationRequest: {
