@@ -37,6 +37,11 @@ export class Issuer {
      * ISO/IEC 18013-5 second edition (CD), 12.3.6.
      */
     status?: Status | StatusOptions
+    /**
+     * Add a SHA-256 `x5t` of the leaf certificate to the protected header, as the second edition of
+     * ISO/IEC 18013-5 recommends. Off by default, as the first edition has nothing but `alg` there.
+     */
+    includeX5t?: boolean
   }): Promise<IssuerSigned> {
     const signingKey = options.signingKey instanceof CoseKey ? options.signingKey : CoseKey.fromJwk(options.signingKey)
     return await this.isb.sign({ ...options, signingKey })

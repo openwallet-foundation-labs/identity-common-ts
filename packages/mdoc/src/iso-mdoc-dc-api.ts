@@ -39,7 +39,7 @@ import {
 import { verifyAgeOverRequestLimit } from './utils/ageOver'
 import type { DeviceRequestMatchOptions } from './utils/matchDeviceRequest'
 import { verifyVersion } from './utils/version'
-import { x5chainHeaderValue } from './utils/x5chain'
+import { x5chainHeaderValue, x5tHeaderValue } from './utils/x5chain'
 
 /**
  * DC API protocol identifier for ISO/IEC TS 18013-7:2025 Annex C.
@@ -157,6 +157,11 @@ export class IsoMdocDcApi {
         signingKey: CoseKey
         certificateChain: Array<Uint8Array>
         origin: string
+        /**
+         * Add a SHA-256 `x5t` of the leaf certificate to the protected header, as the second edition of
+         * ISO/IEC 18013-5 recommends. Off by default, as the first edition has nothing but `alg` there.
+         */
+        includeX5t?: boolean
       }
     },
     ctx: Pick<MdocContext, 'crypto' | 'cose'>
@@ -187,13 +192,18 @@ export class IsoMdocDcApi {
           return DocRequest.create({ itemsRequest })
         }
 
-        const { signingKey, certificateChain } = options.readerAuth
+        const { signingKey, certificateChain, includeX5t } = options.readerAuth
         const unprotectedHeaders = UnprotectedHeaders.create({})
         unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.X5Chain, x5chainHeaderValue(certificateChain))
 
         const readerAuth = (await ReaderAuth.create({
           protectedHeaders: ProtectedHeaders.create({
-            protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, signingKey.algorithm]]),
+            protectedHeaders: new Map<number, unknown>([
+              [RegisteredCwtHeaderClaimKey.Algorithm, signingKey.algorithm],
+              ...(includeX5t
+                ? [[RegisteredCwtHeaderClaimKey.X5T, await x5tHeaderValue(certificateChain, ctx)] as [number, unknown]]
+                : []),
+            ]),
           }),
           unprotectedHeaders,
           payload: null,
