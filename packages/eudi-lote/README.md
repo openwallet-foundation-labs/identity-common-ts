@@ -25,11 +25,15 @@ This SDK implements the ETSI TS 119 602 standard for LoTE documents, enabling:
 | [EU PID Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pid-providers.json) (EC acceptance) | `LoteProfile.EuPidProvidersList` | `strict` |
 | [EU Wallet Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wallet-providers.json) (EC acceptance) | `LoteProfile.EuWalletProvidersList` | `strict` |
 | [EU WRPAC Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wrpac-providers.json) (EC acceptance) | `LoteProfile.EuWrpacProvidersList` | `strict` |
-| [EU Pub-EAA Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pub-eaa-providers.json) (EC acceptance) | `LoteProfile.EuPubEaaProvidersList` | `strict` |
+| [EU Pub-EAA Providers](https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pub-eaa-providers.json) (EC acceptance) | `LoteProfile.EuPubEaaProvidersList` | `compat` |
 | [German PID Providers](https://trustlists.eudihub.de/pid-provider.jwt) | `LoteProfile.EuPidProvidersList` | `compat`, `allowedTerritories: ['DE']` |
 | [German Wallet Providers](https://trustlists-sandbox.eudihub.de/wallet-provider.jwt) (sandbox) | `LoteProfile.EuWalletProvidersList` | `compat`, `allowedTerritories: ['DE']` |
 | [Norwegian PID Providers](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_pid.jws) (sandbox) | `LoteProfile.EuPidProvidersList` | `compat`, `allowedTerritories: ['NO']` |
 | [Norwegian Access Certificate Authorities](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_aca.jws) (sandbox) | `LoteProfile.EuWrpacProvidersList` | `compat`, `allowedTerritories: ['NO']` |
+| [French PID Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/PIDProviders.jwt) (sandbox) | `LoteProfile.EuPidProvidersList` | `strict` |
+| [French WRPAC Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/WRPACProviders.jwt) (sandbox) | `LoteProfile.EuWrpacProvidersList` | `strict` |
+| [French WRPRC Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/WRPRCProviders.jwt) (sandbox) | `LoteProfile.EuWrprcProvidersList` | `strict` |
+| [French Pub-EAA Providers](https://api.playground.france-identite.gouv.fr/france-titres/registry/lote/PubEAAProviders.jwt) (sandbox) | `LoteProfile.EuPubEaaProvidersList` | `compat` |
 | [Norwegian Wallet Providers](https://tillitsliste.test.eidas2sandkasse.net/no_eidas2sandkasse_test_wallet.jws) (sandbox) | `EUWalletProvidersList` | Not supported: its trusted entity has no `TrustedEntityServices`, which the JSON schema requires |
 
 ## Installation
@@ -312,6 +316,8 @@ Options:
 | A `PolicyOrLegalNotice` item with both `LoTEPolicy` and `LoTELegalNotice` | All, and `validateLote` | The German EUDI Wallet sandbox lists |
 | A `ServiceStatus` of `http://uri.etsi.org/19602/PidProvidersList/SvcStatus/notified`, with an optional `StatusStartingTime` | EU PID Providers List | No profile defines this status. The German PID Providers List sets it |
 | A `SchemeTerritory` other than `EU` | All | Only the values passed in `allowedTerritories`, such as `['DE']` |
+| The `http://uri.etsi.org/19602/ListOfTrustedEntities/PubEAAProvider/CC` URI in `TEInformationURI` | EU Pub-EAA Providers List | TS 119 602 H.2 puts it in `TEAddress.TEElectronicAddress`. The EC Pub-EAA Providers List puts it in `TEInformationURI`, as the other profiles do |
+| No `HistoricalInformationPeriod` | EU Pub-EAA Providers List | TS 119 602 H requires it with value `65535`. The French sandbox list leaves it out. Any other value is still rejected |
 
 A Pub-EAA Providers List gives every service a `ServiceStatus` (TS 119 602 H), and a withdrawn provider stays listed with `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/withdrawn`. The list is still valid: only trust services with `http://uri.etsi.org/19602/PubEAAProvidersList/SvcStatus/notified`. The valid result of a Pub-EAA Providers List has the trusted entities with only their notified services as `notifiedTrustedEntities`.
 
