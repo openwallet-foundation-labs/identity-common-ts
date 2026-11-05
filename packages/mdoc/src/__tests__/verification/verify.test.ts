@@ -576,7 +576,9 @@ suite('Verification', () => {
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
     const verification = verifyIssuerSigned(credential)
-    await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
+    await expect(verification).rejects.toThrow(
+      `Verifying the status list ${uri} failed: Status for id '${idx}' is not Valid (0), but is instead '1'`
+    )
     await expect(verification).rejects.toMatchObject({
       assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Invalid } },
     })
