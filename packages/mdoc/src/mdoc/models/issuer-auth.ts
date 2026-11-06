@@ -5,6 +5,7 @@ import {
   Sign1,
   type Sign1EncodedStructure,
   type Sign1Options,
+  verifyX5t,
   zUint8Array,
 } from '@owf/cose'
 import { compareBytes } from '@owf/identity-common'
@@ -207,6 +208,16 @@ export class IssuerAuth extends Sign1 {
       check: "Country name (C) must be present in the issuer certificate's subject distinguished name",
     })
 
+    // ISO/IEC 18013-5 (second edition) § 12.3.4: an x5t, if present, shall use SHA-256. The x5chain
+    // stays in the unprotected header without one, as the first edition requires.
+    const x5tCheck = 'The x5t in the protected header, if present, must be SHA-256 and match the issuer certificate'
+    try {
+      await verifyX5t(this, this.certificate, ctx.crypto)
+      onCheck({ status: 'PASSED', check: x5tCheck })
+    } catch (err) {
+      onCheck({ status: 'FAILED', check: x5tCheck, reason: err instanceof Error ? err.message : 'Unknown error' })
+    }
+
     let trustedStatusCertificates: Uint8Array[] | undefined
     let trustedIssuanceChain: Uint8Array[] | undefined
     if (!disableCertificateChainValidation) {
@@ -271,10 +282,19 @@ export class IssuerAuth extends Sign1 {
           ctx
         ))
       } catch (err) {
+        // The default callback throws the reason without the check, so the reason names the lists.
+        const { statusList: statusListInfo, identifierList: identifierListInfo } =
+          this.mobileSecurityObject.status ?? {}
+        const lists = [
+          statusListInfo && `status list ${statusListInfo.uri}`,
+          identifierListInfo && `identifier list ${identifierListInfo.uri}`,
+        ]
+          .filter(Boolean)
+          .join(' and ')
         onCheck({
           status: 'FAILED',
           check: 'Status information must be valid',
-          reason: err instanceof Error ? err.message : 'Unknown error',
+          reason: `Verifying the ${lists} failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
           result: this.revocationResult(err),
         })
       }

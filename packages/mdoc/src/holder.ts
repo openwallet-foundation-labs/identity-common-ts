@@ -71,7 +71,7 @@ export class Holder {
        */
       now?: Date
     },
-    ctx: Pick<MdocContext, 'cose' | 'x509'>
+    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto'>
   ) {
     const deviceRequest =
       options.deviceRequest instanceof DeviceRequest
