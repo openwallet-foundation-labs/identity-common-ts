@@ -1,4 +1,4 @@
-import { cborEncode } from '@owf/cose'
+import { cborEncode, HashAlgorithm } from '@owf/cose'
 import { base64url, hex } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
 import {
@@ -639,6 +639,94 @@ describe('IsoMdocDcApi input handling', () => {
         mdocContext
       )
     ).rejects.toThrow(InvalidDcApiResponseError)
+  })
+
+  describe('x5t (18013-5 second edition 12.5.4)', () => {
+    const x5tCheck = 'The x5t in the protected header, if present, must be SHA-256 and match the reader certificate'
+
+    test('includeX5t adds a SHA-256 x5t of the reader certificate that verifies', async () => {
+      const { readerKey, readerCertificate } = await createReaderCertificate()
+      const { request, deviceRequest } = await IsoMdocDcApi.createRequest(
+        {
+          docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
+          recipientPublicKey,
+          readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin, includeX5t: true },
+        },
+        mdocContext
+      )
+
+      expect(
+        deviceRequest.docRequests[0].readerAuth?.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5T)
+      ).toEqual([
+        HashAlgorithm.SHA256,
+        await mdocContext.crypto.digest({ digestAlgorithm: 'SHA-256', bytes: readerCertificate }),
+      ])
+
+      const checks: Array<VerificationAssessment> = []
+      await IsoMdocDcApi.parseRequest(
+        {
+          request,
+          origin,
+          trustedReaderCertificates: [readerCertificate],
+          verificationCallback: (check) => checks.push(check),
+        },
+        mdocContext
+      )
+
+      expect(checks.filter((check) => check.status === 'FAILED')).toStrictEqual([])
+      expect(checks.find((check) => check.check === x5tCheck)?.status).toBe('PASSED')
+    })
+
+    test('without includeX5t the protected header has only alg', async () => {
+      const { readerKey, readerCertificate } = await createReaderCertificate()
+      const { deviceRequest } = await IsoMdocDcApi.createRequest(
+        {
+          docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
+          recipientPublicKey,
+          readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin },
+        },
+        mdocContext
+      )
+
+      expect([...(deviceRequest.docRequests[0].readerAuth?.protectedHeaders.headers.keys() ?? [])]).toEqual([
+        RegisteredCwtHeaderClaimKey.Algorithm,
+      ])
+    })
+
+    test('an x5t that is not SHA-256 FAILS', async () => {
+      const { readerKey, readerCertificate } = await createReaderCertificate()
+      const { request, deviceRequest } = await IsoMdocDcApi.createRequest(
+        {
+          docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
+          recipientPublicKey,
+          readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin, includeX5t: true },
+        },
+        mdocContext
+      )
+
+      const x5t = deviceRequest.docRequests[0].readerAuth?.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5T)
+      // SHA-512 (-44)
+      deviceRequest.docRequests[0].readerAuth?.protectedHeaders.headers.set(RegisteredCwtHeaderClaimKey.X5T, [
+        -44,
+        (x5t as [number, Uint8Array])[1],
+      ])
+
+      const checks: Array<VerificationAssessment> = []
+      await IsoMdocDcApi.parseRequest(
+        {
+          request: { ...request, deviceRequest: base64url.encode(deviceRequest.encode()) },
+          origin,
+          trustedReaderCertificates: [readerCertificate],
+          verificationCallback: (check) => checks.push(check),
+        },
+        mdocContext
+      )
+
+      expect(checks.find((check) => check.check === x5tCheck)).toMatchObject({
+        status: 'FAILED',
+        reason: "The x5t of the protected header uses hash algorithm '-44', only SHA-256 (-16) is supported",
+      })
+    })
   })
 
   test('reader auth without a certificate FAILS through the verification callback', async () => {
