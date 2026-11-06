@@ -1,9 +1,8 @@
 import { JoseSignatureVerificationError, JoseValidationError } from '@owf/jose'
 import { describe, expect, it } from 'vitest'
-import { StatusListEntryNotValidError } from '../status-list-error'
 import { decodeStatusListJwt, verifyStatusListJwt } from '../status-list-jwt'
 import { StatusType } from '../types'
-import { claimIssue, verifyJws } from './context'
+import { claimIssue, statusListIssue, verifyJws } from './context'
 import {
   now,
   signStatusListToken,
@@ -27,7 +26,7 @@ describe('verifyStatusListJwt with a decoded token', () => {
 
     const verification = verifyStatusListJwt({ jwt: decoded, uri, now, idx: 3, verifyJwsCallback: verifyJws })
 
-    await expect(verification).rejects.toThrow(StatusListEntryNotValidError)
+    await expect(verification).rejects.toEqual(statusListIssue('status_not_valid', { idx: 3, status: 1 }))
     await expect(verification).rejects.toThrow("Status for id '3' is not Valid (0), but is instead '1'")
   })
 

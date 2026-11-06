@@ -11,7 +11,7 @@ import { StatusListCwt } from '../../cbor/status-list-cwt'
 import { StatusListCwtClaimKey } from '../../cbor/status-list-cwt-payload'
 import { StatusListError } from '../../status-list-error'
 import { StatusListMediaTypes } from '../../types'
-import { otherSignKey, sign1Context, signKey } from '../context'
+import { otherSignKey, sign1Context, signKey, statusListIssue } from '../context'
 
 // `lst` is only decompressed once the signature verified, as in status-list-jwt-decompression.test.ts
 
@@ -79,8 +79,8 @@ describe('StatusListCwt', () => {
   test('rejects a verified token whose status list cannot be decompressed', async () => {
     const cwt = StatusListCwt.fromToken(await signedToken({ lst: notCompressedLst }))
 
-    await expect(cwt.verify({ key: signKey, uri, now, idx: 0 }, { sign1: sign1Context })).rejects.toThrow(
-      'Decompression failed'
+    await expect(cwt.verify({ key: signKey, uri, now, idx: 0 }, { sign1: sign1Context })).rejects.toEqual(
+      statusListIssue('invalid_status_list')
     )
   })
 })

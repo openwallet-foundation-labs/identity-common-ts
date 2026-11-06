@@ -19,9 +19,7 @@ import {
   zStatusListJwtHeader,
   zStatusListJwtPayload,
 } from './jwt-types'
-import { StatusList } from './status-list'
-import { StatusListEntryNotValidError, StatusListError } from './status-list-error'
-import { StatusType } from './types'
+import { StatusList, verifyStatusValid } from './status-list'
 
 type StatusListJwtHeaderSchema = typeof zStatusListJwtHeader
 type StatusListJwtPayloadSchema = typeof zStatusListJwtPayload
@@ -78,7 +76,10 @@ export async function signStatusListJwt({
 }
 
 export type DecodeStatusListJwtResult = DecodeJwtResult<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema> & {
-  /** Decompressed on first read, so read it only once the token verified. */
+  /**
+   * Decompressed on first read, so read it only once the token verified. Throws a `StatusListValidationError`
+   * when `lst` is not a compressed status list.
+   */
   readonly statusList: StatusList
 }
 
@@ -97,13 +98,7 @@ export function decodeStatusListJwt(jwt: string): DecodeStatusListJwtResult {
     ...decoded,
     get statusList() {
       if (statusList) return statusList
-      try {
-        statusList = StatusList.decompressStatusListFromBytes(base64url.decode(lst), bits, aggregation_uri)
-      } catch (error) {
-        throw Object.assign(new StatusListError('The status list token has no valid status_list claim'), {
-          cause: error,
-        })
-      }
+      statusList = StatusList.decompressStatusListFromBytes(base64url.decode(lst), bits, aggregation_uri)
       return statusList
     },
   }
@@ -150,8 +145,8 @@ export type VerifyStatusListJwtResult = VerifyJwtResult<StatusListJwtHeaderSchem
  * `uri`, and the status at `idx` when given. The list is decompressed only once the token verified.
  *
  * @throws JoseParseError, JoseValidationError or JoseVerificationError if the token does not verify.
- * @throws StatusListError if the status list cannot be decompressed.
- * @throws StatusListEntryNotValidError if the status at `idx` is not `Valid`.
+ * @throws StatusListValidationError if the status list cannot be decompressed (`invalid_status_list`), or `idx`
+ *   is not in it (`index_out_of_range`) or its status is not `Valid` (`status_not_valid`).
  */
 export async function verifyStatusListJwt({
   jwt,
@@ -169,15 +164,7 @@ export async function verifyStatusListJwt({
   })
 
   const statusList = decoded.statusList
-  if (idx !== undefined) {
-    const status = statusList.getStatus(idx)
-    if (status !== StatusType.Valid) {
-      throw new StatusListEntryNotValidError(
-        `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`,
-        { idx, status }
-      )
-    }
-  }
+  if (idx !== undefined) verifyStatusValid(statusList, idx)
 
   return { ...verified, statusList }
 }

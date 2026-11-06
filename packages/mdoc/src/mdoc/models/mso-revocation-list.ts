@@ -16,6 +16,7 @@ import {
   StatusListError,
   type StatusListInfo,
   type StatusListJwtPayload,
+  StatusListValidationError,
   StatusType,
   type VerifyStatusListJwtOptions,
   verifyStatusListJwt as verifyTokenStatusListJwt,
@@ -54,7 +55,12 @@ async function asMdlRevocationListError<T>(
     if (error instanceof CoseX5ChainNotBoundError) throw new UnprotectedX5ChainNotBoundError(error.message)
     // The cause is what the verification callback threw, already an mdoc error
     if (error instanceof JoseSignatureVerificationError) throw error.cause ?? new invalidSignatureError(error.message)
-    if (error instanceof StatusListError || error instanceof JoseError || error instanceof JoseValidationError) {
+    if (
+      error instanceof StatusListError ||
+      error instanceof StatusListValidationError ||
+      error instanceof JoseError ||
+      error instanceof JoseValidationError
+    ) {
       throw new InvalidRevocationListError(error.message)
     }
     throw error

@@ -12,6 +12,7 @@ import {
   type VerifyJwsCallback,
 } from '@owf/jose'
 import { expect } from 'vitest'
+import { StatusListValidationError, type StatusListValidationIssue } from '../status-list-error'
 
 const jwsKeyPair = p256.keygen()
 // The uncompressed point is 0x04 || x || y
@@ -40,6 +41,13 @@ export const claimIssue = (claim: string, code: JoseValidationIssue['code']) =>
   expect.objectContaining({
     name: JoseValidationError.name,
     issues: expect.arrayContaining([expect.objectContaining({ code, path: [claim] })]),
+  })
+
+/** Matches a `StatusListValidationError` with an issue of `code`, with `context` when given. */
+export const statusListIssue = (code: StatusListValidationIssue['code'], context?: object) =>
+  expect.objectContaining({
+    name: StatusListValidationError.name,
+    issues: [expect.objectContaining({ code, ...(context && { context }) })],
   })
 
 export const sign1Context: Sign1Context = {

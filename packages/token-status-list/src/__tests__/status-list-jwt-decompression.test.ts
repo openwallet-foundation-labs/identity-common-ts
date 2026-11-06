@@ -3,10 +3,9 @@ import { JoseSignatureVerificationError, JoseValidationError } from '@owf/jose'
 import { deflate } from 'pako'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { StatusList } from '../status-list'
-import { StatusListEntryNotValidError, StatusListError } from '../status-list-error'
 import { decodeStatusListJwt, verifyStatusListJwt } from '../status-list-jwt'
 import { StatusType } from '../types'
-import { claimIssue, verifyJws } from './context'
+import { claimIssue, statusListIssue, verifyJws } from './context'
 import {
   notCompressedLst,
   now,
@@ -86,9 +85,7 @@ describe('verifyStatusListJwt', () => {
 
     const verification = verifyStatusListJwt({ jwt, uri, now, verifyJwsCallback: verifyJws })
 
-    await expect(verification).rejects.toThrow(StatusListError)
-    await expect(verification).rejects.toThrow('The status list token has no valid status_list claim')
-    await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
+    await expect(verification).rejects.toEqual(statusListIssue('invalid_status_list'))
   })
 })
 
@@ -112,8 +109,7 @@ describe('decodeStatusListJwt', () => {
   it('decompresses the status list when it is first read', async () => {
     const decoded = decodeStatusListJwt(await signStatusListToken({ status_list: { bits: 1, lst: notCompressedLst } }))
 
-    expect(() => decoded.statusList).toThrow(StatusListError)
-    expect(() => decoded.statusList).toThrow('The status list token has no valid status_list claim')
+    expect(() => decoded.statusList).toThrow(statusListIssue('invalid_status_list'))
   })
 
   it('returns the same status list every time it is read', async () => {

@@ -1,6 +1,6 @@
 import { deflate, inflate } from 'pako'
-import { StatusListError } from './status-list-error'
-import type { BitsPerStatus, StatusType } from './types'
+import { STATUS_LIST_VALIDATION_CODES, StatusListError, StatusListValidationError } from './status-list-error'
+import { type BitsPerStatus, StatusType } from './types'
 
 /**
  * A status takes exactly `bitsPerStatus` bits, so it must be an integer from 0 to 2^bitsPerStatus - 1.
@@ -12,6 +12,44 @@ function assertStatusValue(value: number, bitsPerStatus: BitsPerStatus, index: n
     throw new StatusListError(
       `Status value out of range at index ${index} with value ${value}, expected an integer from 0 to ${max} for ${bitsPerStatus} bits per status`
     )
+  }
+}
+
+// Draft 16 § 8.3: an index outside the list must reject the Referenced Token, and NaN or a fraction would read undefined
+function isIndexOf(statusList: StatusList, index: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index < statusList.totalStatuses
+}
+
+/**
+ * Verifies that the status at `idx`, the index of a Referenced Token, is Valid (Token Status List § 8.3).
+ *
+ * @throws StatusListValidationError with an `index_out_of_range` or `status_not_valid` issue.
+ */
+export function verifyStatusValid(statusList: StatusList, idx: number): void {
+  const { totalStatuses } = statusList
+  if (!isIndexOf(statusList, idx)) {
+    throw new StatusListValidationError('The Referenced Token is not in the status list', [
+      {
+        severity: 'error',
+        path: [],
+        code: STATUS_LIST_VALIDATION_CODES.INDEX_OUT_OF_RANGE,
+        message: `Index out of bounds: ${idx} is not an index of a list of ${totalStatuses} statuses`,
+        context: { idx, totalStatuses },
+      },
+    ])
+  }
+
+  const status = statusList.getStatus(idx)
+  if (status !== StatusType.Valid) {
+    throw new StatusListValidationError('The Referenced Token is not Valid', [
+      {
+        severity: 'error',
+        path: [],
+        code: STATUS_LIST_VALIDATION_CODES.STATUS_NOT_VALID,
+        message: `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`,
+        context: { idx, status },
+      },
+    ])
   }
 }
 
@@ -71,9 +109,8 @@ export class StatusList {
     this.#isModified = true
   }
 
-  // Draft 16 § 8.3: an index outside the list must reject the Referenced Token, and NaN or a fraction would read undefined
   private assertIndex(index: number): void {
-    if (!Number.isInteger(index) || index < 0 || index >= this.totalStatuses) {
+    if (!isIndexOf(this, index)) {
       throw new StatusListError(
         `Index out of bounds: ${index} is not an index of a list of ${this.totalStatuses} statuses`
       )
@@ -86,7 +123,11 @@ export class StatusList {
     return deflate(byteArray, { level: 9 })
   }
 
-  /** Decompress a raw byte array and return a new StatusList instance. */
+  /**
+   * Decompress a raw byte array and return a new StatusList instance.
+   *
+   * @throws StatusListValidationError with an `invalid_status_list` issue if the bytes are not a compressed status list.
+   */
   static decompressStatusListFromBytes(
     compressed: Uint8Array,
     bitsPerStatus: BitsPerStatus,
@@ -97,7 +138,14 @@ export class StatusList {
       const statusList = StatusList.decodeStatusListFromByteArray(decompressed, bitsPerStatus)
       return new StatusList(statusList, bitsPerStatus, aggregationUri)
     } catch (err: unknown) {
-      throw new Error(`Decompression failed: ${err}`)
+      throw new StatusListValidationError('The status list cannot be decompressed', [
+        {
+          severity: 'error',
+          path: [],
+          code: STATUS_LIST_VALIDATION_CODES.INVALID_STATUS_LIST,
+          message: `Not a status list compressed with zlib: ${err instanceof Error ? err.message : String(err)}`,
+        },
+      ])
     }
   }
 

@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { StatusList } from '../status-list'
-import { StatusListEntryNotValidError, StatusListError } from '../status-list-error'
 import { verifyStatusListJwt } from '../status-list-jwt'
 import { type BitsPerStatus, StatusType } from '../types'
-import { verifyJws } from './context'
+import { statusListIssue, verifyJws } from './context'
 import { now, signStatusListToken, statusListClaim, statusListWith, uri } from './status-list-jwt-tokens'
 
 // The status at `idx` in a signed Status List Token, checked by `verifyStatusListJwt`
@@ -18,10 +17,8 @@ const verifyStatusAt = async (idx: number | undefined, statusList: StatusList) =
   })
 
 const expectNotValid = async (verification: Promise<unknown>, idx: number, status: number) => {
-  await expect(verification).rejects.toThrow(StatusListEntryNotValidError)
+  await expect(verification).rejects.toEqual(statusListIssue('status_not_valid', { idx, status }))
   await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '${status}'`)
-  await expect(verification).rejects.toThrow(StatusListError)
-  await expect(verification).rejects.toMatchObject({ idx, status })
 }
 
 describe('verifyStatusListJwt with an idx', () => {
@@ -82,6 +79,8 @@ describe('verifyStatusListJwt with an idx', () => {
   })
 
   it('rejects an idx beyond the end of the list', async () => {
-    await expect(verifyStatusAt(16, statusListWith())).rejects.toThrow('Index out of bounds')
+    await expect(verifyStatusAt(16, statusListWith())).rejects.toEqual(
+      statusListIssue('index_out_of_range', { idx: 16, totalStatuses: 16 })
+    )
   })
 })

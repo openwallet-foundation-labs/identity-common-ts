@@ -196,6 +196,20 @@ statusList.getStatus(42) // 1
 
 `verifyStatusListJwt` decompresses the list only once the token verified, as a small `lst` can inflate to a very large list. `decodeStatusListJwt` reads a token without verifying it, for example to pick the key. Its `statusList` is decompressed when first read.
 
+A status that is not Valid, an `idx` outside the list and an `lst` that cannot be decompressed throw a `StatusListValidationError`. Check the `code` of its issue, one of `STATUS_LIST_VALIDATION_CODES`. `verify` of a `StatusListCwt` throws the same.
+
+```typescript
+import { StatusListValidationError } from '@owf/token-status-list'
+
+try {
+  await verifyStatusListJwt({ jwt, uri: 'https://issuer.example/statuslists/1', idx: 42, verifyJwsCallback })
+} catch (error) {
+  if (!(error instanceof StatusListValidationError)) throw error
+  const notValid = error.findIssue('status_not_valid')
+  if (notValid) notValid.context.status // 1, the token is revoked
+}
+```
+
 ### JWT transport — read the status of a Referenced Token
 
 ```typescript
@@ -277,6 +291,8 @@ them. Callers that need the original logical length must preserve it separately.
 | `FeistelStatusListIndexAllocatorState` | Restorable FF1 allocator state type |
 | `EncryptBlock` | Type of the `encryptBlock` callback: AES on one 16-byte block |
 | `StatusListError` | Error class thrown by status-list operations |
+| `StatusListValidationError` | Thrown when a status list cannot be decompressed, or does not give a Referenced Token a Valid status |
+| `STATUS_LIST_VALIDATION_CODES` | Its issue codes: `invalid_status_list`, `index_out_of_range` (`{ idx, totalStatuses }`) and `status_not_valid` (`{ idx, status }`) |
 | `StatusType` | Enum of the status values: `Valid`, `Invalid`, `Suspended`, … |
 | `StatusListMediaTypes` | MIME types for JWT and CWT status list tokens |
 | `BitsPerStatus` | Type: `1 \| 2 \| 4 \| 8` |

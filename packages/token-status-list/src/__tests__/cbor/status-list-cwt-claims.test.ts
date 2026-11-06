@@ -5,7 +5,7 @@ import { type CreateStatusListCwtPayloadOptions, StatusListCwtPayload } from '..
 import { StatusList } from '../../status-list'
 import { StatusListError } from '../../status-list-error'
 import { StatusType } from '../../types'
-import { otherSignKey, sign1Context, signKey } from '../context'
+import { otherSignKey, sign1Context, signKey, statusListIssue } from '../context'
 
 const uri = 'https://example.com/statuslists/1'
 const now = new Date('2026-01-01T12:00:00.000Z')
@@ -75,7 +75,9 @@ describe('StatusListCwtPayload.verifyClaims', () => {
   })
 
   test('rejects an index that is not valid', () => {
-    expect(() => payload({ statusList: statusList([3]) }).verifyStatus(3)).toThrow("Status for id '3' is not Valid")
+    expect(() => payload({ statusList: statusList([3]) }).verifyStatus(3)).toThrow(
+      statusListIssue('status_not_valid', { idx: 3, status: 1 })
+    )
     expect(() => payload({ statusList: statusList([3]) }).verifyStatus(2)).not.toThrow()
   })
 })

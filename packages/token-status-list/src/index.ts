@@ -43,7 +43,12 @@ export {
   zStatusListReference,
 } from './jwt-types'
 export { StatusList } from './status-list'
-export { StatusListEntryNotValidError, StatusListError } from './status-list-error'
+export type {
+  StatusListValidationCode,
+  StatusListValidationContexts,
+  StatusListValidationIssue,
+} from './status-list-error'
+export { STATUS_LIST_VALIDATION_CODES, StatusListError, StatusListValidationError } from './status-list-error'
 export type {
   StatusListIndexAllocatorContext,
   StatusListIndexAllocatorOptions,
