@@ -40,9 +40,12 @@
     "build": "tsdown src/index.ts --format esm --dts --sourcemap"
   },
   "dependencies": {
+    "@owf/cose": "workspace:^",
     "@owf/crypto": "workspace:^",
     "@owf/eudi-jades": "workspace:*",
     "@owf/identity-common": "workspace:^",
+    "@owf/jose": "workspace:^",
+    "@owf/token-status-list": "workspace:^",
     "dcql": "workspace:^",
     "zod": "catalog:"
   }

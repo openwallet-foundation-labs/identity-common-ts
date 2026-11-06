@@ -7,6 +7,7 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
+import { SignatureAlgorithm } from '@owf/cose'
 import { zTyp } from '@owf/identity-common'
 import { z } from 'zod'
 
@@ -75,8 +76,11 @@ export const zProvidedAttestation = zCredential.omit({ claim: true }).strict()
  * Status list reference for certificate validity
  */
 export const zStatusList = z.object({
-  /** Index in the status list */
-  idx: z.number().int().nonnegative(),
+  /**
+   * Index in the status list. GEN-6.2.6.1-04 calls it a numeric string, while the Annex C example and
+   * the Token Status List use an integer, so both are read as a number.
+   */
+  idx: z.union([z.number(), z.string().regex(/^\d+$/).transform(Number)]).pipe(z.number().int().nonnegative()),
   /** URI to the status list */
   uri: z.url(),
 })
@@ -244,8 +248,8 @@ export const zRegistrationCertificateJwtHeader = z.object({
 export const zRegistrationCertificateCwtHeader = z.object({
   /** Type of the Web Token - must be "rc-wrp+cwt" for CWT */
   typ: z.literal('rc-wrp+cwt'),
-  /** Algorithm used to sign the CWT per RFC 9052 */
-  alg: z.number().int(),
+  /** Signature algorithm of the CWT per RFC 9052 */
+  alg: z.enum(SignatureAlgorithm),
   /** Certificate chain to verify the CWT per RFC 9360 */
   x5chain: z.array(z.instanceof(Uint8Array)).min(1),
   /** Unix timestamp indicating when the registration certificate was issued (payload field, not in Table 6) */

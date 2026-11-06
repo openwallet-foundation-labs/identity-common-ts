@@ -1,19 +1,28 @@
-import { ES256, hasher, parseCertificateChain, sha256, sha512 } from '@owf/crypto'
-import { base64urlEncode } from '@owf/identity-common'
+import { ES256, parseCertificateChain } from '@owf/crypto'
+import { base64urlEncode, bytesToString } from '@owf/identity-common'
+import {
+  JoseParseError,
+  JoseSignatureVerificationError,
+  JoseValidationError,
+  type JwsSigner,
+  type SignJwsCallback,
+  type VerifyJwsCallback,
+} from '@owf/jose'
 import { describe, expect, it } from 'vitest'
 import {
   DETACHED_MECHANISM_IDS,
+  decodeJades,
   generateSigX5ts,
   generateX5tO,
   generateX5tS256,
-  JadesError,
   JadesProfile,
-  Token,
+  type JadesSerialization,
+  JadesValidationError,
+  type SignJadesOptions,
+  signJades,
   validateProfile,
-  verify,
-  verifyCompact,
-  verifyFlattened,
-  verifyGeneral,
+  verifyJades,
+  verifyJadesJwt,
   zEtsiU,
   zProtectedHeader,
   zProtectedHeaderForSigning,
@@ -49,6 +58,8 @@ const TEST_PUBLIC_KEY = {
   crv: 'P-256',
 }
 const certs = parseCertificateChain(TEST_CERT)
+const signWith = await ES256.getSigner(TEST_PRIVATE_KEY)
+const verifyWith = await ES256.getVerifier(TEST_PUBLIC_KEY)
 const claimedAt = 1_780_000_000
 
 const protectedHeader = (): ProtectedHeaderParams => ({ alg: 'ES256', x5c: certs, iat: claimedAt })
@@ -115,112 +126,158 @@ describe('normative component schemas', () => {
   })
 })
 
-describe('Token and verification', () => {
-  it('creates and verifies compact, general, and flattened serializations', async () => {
-    const token = new Token({ hello: 'world' }).setProtectedHeader(protectedHeader())
-    const signer = await ES256.getSigner(TEST_PRIVATE_KEY)
-    const verifier = await ES256.getVerifier(TEST_PUBLIC_KEY)
-    await token.sign(signer)
+describe('signing and verification', () => {
+  const signer: JwsSigner = { method: 'x5c', alg: 'ES256', x5c: certs }
+  const signJwsCallback: SignJwsCallback = async (_, { signingInput }) => ({
+    signature: await signWith(signingInput),
+    signerJwk: TEST_PUBLIC_KEY,
+  })
+  const verifyJwsCallback: VerifyJwsCallback = async (_, { signingInput, signature }) =>
+    (await verifyWith(signingInput, signature)) ? { verified: true, signerJwk: TEST_PUBLIC_KEY } : { verified: false }
 
-    const compact = token.toString()
-    const general = token.toJSON()
-    const flattened = token.toFlattenedJson()
-    expect((await verifyCompact<{ hello: string }>(compact, verifier)).payload.hello).toBe('world')
-    expect((await verifyGeneral(general, verifier)).valid).toBe(true)
-    expect((await verifyFlattened(flattened, verifier)).valid).toBe(true)
-    expect((await verify(JSON.stringify(flattened), verifier)).valid).toBe(true)
+  const sign = <Serialization extends JadesSerialization = 'compact'>(
+    options: Partial<SignJadesOptions<Serialization>> = {}
+  ) =>
+    signJades<Serialization>({
+      payload: { hello: 'world' },
+      signingTime: claimedAt,
+      signer,
+      signJwsCallback,
+      ...options,
+    })
+
+  it.each(['compact', 'flattened', 'general'] as const)(
+    'signs and verifies a %s serialization',
+    async (serialization) => {
+      const { jws, protectedHeader } = await sign({ serialization })
+
+      const verified = await verifyJades({ jws, verifyJwsCallback })
+
+      expect(JSON.parse(bytesToString(verified.payload))).toEqual({ hello: 'world' })
+      expect(verified.serialization).toBe(serialization)
+      expect(protectedHeader).toMatchObject({ alg: 'ES256', x5c: certs, iat: claimedAt })
+    }
+  )
+
+  it('uses iat for new signatures and rejects sigT', async () => {
+    expect((await sign({ signingTime: new Date(claimedAt * 1000) })).protectedHeader.iat).toBe(claimedAt)
+    const error = await sign({ protectedHeader: { sigT: '2024-01-01T00:00:00Z' } }).catch((error) => error)
+
+    expect(error.findIssue('not_allowed')).toMatchObject({ path: ['protected', 'sigT'] })
   })
 
-  it('uses iat for new signatures and keeps sigT historical-only', async () => {
-    const token = new Token({ value: 1 }).setProtectedHeader({ alg: 'ES256', x5c: certs }).setSigningTime(claimedAt)
-    expect(token.getProtectedHeader().iat).toBe(claimedAt)
-    expect(token.getProtectedHeader().sigT).toBeUndefined()
+  it('requires a reference to the signing certificate', async () => {
+    const jwkSigner: JwsSigner = { method: 'jwk', alg: 'ES256', publicJwk: TEST_PUBLIC_KEY }
 
-    token.setLegacySigningTime('2024-01-01T00:00:00Z')
-    const signer = await ES256.getSigner(TEST_PRIVATE_KEY)
-    await expect(token.sign(signer)).rejects.toThrow('sigT is prohibited')
+    const error = await sign({ signer: jwkSigner }).catch((error) => error)
+
+    expect(error).toBeInstanceOf(JadesValidationError)
+    expect(error.findIssue('missing_certificate_reference')).toMatchObject({ path: ['protected'] })
   })
 
-  it('hashes the signing input with the supplied hasher, not a global crypto implementation', async () => {
-    const token = new Token({ value: 1 }).setProtectedHeader(protectedHeader())
-    const algorithms: string[] = []
+  it('rejects a signature that does not verify', async () => {
+    const { jws } = await sign()
 
-    const digest = await token.getHash(
-      {},
-      {
-        hasher: (data, alg) => {
-          algorithms.push(alg)
-          return hasher(data, alg)
-        },
-      }
+    await expect(verifyJades({ jws, verifyJwsCallback: () => ({ verified: false }) })).rejects.toThrow(
+      JoseSignatureVerificationError
     )
-
-    // The algorithm defaults to the one implied by `alg` and is overridable.
-    expect(algorithms).toEqual(['SHA-256'])
-    expect(digest).toEqual(sha256(token.getSigningInput()))
-    expect(await token.getHash({ algorithm: 'SHA-512' }, { hasher })).toEqual(sha512(token.getSigningInput()))
   })
 
-  it('invalidates a signature when signed material changes', async () => {
-    const token = new Token({ value: 1 }).setProtectedHeader(protectedHeader())
-    await token.sign(await ES256.getSigner(TEST_PRIVATE_KEY))
-    token.setKid('different-key-reference')
-    expect(() => token.toString()).toThrow('Token not signed yet')
-  })
-
-  it('adds only RFC-required critical parameters', async () => {
+  it('marks sigD critical and signs an empty payload for ObjectIdByURIHash', async () => {
     const sigD = {
       mId: DETACHED_MECHANISM_IDS.objectByUriHash,
       pars: ['https://example.test/object'],
       hashM: 'S256',
       hashV: ['YWJj'],
     }
-    const token = new Token({ ignored: true }).setProtectedHeader(protectedHeader()).setDetached(sigD)
-    const signer = await ES256.getSigner(TEST_PRIVATE_KEY)
-    const verifier = await ES256.getVerifier(TEST_PUBLIC_KEY)
-    await token.sign(signer)
-    expect(token.getProtectedHeader().crit).toEqual(['sigD'])
-    expect(token.toJSON().payload).toBeUndefined()
-    expect((await verifyGeneral(token.toJSON(), verifier)).valid).toBe(true)
-  })
 
-  it('rejects critical extensions unless the verifier explicitly understands them', async () => {
-    const token = new Token({ value: 1 }).setProtectedHeader({
-      ...protectedHeader(),
-      crit: ['example'],
-      example: true,
-    })
-    const signer = await ES256.getSigner(TEST_PRIVATE_KEY)
-    const verifier = await ES256.getVerifier(TEST_PUBLIC_KEY)
-    await token.sign(signer)
-    await expect(verifyCompact(token.toString(), verifier)).rejects.toThrow('Unsupported critical header parameter')
-    expect((await verifyCompact(token.toString(), verifier, { understoodCriticalParameters: ['example'] })).valid).toBe(
-      true
+    const { jws, protectedHeader } = await sign({ serialization: 'general', sigD, payload: undefined })
+
+    expect(protectedHeader.crit).toEqual(['sigD'])
+    expect(jws.payload).toBeUndefined()
+    await expect(verifyJades({ jws, verifyJwsCallback })).resolves.toBeDefined()
+    await expect(sign({ sigD })).rejects.toThrow(
+      expect.objectContaining({ issues: [expect.objectContaining({ code: 'not_allowed', path: ['payload'] })] })
     )
   })
 
   it('verifies a direct detached payload only when the caller supplies it', async () => {
     const payload = 'detached content'
-    const token = new Token(payload).setProtectedHeader(protectedHeader()).setDetached({
-      mId: DETACHED_MECHANISM_IDS.objectByUri,
-      pars: ['https://example.test/object'],
-    })
-    const signer = await ES256.getSigner(TEST_PRIVATE_KEY)
-    const verifier = await ES256.getVerifier(TEST_PUBLIC_KEY)
-    await token.sign(signer)
-    const serialized = token.toJSON()
-    await expect(verifyGeneral(serialized, verifier)).rejects.toThrow('Detached JWS payload is required')
-    expect((await verifyGeneral(serialized, verifier, 0, { detachedPayload: payload })).rawPayload).toBe(payload)
+    const sigD = { mId: DETACHED_MECHANISM_IDS.objectByUri, pars: ['https://example.test/object'] }
+
+    const { jws } = await sign({ serialization: 'general', sigD, payload })
+
+    await expect(verifyJades({ jws, verifyJwsCallback })).rejects.toThrow('detached payload')
+    const verified = await verifyJades({ jws, verifyJwsCallback, detachedPayload: payload })
+    expect(bytesToString(verified.payload)).toBe(payload)
   })
 
-  it('enforces JSON serialization when etsiU is present', async () => {
-    const token = new Token({ hello: 'world' })
-      .setProtectedHeader(protectedHeader())
-      .setUnprotectedHeader({ etsiU: [{ sigTst: timestamp }] })
-    await token.sign(await ES256.getSigner(TEST_PRIVATE_KEY))
-    expect(() => token.toString()).toThrow('Compact JWS cannot carry')
-    expect(token.toJSON().signatures[0].header).toEqual({ etsiU: [{ sigTst: timestamp }] })
-    expect(() => token.setUnprotectedHeader({ etsiU: [], kid: 'bad' } as never)).toThrow(JadesError)
+  it('allows sigD only with a detached payload (clause 5.2.8.1)', async () => {
+    const payload = 'detached content'
+    const sigD = { mId: DETACHED_MECHANISM_IDS.objectByUri, pars: ['https://example.test/object'] }
+
+    const { jws } = await sign({ serialization: 'flattened', protectedHeader: { sigD }, payload })
+
+    expect(jws.payload).toBeUndefined()
+    expect(() => decodeJades({ jws: { ...jws, payload: base64urlEncode(payload) } })).toThrow(
+      expect.objectContaining({ issues: [expect.objectContaining({ code: 'not_allowed', path: ['payload'] })] })
+    )
+  })
+
+  it('rejects a malformed JWS with a package error', async () => {
+    const { jws } = await sign({ serialization: 'flattened' })
+
+    for (const header of [{ kid: 'x' }, { etsiU: 'abc' }, { etsiU: [null] }]) {
+      expect(() => decodeJades({ jws: { ...jws, header } })).toThrow(JadesValidationError)
+    }
+    expect(() => decodeJades({ jws: null as never })).toThrow(JoseParseError)
+    expect(() => decodeJades({ jws: { signatures: null } as never })).toThrow(JoseValidationError)
+  })
+
+  it('rejects critical extensions unless the verifier understands them', async () => {
+    const { jws } = await sign({ protectedHeader: { crit: ['example'], example: true } })
+
+    await expect(verifyJades({ jws, verifyJwsCallback })).rejects.toThrow(JoseValidationError)
+    await expect(
+      verifyJades({ jws, verifyJwsCallback, understoodCriticalParameters: ['example'] })
+    ).resolves.toBeDefined()
+  })
+
+  it('carries etsiU only in a JSON serialization, and checks the profile it reaches', async () => {
+    const unprotectedHeader = { etsiU: [{ sigTst: timestamp }] }
+
+    await expect(sign({ unprotectedHeader })).rejects.toThrow('Compact JWS cannot carry')
+    await expect(sign({ serialization: 'general', unprotectedHeader: { etsiU: [] } })).rejects.toThrow(
+      JadesValidationError
+    )
+
+    const { jws } = await sign({ serialization: 'general', unprotectedHeader })
+    expect(jws.signatures[0].header).toEqual(unprotectedHeader)
+    await expect(verifyJades({ jws, verifyJwsCallback, profile: JadesProfile.B_T })).resolves.toBeDefined()
+
+    const { jws: compact } = await sign()
+    expect(() => decodeJades({ jws: compact, profile: JadesProfile.B_T })).toThrow(
+      expect.objectContaining({
+        issues: [
+          expect.objectContaining({
+            code: 'missing_value',
+            path: ['header', 'etsiU'],
+            context: { expected: 'sigTst' },
+          }),
+        ],
+      })
+    )
+  })
+
+  it('verifies the claims of a JAdES JWT', async () => {
+    const { jws } = await sign({ payload: { iss: 'https://issuer.example', exp: claimedAt + 60 } })
+
+    await expect(
+      verifyJadesJwt({ jwt: jws, verifyJwsCallback, now: new Date(claimedAt * 1000) })
+    ).resolves.toMatchObject({ payload: { iss: 'https://issuer.example' } })
+    await expect(
+      verifyJadesJwt({ jwt: jws, verifyJwsCallback, now: new Date((claimedAt + 3600) * 1000) })
+    ).rejects.toThrow(JoseValidationError)
   })
 })
 
@@ -240,6 +297,34 @@ describe('baseline profile validation', () => {
     ],
   }
 
+  it('gives each deviation an issue with a code and a path', () => {
+    const header = {
+      ...protectedHeader(),
+      'x5t#o': { digAlg: 'sha-256', digVal: 'YWJj' },
+      sigPl: {},
+      sigPId: { id: { id: 'not a uri' }, digAlg: 'md5' },
+      sigD: { mId: DETACHED_MECHANISM_IDS.httpHeaders, pars: ['Content-Type'], hashM: 'S256', hashV: ['YWJj'] },
+      crit: ['sigD', 'sigD', 'alg'],
+    } as ProtectedHeaderParams
+
+    const { valid, issues } = validateProfile(header, JadesProfile.B_B)
+
+    expect(valid).toBe(false)
+    expect(issues.map(({ code, path }) => [code, path.join('.')])).toEqual(
+      expect.arrayContaining([
+        ['invalid_value', 'protected.x5t#o.digAlg'],
+        ['too_small', 'protected.sigPl'],
+        ['invalid_format', 'protected.sigPId.id.id'],
+        ['invalid_value', 'protected.sigPId.digAlg'],
+        ['missing_value', 'protected.sigPId.digVal'],
+        ['not_allowed', 'protected.sigD.hashM'],
+        ['invalid_value', 'protected.sigD.pars'],
+        ['invalid_crit', 'protected.crit'],
+        ['invalid_value', 'protected.b64'],
+      ])
+    )
+  })
+
   it('accepts iat, not only the obsolete sigT, at B-B', () => {
     expect(validateProfile(protectedHeader(), JadesProfile.B_B).valid).toBe(true)
   })
@@ -257,9 +342,12 @@ describe('baseline profile validation', () => {
     const incomplete: UnprotectedHeaderParams = {
       etsiU: [{ sigTst: timestamp }, { xVals: certificateValues }, { rVals: revocationValues }],
     }
-    expect(validateProfile(protectedHeader(), JadesProfile.B_LT, incomplete).missing).toContain(
-      'Validation data for electronic time-stamps is not evidenced'
-    )
+    expect(validateProfile(protectedHeader(), JadesProfile.B_LT, incomplete).issues).toEqual([
+      expect.objectContaining({
+        code: 'missing_validation_data',
+        message: 'Validation data for electronic time-stamps is not evidenced',
+      }),
+    ])
   })
 
   it('forbids reference-based validation components at B-LT', () => {

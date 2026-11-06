@@ -1,7 +1,7 @@
 import { IdentityError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import { CborDecodeError, CborError } from '../cbor/error'
-import { CoseError, CoseInvalidSignatureError, CwtClaimVerificationError } from '../cose/error'
+import { CoseError, CoseInvalidSignatureError } from '../cose/error'
 import * as cose from '../index'
 
 type ErrorClass = new (message?: string, options?: { cause?: unknown; details?: unknown }) => Error
@@ -27,9 +27,9 @@ describe('cose errors', () => {
   })
 
   it('is named after the class it is, and defaults its message to that name', () => {
-    expect(new CwtClaimVerificationError().name).toBe('CwtClaimVerificationError')
-    expect(new CwtClaimVerificationError().message).toBe('CwtClaimVerificationError')
-    expect(new CwtClaimVerificationError('the token expired').message).toBe('the token expired')
+    expect(new CoseInvalidSignatureError().name).toBe('CoseInvalidSignatureError')
+    expect(new CoseInvalidSignatureError().message).toBe('CoseInvalidSignatureError')
+    expect(new CoseInvalidSignatureError('the signature is invalid').message).toBe('the signature is invalid')
   })
 
   it('keeps the cause', () => {
@@ -53,7 +53,7 @@ describe('cose errors', () => {
         'CborError',
         'CborDecodeError',
         'CborEncodeError',
-        'CwtClaimVerificationError',
+        'CoseInvalidSignatureError',
       ])
     )
   })
@@ -67,19 +67,19 @@ describe('cose errors', () => {
   })
 
   it.each([
-    ['a cose error', CwtClaimVerificationError],
+    ['a cose error', CoseInvalidSignatureError],
     ['a cbor error', CborDecodeError],
   ])('keeps the details given to %s', (_, ErrorClass) => {
     expect(new ErrorClass('the token expired', { details: { claim: 'exp' } }).details).toEqual({ claim: 'exp' })
   })
 
   it('has no details unless it is given some', () => {
-    expect(new CwtClaimVerificationError('the token expired').details).toBeUndefined()
+    expect(new CoseInvalidSignatureError('the token expired').details).toBeUndefined()
   })
 
   it('reports its name, message and details in the full message', () => {
-    expect(new CwtClaimVerificationError('the token expired', { details: { claim: 'exp' } }).getFullMessage()).toBe(
-      'CwtClaimVerificationError: the token expired - {"claim":"exp"}'
+    expect(new CoseInvalidSignatureError('the token expired', { details: { claim: 'exp' } }).getFullMessage()).toBe(
+      'CoseInvalidSignatureError: the token expired - {"claim":"exp"}'
     )
   })
 })

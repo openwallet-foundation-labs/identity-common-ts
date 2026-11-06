@@ -1,33 +1,94 @@
 /** Runtime schemas for ETSI TS 119 182-1 V1.2.1 JAdES components. */
 
-import { base64urlDecodeJson } from '@owf/identity-common'
+import { base64urlDecodeJson, type SchemaValidationCode, type ValidationIssueInput } from '@owf/identity-common'
+import { zFlattenedJws, zGeneralJws } from '@owf/jose'
 import { z } from 'zod'
 import { DETACHED_MECHANISM_IDS } from './constants'
+import { addJadesIssue, JADES_VALIDATION_CODES, type JadesValidationCode } from './validation'
+
+type JadesIssueInput = ValidationIssueInput<JadesValidationCode | SchemaValidationCode>
+
+/** A refinement that adds `issue` when `predicate` does not hold */
+const check =
+  <T>(predicate: (value: T) => boolean, issue: JadesIssueInput) =>
+  (value: T, context: z.RefinementCtx) => {
+    if (!predicate(value)) addJadesIssue(context, issue)
+  }
+
+const notEmpty = (name: string) =>
+  check((value: object) => Object.keys(value).length > 0, {
+    code: 'too_small',
+    message: `${name} must not be empty`,
+    context: { minimum: 1, inclusive: true, origin: 'object' },
+  })
+
+/** `a` and `b` are present together: an issue at the one that is missing */
+function presentTogether(value: Record<string, unknown>, a: string, b: string, context: z.RefinementCtx): void {
+  if ((value[a] === undefined) === (value[b] === undefined)) return
+  const missing = value[a] === undefined ? a : b
+  addJadesIssue(context, {
+    code: 'missing_value',
+    path: [missing],
+    message: `${a} and ${b} must be present together`,
+    context: { expected: missing },
+  })
+}
 
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 const BASE64URL = /^[A-Za-z0-9_-]+$/
 const UTC_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/
 const zText = z.string().min(1)
-const zDigestAlgorithm = zText.refine((value) => value.toLowerCase() !== 'md5', 'MD5 is prohibited by clause 6.2.1')
+const zDigestAlgorithm = zText.superRefine(
+  check((value) => value.toLowerCase() !== 'md5', {
+    code: 'invalid_value',
+    message: 'MD5 is prohibited by clause 6.2.1',
+  })
+)
 const zBase64 = zText.regex(BASE64, 'Expected a base64-encoded string')
 const zBase64Url = zText.regex(BASE64URL, 'Expected an unpadded base64url-encoded string')
-const zUri = zText.refine((value) => {
-  try {
-    return Boolean(new URL(value).protocol)
-  } catch {
-    return false
-  }
-}, 'Expected an absolute URI')
-const zUriReference = zText.refine((value) => !/\s/.test(value), 'Expected a URI reference')
-const zDateTime = zText.refine((value) => !Number.isNaN(Date.parse(value)), 'Expected an RFC 3339 date-time')
+const zUri = zText.superRefine(
+  check(
+    (value) => {
+      try {
+        return Boolean(new URL(value).protocol)
+      } catch {
+        return false
+      }
+    },
+    { code: 'invalid_format', message: 'Expected an absolute URI', context: { format: 'uri' } }
+  )
+)
+const zUriReference = zText.superRefine(
+  check((value) => !/\s/.test(value), {
+    code: 'invalid_format',
+    message: 'Expected a URI reference',
+    context: { format: 'uri-reference' },
+  })
+)
+const isDateTime = (value: string) => !Number.isNaN(Date.parse(value))
+const zDateTime = zText.superRefine(
+  check(isDateTime, {
+    code: 'invalid_format',
+    message: 'Expected an RFC 3339 date-time',
+    context: { format: 'date-time' },
+  })
+)
 
 export const zClaimedSigningTime = z
   .string()
   .regex(UTC_SECONDS, 'Expected an RFC 3339 UTC timestamp without fractional seconds')
-  .refine((value) => !Number.isNaN(Date.parse(value)), 'Expected a valid date-time')
+  .superRefine(
+    check(isDateTime, {
+      code: 'invalid_format',
+      message: 'Expected a valid date-time',
+      context: { format: 'date-time' },
+    })
+  )
 
 /** JWS algorithm identifier from the IANA JOSE registry. */
-export const zSignAlg = zText.refine((value) => value.toLowerCase() !== 'none', 'alg must identify a signature')
+export const zSignAlg = zText.superRefine(
+  check((value) => value.toLowerCase() !== 'none', { code: 'invalid_value', message: 'alg must identify a signature' })
+)
 
 export const zOid = z
   .object({ id: zUri, desc: z.string().optional(), docRefs: z.array(zUri).min(1).optional() })
@@ -46,15 +107,13 @@ export const zSigTst = z.object({ tstTokens: zTstTokens }).strict()
 export const zAdoTst = zSigTst
 
 const zCertificateDigest = z.object({ digAlg: zDigestAlgorithm, digVal: zBase64Url }).strict()
-export const zX5tO = zCertificateDigest.superRefine((value, context) => {
-  if (value.digAlg.toLowerCase() === 'sha-256') {
-    context.addIssue({
-      code: 'custom',
-      path: ['digAlg'],
-      message: 'x5t#o cannot use sha-256; use x5t#S256',
-    })
-  }
-})
+export const zX5tO = zCertificateDigest.superRefine(
+  check((value) => value.digAlg.toLowerCase() !== 'sha-256', {
+    code: 'invalid_value',
+    path: ['digAlg'],
+    message: 'x5t#o cannot use sha-256, use x5t#S256',
+  })
+)
 
 export const zCommitmentReference = z
   .object({
@@ -73,7 +132,7 @@ export const zSignatureProductionPlace = z
     streetAddress: z.string().optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'sigPl must not be empty')
+  .superRefine(notEmpty('sigPl'))
 
 export const zQualifiedArray = z
   .array(z.object({ mediaType: zText, encoding: zText, qVals: z.array(z.unknown()).min(1) }).strict())
@@ -90,7 +149,7 @@ export const zSignerAttributes = z
     signedAssertions: zQualifiedArray.optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'srAts must not be empty')
+  .superRefine(notEmpty('srAts'))
 
 const zUserNotice = z
   .object({
@@ -101,7 +160,7 @@ const zUserNotice = z
     explText: z.string().optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'spUserNotice must not be empty')
+  .superRefine(notEmpty('spUserNotice'))
 
 export const zSignaturePolicyQualifier = z.union([
   z.object({ spURI: zUri }).strict(),
@@ -119,14 +178,13 @@ export const zSignaturePolicy = z
   })
   .strict()
   .superRefine((value, context) => {
-    if ((value.digAlg === undefined) !== (value.digVal === undefined)) {
-      context.addIssue({ code: 'custom', message: 'sigPId digAlg and digVal must be present together' })
-    }
+    presentTogether(value, 'digAlg', 'digVal', context)
     if (value.digPSp === true && !value.sigPQuals?.some((qualifier) => 'spDSpec' in qualifier)) {
-      context.addIssue({
-        code: 'custom',
+      addJadesIssue(context, {
+        code: 'missing_value',
         path: ['sigPQuals'],
         message: 'sigPId with digPSp=true requires an spDSpec qualifier',
+        context: { expected: 'spDSpec' },
       })
     }
   })
@@ -141,28 +199,39 @@ export const zSigD = z
   })
   .strict()
   .superRefine((value, context) => {
-    if ((value.hashM === undefined) !== (value.hashV === undefined)) {
-      context.addIssue({ code: 'custom', message: 'sigD hashM and hashV must be present together' })
+    presentTogether(value, 'hashM', 'hashV', context)
+    for (const name of ['hashV', 'ctys'] as const) {
+      if (value[name] && value[name].length !== value.pars.length) {
+        addJadesIssue(context, {
+          code: 'invalid_value',
+          path: [name],
+          message: `${name} and pars must have equal length`,
+        })
+      }
     }
-    if (value.hashV && value.hashV.length !== value.pars.length) {
-      context.addIssue({ code: 'custom', path: ['hashV'], message: 'hashV and pars must have equal length' })
-    }
-    if (value.ctys && value.ctys.length !== value.pars.length) {
-      context.addIssue({ code: 'custom', path: ['ctys'], message: 'ctys and pars must have equal length' })
+    const notAllowed = (names: ReadonlyArray<'hashM' | 'hashV' | 'ctys'>, mechanism: string) => {
+      for (const name of names.filter((name) => value[name] !== undefined)) {
+        addJadesIssue(context, { code: 'not_allowed', path: [name], message: `${mechanism} must not contain ${name}` })
+      }
     }
     if (value.mId === DETACHED_MECHANISM_IDS.httpHeaders) {
-      if (value.hashM || value.hashV || value.ctys) {
-        context.addIssue({ code: 'custom', message: 'HttpHeaders must not contain hashM, hashV, or ctys' })
-      }
+      notAllowed(['hashM', 'hashV', 'ctys'], 'HttpHeaders')
       if (value.pars.some((parameter) => parameter !== parameter.toLowerCase())) {
-        context.addIssue({ code: 'custom', path: ['pars'], message: 'HTTP header names must be lower-case' })
+        addJadesIssue(context, {
+          code: 'invalid_value',
+          path: ['pars'],
+          message: 'HTTP header names must be lower-case',
+        })
       }
     } else if (value.mId === DETACHED_MECHANISM_IDS.objectByUri) {
-      if (value.hashM || value.hashV) {
-        context.addIssue({ code: 'custom', message: 'ObjectIdByURI must not contain hashM or hashV' })
-      }
-    } else if (value.mId === DETACHED_MECHANISM_IDS.objectByUriHash && (!value.hashM || !value.hashV)) {
-      context.addIssue({ code: 'custom', message: 'ObjectIdByURIHash requires hashM and hashV' })
+      notAllowed(['hashM', 'hashV'], 'ObjectIdByURI')
+    } else if (value.mId === DETACHED_MECHANISM_IDS.objectByUriHash && !value.hashM && !value.hashV) {
+      addJadesIssue(context, {
+        code: 'missing_value',
+        path: ['hashV'],
+        message: 'ObjectIdByURIHash requires hashM and hashV',
+        context: { expected: 'hashV' },
+      })
     }
   })
 
@@ -182,11 +251,11 @@ export const zRVals = z
     otherVals: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'rVals must not be empty')
+  .superRefine(notEmpty('rVals'))
 export const zValidationValues = z
   .object({ xVals: zXVals.optional(), rVals: zRVals.optional() })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'Validation values must not be empty')
+  .superRefine(notEmpty('Validation values'))
 
 export const zCertId = z
   .object({ digAlg: zDigestAlgorithm, digVal: zBase64Url, kid: zBase64.optional(), x5u: zUriReference.optional() })
@@ -227,27 +296,7 @@ export const zRRefs = z
     otherRefs: z.array(z.record(z.string(), z.unknown())).min(1).optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'rRefs must not be empty')
-
-export const zJwsSignature = z
-  .object({
-    protected: zBase64Url.optional(),
-    header: z.record(z.string(), z.unknown()).optional(),
-    signature: zBase64Url,
-  })
-  .strict()
-export const zGeneralJws = z
-  .object({ payload: z.string().optional(), signatures: z.array(zJwsSignature).min(1) })
-  .strict()
-export const zFlattenedJws = z
-  .object({
-    protected: zBase64Url.optional(),
-    header: z.record(z.string(), z.unknown()).optional(),
-    payload: z.string().optional(),
-    signature: zBase64Url,
-  })
-  .strict()
-export const zCompactJws = z.object({ protected: zBase64Url, payload: z.string(), signature: zBase64Url }).strict()
+  .superRefine(notEmpty('rRefs'))
 
 const zCanonicalizedTstContainer = zTstContainer.extend({ canonAlg: zUri })
 const zNoCanonTstContainer = z.object({ canonAlg: z.never().optional(), tstTokens: zTstTokens }).strict()
@@ -285,9 +334,10 @@ const zEncodedEtsiU = z
     items.forEach((item, index) => {
       try {
         const result = zEncodedEtsiUInstance.safeParse(base64urlDecodeJson(item))
-        if (!result.success) context.addIssue({ code: 'custom', path: [index], message: 'Invalid encoded etsiU value' })
+        if (!result.success)
+          addJadesIssue(context, { code: 'invalid_value', path: [index], message: 'Invalid encoded etsiU value' })
       } catch {
-        context.addIssue({ code: 'custom', path: [index], message: 'Invalid encoded etsiU JSON value' })
+        addJadesIssue(context, { code: 'invalid_value', path: [index], message: 'Invalid encoded etsiU JSON value' })
       }
     })
   })
@@ -326,26 +376,42 @@ function refineProtected(
   context: z.RefinementCtx,
   currentGeneration: boolean
 ): void {
-  if (!header.alg) context.addIssue({ code: 'custom', path: ['alg'], message: 'alg is required' })
+  const missing = (name: string, message: string, expected: string) =>
+    addJadesIssue(context, { code: 'missing_value', path: [name], message, context: { expected } })
+  const invalidCrit = (parameter: string, message: string) =>
+    addJadesIssue(context, {
+      code: JADES_VALIDATION_CODES.INVALID_CRIT,
+      path: ['crit'],
+      message,
+      context: { parameter },
+    })
+
+  if (!header.alg) missing('alg', 'alg is required', 'string')
   if (!(header['x5t#S256'] || header.x5c || header['x5t#o'] || header.sigX5ts)) {
-    context.addIssue({ code: 'custom', message: 'One certificate reference or x5c is required' })
+    addJadesIssue(context, {
+      code: JADES_VALIDATION_CODES.MISSING_CERTIFICATE_REFERENCE,
+      message: 'One certificate reference or x5c is required',
+    })
   }
   if (currentGeneration) {
-    if (header.iat === undefined) {
-      context.addIssue({ code: 'custom', path: ['iat'], message: 'iat is required for signatures generated now' })
-    }
+    if (header.iat === undefined) missing('iat', 'iat is required for signatures generated now', 'number')
     if (header.sigT !== undefined) {
-      context.addIssue({
-        code: 'custom',
+      addJadesIssue(context, {
+        code: 'not_allowed',
         path: ['sigT'],
         message: 'sigT is prohibited for signatures generated on or after 2025-07-15',
       })
     }
-  } else if ((header.iat === undefined) === (header.sigT === undefined)) {
-    context.addIssue({ code: 'custom', message: 'Exactly one of iat or sigT is required' })
+  } else if (header.iat === undefined && header.sigT === undefined) {
+    missing('iat', 'Exactly one of iat or sigT is required', 'number')
+  } else if (header.iat !== undefined && header.sigT !== undefined) {
+    addJadesIssue(context, { code: 'not_allowed', path: ['sigT'], message: 'Exactly one of iat or sigT is required' })
   }
   if (header.crit && new Set(header.crit).size !== header.crit.length) {
-    context.addIssue({ code: 'custom', path: ['crit'], message: 'crit entries must be unique' })
+    invalidCrit(
+      header.crit.find((name, index) => header.crit?.indexOf(name) !== index) ?? '',
+      'crit entries must be unique'
+    )
   }
   const registeredJwsNames = new Set([
     'alg',
@@ -362,21 +428,18 @@ function refineProtected(
   ])
   for (const parameter of header.crit ?? []) {
     if (registeredJwsNames.has(parameter) || !(parameter in header)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['crit'],
-        message: `crit entry ${parameter} must name a present extension header parameter`,
-      })
+      invalidCrit(parameter, `crit entry ${parameter} must name a present extension header parameter`)
     }
   }
-  if (header.b64 !== undefined && !header.crit?.includes('b64')) {
-    context.addIssue({ code: 'custom', path: ['crit'], message: 'crit must contain b64' })
-  }
-  if (header.sigD && !header.crit?.includes('sigD')) {
-    context.addIssue({ code: 'custom', path: ['crit'], message: 'crit must contain sigD' })
-  }
+  if (header.b64 !== undefined && !header.crit?.includes('b64')) invalidCrit('b64', 'crit must contain b64')
+  if (header.sigD && !header.crit?.includes('sigD')) invalidCrit('sigD', 'crit must contain sigD')
   if (header.sigD?.mId === DETACHED_MECHANISM_IDS.httpHeaders && header.b64 !== false) {
-    context.addIssue({ code: 'custom', path: ['b64'], message: 'HttpHeaders requires b64=false' })
+    addJadesIssue(context, {
+      code: 'invalid_value',
+      path: ['b64'],
+      message: 'HttpHeaders requires b64=false',
+      context: { allowed: [false] },
+    })
   }
 }
 
@@ -386,14 +449,3 @@ export const zProtectedHeader = zProtectedHeaderParams.superRefine((header, cont
 export const zProtectedHeaderForSigning = zProtectedHeaderParams.superRefine((header, context) =>
   refineProtected(header, context, true)
 )
-
-export const zSignOptions = z.object({
-  alg: zSignAlg,
-  kid: z.string().optional(),
-  certificates: z.array(z.string()).optional(),
-})
-export const zVerifyOptions = z.object({
-  detachedPayload: z.union([z.string(), z.instanceof(Uint8Array)]).optional(),
-  signatureIndex: z.number().int().nonnegative().optional(),
-  understoodCriticalParameters: z.array(zText).optional(),
-})

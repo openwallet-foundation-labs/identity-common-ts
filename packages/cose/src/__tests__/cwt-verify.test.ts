@@ -142,6 +142,32 @@ describe('CwtPayload.verifyClaims', () => {
     ).not.toThrow()
   })
 
+  test('reports each claim that does not verify as an issue at its key', () => {
+    const error = (() => {
+      try {
+        payload({ expirationTime: minutes(-5), notBefore: minutes(5) }).verifyClaims({
+          now,
+          expectedSubject: 'https://other.example',
+        })
+      } catch (error) {
+        return error as CwtClaimVerificationError
+      }
+    })()
+
+    expect(error?.issues.map(({ code, path, pathLabels }) => [code, path, pathLabels])).toEqual([
+      ['claim_value_mismatch', [2], ['Subject (2)']],
+      ['expired', [4], ['ExpirationTime (4)']],
+      ['not_yet_valid', [5], ['NotBefore (5)']],
+    ])
+    expect(error?.findIssue('expired')?.context).toEqual({ expiredAt: minutes(-5) })
+  })
+
+  test('reports a claim that is both required and expected missing once', () => {
+    expect(() =>
+      CwtPayload.create({}).verifyClaims({ now, requiredClaims: [2], expectedSubject: 'https://other.example' })
+    ).toThrow(expect.objectContaining({ issues: [expect.objectContaining({ code: 'claim_missing', path: [2] })] }))
+  })
+
   test('applies the clock skew to the expiration', () => {
     const expirationTime = minutes(-0.25)
     const expired = payload({ expirationTime })

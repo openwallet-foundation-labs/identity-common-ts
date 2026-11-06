@@ -112,6 +112,26 @@ The verification callback decides whether the key is trusted, for example whethe
 - for a `jwk` or `x5c` signer, `jwk` or `x5c`, without the `kid` of the signer
 - for a `custom` signer, its `kid` when it has one, as the key id is all a verifier has to find a key that is established out of band
 
+## JSON serializations
+
+`signFlattenedJws` and `signGeneralJws` sign the JSON serializations of RFC 7515 section 7.2. `parseJws` and `verifyJwsSignature` parse and verify them, as they do a compact serialization. A general JSON serialization is verified one signature at a time, chosen with `signatureIndex`. A JSON serialization can carry an unprotected header, which is not covered by the signature. Its parameters must not also be in the protected header, and it cannot hold `crit`. A general JSON serialization has one payload and a signature for each entry of `signatures`, and these have to agree on `b64`, as they share the payload. An unencoded payload is not limited to printable ASCII here, as it is in a compact serialization.
+
+```typescript
+import { parseJws, signGeneralJws, verifyJwsSignature } from '@owf/jose'
+
+const { jws } = await signGeneralJws({
+  payload: { iss: 'https://issuer.example' },
+  signJwsCallback: signJws,
+  signatures: [
+    { protectedHeader: { alg: 'ES256' }, unprotectedHeader: { kid: 'key-1' }, signer: firstSigner },
+    { protectedHeader: { alg: 'ES256' }, unprotectedHeader: { kid: 'key-2' }, signer: secondSigner },
+  ],
+})
+
+// Verify the second signature
+await verifyJwsSignature({ jws: parseJws({ jws, signatureIndex: 1 }), verifyJwsCallback: verifyJws })
+```
+
 ## Certificate chains
 
 `x5c`, in a JWS header, a JWE header and a JWK, is validated when it is parsed, as RFC 7515 and RFC 7517 define it: a chain of at least one certificate, with the certificate that holds the key first. Each entry is the standard base64 (RFC 4648 section 4) of a DER encoded certificate. An entry is rejected when it has base64url characters, whitespace or line breaks, or missing or extra `=` padding. It is also rejected when it does not decode to exactly one DER SEQUENCE with a definite, minimally encoded length. The issue has the path of the entry and the code `invalid_format`, with `base64` or `der` as the format.
@@ -153,7 +173,6 @@ The errors of this package extend `IdentityError` from `@owf/identity-common`. T
 - An unsecured JWS (`alg: none`), and a JWS without a protected header.
 - JWE encryption and decryption. The package provides the JWE structures (`zCompactJwe`, `zJweHeader`, and `decodeJwtHeader` to read the header of a compact JWE) and the callback types (`EncryptJweCallback`, `DecryptJweCallback`), and leaves the cryptography to the caller.
 - Nested JWTs. `decodeJwt` expects the claims set as the payload: decrypt an outer JWE, or read an outer JWS with `parseJws`, and decode the inner JWT from its payload.
-- Signing a JWS in a JSON serialization. `parseJws` and `verifyJwsSignature` read the flattened and general JSON serializations, but `signCompactJws` and `signJwt` produce the compact serialization only.
 - An unencoded payload (`b64: false`) in a JWT, and an unencoded payload that is not valid UTF-8.
 
 ## Platform support

@@ -10,7 +10,6 @@ import {
   isPspSubEntitlement,
   isValidEntitlement,
   PSP_SUB_ENTITLEMENTS,
-  RegistrationCertificateError,
   RegistrationCertificateValidationError,
   registrationCertificate,
   validateLegalPersonRegistrationCertificate,
@@ -501,15 +500,13 @@ describe('Factory Functions', () => {
 // Error Tests
 // ============================================================================
 
-describe('RegistrationCertificateError', () => {
-  it('should create an error with message', () => {
-    const error = new RegistrationCertificateError('Test error')
-    expect(error.message).toBe('Test error')
-    expect(error.name).toBe('RegistrationCertificateError')
-  })
-
-  it('should be instanceof Error', () => {
-    const error = new RegistrationCertificateError('Test')
+describe('RegistrationCertificateValidationError', () => {
+  it('should create an error with message and issues', () => {
+    const issues = [{ severity: 'error' as const, code: 'invalid_signature' as const, path: [], message: 'Invalid' }]
+    const error = new RegistrationCertificateValidationError('Test error', issues)
+    expect(error.message).toBe('Test error\n  - Invalid (invalid_signature)')
+    expect(error.name).toBe('RegistrationCertificateValidationError')
+    expect(error.issues).toBe(issues)
     expect(error).toBeInstanceOf(Error)
   })
 })

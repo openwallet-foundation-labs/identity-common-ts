@@ -9,7 +9,7 @@
 import { dateToSeconds, nowInSeconds, parseWithSchema } from '@owf/identity-common'
 import type { z } from 'zod'
 import { ENTITLEMENT_SERVICE_PROVIDER, type WRP_ENTITLEMENTS } from './entitlements'
-import { RegistrationCertificateError, RegistrationCertificateValidationError } from './registration-certificate-error'
+import { RegistrationCertificateValidationError } from './registration-certificate-error'
 import { zRegistrationCertificatePayload } from './schemas'
 import type {
   Claim,
@@ -23,7 +23,7 @@ import type {
   Status,
   SupervisoryAuthority,
 } from './types'
-import { REGISTRATION_CERTIFICATE_VALIDATION_CODES } from './validator'
+import { REGISTRATION_CERTIFICATE_VALIDATION_CODES, validationError } from './validator'
 
 // ============================================================================
 // Partial Payload Type
@@ -296,7 +296,7 @@ export class RegistrationCertificateBuilder {
   /**
    * Build the registration certificate payload
    *
-   * @throws RegistrationCertificateError if the payload is invalid
+   * @throws RegistrationCertificateValidationError if the payload is invalid
    */
   build(): RegistrationCertificatePayload {
     // Set default iat if not provided
@@ -387,11 +387,15 @@ export class CredentialBuilder {
    * Build the Credential object
    */
   build(): Credential {
-    if (!this.credential.format) {
-      throw new RegistrationCertificateError('Credential format is required')
-    }
-    if (!this.credential.meta) {
-      throw new RegistrationCertificateError('Credential meta is required')
+    for (const name of ['format', 'meta'] as const) {
+      if (!this.credential[name]) {
+        throw validationError('Invalid credential', {
+          code: 'missing_value',
+          path: [name],
+          message: `Credential ${name} is required`,
+          context: { expected: name === 'format' ? 'string' : 'object' },
+        })
+      }
     }
     return this.credential as Credential
   }

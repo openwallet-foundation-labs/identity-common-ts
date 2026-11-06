@@ -3,16 +3,26 @@ import type { SignJwsCallback } from '../callbacks'
 import { JoseInvalidArgumentError, JoseValidationError } from '../error'
 import type { Jwk } from '../jwk/z-jwk'
 import { decodeUnencodedPayload, encodeBase64UrlJson, unencodedCompactPayloadIssue } from '../utils/encoding'
+import { hasOwn } from '../utils/object'
 import { assertCriticalHeaderParameters, isPayloadBase64UrlEncoded } from './critical-headers'
 import type { JwsSigner } from './signer'
-import { zJwsProtectedHeader } from './z-jws'
+import {
+  type FlattenedJws,
+  type GeneralJws,
+  type JwsUnprotectedHeader,
+  zJwsProtectedHeader,
+  zJwsUnprotectedHeader,
+} from './z-jws'
+
+/** The payload of a JWS. An object is serialized as JSON, a string is encoded as UTF-8. */
+export type JwsPayload = Record<string, unknown> | string | Uint8Array
 
 export interface SignCompactJwsOptions {
   /** The protected header, validated against {@link zJwsProtectedHeader}. Its `alg` must be the signer's. */
   protectedHeader: Record<string, unknown>
 
   /** The payload. An object is serialized as JSON, a string is encoded as UTF-8. */
-  payload: Record<string, unknown> | string | Uint8Array
+  payload: JwsPayload
 
   /** The signer, which the callback resolves into a key. */
   signer: JwsSigner
@@ -21,7 +31,7 @@ export interface SignCompactJwsOptions {
   signJwsCallback: SignJwsCallback
 
   /**
-   * Whether to leave the payload out of the compact serialization, to carry it out of band.
+   * Whether to leave the payload out of the serialization, to carry it out of band.
    *
    * @default false
    */
@@ -42,6 +52,35 @@ export interface SignCompactJwsResult {
   signerJwk: Jwk
 }
 
+export interface SignFlattenedJwsOptions extends SignCompactJwsOptions {
+  /** The unprotected header, which is not covered by the signature. Its parameters must not be in the protected header. */
+  unprotectedHeader?: JwsUnprotectedHeader
+}
+
+export interface SignFlattenedJwsResult extends Omit<SignCompactJwsResult, 'compact'> {
+  /** The flattened JSON serialization. Without `payload` when `detachPayload` was set. */
+  jws: FlattenedJws
+}
+
+export interface SignGeneralJwsOptions
+  extends Pick<SignCompactJwsOptions, 'payload' | 'signJwsCallback' | 'detachPayload'> {
+  /** The signatures over the payload, each with its own headers and signer. All must agree on `b64`. */
+  signatures: [GeneralJwsSignatureOptions, ...GeneralJwsSignatureOptions[]]
+}
+
+export type GeneralJwsSignatureOptions = Pick<
+  SignFlattenedJwsOptions,
+  'protectedHeader' | 'unprotectedHeader' | 'signer'
+>
+
+export interface SignGeneralJwsResult {
+  /** The general JSON serialization. Without `payload` when `detachPayload` was set. */
+  jws: GeneralJws
+
+  /** The result of each signature, in the order of `signatures`. */
+  signatures: Array<Omit<SignCompactJwsResult, 'compact'>>
+}
+
 /**
  * Signs a JWS in compact serialization. The callback signs the exact bytes that end up in the token.
  *
@@ -54,15 +93,140 @@ export interface SignCompactJwsResult {
  *   outside printable ASCII.
  */
 export async function signCompactJws(options: SignCompactJwsOptions): Promise<SignCompactJwsResult> {
+  // A compact serialization has no unprotected header, whatever the options carry
+  const {
+    encodedProtectedHeader,
+    encodedPayload,
+    unprotectedHeader: _,
+    ...result
+  } = await signJwsPart({
+    ...options,
+    unprotectedHeader: undefined,
+    serialization: 'compact',
+  })
+
+  return {
+    compact: `${encodedProtectedHeader}.${options.detachPayload ? '' : encodedPayload}.${result.signature}`,
+    ...result,
+  }
+}
+
+/**
+ * Signs a JWS in flattened JSON serialization, which can carry an unprotected header.
+ *
+ * @throws See {@link signCompactJws}, except that an unencoded payload is not limited to printable ASCII.
+ * @throws JoseValidationError if the unprotected header is not an object, or has `crit`.
+ * @throws JoseInvalidArgumentError if a parameter is in both the protected and the unprotected header, or `b64` is in
+ *   the unprotected header.
+ * @see https://www.rfc-editor.org/rfc/rfc7515#section-7.2.2
+ */
+export async function signFlattenedJws(options: SignFlattenedJwsOptions): Promise<SignFlattenedJwsResult> {
+  const { encodedProtectedHeader, encodedPayload, unprotectedHeader, ...result } = await signJwsPart({
+    ...options,
+    serialization: 'json',
+  })
+
+  return {
+    jws: {
+      ...(options.detachPayload ? {} : { payload: encodedPayload }),
+      protected: encodedProtectedHeader,
+      ...(unprotectedHeader ? { header: unprotectedHeader } : {}),
+      signature: result.signature,
+    },
+    ...result,
+  }
+}
+
+/**
+ * Signs a JWS in general JSON serialization: one payload with one or more signatures.
+ *
+ * @throws See {@link signFlattenedJws}.
+ * @throws JoseInvalidArgumentError if there are no signatures, or they do not agree on `b64`, as they share the payload.
+ * @see https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
+ */
+export async function signGeneralJws(options: SignGeneralJwsOptions): Promise<SignGeneralJwsResult> {
+  if (options.signatures.length === 0) {
+    throw new JoseInvalidArgumentError(
+      'Unable to sign the JWS, a general JSON serialization needs at least one signature.'
+    )
+  }
+  // RFC 7797 section 3: the signatures share the payload, so they must agree on `b64`
+  if (new Set(options.signatures.map(({ protectedHeader }) => protectedHeader.b64 ?? true)).size > 1) {
+    throw new JoseInvalidArgumentError(
+      'Unable to sign the JWS, the signatures of a general JSON serialization must all use the same b64 value.'
+    )
+  }
+
+  const parts = []
+  for (const signature of options.signatures) {
+    parts.push(
+      await signJwsPart({
+        ...signature,
+        payload: options.payload,
+        signJwsCallback: options.signJwsCallback,
+        serialization: 'json',
+      })
+    )
+  }
+
+  const [{ encodedPayload }] = parts
+  return {
+    jws: {
+      ...(options.detachPayload ? {} : { payload: encodedPayload }),
+      signatures: parts.map(({ encodedProtectedHeader, unprotectedHeader, signature }) => ({
+        protected: encodedProtectedHeader,
+        ...(unprotectedHeader ? { header: unprotectedHeader } : {}),
+        signature,
+      })),
+    },
+    signatures: parts.map(({ signature, signingInput, signerJwk }) => ({ signature, signingInput, signerJwk })),
+  }
+}
+
+/** Validates the headers and signs the payload with them, for any serialization. */
+async function signJwsPart(
+  options: Omit<SignFlattenedJwsOptions, 'detachPayload'> & {
+    serialization: 'compact' | 'json'
+    detachPayload?: boolean
+  }
+) {
   const protectedHeader = parseWithErrorHandling(
     zJwsProtectedHeader,
     options.protectedHeader,
     'Unable to sign the JWS, invalid header',
     JoseValidationError
   )
+  // RFC 7515 section 7.2.1: an empty unprotected header is left out
+  const unprotectedHeader =
+    options.unprotectedHeader && Object.keys(options.unprotectedHeader).length > 0
+      ? parseWithErrorHandling(
+          zJwsUnprotectedHeader,
+          options.unprotectedHeader,
+          'Unable to sign the JWS, invalid unprotected header',
+          JoseValidationError
+        )
+      : undefined
+
+  // RFC 7515 section 7.2.1: the protected and the unprotected header are disjoint
+  const duplicates = Object.keys(unprotectedHeader ?? {}).filter((name) => hasOwn(protectedHeader, name))
+  if (duplicates.length > 0) {
+    throw new JoseInvalidArgumentError(
+      `Unable to sign the JWS, the header parameter(s) ${duplicates.map((name) => `'${name}'`).join(', ')} are in both the protected and the unprotected header.`
+    )
+  }
+  // RFC 7797 section 3: `b64` must be integrity protected. `parseJws` ignores it in the unprotected header.
+  if (unprotectedHeader && hasOwn(unprotectedHeader, 'b64')) {
+    throw new JoseInvalidArgumentError(
+      `Unable to sign the JWS, the header parameter 'b64' has to be in the protected header, as it must be integrity protected.`
+    )
+  }
 
   // A producer understands what it marks critical
-  assertCriticalHeaderParameters({ protectedHeader, understoodCriticalParameters: protectedHeader.crit ?? [] })
+  assertCriticalHeaderParameters({
+    protectedHeader,
+    unprotectedHeader,
+    understoodCriticalParameters: protectedHeader.crit ?? [],
+  })
 
   if (options.signer.alg !== protectedHeader.alg) {
     throw new JoseInvalidArgumentError(
@@ -85,7 +249,9 @@ export async function signCompactJws(options: SignCompactJwsOptions): Promise<Si
 
   // RFC 7797 section 5.2
   const compactPayloadIssue =
-    !isBase64UrlEncoded && !options.detachPayload ? unencodedCompactPayloadIssue(encodedPayload) : undefined
+    options.serialization === 'compact' && !isBase64UrlEncoded && !options.detachPayload
+      ? unencodedCompactPayloadIssue(encodedPayload)
+      : undefined
   if (compactPayloadIssue) {
     throw new JoseInvalidArgumentError(
       `Unable to sign the JWS. ${compactPayloadIssue} Detach the payload, or leave out 'b64' so that it is base64url encoded.`
@@ -96,6 +262,7 @@ export async function signCompactJws(options: SignCompactJwsOptions): Promise<Si
     signingInput,
     signingInputBytes: stringToBytes(signingInput),
     protectedHeader,
+    unprotectedHeader,
     payload,
     jwtPayload:
       typeof options.payload === 'object' && !(options.payload instanceof Uint8Array) ? options.payload : undefined,
@@ -108,10 +275,5 @@ export async function signCompactJws(options: SignCompactJwsOptions): Promise<Si
     )
   }
 
-  return {
-    compact: `${encodedProtectedHeader}.${options.detachPayload ? '' : encodedPayload}.${signature}`,
-    signature,
-    signingInput,
-    signerJwk,
-  }
+  return { encodedProtectedHeader, encodedPayload, unprotectedHeader, signature, signingInput, signerJwk }
 }
