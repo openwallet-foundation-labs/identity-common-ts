@@ -108,7 +108,7 @@ const { jws } = await signJades({
 await verifyJades({ jws, verifyJwsCallback, detachedPayload: payload })
 ```
 
-`sigD` is marked critical. For `ObjectIdByURIHash`, `hashM` and `hashV` are required and the JWS Payload contributes an empty stream to the signature computation, so no payload is given when signing or verifying. For `HttpHeaders`, `b64` is set to `false`, and `hashM`, `hashV` and `ctys` are prohibited.
+`sigD` is marked critical. For `ObjectIdByURIHash`, `hashM` and `hashV` are required and the JWS Payload contributes an empty stream to the signature computation, so no payload is given when signing or verifying. The signature then covers only the `hashV` digests: fetch each object of `pars` and compare its `hashM` digest with `hashV` yourself. For `HttpHeaders`, `b64` is set to `false`, and `hashM`, `hashV` and `ctys` are prohibited.
 
 ## Baseline Profiles
 

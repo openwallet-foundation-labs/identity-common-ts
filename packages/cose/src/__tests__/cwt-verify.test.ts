@@ -162,6 +162,12 @@ describe('CwtPayload.verifyClaims', () => {
     expect(error?.findIssue('expired')?.context).toEqual({ expiredAt: minutes(-5) })
   })
 
+  test('reports a claim that is both required and expected missing once', () => {
+    expect(() =>
+      CwtPayload.create({}).verifyClaims({ now, requiredClaims: [2], expectedSubject: 'https://other.example' })
+    ).toThrow(expect.objectContaining({ issues: [expect.objectContaining({ code: 'claim_missing', path: [2] })] }))
+  })
+
   test('applies the clock skew to the expiration', () => {
     const expirationTime = minutes(-0.25)
     const expired = payload({ expirationTime })

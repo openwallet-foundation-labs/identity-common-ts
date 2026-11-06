@@ -96,7 +96,9 @@ export interface SignJadesResult<Serialization extends JadesSerialization = 'com
 export async function signJades<Serialization extends JadesSerialization = 'compact'>(
   options: SignJadesOptions<Serialization>
 ): Promise<SignJadesResult<Serialization>> {
-  const { sigD, signingTime = getSigningTime(), signer, signJwsCallback } = options
+  const { signingTime = getSigningTime(), signer, signJwsCallback } = options
+  // Clause 5.2.8.1: a JWS Payload signed with sigD is detached, wherever sigD is given
+  const sigD = options.sigD ?? options.protectedHeader?.sigD
   const serialization = options.serialization ?? 'compact'
 
   const header: ProtectedHeaderParams = {

@@ -57,7 +57,19 @@ describe('signFlattenedJws', () => {
     ).resolves.toBeDefined()
   })
 
-  it('rejects a parameter in both headers, and crit in the unprotected header', async () => {
+  it('leaves out an empty unprotected header (RFC 7515 section 7.2.1)', async () => {
+    const { jws } = await signFlattenedJws({
+      protectedHeader: { alg: 'ES256' },
+      unprotectedHeader: {},
+      payload: 'payload',
+      signer,
+      signJwsCallback: signJws,
+    })
+
+    expect(jws).not.toHaveProperty('header')
+  })
+
+  it('rejects a parameter in both headers, and crit or b64 in the unprotected header', async () => {
     const sign = (unprotectedHeader: Record<string, unknown>) =>
       signFlattenedJws({
         protectedHeader: { alg: 'ES256', kid: 'key-1' },
@@ -69,6 +81,8 @@ describe('signFlattenedJws', () => {
 
     await expect(sign({ kid: 'key-2' })).rejects.toThrow(JoseInvalidArgumentError)
     await expect(sign({ crit: ['example'] })).rejects.toThrow(validationIssue(['crit'], 'invalid_crit'))
+    // RFC 7797 section 3
+    await expect(sign({ b64: false })).rejects.toThrow("'b64' has to be in the protected header")
   })
 })
 
@@ -100,10 +114,10 @@ describe('signGeneralJws', () => {
     ).resolves.toBeDefined()
   })
 
-  it('rejects signatures that encode the payload differently', async () => {
+  it('rejects signatures that disagree on b64, also for an empty payload that encodes the same', async () => {
     await expect(
       signGeneralJws({
-        payload: 'payload',
+        payload: '',
         signJwsCallback: signJws,
         signatures: [
           { protectedHeader: { alg: 'ES256' }, signer },
@@ -111,5 +125,11 @@ describe('signGeneralJws', () => {
         ],
       })
     ).rejects.toThrow('same b64 value')
+  })
+
+  it('rejects an empty list of signatures', async () => {
+    await expect(
+      signGeneralJws({ payload: 'payload', signJwsCallback: signJws, signatures: [] as never })
+    ).rejects.toThrow(JoseInvalidArgumentError)
   })
 })

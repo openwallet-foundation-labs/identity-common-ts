@@ -26,7 +26,10 @@ const zStatusListJwtHeader = z.object({ ...zJwtHeader.shape, typ: zTyp(StatusLis
 export interface VerifyRegistrationCertificateStatusOptions {
   /** The `status` of the registration certificate payload */
   status: Status
-  /** Verify the signature of the status list, which the registration certificate provider signs (REV-6.2.6.2-05) */
+  /**
+   * Verify the signature of the status list, which the registration certificate provider signs (REV-6.2.6.2-05). A CWT
+   * status list must carry its chain in the protected `x5chain` header, as `verifyCose` gets no other key reference.
+   */
   callbacks: VerifyRegistrationCertificateCallbacks
   /** The time to check the status list at; defaults to now */
   now?: Date

@@ -374,11 +374,7 @@ export class CwtPayload<Structure extends AnyTypedMap = CwtPayloadDecodedStructu
     // this CWT type adds — which has no accessor here — can be required too.
     for (const key of requiredClaims ?? []) {
       if (!this.structure.has(key)) {
-        issues.add({
-          code: 'claim_missing',
-          ...at(key),
-          message: `The token has no ${claimLabel(key, keyLabels)} claim, which is required`,
-        })
+        addClaimMissing(issues, at, key, `The token has no ${claimLabel(key, keyLabels)} claim, which is required`)
       }
     }
 
@@ -420,6 +416,12 @@ type ClaimIssues = ValidationIssues<'claim_missing' | 'claim_value_mismatch' | '
 /** The `path` and `pathLabels` of the issue of a claim */
 type ClaimPath = (key: number | string) => { path: (number | string)[]; pathLabels: (number | string)[] }
 
+/** A required claim is absent. A claim is reported once, however many checks need it. */
+function addClaimMissing(issues: ClaimIssues, at: ClaimPath, key: number | string, message: string): void {
+  const reported = issues.issues.some((issue) => issue.code === 'claim_missing' && issue.path[0] === key)
+  if (!reported) issues.add({ code: 'claim_missing', ...at(key), message })
+}
+
 function verifyClaimMatches(
   issues: ClaimIssues,
   at: ClaimPath,
@@ -435,11 +437,12 @@ function verifyClaimMatches(
   // An absent claim is a mismatch rather than something to skip: a token that does not say who
   // issued it is not a token issued by the expected issuer.
   if (value === undefined) {
-    issues.add({
-      code: 'claim_missing',
-      ...at(key),
-      message: `The token has no ${claimLabel(key, keyLabels)} claim, which is required to match the expected value ${quoted(expectedValues)}`,
-    })
+    addClaimMissing(
+      issues,
+      at,
+      key,
+      `The token has no ${claimLabel(key, keyLabels)} claim, which is required to match the expected value ${quoted(expectedValues)}`
+    )
   } else if (!expectedValues.includes(value)) {
     issues.add({
       code: 'claim_value_mismatch',
@@ -465,11 +468,12 @@ function verifyAudienceMatches(
 
   // See `verifyClaimMatches`: a token carrying no audience is not a token for this audience.
   if (audience === undefined) {
-    issues.add({
-      code: 'claim_missing',
-      ...at(key),
-      message: `The token has no ${claimLabel(key, keyLabels)} claim, which is required to match the expected value ${quoted(expectedValues)}`,
-    })
+    addClaimMissing(
+      issues,
+      at,
+      key,
+      `The token has no ${claimLabel(key, keyLabels)} claim, which is required to match the expected value ${quoted(expectedValues)}`
+    )
     return
   }
 

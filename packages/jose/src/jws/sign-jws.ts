@@ -93,8 +93,15 @@ export interface SignGeneralJwsResult {
  *   outside printable ASCII.
  */
 export async function signCompactJws(options: SignCompactJwsOptions): Promise<SignCompactJwsResult> {
-  const { encodedProtectedHeader, encodedPayload, ...result } = await signJwsPart({
+  // A compact serialization has no unprotected header, whatever the options carry
+  const {
+    encodedProtectedHeader,
+    encodedPayload,
+    unprotectedHeader: _,
+    ...result
+  } = await signJwsPart({
     ...options,
+    unprotectedHeader: undefined,
     serialization: 'compact',
   })
 
@@ -109,7 +116,8 @@ export async function signCompactJws(options: SignCompactJwsOptions): Promise<Si
  *
  * @throws See {@link signCompactJws}, except that an unencoded payload is not limited to printable ASCII.
  * @throws JoseValidationError if the unprotected header is not an object, or has `crit`.
- * @throws JoseInvalidArgumentError if a parameter is in both the protected and the unprotected header.
+ * @throws JoseInvalidArgumentError if a parameter is in both the protected and the unprotected header, or `b64` is in
+ *   the unprotected header.
  * @see https://www.rfc-editor.org/rfc/rfc7515#section-7.2.2
  */
 export async function signFlattenedJws(options: SignFlattenedJwsOptions): Promise<SignFlattenedJwsResult> {
@@ -133,10 +141,22 @@ export async function signFlattenedJws(options: SignFlattenedJwsOptions): Promis
  * Signs a JWS in general JSON serialization: one payload with one or more signatures.
  *
  * @throws See {@link signFlattenedJws}.
- * @throws JoseInvalidArgumentError if the signatures do not agree on `b64`, as they share the payload.
+ * @throws JoseInvalidArgumentError if there are no signatures, or they do not agree on `b64`, as they share the payload.
  * @see https://www.rfc-editor.org/rfc/rfc7515#section-7.2.1
  */
 export async function signGeneralJws(options: SignGeneralJwsOptions): Promise<SignGeneralJwsResult> {
+  if (options.signatures.length === 0) {
+    throw new JoseInvalidArgumentError(
+      'Unable to sign the JWS, a general JSON serialization needs at least one signature.'
+    )
+  }
+  // RFC 7797 section 3: the signatures share the payload, so they must agree on `b64`
+  if (new Set(options.signatures.map(({ protectedHeader }) => protectedHeader.b64 ?? true)).size > 1) {
+    throw new JoseInvalidArgumentError(
+      'Unable to sign the JWS, the signatures of a general JSON serialization must all use the same b64 value.'
+    )
+  }
+
   const parts = []
   for (const signature of options.signatures) {
     parts.push(
@@ -149,14 +169,7 @@ export async function signGeneralJws(options: SignGeneralJwsOptions): Promise<Si
     )
   }
 
-  // RFC 7797 section 7: the payload is encoded once, so every signature has to encode it the same way
   const [{ encodedPayload }] = parts
-  if (parts.some((part) => part.encodedPayload !== encodedPayload)) {
-    throw new JoseInvalidArgumentError(
-      'Unable to sign the JWS, the signatures of a general JSON serialization must all use the same b64 value.'
-    )
-  }
-
   return {
     jws: {
       ...(options.detachPayload ? {} : { payload: encodedPayload }),
@@ -183,20 +196,28 @@ async function signJwsPart(
     'Unable to sign the JWS, invalid header',
     JoseValidationError
   )
-  const unprotectedHeader = options.unprotectedHeader
-    ? parseWithErrorHandling(
-        zJwsUnprotectedHeader,
-        options.unprotectedHeader,
-        'Unable to sign the JWS, invalid unprotected header',
-        JoseValidationError
-      )
-    : undefined
+  // RFC 7515 section 7.2.1: an empty unprotected header is left out
+  const unprotectedHeader =
+    options.unprotectedHeader && Object.keys(options.unprotectedHeader).length > 0
+      ? parseWithErrorHandling(
+          zJwsUnprotectedHeader,
+          options.unprotectedHeader,
+          'Unable to sign the JWS, invalid unprotected header',
+          JoseValidationError
+        )
+      : undefined
 
   // RFC 7515 section 7.2.1: the protected and the unprotected header are disjoint
   const duplicates = Object.keys(unprotectedHeader ?? {}).filter((name) => hasOwn(protectedHeader, name))
   if (duplicates.length > 0) {
     throw new JoseInvalidArgumentError(
       `Unable to sign the JWS, the header parameter(s) ${duplicates.map((name) => `'${name}'`).join(', ')} are in both the protected and the unprotected header.`
+    )
+  }
+  // RFC 7797 section 3: `b64` must be integrity protected. `parseJws` ignores it in the unprotected header.
+  if (unprotectedHeader && hasOwn(unprotectedHeader, 'b64')) {
+    throw new JoseInvalidArgumentError(
+      `Unable to sign the JWS, the header parameter 'b64' has to be in the protected header, as it must be integrity protected.`
     )
   }
 

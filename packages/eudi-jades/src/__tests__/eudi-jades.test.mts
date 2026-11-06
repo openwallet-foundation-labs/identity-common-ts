@@ -1,6 +1,7 @@
 import { ES256, parseCertificateChain } from '@owf/crypto'
 import { base64urlEncode, bytesToString } from '@owf/identity-common'
 import {
+  JoseParseError,
   JoseSignatureVerificationError,
   JoseValidationError,
   type JwsSigner,
@@ -209,6 +210,28 @@ describe('signing and verification', () => {
     await expect(verifyJades({ jws, verifyJwsCallback })).rejects.toThrow('detached payload')
     const verified = await verifyJades({ jws, verifyJwsCallback, detachedPayload: payload })
     expect(bytesToString(verified.payload)).toBe(payload)
+  })
+
+  it('allows sigD only with a detached payload (clause 5.2.8.1)', async () => {
+    const payload = 'detached content'
+    const sigD = { mId: DETACHED_MECHANISM_IDS.objectByUri, pars: ['https://example.test/object'] }
+
+    const { jws } = await sign({ serialization: 'flattened', protectedHeader: { sigD }, payload })
+
+    expect(jws.payload).toBeUndefined()
+    expect(() => decodeJades({ jws: { ...jws, payload: base64urlEncode(payload) } })).toThrow(
+      expect.objectContaining({ issues: [expect.objectContaining({ code: 'not_allowed', path: ['payload'] })] })
+    )
+  })
+
+  it('rejects a malformed JWS with a package error', async () => {
+    const { jws } = await sign({ serialization: 'flattened' })
+
+    for (const header of [{ kid: 'x' }, { etsiU: 'abc' }, { etsiU: [null] }]) {
+      expect(() => decodeJades({ jws: { ...jws, header } })).toThrow(JadesValidationError)
+    }
+    expect(() => decodeJades({ jws: null as never })).toThrow(JoseParseError)
+    expect(() => decodeJades({ jws: { signatures: null } as never })).toThrow(JoseValidationError)
   })
 
   it('rejects critical extensions unless the verifier understands them', async () => {

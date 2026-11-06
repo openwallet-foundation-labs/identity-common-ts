@@ -1,4 +1,5 @@
 /** JAdES decoding and verification (ETSI TS 119 182-1 V1.2.1), on the JWS verification of `@owf/jose`. */
+import { type SchemaValidationCode, ValidationIssues } from '@owf/identity-common'
 import {
   decodeBase64UrlJsonObject,
   type FlattenedJws,
@@ -18,6 +19,7 @@ import { JadesValidationError } from './jades-error'
 import { type ProfileValidationOptions, validateProfile } from './profile'
 import type { zProtectedHeader, zUnprotectedHeader } from './schemas'
 import type { ProtectedHeader, UnprotectedHeaderParams } from './types'
+import type { JadesValidationCode } from './validation'
 
 export interface DecodeJadesOptions {
   /** The signature: a compact serialization, or a flattened or general JSON serialization */
@@ -79,9 +81,10 @@ export interface VerifyJadesJwtOptions
  */
 export function decodeJades(options: DecodeJadesOptions): DecodedJades {
   const signatureIndex = options.signatureIndex ?? 0
+  const objectByUriHash = isObjectByUriHash(options.jws, signatureIndex)
   const decoded = parseJws({
     jws: options.jws,
-    detachedPayload: isObjectByUriHash(options.jws, signatureIndex) ? '' : options.detachedPayload,
+    detachedPayload: objectByUriHash ? '' : options.detachedPayload,
     signatureIndex,
     understoodCriticalParameters: [...CRITICAL_PARAMETERS, ...(options.understoodCriticalParameters ?? [])],
   })
@@ -90,6 +93,18 @@ export function decodeJades(options: DecodeJadesOptions): DecodedJades {
   const profile = options.profile ?? JadesProfile.B_B
   const protectedHeader = decoded.protectedHeader as ProtectedHeader
   const unprotectedHeader = decoded.unprotectedHeader as UnprotectedHeaderParams | undefined
+
+  // The payload is attached here, as without a detached payload `parseJws` rejects a JWS that has none
+  if (protectedHeader.sigD && !objectByUriHash && options.detachedPayload === undefined) {
+    const issues = new ValidationIssues<JadesValidationCode | SchemaValidationCode>()
+    issues.add({
+      code: 'not_allowed',
+      path: ['payload'],
+      message: 'sigD is not allowed in a signature whose JWS Payload is attached (clause 5.2.8.1)',
+    })
+    throw new JadesValidationError('Invalid JAdES signature', issues.issues)
+  }
+
   const result = validateProfile(protectedHeader, profile, unprotectedHeader, options.profileOptions)
   if (!result.valid) {
     throw new JadesValidationError(`The signature does not meet the JAdES ${profile} profile`, result.issues)
@@ -99,7 +114,9 @@ export function decodeJades(options: DecodeJadesOptions): DecodedJades {
 }
 
 /**
- * Verify a JAdES signature: {@link decodeJades}, and then the signature through `verifyJwsCallback`.
+ * Verify a JAdES signature: {@link decodeJades}, and then the signature through `verifyJwsCallback`. For
+ * `ObjectIdByURIHash` the signature covers the `hashV` digests only, so the caller checks each object of `pars` against
+ * them.
  *
  * @throws The errors of {@link decodeJades}, and of `verifyJwsSignature` of `@owf/jose`
  */
@@ -141,14 +158,13 @@ export async function verifyJadesJwt({
 
 /** Whether the signature uses `ObjectIdByURIHash`, whose empty JWS Payload the caller is not given (clause 5.2.8.3) */
 function isObjectByUriHash(jws: DecodeJadesOptions['jws'], signatureIndex: number): boolean {
-  const encoded =
-    typeof jws === 'string'
-      ? jws.split('.')[0]
-      : 'signatures' in jws
-        ? (jws as GeneralJws).signatures[signatureIndex]?.protected
-        : (jws as FlattenedJws).protected
-
   try {
+    const encoded =
+      typeof jws === 'string'
+        ? jws.split('.')[0]
+        : 'signatures' in jws
+          ? (jws as GeneralJws).signatures[signatureIndex]?.protected
+          : (jws as FlattenedJws).protected
     const { sigD } = decodeBase64UrlJsonObject(encoded ?? '', 'JWS protected header') as { sigD?: { mId?: unknown } }
     return sigD?.mId === DETACHED_MECHANISM_IDS.objectByUriHash
   } catch {

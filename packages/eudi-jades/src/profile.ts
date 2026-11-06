@@ -28,15 +28,19 @@ type EtsiUItem = Record<string, unknown>
 type Issues = ValidationIssues<JadesValidationCode | SchemaValidationCode>
 
 function decodeEtsiU(header?: UnprotectedHeaderParams): EtsiUItem[] {
-  if (!header) return []
-  return header.etsiU.flatMap((item) => {
-    if (typeof item !== 'string') return [item as EtsiUItem]
-    try {
-      const decoded = base64urlDecodeJson(item)
-      return typeof decoded === 'object' && decoded !== null ? [decoded as EtsiUItem] : []
-    } catch {
-      return []
+  // Read before the header is validated, so `etsiU` and its items can be anything
+  const etsiU: unknown = header?.etsiU
+  if (!Array.isArray(etsiU)) return []
+  return etsiU.flatMap((item) => {
+    let decoded: unknown = item
+    if (typeof item === 'string') {
+      try {
+        decoded = base64urlDecodeJson(item)
+      } catch {
+        return []
+      }
     }
+    return typeof decoded === 'object' && decoded !== null && !Array.isArray(decoded) ? [decoded as EtsiUItem] : []
   })
 }
 
