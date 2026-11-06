@@ -1,5 +1,12 @@
+import { ValidationIssues } from '@owf/identity-common'
 import { deflate, inflate } from 'pako'
-import { STATUS_LIST_VALIDATION_CODES, StatusListError, StatusListValidationError } from './status-list-error'
+import {
+  STATUS_LIST_VALIDATION_CODES,
+  StatusListError,
+  type StatusListValidationCode,
+  type StatusListValidationContexts,
+  StatusListValidationError,
+} from './status-list-error'
 import { type BitsPerStatus, StatusType } from './types'
 
 /**
@@ -15,6 +22,8 @@ function assertStatusValue(value: number, bitsPerStatus: BitsPerStatus, index: n
   }
 }
 
+type StatusListIssues = ValidationIssues<StatusListValidationCode, StatusListValidationContexts>
+
 // Draft 16 § 8.3: an index outside the list must reject the Referenced Token, and NaN or a fraction would read undefined
 function isIndexOf(statusList: StatusList, index: number): boolean {
   return Number.isInteger(index) && index >= 0 && index < statusList.totalStatuses
@@ -26,31 +35,27 @@ function isIndexOf(statusList: StatusList, index: number): boolean {
  * @throws StatusListValidationError with an `index_out_of_range` or `status_not_valid` issue.
  */
 export function verifyStatusValid(statusList: StatusList, idx: number): void {
+  const issues: StatusListIssues = new ValidationIssues()
   const { totalStatuses } = statusList
-  if (!isIndexOf(statusList, idx)) {
-    throw new StatusListValidationError('The Referenced Token is not in the status list', [
-      {
-        severity: 'error',
-        path: [],
-        code: STATUS_LIST_VALIDATION_CODES.INDEX_OUT_OF_RANGE,
-        message: `Index out of bounds: ${idx} is not an index of a list of ${totalStatuses} statuses`,
-        context: { idx, totalStatuses },
-      },
-    ])
-  }
 
-  const status = statusList.getStatus(idx)
-  if (status !== StatusType.Valid) {
-    throw new StatusListValidationError('The Referenced Token is not Valid', [
-      {
-        severity: 'error',
-        path: [],
+  if (!isIndexOf(statusList, idx)) {
+    issues.add({
+      code: STATUS_LIST_VALIDATION_CODES.INDEX_OUT_OF_RANGE,
+      message: `Index out of bounds: ${idx} is not an index of a list of ${totalStatuses} statuses`,
+      context: { idx, totalStatuses },
+    })
+  } else {
+    const status = statusList.getStatus(idx)
+    if (status !== StatusType.Valid) {
+      issues.add({
         code: STATUS_LIST_VALIDATION_CODES.STATUS_NOT_VALID,
         message: `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`,
         context: { idx, status },
-      },
-    ])
+      })
+    }
   }
+
+  if (issues.issues.length) throw new StatusListValidationError('The Referenced Token is not Valid', issues.issues)
 }
 
 /**
@@ -138,14 +143,12 @@ export class StatusList {
       const statusList = StatusList.decodeStatusListFromByteArray(decompressed, bitsPerStatus)
       return new StatusList(statusList, bitsPerStatus, aggregationUri)
     } catch (err: unknown) {
-      throw new StatusListValidationError('The status list cannot be decompressed', [
-        {
-          severity: 'error',
-          path: [],
-          code: STATUS_LIST_VALIDATION_CODES.INVALID_STATUS_LIST,
-          message: `Not a status list compressed with zlib: ${err instanceof Error ? err.message : String(err)}`,
-        },
-      ])
+      const issues: StatusListIssues = new ValidationIssues()
+      issues.add({
+        code: STATUS_LIST_VALIDATION_CODES.INVALID_STATUS_LIST,
+        message: `Not a status list compressed with zlib: ${err instanceof Error ? err.message : String(err)}`,
+      })
+      throw new StatusListValidationError('The status list cannot be decompressed', issues.issues)
     }
   }
 
