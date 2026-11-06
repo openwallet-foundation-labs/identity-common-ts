@@ -66,7 +66,6 @@ describe('decodeOpenid4vpRegistrationCertificate', () => {
   it.each([
     ['a JWT in base64url', openid4vpRegistrationCertificateVerifierInfo(jws), base64url.encode(stringToBytes(jws))],
     ['a JWT as is', openid4vpRegistrationCertificateVerifierInfo(jws, { encoding: 'compact' }), jws],
-    ['a CWT in base64url', openid4vpRegistrationCertificateVerifierInfo(cwt), base64url.encode(cwt)],
   ])('creates and decodes %s', (_, element, data) => {
     expect(element).toEqual({ format: 'registration_cert', data })
     expect(decodeOpenid4vpRegistrationCertificate([element], SUB)?.payload).toStrictEqual(payload)
@@ -77,20 +76,10 @@ describe('decodeOpenid4vpRegistrationCertificate', () => {
     { format: 'registration_cert', data, ...element },
   ]
 
-  it('decodes a CWT registration certificate in base64url', () => {
-    const decoded = decodeOpenid4vpRegistrationCertificate(verifierInfo(base64url.encode(cwt)), SUB)
-
-    expect(decoded && 'cwt' in decoded && decoded.cwt).toStrictEqual(cwt)
-    expect(decoded?.payload).toStrictEqual(payload)
-  })
-
-  it.each([
-    ['as its compact serialization', jws],
-    ['in base64url', base64url.encode(stringToBytes(jws))],
-  ])('decodes a JWT registration certificate %s', (_, data) => {
-    const decoded = decodeOpenid4vpRegistrationCertificate(verifierInfo(data), SUB)
-
-    expect(decoded && 'jws' in decoded && decoded.jws).toBe(jws)
+  it('rejects a CWT registration certificate, which is for mdoc requests', () => {
+    expect(() => decodeOpenid4vpRegistrationCertificate(verifierInfo(base64url.encode(cwt)), SUB)).toThrow(
+      expect.objectContaining({ issues: [expect.objectContaining({ code: 'invalid_format' })] })
+    )
   })
 
   it('returns undefined without a registration certificate', () => {

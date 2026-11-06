@@ -33,8 +33,8 @@ export function mdocRegistrationCertificateExtension(registrationCertificate: Ui
 /** Options for {@link openid4vpRegistrationCertificateVerifierInfo} */
 export interface Openid4vpRegistrationCertificateVerifierInfoOptions {
   /**
-   * How `data` carries a JWT: `base64url` encoded, as OIDFVP-HAIP-COMMON-REQ-RO-16 asks, or as the `compact` serialization
-   * itself. A CWT is always base64url encoded.
+   * How `data` carries the JWT: `base64url` encoded, as OIDFVP-HAIP-COMMON-REQ-RO-16 asks, or as the `compact`
+   * serialization itself
    *
    * @default 'base64url'
    */
@@ -42,32 +42,18 @@ export interface Openid4vpRegistrationCertificateVerifierInfoOptions {
 }
 
 /**
- * The `verifier_info` element that carries a registration certificate in an OpenID4VP request
+ * The `verifier_info` element that carries a registration certificate in an OpenID4VP request. Only a JWT, as a CWT is
+ * for mdoc requests.
  *
- * @param registrationCertificate - A compact JWS or a CWT
+ * @param registrationCertificate - A compact JWS
  */
 export function openid4vpRegistrationCertificateVerifierInfo(
   registrationCertificate: string,
-  options?: Openid4vpRegistrationCertificateVerifierInfoOptions
-): { format: 'registration_cert'; data: string }
-export function openid4vpRegistrationCertificateVerifierInfo(registrationCertificate: Uint8Array): {
-  format: 'registration_cert'
-  data: string
-}
-export function openid4vpRegistrationCertificateVerifierInfo(
-  registrationCertificate: string | Uint8Array,
   { encoding = 'base64url' }: Openid4vpRegistrationCertificateVerifierInfoOptions = {}
 ): { format: 'registration_cert'; data: string } {
   return {
     format: OPENID4VP_REGISTRATION_CERTIFICATE_FORMAT,
-    data:
-      typeof registrationCertificate === 'string' && encoding === 'compact'
-        ? registrationCertificate
-        : base64url.encode(
-            typeof registrationCertificate === 'string'
-              ? stringToBytes(registrationCertificate)
-              : registrationCertificate
-          ),
+    data: encoding === 'compact' ? registrationCertificate : base64url.encode(stringToBytes(registrationCertificate)),
   }
 }
 
@@ -105,10 +91,10 @@ export function decodeMdocRegistrationCertificate(
 
 /**
  * Decode the registration certificate a verifier sends in the `verifier_info` of an OpenID4VP request, without
- * cryptographic verification.
+ * cryptographic verification. Only a JWT is accepted, as a CWT is for mdoc requests.
  *
- * OIDFVP-HAIP-COMMON-REQ-RO-16 has `data` be the base64url encoding of the serialized registration certificate, which
- * for a CWT is the base64url of its bytes. A JWT is accepted both as its compact serialization and in that encoding.
+ * OIDFVP-HAIP-COMMON-REQ-RO-16 has `data` be the base64url encoding of the serialized registration certificate. The
+ * compact serialization itself is accepted too.
  *
  * @param verifierInfo - The `verifier_info` of the request
  * @returns The decoded registration certificate, or `undefined` when `verifier_info` has none
@@ -117,7 +103,7 @@ export function decodeMdocRegistrationCertificate(
 export function decodeOpenid4vpRegistrationCertificate(
   verifierInfo: ReadonlyArray<{ format: string; data: unknown; credential_ids?: unknown }> | undefined,
   accessCertificateSub: string
-): SignedRegistrationCertificateJwt | SignedRegistrationCertificateCwt | undefined {
+): SignedRegistrationCertificateJwt | undefined {
   const index = verifierInfo?.findIndex(({ format }) => format === OPENID4VP_REGISTRATION_CERTIFICATE_FORMAT) ?? -1
   if (!verifierInfo || index === -1) return undefined
 
@@ -165,7 +151,7 @@ export function decodeOpenid4vpRegistrationCertificate(
       context: { format: 'base64url' },
     })
   }
-  return decodeSerializedRegistrationCertificate(bytes, accessCertificateSub)
+  return decodeRegistrationCertificateJwt(bytesToString(bytes), accessCertificateSub)
 }
 
 /** Decode a serialized registration certificate of either format of GEN-5.2.1-01 */

@@ -284,7 +284,7 @@ It returns `undefined` when the request has none. The CIR asks for a CBOR-encode
 
 ### Registration certificates in OpenID4VP requests
 
-A verifier sends its registration certificate as an element of `verifier_info` with `format` `registration_cert` (ETSI TS 119 472-2 clause 6.3.2.2). `openid4vpRegistrationCertificateVerifierInfo` gives that element, with `data` base64url encoded, as OIDFVP-HAIP-COMMON-REQ-RO-16 asks. A JWT can be sent as its compact serialization instead:
+A verifier sends its registration certificate as an element of `verifier_info` with `format` `registration_cert` (ETSI TS 119 472-2 clause 6.3.2.2). Only a JWT registration certificate is sent this way, as a CWT is for mdoc requests. `openid4vpRegistrationCertificateVerifierInfo` gives that element, with `data` base64url encoded, as OIDFVP-HAIP-COMMON-REQ-RO-16 asks, or as the compact serialization itself:
 
 ```typescript
 import { openid4vpRegistrationCertificateVerifierInfo } from '@owf/eudi-registration-certificate'
@@ -306,7 +306,7 @@ const registrationCertificate = decodeOpenid4vpRegistrationCertificate(
 )
 ```
 
-OIDFVP-HAIP-COMMON-REQ-RO-16 has `data` be the base64url encoding of the serialized registration certificate. That is read for a CWT and a JWT, and a JWT is also read as its compact serialization. It returns `undefined` when `verifier_info` has no registration certificate, and rejects more than one, an element with `credential_ids` (RO-14) and `data` that is not a string.
+`data` is read as a base64url encoded or a compact JWT, and anything else, a CWT included, is rejected. It returns `undefined` when `verifier_info` has no registration certificate, and rejects more than one, an element with `credential_ids` (RO-14) and `data` that is not a string.
 
 ### Verifying a registration certificate
 
@@ -525,7 +525,7 @@ This library is **platform agnostic** and works in:
 
 - `mdocRegistrationCertificateExtension(registrationCertificate)` - The `euWrprc` entry for the `requestInfo` of an `ItemsRequest`
 - `decodeMdocRegistrationCertificate(requestInfo, accessCertificateSub)` - Decode the registration certificate of an mdoc request
-- `openid4vpRegistrationCertificateVerifierInfo(registrationCertificate, options)` - The `registration_cert` element of `verifier_info`
+- `openid4vpRegistrationCertificateVerifierInfo(jws, options)` - The `registration_cert` element of `verifier_info`
 - `decodeOpenid4vpRegistrationCertificate(verifierInfo, accessCertificateSub)` - Decode the registration certificate of an OpenID4VP request
 
 ### Verification
