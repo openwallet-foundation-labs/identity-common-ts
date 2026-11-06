@@ -5,7 +5,7 @@
  */
 
 import { parseCertificateChain, sha256, sha384, sha512 } from '@owf/crypto'
-import { base64, base64urlEncode, uint8ArrayToBase64Url } from '@owf/identity-common'
+import { base64, uint8ArrayToBase64Url } from '@owf/identity-common'
 import { JadesError } from './jades-error'
 import type { X5tO } from './types'
 
@@ -85,29 +85,8 @@ export function generateSigX5ts(certsDer: string[], algorithm: 'SHA-256' | 'SHA-
 }
 
 /**
- * Encode an object as a base64url JSON string.
- *
- * @param obj - Object to encode
- * @returns Base64url-encoded JSON string
- * @internal
- */
-export function encodeJson(obj: object): string {
-  return base64urlEncode(JSON.stringify(obj))
-}
-
-/**
- * Get current ISO 8601 timestamp for sigT header.
- *
- * @returns ISO 8601 timestamp string
+ * The current time as the integer Unix seconds of the `iat` claimed signing time.
  */
 export function getSigningTime(): number {
   return Math.floor(Date.now() / 1000)
-}
-
-/**
- * Return the historical sigT representation accepted for signatures created before
- * 2025-07-15. New signatures have to use the integer iat parameter instead.
- */
-export function getLegacySigningTime(date = new Date()): string {
-  return date.toISOString().replace(/\.\d{3}Z$/, 'Z')
 }

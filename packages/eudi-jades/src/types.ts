@@ -1,5 +1,4 @@
 /** Types derived from the ETSI TS 119 182-1 V1.2.1 runtime schemas. */
-import type { Hasher } from '@owf/identity-common'
 import type { z } from 'zod'
 import type {
   zAdoTst,
@@ -7,8 +6,6 @@ import type {
   zCommitmentReference,
   zEtsiU,
   zEtsiUClearInstance,
-  zFlattenedJws,
-  zGeneralJws,
   zOid,
   zPkiObject,
   zProtectedHeader,
@@ -20,14 +17,12 @@ import type {
   zSignaturePolicy,
   zSignatureProductionPlace,
   zSignerAttributes,
-  zSignOptions,
   zSigTst,
   zTstContainer,
   zTstToken,
   zTstTokens,
   zUnprotectedHeader,
   zValidationValues,
-  zVerifyOptions,
   zX5tO,
   zXRefs,
   zXVals,
@@ -59,16 +54,3 @@ export type CertId = z.infer<typeof zCertId>
 export type XRefs = z.infer<typeof zXRefs>
 export type RRefs = z.infer<typeof zRRefs>
 export type ArcTst = TstContainer
-export type GeneralJws = z.infer<typeof zGeneralJws>
-export type FlattenedJws = z.infer<typeof zFlattenedJws>
-export type CompactJws = string
-
-/** Callbacks the token needs from its host environment. */
-export type TokenContext = {
-  hasher: Hasher
-}
-
-export type SignOptions = z.infer<typeof zSignOptions> & {
-  signer: (data: string) => Promise<string>
-}
-export type VerifyOptions = z.infer<typeof zVerifyOptions>

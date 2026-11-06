@@ -7,8 +7,11 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
-import type { Signer } from '@owf/crypto'
+import type { CoseKey, Sign1Context, SignatureAlgorithm } from '@owf/cose'
+import type { OrPromise } from '@owf/identity-common'
+import type { SignJwsCallback, VerifyJwsCallback } from '@owf/jose'
 import type { z } from 'zod'
+import type { RegistrationCertificateCwtPayload } from './cwt'
 import type { RegistrationCertificateDialect } from './dialect'
 import type {
   zClaim,
@@ -98,7 +101,7 @@ export type RegistrationCertificateCwt = z.infer<typeof zRegistrationCertificate
 // ============================================================================
 
 /** Signed JWT registration certificate (compact JWS format) */
-export interface SignedRegistrationCertificate {
+export interface SignedRegistrationCertificateJwt {
   /** The compact JWS string */
   jws: string
   /** Decoded header */
@@ -107,8 +110,18 @@ export interface SignedRegistrationCertificate {
   payload: RegistrationCertificatePayload
 }
 
-/** Options for signing a registration certificate */
-export interface SignOptions {
+/** Signed CWT registration certificate (COSE_Sign1) */
+export interface SignedRegistrationCertificateCwt {
+  /** The encoded COSE_Sign1 */
+  cwt: Uint8Array
+  /** Decoded protected header */
+  header: RegistrationCertificateCwtHeader
+  /** Decoded payload */
+  payload: RegistrationCertificatePayload
+}
+
+/** Options for signing a registration certificate as a JWT */
+export interface SignJwtOptions {
   /** The registration certificate payload to sign */
   payload: RegistrationCertificatePayload
   /** Required subject of the access certificate the registration certificate is intended to authorize */
@@ -123,8 +136,55 @@ export interface SignOptions {
   signingTime?: number | string | Date
   /** Wire dialect to emit; defaults to ETSI TS 119 475 v1.2.1 as published */
   dialect?: RegistrationCertificateDialect
-  /** Signer function for signing the JWS */
-  signer: Signer
+  /** Signs the JWS with the key of the first certificate, see `@owf/jose` */
+  signJwsCallback: SignJwsCallback
+}
+
+/** Options for signing a registration certificate as a CWT */
+export interface SignCwtOptions extends Pick<SignJwtOptions, 'accessCertificateSub' | 'certificates'> {
+  /**
+   * The payload: a registration certificate payload, or its CBOR claims set, to extend or modify it before it is signed
+   */
+  payload: RegistrationCertificatePayload | RegistrationCertificateCwtPayload
+  /** Wire dialect of a registration certificate payload; defaults to ETSI TS 119 475 v1.2.1 as published */
+  dialect?: RegistrationCertificateDialect
+  /** The key to sign with */
+  signingKey: CoseKey
+  /** Signature algorithm; defaults to the algorithm of `signingKey` */
+  algorithm?: SignatureAlgorithm
+  /** Signs the COSE_Sign1 with `signingKey`, see `@owf/cose` */
+  signCoseCallback: Sign1Context['sign']
+}
+
+// ============================================================================
+// Verification Types
+// ============================================================================
+
+/**
+ * Verifies the signature of a COSE_Sign1 with the key of the first certificate of `x5chain`, and decides whether the
+ * chain is trusted. Returning `false` and throwing both fail.
+ */
+export type VerifyCoseCallback = (options: {
+  /** The DER encoded certificates of the protected `x5chain` header (RFC 9360), leaf first */
+  x5chain: Uint8Array[]
+  /** The signature algorithm of the protected `alg` header */
+  algorithm: SignatureAlgorithm
+  /** The `Sig_structure` the signature is over (RFC 9052 section 4.4) */
+  toBeVerified: Uint8Array
+  signature: Uint8Array
+}) => OrPromise<boolean>
+
+/** The callbacks of registration certificate verification */
+export interface VerifyRegistrationCertificateCallbacks {
+  /**
+   * Verifies the signature of a JWT, a registration certificate or a status list, and decides whether its signer is
+   * trusted (see `@owf/jose`)
+   */
+  verifyJws: VerifyJwsCallback
+  /** The same for a CWT */
+  verifyCose: VerifyCoseCallback
+  /** Fetches the status list; defaults to the global `fetch` */
+  fetch?: typeof fetch
 }
 
 // ============================================================================

@@ -1,4 +1,4 @@
-import { IdentityError, ValidationError } from '@owf/identity-common'
+import { type CommonValidationCode, IdentityError, ValidationError, type ValidationIssueOf } from '@owf/identity-common'
 
 /**
  * Base error class for the COSE structures in this package.
@@ -58,6 +58,8 @@ export class CwtMissingVerifyContextError extends CoseError {}
 
 /**
  * A claim required by the profile the token is verified against is missing, a claim does not match
- * the value it was expected to have, or the token is outside its validity window.
+ * the value it was expected to have, or the token is outside its validity window. Each with an issue
+ * of `VALIDATION_CODES`: `claim_missing`, `claim_value_mismatch`, `expired` or `not_yet_valid`, at
+ * the key of the claim.
  */
-export class CwtClaimVerificationError extends CoseError {}
+export class CwtClaimVerificationError extends ValidationError<ValidationIssueOf<CommonValidationCode>> {}

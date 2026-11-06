@@ -12,72 +12,79 @@ TypeScript building blocks for JSON Advanced Electronic Signatures (JAdES), alig
 - Attached and detached payloads, including the three `sigD` mechanisms from clause 5.2.8
 - Runtime schemas for the signed and unsigned JAdES components in the normative ETSI JSON Schema
 - Structural checks for the B-B, B-T, B-LT, and B-LTA baseline levels
-- Caller-provided signing and verification functions
-
-## Installation
-
-```bash
-pnpm add @owf/eudi-jades
-```
+- Built on [`@owf/jose`](../jose), which parses, signs and verifies the JWS through callbacks
 
 ## Create a B-B Signature
 
-New JAdES signatures created on or after 2025-07-15 use the integer `iat` claimed signing time. The historical
-`sigT` parameter remains accepted when parsing older signatures but is rejected by the current signature builder.
+`signJades` validates the protected header against clause 5 and signs it with `signCompactJws`, `signFlattenedJws` or `signGeneralJws` of `@owf/jose`. The signer and the callbacks are those of `@owf/jose`. New JAdES signatures created on or after 2025-07-15 use the integer `iat` claimed signing time, which defaults to now. The historical `sigT` parameter remains accepted when verifying older signatures but is rejected when signing.
 
 ```typescript
-import { ES256, parseCertificateChain } from '@owf/crypto'
-import { Token } from '@owf/eudi-jades'
+import { parseCertificateChain } from '@owf/crypto'
+import { signJades } from '@owf/eudi-jades'
 
-const token = new Token({ hello: 'world' })
-  .setProtectedHeader({ alg: 'ES256' })
-  .setX5c(parseCertificateChain(pemCertificate))
-  .setSigningTime()
+const { jws } = await signJades({
+  payload: { hello: 'world' },
+  // `x5c` signer: the certificate chain goes into the protected header
+  signer: { method: 'x5c', alg: 'ES256', x5c: parseCertificateChain(pemCertificate) },
+  signJwsCallback,
+})
 
-await token.sign(await ES256.getSigner(privateKey))
-
-const compact = token.toString()
-const general = token.toJSON()
-const flattened = token.toFlattenedJson()
+const { jws: general } = await signJades({ serialization: 'general', payload, signer, signJwsCallback })
 ```
 
-The signer receives the exact JWS Signing Input and returns an unpadded base64url signature.
+A signature needs a reference to the signing certificate (clause 5.1.7 and 5.1.8). An `x5c` signer gives it, or set `x5t#S256`, `x5t#o` or `sigX5ts` in `protectedHeader`.
 
 ## Verify
 
 ```typescript
-import { ES256 } from '@owf/crypto'
-import { verifyCompact } from '@owf/eudi-jades'
+import { verifyJades, verifyJadesJwt } from '@owf/eudi-jades'
 
-const verifier = await ES256.getVerifier(publicKey)
-const result = await verifyCompact(compact, verifier)
+const { protectedHeader, payload, signer } = await verifyJades({ jws, verifyJwsCallback })
 
-console.log(result.valid)
-console.log(result.header)
-console.log(result.payload)
-console.log(result.rawPayload)
+// A JWT signed as a JAdES signature, with its claims verified by `verifyJwt` of @owf/jose
+const { payload: claims } = await verifyJadesJwt({ jwt, verifyJwsCallback, expectedIssuer: 'https://issuer.example' })
 ```
 
-`verify` accepts compact strings, JSON serialization objects, and stringified JSON serializations. `decode` applies
-the same JAdES structural checks without performing cryptographic verification.
+The callback verifies the signature and decides whether the signing certificate is trusted. `verify*` first decode the signature with `decodeJades`, which checks the headers against clause 5 and the B-B profile, or the one given as `profile`. `decodeJades` does the same without verifying the signature.
+
+## Errors and validation issues
+
+A signature or a header that does not meet ETSI TS 119 182-1 throws a `JadesValidationError` with the `issues` of the validation, from `signJades` as well as from `decodeJades` and `verify*`. Each issue has a `code`, a `path` and a `message`. The codes are those of `SCHEMA_VALIDATION_CODES` of `@owf/identity-common`, such as `missing_value` or `not_allowed`, and of `JADES_VALIDATION_CODES` for the JAdES checks they do not cover:
+
+- `missing_certificate_reference`, when none of `x5t#S256`, `x5c`, `x5t#o` and `sigX5ts` is present.
+- `invalid_timestamp`, for a baseline time-stamp that is not a single RFC 3161 token in `val`.
+- `missing_validation_data`, when B-LT or B-LTA validation data is not evidenced.
+
+A `crit` that repeats an entry, names an absent or registered parameter, or lacks `sigD` or `b64` gives the `invalid_crit` of `VALIDATION_CODES`, the code `@owf/jose` uses for `crit` too.
+
+A path starts with `protected`, `header` or `payload`, the members of a JSON serialization:
+
+```typescript
+try {
+  await verifyJades({ jws, verifyJwsCallback })
+} catch (error) {
+  if (error instanceof JadesValidationError) {
+    const reference = error.findIssue('missing_certificate_reference')
+  }
+}
+```
+
+The JWS itself is parsed, signed and verified by `@owf/jose`, whose errors are thrown as they are: `JoseValidationError`, also with `issues`, for a JWS that does not validate, and `JoseSignatureVerificationError` for a signature that does not verify.
 
 ## Unsigned Properties and B-T
 
-The JWS Unprotected Header of a JAdES signature may contain only `etsiU`. Because compact JWS has no unprotected
-header, a token containing `etsiU` must use a JSON serialization.
+The JWS Unprotected Header of a JAdES signature may contain only `etsiU`. Because compact JWS has no unprotected header, a signature containing `etsiU` must use a JSON serialization.
 
 ```typescript
-token.setUnprotectedHeader({
-  etsiU: [
-    {
-      sigTst: {
-        tstTokens: [{ val: base64EncodedRfc3161Token }],
-      },
-    },
-  ],
+const { jws } = await signJades({
+  serialization: 'general',
+  unprotectedHeader: {
+    etsiU: [{ sigTst: { tstTokens: [{ val: base64EncodedRfc3161Token }] } }],
+  },
+  payload,
+  signer,
+  signJwsCallback,
 })
-
-const general = token.toJSON()
 ```
 
 All clear `etsiU` elements are single-property objects. They cannot be mixed with base64url-encoded elements.
@@ -86,33 +93,33 @@ Time-stamp containers in clear unsigned values require `canonAlg`, except `sigTs
 ## Detached Payloads
 
 ```typescript
-import { DETACHED_MECHANISM_IDS, Token, verifyGeneral } from '@owf/eudi-jades'
+import { DETACHED_MECHANISM_IDS, signJades, verifyJades } from '@owf/eudi-jades'
 
 const payload = 'the already constructed detached JWS Payload'
-const token = new Token(payload)
-  .setProtectedHeader({ alg: 'ES256', x5c: certificates })
-  .setSigningTime()
-  .setDetached({
-    mId: DETACHED_MECHANISM_IDS.objectByUri,
-    pars: ['https://example.test/document'],
-  })
+const { jws } = await signJades({
+  serialization: 'general',
+  payload,
+  sigD: { mId: DETACHED_MECHANISM_IDS.objectByUri, pars: ['https://example.test/document'] },
+  signer,
+  signJwsCallback,
+})
 
-await token.sign(signer)
-const detachedJws = token.toJSON() // payload is omitted
-
-const result = await verifyGeneral(detachedJws, verifier, 0, { detachedPayload: payload })
+// The payload is omitted from `jws`
+await verifyJades({ jws, verifyJwsCallback, detachedPayload: payload })
 ```
 
-For `ObjectIdByURIHash`, `hashM` and `hashV` are required and the JWS Payload contributes an empty stream to the
-signature computation. For `HttpHeaders`, `b64` is set to `false`; `hashM`, `hashV`, and `ctys` are prohibited.
+`sigD` is marked critical. For `ObjectIdByURIHash`, `hashM` and `hashV` are required and the JWS Payload contributes an empty stream to the signature computation, so no payload is given when signing or verifying. For `HttpHeaders`, `b64` is set to `false`, and `hashM`, `hashV` and `ctys` are prohibited.
 
 ## Baseline Profiles
 
 ```typescript
-import { decode, JadesProfile, validateProfile } from '@owf/eudi-jades'
+import { decodeJades, JadesProfile, validateProfile } from '@owf/eudi-jades'
 
-const decoded = decode(jws)
-const result = validateProfile(decoded.header, JadesProfile.B_T, decoded.unprotectedHeader)
+// Throws a JadesValidationError when the signature does not meet B-T
+const decoded = decodeJades({ jws, profile: JadesProfile.B_T })
+
+// Or the issues without throwing: { valid, issues }
+const result = validateProfile(decoded.protectedHeader, JadesProfile.B_T, decoded.unprotectedHeader)
 ```
 
 `validateProfile` checks component structure, placement, cardinality, prohibited reference components at B-LT/B-LTA,

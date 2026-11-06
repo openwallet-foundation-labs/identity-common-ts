@@ -220,6 +220,27 @@ describe('ISO/IEC TS 23220-4 request information', () => {
     expect(decoded.deviceRequestInfo?.useCases?.[0].documentSets).toStrictEqual([[0], [1]])
   })
 
+  test('creates and reads entries a profile adds to requestInfo', () => {
+    // The registration certificate of ETSI TS 119 472-2 clause 5.3.2
+    const euWrprc = hex.decode('d28443a10126a0f640')
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: MDL,
+            namespaces: { [MDL_NS]: { age_over_18: false } },
+            requestInfo: { maximumResponseSize: 1024, extensions: { euWrprc, maximumResponseSize: 1 } },
+          }),
+        }),
+      ],
+    })
+
+    const requestInfo = DeviceRequest.decode(deviceRequest.encode()).docRequests[0].itemsRequest.requestInfo
+
+    expect(requestInfo?.getExtension('euWrprc')).toStrictEqual(euWrprc)
+    expect(requestInfo?.maximumResponseSize).toBe(1024)
+  })
+
   test('reports each missing doc request of a use case once', () => {
     const outOfRange = new DataItem({
       buffer: cborEncode(

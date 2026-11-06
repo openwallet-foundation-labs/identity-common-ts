@@ -6,7 +6,9 @@
  * @see https://www.etsi.org/deliver/etsi_ts/119400_119499/119475/01.02.01_60/ts_119475v010201p.pdf
  */
 
+import type { JadesValidationCode } from '@owf/eudi-jades'
 import {
+  type CommonValidationCode,
   type ValidationResult as CommonValidationResult,
   parseWithSchema,
   prefixIssuePaths,
@@ -14,6 +16,8 @@ import {
   secondsToDate,
   toValidationResult,
   VALIDATION_CODES,
+  ValidationError,
+  type ValidationIssueInput,
   type ValidationIssueOf,
   ValidationIssues,
 } from '@owf/identity-common'
@@ -24,6 +28,7 @@ import { RegistrationCertificateValidationError } from './registration-certifica
 import {
   zLegalPersonSubject,
   zNaturalPersonSubject,
+  zRegistrationCertificateCwtHeader,
   zRegistrationCertificateJwtHeader,
   zRegistrationCertificatePayload,
 } from './schemas'
@@ -67,19 +72,73 @@ export const REGISTRATION_CERTIFICATE_VALIDATION_CODES = {
   INVALID_TYP: VALIDATION_CODES.INVALID_TYP,
   /** Selected registration certificate identity does not match the access certificate subject */
   ACCESS_CERTIFICATE_IDENTITY_MISMATCH: 'access_certificate_identity_mismatch',
+  /** The signature does not verify, or the verification callback does not trust its signer (GEN-5.2.1-03) */
+  INVALID_SIGNATURE: 'invalid_signature',
+  /** The status list cannot be fetched, so no statement about the status can be made (clause 6.2.6) */
+  STATUS_LIST_UNAVAILABLE: 'status_list_unavailable',
+  /** The status list does not verify, so no statement about the status can be made (clause 6.2.6) */
+  INVALID_STATUS_LIST: 'invalid_status_list',
+  /** The status list holds a status other than valid, with the `status` as context (REV-6.2.6.2-04) */
+  REVOKED: 'revoked',
 } as const
 
 /** A semantic validation code emitted by this validator */
 export type RegistrationCertificateValidationCode =
   (typeof REGISTRATION_CERTIFICATE_VALIDATION_CODES)[keyof typeof REGISTRATION_CERTIFICATE_VALIDATION_CODES]
 
+/** The context of the codes of `REGISTRATION_CERTIFICATE_VALIDATION_CODES` that have one */
+export interface RegistrationCertificateValidationContexts {
+  /** The status in the status list, e.g. `1` for revoked */
+  revoked: { status?: number }
+}
+
 /**
- * An issue of a registration certificate validation, with a `RegistrationCertificateValidationCode` from the semantic checks or
- * a code of `SCHEMA_VALIDATION_CODES` from schema parsing. `requirement` is the ETSI TS 119 475 requirement.
+ * An issue of a registration certificate validation, with a `RegistrationCertificateValidationCode` from the semantic checks,
+ * a code of `SCHEMA_VALIDATION_CODES` from schema parsing, or a code of `VALIDATION_CODES` or `JADES_VALIDATION_CODES` from
+ * the JWS, JAdES and claims checks. `requirement` is the ETSI TS 119 475 requirement.
  */
 export type RegistrationCertificateValidationIssue = ValidationIssueOf<
-  RegistrationCertificateValidationCode | SchemaValidationCode
+  RegistrationCertificateValidationCode | SchemaValidationCode | CommonValidationCode | JadesValidationCode,
+  RegistrationCertificateValidationContexts
 >
+
+type RegistrationCertificateValidationIssueInput = ValidationIssueInput<
+  RegistrationCertificateValidationIssue['code'],
+  RegistrationCertificateValidationContexts
+>
+
+/** A `RegistrationCertificateValidationError` with one issue */
+export function validationError(
+  message: string,
+  issue: RegistrationCertificateValidationIssueInput
+): RegistrationCertificateValidationError {
+  const issues = new ValidationIssues<
+    RegistrationCertificateValidationIssue['code'],
+    RegistrationCertificateValidationContexts
+  >()
+  issues.add(issue)
+  return new RegistrationCertificateValidationError(message, issues.issues)
+}
+
+/**
+ * A `RegistrationCertificateValidationError` for an error of a library this package builds on: the issues of a validation
+ * error below `path`, and any other error as the issue given, with the message of the error
+ */
+export function asValidationError(
+  error: unknown,
+  message: string,
+  { path = [], ...issue }: Omit<RegistrationCertificateValidationIssueInput, 'message'>
+): RegistrationCertificateValidationError {
+  if (error instanceof ValidationError) {
+    const issues = path.reduceRight((prefixed, segment) => prefixIssuePaths(segment, prefixed), error.issues)
+    return new RegistrationCertificateValidationError(message, issues as RegistrationCertificateValidationIssue[])
+  }
+  return validationError(message, {
+    ...issue,
+    path,
+    message: error instanceof Error ? error.message : String(error),
+  } as RegistrationCertificateValidationIssueInput)
+}
 
 /**
  * Result of registration certificate validation: errors make the registration certificate invalid, warnings don't but should be
@@ -264,6 +323,14 @@ export function validateRegistrationCertificateJwtHeader(header: unknown): Valid
 }
 
 /**
+ * Validate the protected header of a CWT registration certificate (clause 5.2.3, Table 6)
+ */
+export function validateRegistrationCertificateCwtHeader(header: unknown): ValidationResult {
+  const result = parseRegistrationCertificateSchema(zRegistrationCertificateCwtHeader, header)
+  return toValidationResult(result.success ? [] : result.issues)
+}
+
+/**
  * Validate a complete registration certificate (header + payload)
  */
 export function validateRegistrationCertificate(
@@ -412,7 +479,7 @@ function validateSemanticIdentifier(identifier: string): {
 // ============================================================================
 
 /**
- * Assert that a registration certificate payload is valid, throws RegistrationCertificateError if not
+ * Assert that a registration certificate payload is valid, throws RegistrationCertificateValidationError if not
  */
 export function assertValidRegistrationCertificatePayload(
   payload: unknown,
@@ -426,7 +493,7 @@ export function assertValidRegistrationCertificatePayload(
 /**
  * Parse a registration certificate payload into its canonical form, accepting either dialect spelling.
  *
- * @throws RegistrationCertificateError if the payload is invalid
+ * @throws RegistrationCertificateValidationError if the payload is invalid
  */
 export function parseRegistrationCertificatePayload(
   payload: unknown,
@@ -437,7 +504,7 @@ export function parseRegistrationCertificatePayload(
 }
 
 /**
- * Assert that a registration certificate is valid (header + payload), throws RegistrationCertificateError if not
+ * Assert that a registration certificate is valid (header + payload), throws RegistrationCertificateValidationError if not
  */
 export function assertValidRegistrationCertificate(
   header: unknown,

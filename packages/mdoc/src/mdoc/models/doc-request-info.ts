@@ -37,6 +37,11 @@ export type DocRequestInfoOptions = {
    * The largest unencrypted DeviceResponse, in bytes, the reader accepts.
    */
   maximumResponseSize?: number
+  /**
+   * Entries a profile adds to `requestInfo`, such as the `euWrprc` registration certificate of ETSI TS
+   * 119 472-2 clause 5.3.2. The entries above take precedence over one with the same key.
+   */
+  extensions?: Record<string, unknown>
 }
 
 /**
@@ -67,8 +72,16 @@ export class DocRequestInfo extends CborStructure<DocRequestInfoEncodedStructure
     return maximumResponseSize === undefined ? undefined : Number(maximumResponseSize)
   }
 
+  /**
+   * An entry of `requestInfo` by key, such as a profile extension. An entry this structure does not
+   * define is returned as decoded, without validation.
+   */
+  public getExtension(key: string): unknown {
+    return this.structure.get(key as never)
+  }
+
   public static create(options: DocRequestInfoOptions): DocRequestInfo {
-    const map: DocRequestInfoDecodedStructure = new TypedMap([])
+    const map: DocRequestInfoDecodedStructure = TypedMap.fromObject(options.extensions ?? {})
 
     if (options.alternativeDataElements !== undefined) {
       map.set(
