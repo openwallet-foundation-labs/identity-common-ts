@@ -17,7 +17,8 @@ export interface ValidateOpenid4vpAuthorizationRequestIaePayloadOptions {
  * interact directly with the wallet during the authorization process.
  *
  * Key validation rules:
- * - For signed requests (JAR), expected_url parameter is validated against the actual endpoint URL
+ * - The request must be signed (JAR)
+ * - expected_url parameter is validated against the actual endpoint URL
  * - expected_url is used instead of expected_origins to prevent replay attacks
  * - dcql_query must be present
  */
@@ -26,8 +27,15 @@ export const validateOpenid4vpAuthorizationRequestIaePayload = (
 ) => {
   const { params, isJarRequest, expectedUrl, disableExpectedUrlValidation } = options
 
-  // OpenID4VCI 1.1 IAE: expected_url validation for signed requests
-  if (isJarRequest && !params.expected_url) {
+  // Whether IAE requests can be unsigned is still open (https://github.com/openid/OpenID4VCI/issues/701)
+  if (!isJarRequest) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequest,
+      error_description: `An authorization request with response_mode '${params.response_mode}' must be signed.`,
+    })
+  }
+
+  if (!params.expected_url) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequest,
       error_description: `The 'expected_url' parameter MUST be present when using the iae_post response mode in combination with jar.`,
