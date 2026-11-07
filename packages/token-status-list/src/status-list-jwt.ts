@@ -1,5 +1,5 @@
 import type { JwtPayload } from '@owf/identity-common'
-import { base64url, decodeJwt, isJwtTyp } from '@owf/identity-common'
+import { base64url, decodeJwt, isJwtTyp, stringToBytes } from '@owf/identity-common'
 import type { JwtWithStatusListPayload, StatusListJwtHeaderParameters, StatusListJwtPayload } from './jwt-types'
 import { JWT_STATUS_LIST_TYPE } from './jwt-types'
 import { StatusList } from './status-list'
@@ -178,22 +178,59 @@ export function verifyStatusListJwtHeader<Header extends { typ?: unknown; alg?: 
 }
 
 /**
- * Verify the header and the claims of a `token` and the status of an `idx` in it. The status list is
- * only read once the header and the claims are verified.
+ * Verifies the signature of a Status List Token over its JWS signing input, with the key of its issuer, and decides
+ * whether that key is trusted, for example from the `x5c` header and the trust anchors of the caller.
+ */
+export type VerifyStatusListJwtSignature = (options: {
+  /** The header of the token, checked to have an `alg` and the `typ` of a Status List Token. */
+  header: StatusListJwtHeaderParameters
+  /** The bytes of the JWS signing input, the encoded header and payload. */
+  signingInput: Uint8Array
+  /** The signature, decoded from base64url. */
+  signature: Uint8Array
+}) => boolean | Promise<boolean>
+
+/**
+ * Verify a Status List Token `token` and the status of an `idx` in it: its header, its signature with
+ * `verifySignature`, its claims, and then the status. The claims and the status list are only read
+ * once the signature verified, as they are only the issuer's then (Token Status List Section 8.3).
  *
  * @throws StatusListEntryNotValidError if the status at `idx` is not Valid.
- * @throws StatusListError if the header, the claims or the status list itself are not valid.
- *
- * @todo properly validate the JWT with zod + signature
+ * @throws StatusListError if the header, the signature, the claims or the status list itself are not valid.
  */
-export function verifyStatus({
+export async function verifyStatus({
   token,
   idx,
+  verifySignature,
   ...claimsOptions
-}: { token: string; idx: number } & VerifyStatusListJwtClaimsOptions) {
-  const { header, payload } = decodeJwt<Record<string, unknown>, StatusListJwtPayload>(token)
+}: {
+  token: string
+  idx: number
+  verifySignature: VerifyStatusListJwtSignature
+} & VerifyStatusListJwtClaimsOptions): Promise<true> {
+  const { header, payload, signature } = decodeJwt<Record<string, unknown>, StatusListJwtPayload>(token)
 
-  verifyStatusListJwtHeader(header)
+  const statusListHeader = verifyStatusListJwtHeader(header) as StatusListJwtHeaderParameters
+  // RFC 7515 Section 4.1.11: a critical extension the recipient does not understand is rejected, and none is here
+  if ('crit' in header) {
+    throw new StatusListError('The status list token has a crit header, which is not supported')
+  }
+
+  let signatureBytes: Uint8Array
+  try {
+    signatureBytes = base64url.decode(signature)
+  } catch (error) {
+    throw Object.assign(new StatusListError('The status list token has no valid signature'), { cause: error })
+  }
+  const isSignatureValid = await verifySignature({
+    header: statusListHeader,
+    signingInput: stringToBytes(token.slice(0, token.lastIndexOf('.'))),
+    signature: signatureBytes,
+  })
+  if (!isSignatureValid) {
+    throw new StatusListError('The signature of the status list token is not valid')
+  }
+
   verifyStatusListJwtClaims(payload, claimsOptions)
 
   let statusList: StatusList

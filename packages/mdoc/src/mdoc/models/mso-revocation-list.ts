@@ -5,7 +5,7 @@ import {
   RegisteredCwtClaimKey,
   SignatureAlgorithm,
 } from '@owf/cose'
-import { base64, base64url, decodeJwt, stringToBytes } from '@owf/identity-common'
+import { base64, decodeJwt } from '@owf/identity-common'
 import {
   fetchStatusList,
   getListFromStatusListJwt,
@@ -154,12 +154,9 @@ async function verifyStatusListJwt(
 ) {
   let header: Record<string, unknown>
   let payload: StatusListJwtPayload
-  let signature: Uint8Array
   try {
-    let encodedSignature: string
-    ;({ header, payload, signature: encodedSignature } = decodeJwt<Record<string, unknown>, StatusListJwtPayload>(jwt))
+    ;({ header, payload } = decodeJwt<Record<string, unknown>, StatusListJwtPayload>(jwt))
     if (!isJsonObject(header) || !isJsonObject(payload)) throw new Error('The header and payload must be objects')
-    signature = base64url.decode(encodedSignature)
   } catch {
     throw new InvalidRevocationListError(`The status list at ${uri} is not a valid JWT`)
   }
@@ -204,31 +201,36 @@ async function verifyStatusListJwt(
     ctx
   )
 
-  // A DER-encoded signature, as some signers produce, is not a JWS signature and is rejected here
-  // rather than left to the `sign1.verify` callback, which may throw on an unexpected length.
-  if (signature.length !== signatureLength) {
-    throw new InvalidSignatureError(
-      `The signature of the status list at ${uri} is ${signature.length} bytes, not the ${signatureLength} bytes of a raw ${header.alg} signature`
-    )
-  }
-
-  // NOTE: `sign1.verify` is used as a raw signature check over the JWS signing input, which it
-  // does not parse, so the context needs no JWT callback.
-  const isValid = await ctx.cose.sign1.verify({
-    toBeVerified: stringToBytes(jwt.slice(0, jwt.lastIndexOf('.'))),
-    signature,
-    key,
-    algorithm,
-  })
-  if (!isValid) {
-    throw new InvalidSignatureError(`The signature of the status list at ${uri} is not valid`)
-  }
-
-  // The header, the claims and then the status at `idx`, only once the list verified, so that a list
-  // that does not verify is never reported as a status (Token Status List § 8.3).
-  await asMdlRevocationListError(() => {
+  // The header, the signature, the claims and then the status at `idx`, so that a list that does not
+  // verify is never reported as a status (Token Status List § 8.3).
+  await asMdlRevocationListError(async () => {
     try {
-      verifyStatus({ token: jwt, idx, uri, now, skewSeconds, checkFreshness, requireExpirationTime: true })
+      await verifyStatus({
+        token: jwt,
+        idx,
+        uri,
+        now,
+        skewSeconds,
+        checkFreshness,
+        requireExpirationTime: true,
+        verifySignature: async ({ signingInput, signature }) => {
+          // A DER-encoded signature, as some signers produce, is not a JWS signature and is rejected here
+          // rather than left to the `sign1.verify` callback, which may throw on an unexpected length.
+          if (signature.length !== signatureLength) {
+            throw new InvalidSignatureError(
+              `The signature of the status list at ${uri} is ${signature.length} bytes, not the ${signatureLength} bytes of a raw ${header.alg} signature`
+            )
+          }
+
+          // NOTE: `sign1.verify` is used as a raw signature check over the JWS signing input, which it
+          // does not parse, so the context needs no JWT callback.
+          const isValid = await ctx.cose.sign1.verify({ toBeVerified: signingInput, signature, key, algorithm })
+          if (!isValid) {
+            throw new InvalidSignatureError(`The signature of the status list at ${uri} is not valid`)
+          }
+          return true
+        },
+      })
     } catch (error) {
       if (error instanceof TokenStatusListEntryNotValidError) {
         throw new StatusListEntryNotValidError(error.message, { uri, idx, status: error.status })

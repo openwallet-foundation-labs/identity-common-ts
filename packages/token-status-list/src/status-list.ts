@@ -1,4 +1,5 @@
-import { deflate, inflate } from 'pako'
+import { concatBytes } from '@owf/identity-common'
+import { deflate, Inflate } from 'pako'
 import { StatusListError } from './status-list-error'
 import type { BitsPerStatus, StatusType } from './types'
 
@@ -13,6 +14,31 @@ function assertStatusValue(value: number, bitsPerStatus: BitsPerStatus, index: n
       `Status value out of range at index ${index} with value ${value}, expected an integer from 0 to ${max} for ${bitsPerStatus} bits per status`
     )
   }
+}
+
+/**
+ * The default maximum number of statuses read from a compressed status list: 16 MiB at 8 bits per status. A small
+ * compressed list can inflate to a list large enough to exhaust the memory of whoever reads it.
+ */
+const DEFAULT_MAX_STATUSES = 2 ** 24
+
+/**
+ * Inflate `compressed`, but stop with an error once the output exceeds `maxBytes`.
+ */
+function inflateAtMost(compressed: Uint8Array, maxBytes: number): Uint8Array {
+  const inflator = new Inflate()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  inflator.onData = (chunk) => {
+    length += chunk.length
+    if (length > maxBytes) {
+      throw new StatusListError(`The status list is larger than the maximum of ${maxBytes} bytes`)
+    }
+    chunks.push(chunk)
+  }
+  inflator.push(compressed, true)
+  if (inflator.err) throw new StatusListError(`The status list could not be inflated: ${inflator.msg}`)
+  return concatBytes(...chunks)
 }
 
 /**
@@ -81,14 +107,19 @@ export class StatusList {
     return deflate(byteArray, { level: 9 })
   }
 
-  /** Decompress a raw byte array and return a new StatusList instance. */
+  /**
+   * Decompress a raw byte array and return a new StatusList instance.
+   *
+   * @param options.maxStatuses - The maximum number of statuses the list may have, `2^24` by default.
+   */
   static decompressStatusListFromBytes(
     compressed: Uint8Array,
     bitsPerStatus: BitsPerStatus,
-    aggregationUri?: string
+    aggregationUri?: string,
+    { maxStatuses = DEFAULT_MAX_STATUSES }: { maxStatuses?: number } = {}
   ): StatusList {
     try {
-      const decompressed = inflate(compressed)
+      const decompressed = inflateAtMost(compressed, Math.ceil((maxStatuses * bitsPerStatus) / 8))
       const statusList = StatusList.decodeStatusListFromByteArray(decompressed, bitsPerStatus)
       return new StatusList(statusList, bitsPerStatus, aggregationUri)
     } catch (err: unknown) {

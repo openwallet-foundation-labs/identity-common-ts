@@ -272,7 +272,8 @@ const decoded = decodeCWTStatusClaim(encoded)
 | Export | Description |
 |--------|-------------|
 | `createHeaderAndPayload` | Build JWT header + payload from a `StatusList` |
-| `getListFromStatusListJwt` | Decode a `StatusList` from a JWT string |
+| `getListFromStatusListJwt` | Decode a `StatusList` from a JWT string, without verifying its signature |
+| `verifyStatus` | Verify a Status List Token (header, signature with a `verifySignature` callback, claims) and the status at an index |
 | `getStatusListFromJwt` | Extract `StatusListEntry` from a referenced token JWT |
 | `JWT_STATUS_LIST_TYPE` | `"statuslist+jwt"` |
 | `JwtClaimNames` | Claim name constants |

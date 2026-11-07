@@ -28,6 +28,7 @@ import {
   Status,
   UnprotectedHeaders,
   //StatusListInfo,
+  type VerificationAssessment,
   VerificationError,
   Verifier,
 } from '../..'
@@ -749,45 +750,70 @@ suite('Verification', () => {
 
   // Disabling certificate chain validation also applies to the signer of a revocation list, but the
   // revocation status itself is still checked.
-  const verifyWithoutChainValidation = (credential: IssuerSigned) =>
+  const verifyWithoutChainValidation = (
+    credential: IssuerSigned,
+    verificationCallback?: (check: VerificationAssessment) => void
+  ) =>
     Holder.verifyIssuerSigned(
-      { issuerSigned: credential, trustedCertificates: [], disableCertificateChainValidation: true },
+      {
+        issuerSigned: credential,
+        trustedCertificates: [],
+        disableCertificateChainValidation: true,
+        verificationCallback,
+      },
       mdocContext
     )
 
-  test('Verify mdoc with a status list without certificate chain validation', async () => {
+  // Without chain validation, the MSO is only known to be signed with the key of its own certificate, so whoever
+  // presents a self-signed MSO could make the verifier request the revocation URIs of their choosing
+  test('Verify mdoc with a status list without certificate chain validation does not fetch the status list', async () => {
+    // Not mocked, so a request to it fails
+    const uri = 'https://example.org/status-list/not-fetched'
+    const credential = await issueMdocWithStatus({ statusList: { idx: 3, uri } })
+    const checks: VerificationAssessment[] = []
+
+    const { statusList } = await verifyWithoutChainValidation(credential, (check) => checks.push(check))
+    expect(statusList).toBeUndefined()
+    expect(checks.filter((check) => check.status !== 'PASSED')).toEqual([
+      expect.objectContaining({ status: 'WARNING', check: 'Status information must be valid' }),
+    ])
+  })
+
+  // How a verifier that establishes the trust in the issuer itself checks the status
+  test('Verify the status of an mdoc with IssuerAuth.verifyStatus without certificate chain validation', async () => {
     const idx = 3
     const uri = await mockStatusList('/status-list/no-chain-validation', { idx })
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    const { statusList, trustedStatusListChain } = await verifyWithoutChainValidation(credential)
+    const { statusList, trustedStatusListChain } = await credential.issuerAuth.verifyStatus(
+      { disableCertificateChainValidation: true },
+      mdocContext
+    )
     expect(statusList).toBeDefined()
     expect(trustedStatusListChain).toBeUndefined()
   })
 
-  test('Verify mdoc with a revoked entry in a status list without certificate chain validation', async () => {
+  test('Verify a revoked entry in a status list with IssuerAuth.verifyStatus without certificate chain validation', async () => {
     const idx = 3
     const uri = await mockStatusList('/status-list/no-chain-validation-revoked', { idx, status: StatusType.Invalid })
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    const verification = verifyWithoutChainValidation(credential)
-    await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
-    await expect(verification).rejects.toMatchObject({
-      assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Invalid } },
-    })
+    await expect(
+      credential.issuerAuth.verifyStatus({ disableCertificateChainValidation: true }, mdocContext)
+    ).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
   })
 
-  test('Verify mdoc with an identifier list that carries its identifier without certificate chain validation', async () => {
+  test('Verify an identifier list that carries its identifier with IssuerAuth.verifyStatus without certificate chain validation', async () => {
     const id = new Uint8Array([0xab, 0xcd])
     const uri = await mockIdentifierList('/identifier-list/no-chain-validation-revoked', { identifiers: [id] })
 
     const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
 
-    await expect(verifyWithoutChainValidation(credential)).rejects.toThrow(
-      `Identifier abcd found in the revoked identifier list at '${uri}'`
-    )
+    await expect(
+      credential.issuerAuth.verifyStatus({ disableCertificateChainValidation: true }, mdocContext)
+    ).rejects.toThrow(`Identifier abcd found in the revoked identifier list at '${uri}'`)
   })
 
   test('Verify mdoc with an identifier list that carries its identifier', async () => {

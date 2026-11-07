@@ -1,3 +1,4 @@
+import { deflate } from 'pako'
 import { describe, expect, it, test } from 'vitest'
 import { StatusList } from '../status-list'
 import { StatusListError } from '../status-list-error'
@@ -247,5 +248,18 @@ describe('status values', () => {
     const list = new StatusList([0, 0, 0, 0], 2)
     list.statusList[1] = 4
     expect(() => list.encodeStatusListIntoByteArray()).toThrow('Status value out of range at index 1 with value 4')
+  })
+
+  // A few KiB of compressed zeros inflate to a list that would exhaust the memory of whoever reads it
+  it('stops decompressing a list with more statuses than the maximum', () => {
+    const compressed = deflate(new Uint8Array(2 ** 21 + 1), { level: 9 })
+    expect(compressed.length).toBeLessThan(4096)
+
+    // 2^21 + 1 bytes are more than the default maximum of 2^24 statuses at 1 bit per status
+    expect(() => StatusList.decompressStatusListFromBytes(compressed, 1)).toThrow('larger than the maximum')
+    expect(() => StatusList.decompressStatusListFromBytes(compressed, 8)).not.toThrow()
+    expect(() =>
+      StatusList.decompressStatusListFromBytes(deflate(new Uint8Array(126)), 8, undefined, { maxStatuses: 125 })
+    ).toThrow('larger than the maximum')
   })
 })

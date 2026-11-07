@@ -32,7 +32,7 @@ export type {
   FeistelStatusListIndexAllocatorState,
 } from './status-list-index-feistel'
 export { createFeistelStatusListIndexAllocator, FeistelStatusListIndexAllocator } from './status-list-index-feistel'
-export type { VerifyStatusListJwtClaimsOptions } from './status-list-jwt'
+export type { VerifyStatusListJwtClaimsOptions, VerifyStatusListJwtSignature } from './status-list-jwt'
 export {
   createHeaderAndPayload,
   getListFromStatusListJwt,
