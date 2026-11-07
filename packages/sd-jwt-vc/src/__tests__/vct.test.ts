@@ -399,6 +399,42 @@ describe('App', () => {
     expect(resolvedTypeMetadata?.vctValues[0]).toBe('http://example.com/example')
   })
 
+  // The error can reach whoever presented the credential, so it must not return the body of an internal endpoint
+  test.each([
+    ['an error response', new HttpResponse('internal-secret', { status: 500 }), 'Error fetching'],
+    [
+      'a response that is not JSON',
+      new HttpResponse('internal-secret', { headers: { 'Content-Type': 'application/json' } }),
+      'is not valid JSON',
+    ],
+  ])('keeps the body of %s for the type metadata out of the error', async (_description, response, expected) => {
+    server.use(http.get('http://example.com/internal', () => response, { once: true }))
+    const encodedSdjwt = await sdjwt.issue({ iat, iss, vct: 'http://example.com/internal', ...claims })
+
+    const error = await sdjwt.verify(encodedSdjwt).catch((e) => e)
+    expect(error.message).toContain(expected)
+    expect(error.message).not.toContain('internal-secret')
+  })
+
+  test('keeps the body of an error response for the status list out of the error', async () => {
+    server.use(
+      http.get('http://example.com/status-list', () => new HttpResponse('internal-secret', { status: 500 }), {
+        once: true,
+      })
+    )
+    const encodedSdjwt = await sdjwt.issue({
+      iat,
+      iss,
+      vct,
+      status: { status_list: { uri: 'http://example.com/status-list', idx: 0 } },
+      ...claims,
+    })
+
+    const error = await sdjwt.verify(encodedSdjwt).catch((e) => e)
+    expect(error.message).toContain('Error fetching status list: 500')
+    expect(error.message).not.toContain('internal-secret')
+  })
+
   test('VCT Metadata retrieval fails when fetched type metadata is invalid', async () => {
     const expectedPayload: SdJwtVcPayload = {
       iat,
@@ -412,6 +448,35 @@ describe('App', () => {
     )
 
     await expect(sdjwt.getVct(encodedSdjwt)).rejects.toThrowError()
+  })
+
+  test('getVct and verifyTypeMetadata fetch no type metadata of an SD-JWT VC with an invalid signature', async () => {
+    const vctFetcher = vitest.fn(async () => undefined)
+    const sdjwtWithFetcher = new SdJwtVcInstance({ verifier, hasher: digest, vctFetcher })
+    // Signed with a key the verifier does not trust, so the vct in it is chosen by whoever signed it
+    const { privateKey: untrustedKey } = Crypto.generateKeyPairSync('ed25519')
+    const untrustedIssuer = new SdJwtVcInstance({
+      signer: async (data: string) => Crypto.sign(null, Buffer.from(data), untrustedKey).toString('base64url'),
+      signAlg: 'EdDSA',
+      hasher: digest,
+      saltGenerator: generateSalt,
+    })
+    const credential = await untrustedIssuer.issue({ iat, iss, vct: 'http://169.254.169.254/latest/meta-data/' })
+
+    await expect(sdjwtWithFetcher.getVct(credential)).rejects.toThrowError('Invalid JWT Signature')
+    await expect(sdjwtWithFetcher.verifyTypeMetadata(credential)).rejects.toThrowError('Invalid JWT Signature')
+    await expect(new SdJwtVcInstance({ hasher: digest, vctFetcher }).getVct(credential)).rejects.toThrowError(
+      'Verifier not found'
+    )
+    expect(vctFetcher).not.toHaveBeenCalled()
+  })
+
+  test('getVct verifies the signature with the verification options', async () => {
+    const encodedSdjwt = await sdjwt.issue({ iat, iss, vct, ...claims })
+
+    await expect(sdjwt.getVct(encodedSdjwt, { allowedIssuerAlgorithms: ['ES256'] })).rejects.toThrowError(
+      'Disallowed alg EdDSA'
+    )
   })
 
   test('VCT with extends - simple chain', async () => {

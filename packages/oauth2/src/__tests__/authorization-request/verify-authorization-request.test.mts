@@ -6,7 +6,7 @@ import { createClientAttestationJwt } from '../../client-attestation/client-atte
 import { createClientAttestationPopJwt } from '../../client-attestation/client-attestation-pop'
 import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
-import { callbacks, getSignJwsCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback, testAttester } from '../util.mjs'
 
 const authorizationServerMetadata = {
   issuer: 'https://server.com',
@@ -22,14 +22,13 @@ async function generateEs256Key() {
 }
 
 async function createClientAttestation(instance: Awaited<ReturnType<typeof generateEs256Key>>) {
-  const attester = await generateEs256Key()
-  const signJws = getSignJwsCallback([attester.privateJwk, instance.privateJwk])
+  const signJws = getSignJwsCallback([instance.privateJwk])
   const clientAttestationJwt = await createClientAttestationJwt({
     callbacks: { signJws },
     clientId: 'wallet',
     confirmation: { jwk: instance.publicJwk },
     expiresAt: new Date(Date.now() + 3600 * 1000),
-    signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+    signer: testAttester.signer,
   })
   const clientAttestationPopJwt = await createClientAttestationPopJwt({
     callbacks: { signJws, generateRandom: callbacks.generateRandom },

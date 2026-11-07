@@ -23,7 +23,8 @@ const zCertOrChain = z.union([zUint8Array, z.array(zUint8Array)])
  */
 export const coseHeaderClaimEntries = [
   [RegisteredCwtHeaderClaimKey.Algorithm, zCoseLabel.exactOptional()],
-  [RegisteredCwtHeaderClaimKey.Critical, z.array(zCoseLabel).exactOptional()],
+  // RFC 9052 Section 3.1: the crit array MUST have at least one value in it.
+  [RegisteredCwtHeaderClaimKey.Critical, z.array(zCoseLabel).min(1).exactOptional()],
   [RegisteredCwtHeaderClaimKey.ContentType, zCoseLabel.exactOptional()],
   [RegisteredCwtHeaderClaimKey.KeyId, zUint8Array.exactOptional()],
   [RegisteredCwtHeaderClaimKey.Iv, zUint8Array.exactOptional()],

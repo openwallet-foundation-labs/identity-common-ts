@@ -175,6 +175,9 @@ export async function fetchCredentialIssuerMetadata(
     const verifyResult = await verifyJwt({
       jwt: decodedJwt,
       verifyJwsCallback: options.callbacks.verifyJws,
+      // The wallet must trust the signer of the metadata (OpenID4VCI 1.0 Section 12.2.3), so its key cannot come from
+      // the metadata itself: with a `jwk` header or a DID such as did:jwk, anyone could sign metadata for any issuer
+      allowedSignerMethods: ['x5c', 'federation', 'custom'],
       now: options.now,
       skewSeconds: options.allowedSkewInSeconds,
       expectedSubject: credentialIssuer,

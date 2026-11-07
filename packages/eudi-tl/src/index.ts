@@ -71,18 +71,25 @@ export {
 } from './verify'
 
 import { type ParseTrustedListOptions, parseTrustedList } from './parse'
+import { TrustedListSignatureError } from './trusted-list-error'
 import type { TrustedList } from './types'
 import { type VerifyTrustedListOptions, verifyTrustedListSignature } from './verify'
 
 /**
- * Verify the trusted list signature and, only if it is valid, parse it. This is
- * the safe entry point: it never returns a {@link TrustedList} whose
- * authenticity has not been established.
+ * Verify the trusted list signature against the `trustAnchors` and, only if it
+ * is valid, parse it. This is the safe entry point: it never returns a
+ * {@link TrustedList} whose authenticity has not been established.
+ *
+ * @throws TrustedListSignatureError when `trustAnchors` is missing or empty, or the signature is not valid.
  */
 export async function loadTrustedList(
   xml: string,
-  options: VerifyTrustedListOptions & ParseTrustedListOptions = {}
+  options: Required<VerifyTrustedListOptions> & ParseTrustedListOptions
 ): Promise<TrustedList> {
+  // Without them, the signature check would only establish the integrity of the list
+  if (!options?.trustAnchors) {
+    throw new TrustedListSignatureError('loadTrustedList needs the trustAnchors of the scheme operator')
+  }
   await verifyTrustedListSignature(xml, options)
   return parseTrustedList(xml, options)
 }

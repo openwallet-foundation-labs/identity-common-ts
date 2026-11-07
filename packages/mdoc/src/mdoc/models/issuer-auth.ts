@@ -5,6 +5,7 @@ import {
   Sign1,
   type Sign1EncodedStructure,
   type Sign1Options,
+  verifyX5t,
   zUint8Array,
 } from '@owf/cose'
 import { compareBytes } from '@owf/identity-common'
@@ -96,6 +97,10 @@ export class IssuerAuth extends Sign1 {
   /**
    * Verifies the MSO's revocation status. Throws on revocation or
    * a revocation list that fails verification; succeeds silently otherwise.
+   *
+   * It fetches the revocation list URIs of the MSO, so call it only once the issuer is trusted: the
+   * URIs of a self-signed MSO are chosen by whoever presents it. `verify` does not check the status
+   * without certificate chain validation, and leaves it to this method.
    *
    * @todo return the full verified chain for audit / compliance.
    */
@@ -207,6 +212,16 @@ export class IssuerAuth extends Sign1 {
       check: "Country name (C) must be present in the issuer certificate's subject distinguished name",
     })
 
+    // ISO/IEC 18013-5 (second edition) § 12.3.4: an x5t, if present, shall use SHA-256. The x5chain
+    // stays in the unprotected header without one, as the first edition requires.
+    const x5tCheck = 'The x5t in the protected header, if present, must be SHA-256 and match the issuer certificate'
+    try {
+      await verifyX5t(this, this.certificate, ctx.crypto)
+      onCheck({ status: 'PASSED', check: x5tCheck })
+    } catch (err) {
+      onCheck({ status: 'FAILED', check: x5tCheck, reason: err instanceof Error ? err.message : 'Unknown error' })
+    }
+
     let trustedStatusCertificates: Uint8Array[] | undefined
     let trustedIssuanceChain: Uint8Array[] | undefined
     if (!disableCertificateChainValidation) {
@@ -255,8 +270,17 @@ export class IssuerAuth extends Sign1 {
     let identifierList: IdentifierListCwt | undefined
     let trustedIdentifierListChain: Uint8Array[] | undefined
     // The revocation list URIs come from the MSO, so they are only fetched once the MSO is known to be
-    // signed by the issuer. A forged MSO must not make the verifier request a URI of its choosing.
-    if (!disableStatusValidation && isSignatureValid) {
+    // signed by a trusted issuer. A forged MSO must not make the verifier request a URI of its choosing.
+    // Without chain validation, the signature only shows that the MSO is signed with the key of its own
+    // certificate, so the status is left to `verifyStatus` once the caller trusts the issuer.
+    if (!disableStatusValidation && isSignatureValid && disableCertificateChainValidation) {
+      onCheck({
+        status: 'WARNING',
+        check: 'Status information must be valid',
+        reason:
+          'The status is not checked without certificate chain validation. Call IssuerAuth.verifyStatus once the issuer is trusted.',
+      })
+    } else if (!disableStatusValidation && isSignatureValid) {
       try {
         ;({ statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } = await this.verifyStatus(
           {
@@ -264,17 +288,23 @@ export class IssuerAuth extends Sign1 {
             skewSeconds,
             checkFreshness: true,
             trustedStatusCertificates,
-            // Without chain validation there is no trust anchor to take the status certificates from,
-            // so the chains of the revocation lists are not validated either.
-            disableCertificateChainValidation,
           },
           ctx
         ))
       } catch (err) {
+        // The default callback throws the reason without the check, so the reason names the lists.
+        const { statusList: statusListInfo, identifierList: identifierListInfo } =
+          this.mobileSecurityObject.status ?? {}
+        const lists = [
+          statusListInfo && `status list ${statusListInfo.uri}`,
+          identifierListInfo && `identifier list ${identifierListInfo.uri}`,
+        ]
+          .filter(Boolean)
+          .join(' and ')
         onCheck({
           status: 'FAILED',
           check: 'Status information must be valid',
-          reason: err instanceof Error ? err.message : 'Unknown error',
+          reason: `Verifying the ${lists} failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
           result: this.revocationResult(err),
         })
       }

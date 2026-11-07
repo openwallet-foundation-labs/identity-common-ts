@@ -88,6 +88,9 @@ const esList = await loadTrustedList(esXml, { trustAnchors: anchors });
 the `TrustedListProfiles.euLotl` profile. Pass your own `trustAnchors` to
 override the shipped set.
 
+`loadTrustedList` requires `trustAnchors`, and an empty list fails closed, for
+example when the LOTL has no pointer with a certificate for the territory.
+
 #### Why the LOTL signers are pinned, and how to update them
 
 The shipped set (`EU_LOTL_SIGNING_CERTIFICATES`, with its
@@ -157,9 +160,12 @@ const { signerCertificateBase64 } = await verifyTrustedListSignature(xml, {
 });
 ```
 
-Without `trustAnchors`, only the cryptographic validity of the enveloped
+The signature must verify with the key of a pinned certificate in its
+`KeyInfo`, and the list must have exactly one `ds:Signature`, as a child of its
+root. Without `trustAnchors`, only the cryptographic validity of the enveloped
 signature is checked — that proves integrity, not trust. Production callers
-should always pin the scheme operator certificate(s).
+should always pin the scheme operator certificate(s); `loadTrustedList` requires
+them.
 
 Verification uses the global Web Crypto API by default. To run it through a
 reviewed or policy-constrained engine ("bring your own crypto"), install your

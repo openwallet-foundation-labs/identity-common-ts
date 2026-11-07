@@ -9,7 +9,7 @@ import { zLegacyVpFormats, zVpFormatsSupported } from './z-vp-formats-supported'
 export const zClientMetadata = z
   .object({
     // Up until draft 22
-    jwks_uri: z.url().optional(),
+    jwks_uri: zHttpsUrl.optional(),
     jwks: z.optional(zJwkSet),
 
     // Up until draft 26

@@ -120,7 +120,8 @@ const validateJwt = async (jwt: string, credentialMetadataUri: string, verifier:
       credential_metadata: zCredentialIssuerMetadataSchema,
     })
     .refine((data) => data.exp > data.iat, { message: 'exp must be after iat', path: ['exp'] })
-    .refine((data) => new Date(data.exp) < new Date(), { message: 'exp must be after iat', path: ['exp'] })
+    // `exp` is in seconds, and expired metadata could be replayed by whoever serves it
+    .refine((data) => data.exp * 1000 > Date.now(), { message: 'exp must be in the future', path: ['exp'] })
     .refine(
       (data) => {
         return data.credential_metadata_uri === credentialMetadataUri

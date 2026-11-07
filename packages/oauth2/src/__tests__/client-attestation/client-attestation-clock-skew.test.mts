@@ -14,7 +14,7 @@ import {
   preAuthorizedCodeGrantIdentifier,
   refreshTokenGrantIdentifier,
 } from '../../z-grant-type'
-import { callbacks, getSignJwsCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback, testAttester } from '../util.mjs'
 
 const authorizationServerMetadata = {
   issuer: 'https://server.com',
@@ -35,15 +35,13 @@ async function generateEs256Key() {
 }
 
 describe('Client attestation clock skew', () => {
-  let attester: Awaited<ReturnType<typeof generateEs256Key>>
   let instance: Awaited<ReturnType<typeof generateEs256Key>>
   let signJws: ReturnType<typeof getSignJwsCallback>
   let clientAttestationJwt: string
 
   beforeAll(async () => {
-    attester = await generateEs256Key()
     instance = await generateEs256Key()
-    signJws = getSignJwsCallback([attester.privateJwk, instance.privateJwk])
+    signJws = getSignJwsCallback([instance.privateJwk])
 
     clientAttestationJwt = await createClientAttestationJwt({
       callbacks: { signJws },
@@ -51,7 +49,7 @@ describe('Client attestation clock skew', () => {
       confirmation: { jwk: instance.publicJwk },
       issuedAt: now,
       expiresAt: new Date(now.getTime() + 3600 * 1000),
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+      signer: testAttester.signer,
     })
   })
 
@@ -182,7 +180,7 @@ describe('Client attestation clock skew', () => {
         confirmation: { jwk: instance.publicJwk },
         issuedAt: now,
         expiresAt: new Date(now.getTime() + 3600 * 1000),
-        signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+        signer: testAttester.signer,
         additionalPayload: { nbf: nowInSeconds + attestationNbfAhead },
       })
       const dpopJwt = await createDpopJwt({

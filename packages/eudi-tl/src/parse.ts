@@ -25,11 +25,16 @@ function firstDescendant(el: Element, name: string, ns = TSL_NS): Element | unde
   return descendants(el, name, ns)[0]
 }
 
-/** The first direct child element with the name, so a nested element of the same name is not taken */
-function child(el: Element, name: string, ns = TSL_NS): Element | undefined {
-  return Array.from(el.childNodes).find(
+/** The direct child elements with the name, so nested elements of the same name are not taken */
+function children(el: Element | undefined, name: string, ns = TSL_NS): Element[] {
+  return Array.from(el?.childNodes ?? []).filter(
     (n): n is Element => (n as Element).namespaceURI === ns && (n as Element).localName === name
   )
+}
+
+/** The first direct child element with the name, so a nested element of the same name is not taken */
+function child(el: Element, name: string, ns = TSL_NS): Element | undefined {
+  return children(el, name, ns)[0]
 }
 
 function textOf(el: Element | undefined): string | undefined {
@@ -166,12 +171,14 @@ export function parseTrustedList(xml: string, options: ParseTrustedListOptions =
     throw new TrustedListParseError('Root element is not a TS 119 612 TrustServiceStatusList')
   }
 
-  const schemeInfo = firstDescendant(root, 'SchemeInformation')
+  // The signature in the list does not sign its own KeyInfo and ds:Object, apart from the signed properties, so the
+  // scheme information and the providers are only read from their place in the list (ETSI TS 119 612 clause 5)
+  const schemeInfo = child(root, 'SchemeInformation')
   const sequenceText = textOf(schemeInfo && firstDescendant(schemeInfo, 'TSLSequenceNumber'))
   const nextUpdate = schemeInfo && firstDescendant(schemeInfo, 'NextUpdate')
 
   const providers: TrustServiceProvider[] = []
-  for (const tsp of descendants(root, 'TrustServiceProvider')) {
+  for (const tsp of children(child(root, 'TrustServiceProviderList'), 'TrustServiceProvider')) {
     const services: TrustedListService[] = []
     for (const service of descendants(tsp, 'TSPService')) {
       const info = firstDescendant(service, 'ServiceInformation')

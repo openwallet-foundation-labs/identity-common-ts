@@ -13,7 +13,8 @@ export const zHttpsUrl = z.url().superRefine((url, ctx) => {
   })
 })
 
-export const zDataUrl = z.string().regex(/data:[\w/\-.]+(\+[\w/\-.]+)?;\w+,.*/, 'url must be a data URL')
+// Anchored, so the scheme of the url is `data:` and not, for example, `http:` with `data:` in its query
+export const zDataUrl = z.string().regex(/^data:[\w/\-.]+(\+[\w/\-.]+)?;\w+,.*$/, 'url must be a data URL')
 
 export const zInteger = z.number().int()
 

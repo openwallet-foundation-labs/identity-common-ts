@@ -55,7 +55,9 @@ describe('verifyJarmAuthorizationResponse with a signed response', () => {
       issuer: 'https://wallet.example',
     })
 
-    const error = await verify(await createResponse({ jwk: other.publicJwk }, wallet)).catch((error) => error)
+    const [header, payload] = (await createResponse({ jwk: wallet.publicJwk }, wallet)).split('.')
+    const [, , otherSignature] = (await createResponse({ jwk: other.publicJwk }, other)).split('.')
+    const error = await verify(`${header}.${payload}.${otherSignature}`).catch((error) => error)
     expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
     expect(error.errorResponse.error_description).toBe('The signature of the JARM authorization response is not valid.')
     expect(error.cause).toBeInstanceOf(JoseSignatureVerificationError)

@@ -1,7 +1,11 @@
-import { CommonMediaTypes, isMediaType } from '@owf/identity-common'
 import type { FetchResponse } from '../globals'
 import { Openid4vcBaseError } from './Openid4vcBaseError'
 
+/**
+ * The response to a request was not the one expected. The body of the response is `textResponse`, and is not part of
+ * the message: the URL can be chosen by whoever sent the request, and the message may be returned to them, which
+ * would let them read the responses of internal endpoints.
+ */
 export class InvalidFetchResponseError extends Openid4vcBaseError {
   public readonly response: FetchResponse
 
@@ -10,13 +14,7 @@ export class InvalidFetchResponseError extends Openid4vcBaseError {
     public readonly textResponse: string,
     response: FetchResponse
   ) {
-    // We don't want to put html content in pages. For other content we take the first 1000 characters
-    // to prevent ridiculously long errors.
-    const textResponseMessage = isMediaType(response.headers.get('Content-Type'), CommonMediaTypes.Html)
-      ? undefined
-      : textResponse.substring(0, 1000)
-
-    super(textResponseMessage ? `${message}\n${textResponseMessage}` : message)
+    super(message)
 
     this.response = response.clone()
   }

@@ -15,6 +15,9 @@ describe('zDataUrl', () => {
     ['a regular https url', 'https://example.com/logo.png'],
     ['a data url missing the encoding and data segment', 'data:image/png'],
     ['an empty string', ''],
+    // Only the scheme of the url makes it a data url, not a `data:` elsewhere in it
+    ['an http url with a data url in its query', 'http://10.0.0.1/track?x=data:a/b;c,'],
+    ['a javascript url with a data url in a comment', 'javascript:alert(1)//data:a;b,'],
   ])('rejects %s', (_description, url) => {
     const result = zDataUrl.safeParse(url)
     expect(result.success).toBe(false)

@@ -50,6 +50,11 @@ export enum MacAlgorithm {
   HS512 = 7,
 }
 
+/** Hash algorithms, as registered in RFC 9054, e.g. for the `x5t` header (RFC 9360). */
+export enum HashAlgorithm {
+  SHA256 = -16,
+}
+
 export enum EncryptionAlgorithm {
   A128GCM = 1,
   A192GCM = 2,

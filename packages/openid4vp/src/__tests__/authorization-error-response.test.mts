@@ -74,6 +74,27 @@ describe('resolveOpenid4vpAuthorizationRequest errors', () => {
     })
   })
 
+  // OpenID4VP 1.0 Section 5.9: the library cannot check the registration of a pre-registered client, so the
+  // response_uri of the request may not belong to it
+  test('does not report a pre-registered client as authenticated', async () => {
+    const error = await resolveOpenid4vpAuthorizationRequest({
+      authorizationRequestPayload: {
+        ...authenticatedRequest,
+        client_id: 'bank-verifier',
+        transaction_data: [base64urlEncode(JSON.stringify({ type: 'payment' }))],
+      },
+      callbacks,
+      responseMode: { type: 'direct_post' },
+    }).catch((error) => error)
+
+    expect(error).toBeInstanceOf(Openid4vpAuthorizationRequestError)
+    expect(error).toMatchObject({
+      isClientAuthenticated: false,
+      client: undefined,
+      errorResponse: { error: 'invalid_transaction_data' },
+    })
+  })
+
   test('throws an Openid4vpAuthorizationRequestError for an invalid request from an authenticated client', async () => {
     const error = await resolveOpenid4vpAuthorizationRequest({
       authorizationRequestPayload: {

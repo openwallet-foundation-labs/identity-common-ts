@@ -168,7 +168,13 @@ export interface VerifyKeyAttestationJwtOptions {
   keyAttestationsRequired?: KeyAttestationsRequired
 
   /**
-   * Callbacks required for the key attestation jwt verification
+   * Callbacks required for the key attestation jwt verification. `verifyJws` decides whether the attester is
+   * trusted, for example by validating the `x5c` chain. A key attestation signed with a `jwk` signer is rejected
+   * before, as its key comes from the key attestation itself.
+   *
+   * A key attestation signed with a `did` signer is passed to `verifyJws`, which must then check that
+   * `signer.didUrl` belongs to a key attester the credential issuer trusts. Resolving the DID is not enough: anyone
+   * can create a did:jwk or did:key, or host a did:web, so any wallet could attest its own keys.
    */
   callbacks: Pick<CallbackContext, 'verifyJws'>
 }
@@ -188,6 +194,11 @@ export async function verifyKeyAttestationJwt(options: VerifyKeyAttestationJwtOp
   const { signer } = await verifyJwt({
     jwt: decodedJwt,
     verifyJwsCallback: options.callbacks.verifyJws,
+    // The attester must be one the issuer trusts (OpenID4VCI 1.0 Appendix D), so its key cannot come from the key
+    // attestation itself: `verifyJws` accepts a key from a `jwk` header for proofs, and with it any wallet could
+    // attest its own keys. A DID signer (a `kid`, as Appendix D.1 allows) is allowed, and `verifyJws` must check
+    // that the DID is a trusted attester.
+    allowedSignerMethods: ['x5c', 'federation', 'custom', 'did'],
     errorMessage: 'Error verifying key attestation jwt',
     expectedNonce: options.expectedNonce,
     now: options.now,
