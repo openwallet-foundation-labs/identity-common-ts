@@ -1,6 +1,6 @@
 {
   "name": "@owf/jose",
-  "version": "0.0.0",
+  "version": "0.8.0",
   "description": "JOSE (JWK, JWA, JWS, JWT and JWE) with strict, schema based parsing and verification",
   "files": [
     "dist"
