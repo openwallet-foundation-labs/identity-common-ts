@@ -34,11 +34,3 @@ export const StatusListMediaTypes = {
  * BitsPerStatus type.
  */
 export type BitsPerStatus = 1 | 2 | 4 | 8
-
-/**
- * Reference to a status list entry.
- */
-export interface StatusListEntry {
-  idx: number
-  uri: string
-}

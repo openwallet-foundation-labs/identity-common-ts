@@ -1,14 +1,9 @@
 import Crypto from 'node:crypto'
 import { hasher as digest, generateSalt } from '@owf/crypto'
-import {
-  createHeaderAndPayload,
-  StatusList,
-  StatusListError,
-  type StatusListJwtHeaderParameters,
-} from '@owf/token-status-list'
+import { base64url } from '@owf/identity-common'
+import { JoseValidationError, StatusList, StatusListError } from '@owf/token-status-list'
 import {
   type DisclosureFrame,
-  type JwtPayload,
   JwtTimeClaimError,
   SdJwtError,
   SdJwtInstance,
@@ -47,22 +42,24 @@ class PlainSdJwtVcIssuer extends SdJwtInstance<SdJwtVcPayload> {
   protected type = 'dc+sd-jwt'
 }
 
-const generateStatusList = async (): Promise<string> => {
-  const statusList = new StatusList([0, 1, 0, 0, 0, 0, 1, 1], 1)
-  const payload: JwtPayload = {
-    iss: 'https://example.com',
-    sub: 'https://example.com/status-list',
-    iat: Math.floor(Date.now() / 1000),
-  }
-  const header: StatusListJwtHeaderParameters = {
-    alg: 'EdDSA',
-    typ: 'statuslist+jwt',
-  }
-  const values = createHeaderAndPayload(statusList, payload, header)
-  return new SignJWT(values.payload).setProtectedHeader(values.header).sign(statusListPrivateKey)
-}
+const signStatusList = (
+  key: Crypto.KeyObject,
+  statusList: StatusList,
+  claims: Record<string, unknown>,
+  typ = 'statuslist+jwt'
+) =>
+  new SignJWT({
+    ...claims,
+    status_list: { bits: statusList.getBitsPerStatus(), lst: base64url.encode(statusList.compressStatusListToBytes()) },
+  })
+    .setProtectedHeader({ alg: 'EdDSA', typ })
+    .sign(key)
 
-const statusListJWT = await generateStatusList()
+const statusListJWT = await signStatusList(statusListPrivateKey, new StatusList([0, 1, 0, 0, 0, 0, 1, 1], 1), {
+  iss: 'https://example.com',
+  sub: 'https://example.com/status-list',
+  iat,
+})
 
 describe('App', () => {
   test('Example', async () => {
@@ -548,20 +545,17 @@ describe('Revocation', () => {
     const encodedSdjwt = await sdjwt.issue(expectedPayload)
     const result = sdjwt.verify(encodedSdjwt)
     await expect(result).rejects.toThrowError(
-      "The subject claim 'https://example.com/status-list' must be equal to the uri 'https://example.com/other-status-list'"
+      "The 'sub' claim 'https://example.com/status-list' does not match the expected value 'https://example.com/other-status-list'"
     )
   })
 
   test('Test with a status list token whose typ header is not statuslist+jwt', async () => {
-    const { header, payload } = createHeaderAndPayload(
+    const wrongTypStatusListJWT = await signStatusList(
+      statusListPrivateKey,
       new StatusList([0, 0], 1),
       { iss: 'https://example.com', sub: 'https://example.com/status-list', iat },
-      { alg: 'EdDSA', typ: 'statuslist+jwt' }
+      'JWT'
     )
-    // `createHeaderAndPayload` always sets the typ, so the wrong typ is set on the protected header instead
-    const wrongTypStatusListJWT = await new SignJWT(payload)
-      .setProtectedHeader({ ...header, typ: 'JWT' })
-      .sign(statusListPrivateKey)
 
     const { signer, verifier } = createSignerVerifier()
     const sdjwtWithWrongTyp = new SdJwtVcInstance({
@@ -583,20 +577,18 @@ describe('Revocation', () => {
       status: { status_list: { uri: 'https://example.com/status-list', idx: 0 } },
     }
     const encodedSdjwt = await sdjwtWithWrongTyp.issue(expectedPayload)
-    await expect(sdjwtWithWrongTyp.verify(encodedSdjwt)).rejects.toThrowError(
-      "The typ header 'JWT' must be equal to 'statuslist+jwt'"
-    )
+    const error = await sdjwtWithWrongTyp.verify(encodedSdjwt).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(JoseValidationError)
+    expect((error as Error).message).toContain('typ: typ must be statuslist+jwt (invalid_typ)')
   })
 
   test('Test with the verifier used for the status list when no status verifier is provided', async () => {
     // the status list is signed with the same key as the credential
-    const statusList = new StatusList([0, 1], 1)
-    const { header, payload } = createHeaderAndPayload(
-      statusList,
-      { iss: 'https://example.com', sub: 'https://example.com/status-list', iat },
-      { alg: 'EdDSA', typ: 'statuslist+jwt' }
-    )
-    const sameKeyStatusListJWT = await new SignJWT(payload).setProtectedHeader(header).sign(privateKey)
+    const sameKeyStatusListJWT = await signStatusList(privateKey, new StatusList([0, 1], 1), {
+      iss: 'https://example.com',
+      sub: 'https://example.com/status-list',
+      iat,
+    })
 
     const { signer, verifier } = createSignerVerifier()
     const sdjwtWithoutStatusVerifier = new SdJwtVcInstance({
@@ -654,12 +646,12 @@ describe('Revocation', () => {
   })
 
   test('test with an expired status list', async () => {
-    const { header, payload } = createHeaderAndPayload(
-      new StatusList([0, 0], 1),
-      { iss: 'https://example.com', sub: 'https://example.com/status-list', iat: 1000, exp: 2000 },
-      { alg: 'EdDSA', typ: 'statuslist+jwt' }
-    )
-    const expiredStatusListJWT = await new SignJWT(payload).setProtectedHeader(header).sign(statusListPrivateKey)
+    const expiredStatusListJWT = await signStatusList(statusListPrivateKey, new StatusList([0, 0], 1), {
+      iss: 'https://example.com',
+      sub: 'https://example.com/status-list',
+      iat: 1000,
+      exp: 2000,
+    })
 
     const { signer, verifier } = createSignerVerifier()
     const sdjwtWithExpiredList = new SdJwtVcInstance({

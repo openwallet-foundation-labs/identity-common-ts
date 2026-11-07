@@ -1177,7 +1177,7 @@ suite('Verification', () => {
         },
         mdocContext
       )
-    ).rejects.toThrow(`The status list at ${uri} is not a valid JWT`)
+    ).rejects.toThrow('Unable to parse the JWS')
   })
 
   test('Verify mdoc with status invalid no trusted certificates supplied', async () => {

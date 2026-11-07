@@ -1,254 +1,170 @@
-import type { JwtPayload } from '@owf/identity-common'
-import { base64url, decodeJwt, isJwtTyp, stringToBytes } from '@owf/identity-common'
-import type { JwtWithStatusListPayload, StatusListJwtHeaderParameters, StatusListJwtPayload } from './jwt-types'
-import { JWT_STATUS_LIST_TYPE } from './jwt-types'
-import { StatusList } from './status-list'
-import { StatusListEntryNotValidError, StatusListError } from './status-list-error'
-import { type StatusListEntry, StatusListMediaTypes, StatusType } from './types'
+import { base64url, type MarkOptional } from '@owf/identity-common'
+import {
+  type DecodeJwtResult,
+  decodeJwt,
+  jwsHeaderFromSigner,
+  type SignJwtOptions,
+  type SignJwtResult,
+  signJwt,
+  type VerifyJwtClaimsOptions,
+  type VerifyJwtOptions,
+  type VerifyJwtResult,
+  verifyJwt,
+  verifyJwtClaims,
+} from '@owf/jose'
+import z from 'zod'
+import {
+  JWT_STATUS_LIST_TYPE,
+  type StatusListJwtPayload,
+  zStatusListJwtHeader,
+  zStatusListJwtPayload,
+} from './jwt-types'
+import { StatusList, verifyStatusValid } from './status-list'
 
-/**
- * Decode a JWT and return the payload.
- * @param jwt JWT token in compact JWS serialization.
- */
-function decodeJwtPayload<T extends Record<string, unknown>>(jwt: string): T {
-  return decodeJwt<Record<string, unknown>, T>(jwt).payload
+type StatusListJwtHeaderSchema = typeof zStatusListJwtHeader
+type StatusListJwtPayloadSchema = typeof zStatusListJwtPayload
+
+// Only `statuslist+jwt` is signed, while decoding also accepts other forms of it, such as `application/statuslist+jwt`
+const zStatusListJwtHeaderToSign = zStatusListJwtHeader.extend({ typ: z.literal(JWT_STATUS_LIST_TYPE) })
+
+/** The header of a Status List Token to sign. `typ` defaults to `statuslist+jwt`. */
+export type CreateStatusListJwtHeader = MarkOptional<z.input<StatusListJwtHeaderSchema>, 'typ'>
+
+/** The claims of a Status List Token to sign. `status_list` is created from the list. */
+export type CreateStatusListJwtPayload = MarkOptional<z.input<StatusListJwtPayloadSchema>, 'status_list'>
+
+export type SignStatusListJwtOptions = Omit<
+  SignJwtOptions<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema>,
+  'header' | 'payload' | 'headerSchema' | 'payloadSchema'
+> & {
+  statusList: StatusList
+  payload: CreateStatusListJwtPayload
+
+  /** Extra header parameters. `alg` and the parameters that identify the signer come from the signer. */
+  header?: MarkOptional<CreateStatusListJwtHeader, 'alg'>
 }
 
 /**
- * Adds the status list to the payload and header of a JWT.
+ * Signs a Status List Token in JWT format carrying `statusList`.
+ *
+ * @throws JoseValidationError if the header or payload is not valid for a Status List Token.
+ * @throws JoseInvalidArgumentError if the header identifies another signer than `signer`, see `signCompactJws`.
  */
-export function createHeaderAndPayload(list: StatusList, payload: JwtPayload, header: StatusListJwtHeaderParameters) {
-  if (!payload.sub) {
-    throw new StatusListError('sub field is required')
+export async function signStatusListJwt({
+  statusList,
+  payload,
+  header = {},
+  ...options
+}: SignStatusListJwtOptions): Promise<SignJwtResult<typeof zStatusListJwtHeaderToSign, StatusListJwtPayloadSchema>> {
+  // A parameter the header leaves undefined does not remove the one the signer gives
+  const definedHeader = Object.fromEntries(Object.entries(header).filter(([, value]) => value !== undefined))
+
+  return signJwt({
+    ...options,
+    header: { ...jwsHeaderFromSigner(options.signer), typ: JWT_STATUS_LIST_TYPE, ...definedHeader },
+    payload: {
+      ...payload,
+      status_list: {
+        bits: statusList.getBitsPerStatus(),
+        lst: base64url.encode(statusList.compressStatusListToBytes()),
+        ...(statusList.aggregationUri !== undefined && { aggregation_uri: statusList.aggregationUri }),
+      },
+    },
+    headerSchema: zStatusListJwtHeaderToSign,
+    payloadSchema: zStatusListJwtPayload,
+  })
+}
+
+export type DecodeStatusListJwtResult = DecodeJwtResult<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema> & {
+  /**
+   * Decompressed on first read, so read it only once the token verified. Throws a `StatusListValidationError`
+   * when `lst` is not a compressed status list.
+   */
+  readonly statusList: StatusList
+}
+
+/**
+ * Decodes a Status List Token in JWT format without verifying the signature, see {@link verifyStatusListJwt}.
+ *
+ * @throws JoseParseError if the token is not well-formed.
+ * @throws JoseValidationError if the token is not a Status List Token.
+ */
+export function decodeStatusListJwt(jwt: string): DecodeStatusListJwtResult {
+  const decoded = decodeJwt({ jwt, headerSchema: zStatusListJwtHeader, payloadSchema: zStatusListJwtPayload })
+  const { bits, lst, aggregation_uri } = decoded.payload.status_list
+
+  let statusList: StatusList | undefined
+  return {
+    ...decoded,
+    get statusList() {
+      if (statusList) return statusList
+      statusList = StatusList.decompressStatusListFromBytes(base64url.decode(lst), bits, aggregation_uri)
+      return statusList
+    },
   }
-  if (!payload.iat) {
-    throw new StatusListError('iat field is required')
-  }
-
-  header.typ = JWT_STATUS_LIST_TYPE
-  payload.status_list = {
-    bits: list.getBitsPerStatus(),
-    lst: base64url.encode(list.compressStatusListToBytes()),
-  }
-  return { header, payload }
 }
 
-/**
- * Get the status list from a JWT, but do not verify the signature.
- */
-export function getListFromStatusListJwt(jwt: string): StatusList {
-  const payload = decodeJwtPayload<StatusListJwtPayload>(jwt)
-  const statusList = payload.status_list
-  const compressed = base64url.decode(statusList.lst)
-  return StatusList.decompressStatusListFromBytes(compressed, statusList.bits)
-}
-
-/**
- * Get the status list entry from a JWT, but do not verify the signature.
- */
-export function getStatusListFromJwt(jwt: string): StatusListEntry {
-  const payload = decodeJwtPayload<JwtWithStatusListPayload>(jwt)
-  return payload.status.status_list
-}
-
-export type VerifyStatusListJwtClaimsOptions = {
-  /** The `uri` of the status list reference the token was fetched for, which `sub` must equal. */
+export type VerifyStatusListJwtClaimsOptions = Omit<VerifyJwtClaimsOptions, 'expectedSubject'> & {
+  /** The `uri` of the status list reference, which `sub` must equal. */
   uri: string
-  now?: Date
-  /**
-   * Clock tolerance applied to `exp`, `nbf` and `iat`, in seconds. Defaults to 30, which keeps a
-   * token that only just expired — or was issued a moment ago by a slightly fast clock — usable
-   * across the small clock differences typical between issuer and verifier.
-   */
-  skewSeconds?: number
-  /** When false, `iat` is not compared against `now`. Its presence is still required. */
-  checkFreshness?: boolean
-  /**
-   * Require `exp` to be present. It is OPTIONAL in the Token Status List specification, but
-   * profiles can make it mandatory — ISO/IEC 18013-5 second edition § 12.3.6.3 does, for the
-   * revocation list of an MSO.
-   */
-  requireExpirationTime?: boolean
 }
 
 /**
- * Verify the claims of a Status List Token in JWT format.
+ * Verifies the claims of a Status List Token in JWT format, with `sub` expected to be `uri`.
  *
- * Both `sub` and `iat` are REQUIRED claims of a Status List Token, and `sub` has to match the URI
- * the token was referenced by — without that check a token published for one URI can be replayed
- * for another under the same issuer.
- *
- * The CWT serialization verifies the same rules through `StatusListCwtPayload.verifyClaims`, which
- * builds on the generic CWT claim verification. A JWT has no such base to build on yet, so the
- * checks are spelled out here.
- *
- * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5
+ * @throws JoseValidationError with an issue for each claim that does not verify.
+ * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-8.3
  */
 export function verifyStatusListJwtClaims(
   payload: StatusListJwtPayload,
-  {
-    uri,
-    now = new Date(),
-    skewSeconds = 30,
-    checkFreshness = true,
-    requireExpirationTime = false,
-  }: VerifyStatusListJwtClaimsOptions
+  { uri, ...options }: VerifyStatusListJwtClaimsOptions
 ): void {
-  const skewMs = skewSeconds * 1000
-  const secondsToDate = (value: unknown) => (typeof value === 'number' ? new Date(value * 1000) : undefined)
+  verifyJwtClaims(payload, { ...options, expectedSubject: uri })
+}
 
-  // The registered JWT claim names, not their CWT counterparts: a Status List Token in JWT format
-  // carries `sub`, `iat`, `nbf` and `exp`.
-  const subject = typeof payload.sub === 'string' ? payload.sub : undefined
-  const issuedAt = secondsToDate(payload.iat)
-  const notBefore = secondsToDate(payload.nbf)
-  const expirationTime = secondsToDate(payload.exp)
+export type VerifyStatusListJwtOptions = Omit<
+  VerifyJwtOptions<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema>,
+  'jwt' | 'headerSchema' | 'payloadSchema' | 'expectedSubject' | 'understoodCriticalParameters'
+> & {
+  /** The compact token, or a decoded one, of which only `compact` is used. */
+  jwt: string | DecodeStatusListJwtResult
 
-  if (subject === undefined) {
-    throw new StatusListError('The status list token has no subject claim, which is required')
-  }
+  /** The `uri` of the status list reference, which `sub` must equal. */
+  uri: string
 
-  if (subject !== uri) {
-    throw new StatusListError(`The subject claim '${subject}' must be equal to the uri '${uri}'`)
-  }
+  /** When given, the status at this index must be `Valid`. */
+  idx?: number
+}
 
-  if (expirationTime === undefined) {
-    if (requireExpirationTime) {
-      throw new StatusListError('The status list token has no expiration claim, which is required for this profile')
-    }
-    // `exp` is the first instant the token is no longer valid, so a token that expired within the
-    // tolerance is still accepted.
-  } else if (new Date(expirationTime.getTime() + skewMs) <= now) {
-    throw new StatusListError(
-      `The expiration claim '${expirationTime.toISOString()}' is in the past (compared to '${now.toISOString()}'), and therefore not valid`
-    )
-  }
-
-  if (issuedAt === undefined) {
-    throw new StatusListError('The status list token has no issued at claim, which is required')
-  }
-
-  if (checkFreshness && new Date(issuedAt.getTime() - skewMs) > now) {
-    throw new StatusListError(
-      `The issued at claim '${issuedAt.toISOString()}' is in the future (compared to '${now.toISOString()}'), and therefore not valid`
-    )
-  }
-
-  if (notBefore !== undefined && new Date(notBefore.getTime() - skewMs) > now) {
-    throw new StatusListError(
-      `The not before claim '${notBefore.toISOString()}' is in the future (compared to '${now.toISOString()}'), and therefore not valid`
-    )
-  }
+export type VerifyStatusListJwtResult = VerifyJwtResult<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema> & {
+  statusList: StatusList
 }
 
 /**
- * Verify the JOSE header of a Status List Token in JWT format.
+ * Verifies a Status List Token in JWT format: the signature, the claims with `sub` expected to be
+ * `uri`, and the status at `idx` when given. The list is decompressed only once the token verified.
  *
- * The `typ` header is REQUIRED and MUST be `statuslist+jwt`. Without that check a JWT the issuer
- * signed for another purpose with the same key can be presented as a status list.
- *
- * RFC 7515 section 4.1.9 lets a producer omit the `application/` prefix of a media type in `typ`,
- * and requires a recipient to treat a value without a `/` as if the prefix were present. So
- * `application/statuslist+jwt` is accepted too.
- *
- * The `alg` header is REQUIRED as well (RFC 7515 section 4.1.1). Which algorithms to accept is left
- * to the caller, which verifies the signature.
- *
- * @returns the `header`, typed with the `alg` and `typ` it was checked to have.
- * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-16.html#section-5.1
+ * @throws JoseParseError, JoseValidationError or JoseVerificationError if the token does not verify.
+ * @throws StatusListValidationError if the status list cannot be decompressed (`invalid_status_list`), or `idx`
+ *   is not in it (`index_out_of_range`) or its status is not `Valid` (`status_not_valid`).
  */
-export function verifyStatusListJwtHeader<Header extends { typ?: unknown; alg?: unknown }>(
-  header: Header
-): Header & { alg: string; typ: string } {
-  if (typeof header.alg !== 'string' || header.alg.length === 0) {
-    throw new StatusListError('The status list token has no alg header, which is required')
-  }
-
-  const typ = header.typ
-
-  if (typeof typ !== 'string') {
-    throw new StatusListError('The status list token has no typ header, which is required')
-  }
-
-  if (!isJwtTyp(typ, StatusListMediaTypes.StatusListJwt)) {
-    throw new StatusListError(`The typ header '${typ}' must be equal to '${JWT_STATUS_LIST_TYPE}'`)
-  }
-
-  return header as Header & { alg: string; typ: string }
-}
-
-/**
- * Verifies the signature of a Status List Token over its JWS signing input, with the key of its issuer, and decides
- * whether that key is trusted, for example from the `x5c` header and the trust anchors of the caller.
- */
-export type VerifyStatusListJwtSignature = (options: {
-  /** The header of the token, checked to have an `alg` and the `typ` of a Status List Token. */
-  header: StatusListJwtHeaderParameters
-  /** The bytes of the JWS signing input, the encoded header and payload. */
-  signingInput: Uint8Array
-  /** The signature, decoded from base64url. */
-  signature: Uint8Array
-}) => boolean | Promise<boolean>
-
-/**
- * Verify a Status List Token `token` and the status of an `idx` in it: its header, its signature with
- * `verifySignature`, its claims, and then the status. The claims and the status list are only read
- * once the signature verified, as they are only the issuer's then (Token Status List Section 8.3).
- *
- * @throws StatusListEntryNotValidError if the status at `idx` is not Valid.
- * @throws StatusListError if the header, the signature, the claims or the status list itself are not valid.
- */
-export async function verifyStatus({
-  token,
+export async function verifyStatusListJwt({
+  jwt,
+  uri,
   idx,
-  verifySignature,
-  ...claimsOptions
-}: {
-  token: string
-  idx: number
-  verifySignature: VerifyStatusListJwtSignature
-} & VerifyStatusListJwtClaimsOptions): Promise<true> {
-  const { header, payload, signature } = decodeJwt<Record<string, unknown>, StatusListJwtPayload>(token)
+  ...options
+}: VerifyStatusListJwtOptions): Promise<VerifyStatusListJwtResult> {
+  const decoded = decodeStatusListJwt(typeof jwt === 'string' ? jwt : jwt.compact)
 
-  const statusListHeader = verifyStatusListJwtHeader(header) as StatusListJwtHeaderParameters
-  // RFC 7515 Section 4.1.11: a critical extension the recipient does not understand is rejected, and none is here
-  if ('crit' in header) {
-    throw new StatusListError('The status list token has a crit header, which is not supported')
-  }
-
-  let signatureBytes: Uint8Array
-  try {
-    signatureBytes = base64url.decode(signature)
-  } catch (error) {
-    throw Object.assign(new StatusListError('The status list token has no valid signature'), { cause: error })
-  }
-  const isSignatureValid = await verifySignature({
-    header: statusListHeader,
-    signingInput: stringToBytes(token.slice(0, token.lastIndexOf('.'))),
-    signature: signatureBytes,
+  const verified = await verifyJwt<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema>({
+    ...options,
+    jwt: decoded,
+    expectedSubject: uri,
+    errorMessage: options.errorMessage ?? 'Error during verification of the Status List Token.',
   })
-  if (!isSignatureValid) {
-    throw new StatusListError('The signature of the status list token is not valid')
-  }
 
-  verifyStatusListJwtClaims(payload, claimsOptions)
+  const statusList = decoded.statusList
+  if (idx !== undefined) verifyStatusValid(statusList, idx)
 
-  let statusList: StatusList
-  try {
-    statusList = StatusList.decompressStatusListFromBytes(
-      base64url.decode(payload.status_list.lst),
-      payload.status_list.bits
-    )
-  } catch (error) {
-    throw Object.assign(new StatusListError('The status list token has no valid status_list claim'), { cause: error })
-  }
-
-  const status = statusList.getStatus(idx)
-  if (status !== StatusType.Valid) {
-    throw new StatusListEntryNotValidError(
-      `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`,
-      { idx, status }
-    )
-  }
-  return true
+  return { ...verified, statusList }
 }

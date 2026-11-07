@@ -415,6 +415,9 @@ importers:
       '@owf/identity-common':
         specifier: workspace:*
         version: link:../identity-common
+      '@owf/jose':
+        specifier: workspace:*
+        version: link:../jose
       cbor-x:
         specifier: 'catalog:'
         version: 1.6.8

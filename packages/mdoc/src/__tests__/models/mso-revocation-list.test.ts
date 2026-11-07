@@ -190,13 +190,13 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
     await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
   })
 
-  // Unchanged for now: `StatusList.getStatus` throws a plain `Error` for an index outside the list,
-  // which is not mapped to `InvalidRevocationListError`.
+  // Token Status List § 8.3 step 6: an index outside the list rejects the token, without a status
   test('Verify a status list with an index outside the list', async () => {
     const verification = verify({ status: StatusType.Valid }, { uri, idx: 1000 })
 
+    await expect(verification).rejects.toThrow(InvalidRevocationListError)
     await expect(verification).rejects.toThrow('Index out of bounds')
-    await expect(verification).rejects.not.toThrow(InvalidRevocationListError)
+    await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
   })
 })
 
@@ -358,12 +358,8 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
       error: InvalidRevocationListError,
     },
     { name: 'no x5c', options: { header: { x5c: undefined } }, error: UnableToExtractX5ChainFromJwtError },
-    { name: 'an empty x5c', options: { header: { x5c: [] } }, error: UnableToExtractX5ChainFromJwtError },
-    {
-      name: 'an x5c that is not base64',
-      options: { header: { x5c: ['!!!'] } },
-      error: UnableToExtractX5ChainFromJwtError,
-    },
+    { name: 'an empty x5c', options: { header: { x5c: [] } }, error: InvalidRevocationListError },
+    { name: 'an x5c that is not base64', options: { header: { x5c: ['!!!'] } }, error: InvalidRevocationListError },
   ])('Verify a JWT status list with $name', async ({ name, options, error }) => {
     const uri = await mockStatusList(`/broken-${name.replace(/ /g, '-')}`, { ...options, status: StatusType.Invalid })
     const verification = verify(uri)

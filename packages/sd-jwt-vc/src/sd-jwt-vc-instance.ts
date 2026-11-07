@@ -1,13 +1,12 @@
 import { base64, isMediaType, secondsToDate } from '@owf/identity-common'
 import {
-  getListFromStatusListJwt,
+  decodeStatusListJwt,
   StatusListError,
   type StatusListJwtHeaderParameters,
   type StatusListJwtPayload,
   StatusListMediaTypes,
   StatusType,
   verifyStatusListJwtClaims,
-  verifyStatusListJwtHeader,
 } from '@owf/token-status-list'
 import {
   createHashMapping,
@@ -795,11 +794,9 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
         // fetch the status list from the uri
         const fetcher: StatusListFetcher = this.userConfig.statusListFetcher ?? this.statusListFetcher.bind(this)
         // fetch the status list from the uri
-        const statusListJWT = await fetcher(uri)
+        const statusListJwt = await fetcher(uri)
 
-        const slJWT = Jwt.fromEncode<StatusListJwtHeaderParameters, StatusListJwtPayload>(statusListJWT)
-        // check that the token is a Status List Token before its signature is verified
-        verifyStatusListJwtHeader(slJWT.header ?? {})
+        const slJWT = Jwt.fromEncode<StatusListJwtHeaderParameters, StatusListJwtPayload>(statusListJwt)
         // check if the status list has a valid signature. Falls back to the verifier of the SD-JWT-VC.
         const statusListVerifier = this.userConfig.statusVerifier ?? this.userConfig.verifier
         if (!statusListVerifier) {
@@ -820,15 +817,15 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
           })
 
         // check the claims required for a Status List Token, e.g. that `sub` matches the referenced uri
-        verifyStatusListJwtClaims(slJWT.payload as StatusListJwtPayload, {
+        const decodedStatusListJwt = decodeStatusListJwt(statusListJwt)
+        verifyStatusListJwtClaims(decodedStatusListJwt.payload, {
           uri,
           now: options?.currentDate !== undefined ? secondsToDate(options.currentDate) : undefined,
           skewSeconds: options?.skewSeconds,
         })
 
         // get the status list from the status list JWT
-        const statusList = getListFromStatusListJwt(statusListJWT)
-        const status = statusList.getStatus(idx)
+        const status = decodedStatusListJwt.statusList.getStatus(idx)
 
         // validate the status
         const statusValidator: StatusValidator = this.userConfig.statusValidator ?? this.statusValidator.bind(this)
