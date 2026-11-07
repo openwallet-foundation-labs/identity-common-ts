@@ -1,15 +1,5 @@
-import { IdentityError, ValidationError } from '@owf/identity-common'
+import { ValidationError } from '@owf/identity-common'
 import type { RegistrationCertificateValidationIssue } from './validator'
-
-/**
- * RegistrationCertificateError is the error of registration certificate operations.
- */
-export class RegistrationCertificateError extends IdentityError {
-  constructor(message: string, details?: unknown) {
-    super(message, details)
-    this.name = 'RegistrationCertificateError'
-  }
-}
 
 /**
  * Thrown when a registration certificate does not pass validation, with the `issues` of the validation. The message lists the errors among them.

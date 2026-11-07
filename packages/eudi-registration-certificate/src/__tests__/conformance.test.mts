@@ -5,16 +5,15 @@
  *  - Table 10 fields: exp (<= 12 months after iat), intermediary{sub,sname}, act
  */
 
-import { ES256 } from '@owf/crypto'
 import { base64urlDecode, base64urlEncode, VALIDATION_CODES } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
-  decodeRegistrationCertificate,
+  decodeRegistrationCertificateJwt,
   parseRegistrationCertificatePayload,
   REGISTRATION_CERTIFICATE_DIALECTS,
   REGISTRATION_CERTIFICATE_VALIDATION_CODES,
   registrationCertificate,
-  signRegistrationCertificate,
+  signRegistrationCertificateJwt,
   toRegistrationCertificateDialect,
   validateRegistrationCertificate,
   validateRegistrationCertificateJwtHeader,
@@ -22,6 +21,7 @@ import {
   WRP_ENTITLEMENTS,
   zRegistrationCertificatePayload,
 } from '../index'
+import { signJwsCallback } from './context.mjs'
 
 const base = () =>
   registrationCertificate()
@@ -160,12 +160,11 @@ describe('wire dialects', () => {
   })
 
   it('signs in the requested dialect while reporting the canonical payload', async () => {
-    const { privateKey } = await ES256.generateKeyPair()
-    const signed = await signRegistrationCertificate({
+    const signed = await signRegistrationCertificateJwt({
       payload: withNested(),
       accessCertificateSub: 'LEINL-INTERMEDIARY',
       certificates: [TEST_CERT],
-      signer: await ES256.getSigner(privateKey),
+      signJwsCallback,
       dialect: REGISTRATION_CERTIFICATE_DIALECTS.DRAFT,
     })
 
@@ -174,7 +173,7 @@ describe('wire dialects', () => {
     expect(onTheWire.intermediary).toHaveProperty('name')
 
     // decoding maps back to the canonical v1.2.1 shape
-    expect(decodeRegistrationCertificate(signed.jws, 'LEINL-INTERMEDIARY').payload).toEqual(withNested())
+    expect(decodeRegistrationCertificateJwt(signed.jws, 'LEINL-INTERMEDIARY').payload).toEqual(withNested())
   })
 
   it('rejects provides_attestations as scheme URLs', () => {
@@ -203,12 +202,11 @@ describe('wire dialects', () => {
 
 describe('GEN-5.2.1-04 JAdES B-B signature', () => {
   it('signs with a B-B protected header and decodes it back', async () => {
-    const { privateKey } = await ES256.generateKeyPair()
-    const signed = await signRegistrationCertificate({
+    const signed = await signRegistrationCertificateJwt({
       payload: base().build(),
       accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
       certificates: [TEST_CERT],
-      signer: await ES256.getSigner(privateKey),
+      signJwsCallback,
     })
 
     // Claimed signing time required by TS 119 182-1 for signatures generated now
@@ -217,14 +215,14 @@ describe('GEN-5.2.1-04 JAdES B-B signature', () => {
     expect(signed.header.x5c).toHaveLength(1)
     expect(validateRegistrationCertificateJwtHeader(signed.header).valid).toBe(true)
 
-    expect(decodeRegistrationCertificate(signed.jws, 'LEINL-529900T8BM49AURSDO55').payload).toEqual(signed.payload)
+    expect(decodeRegistrationCertificateJwt(signed.jws, 'LEINL-529900T8BM49AURSDO55').payload).toEqual(signed.payload)
   })
 
   it('rejects a registration certificate whose header has no claimed signing time', () => {
     const header = base64urlEncode(JSON.stringify({ typ: 'rc-wrp+jwt', alg: 'ES256', x5c: ['MIIBkDCB'] }))
     const payload = base64urlEncode(JSON.stringify(base().build()))
 
-    expect(() => decodeRegistrationCertificate(`${header}.${payload}.AAAA`, 'LEINL-529900T8BM49AURSDO55')).toThrow(
+    expect(() => decodeRegistrationCertificateJwt(`${header}.${payload}.AAAA`, 'LEINL-529900T8BM49AURSDO55')).toThrow(
       /B-B/
     )
   })

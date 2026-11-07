@@ -16,7 +16,7 @@
 // Constants
 export { CommitmentOids, CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS, JadesProfile } from './constants'
 // Error
-export { JadesError } from './jades-error'
+export { JadesError, JadesValidationError } from './jades-error'
 // Profile validation
 export type { ProfileValidationOptions, ProfileValidationResult } from './profile'
 export { detectProfiles, validateProfile } from './profile'
@@ -27,11 +27,8 @@ export {
   zCertId,
   zClaimedSigningTime,
   zCommitmentReference,
-  zCompactJws,
   zEtsiU,
   zEtsiUClearInstance,
-  zFlattenedJws,
-  zGeneralJws,
   zOid,
   zPkiObject,
   zProtectedHeader,
@@ -46,31 +43,27 @@ export {
   zSignaturePolicyStore,
   zSignatureProductionPlace,
   zSignerAttributes,
-  zSignOptions,
   zSigTst,
   zTstContainer,
   zTstToken,
   zTstTokens,
   zUnprotectedHeader,
   zValidationValues,
-  zVerifyOptions,
   zX5tO,
   zXRefs,
   zXVals,
 } from './schemas'
-// Main Token class
-export { Token } from './token'
+// Signing
+export type { JadesSerialization, JadesSerializations, SignJadesOptions, SignJadesResult } from './sign'
+export { signJades } from './sign'
 // Types
 export type {
   AdoTst,
   ArcTst,
   CertId,
   CommitmentReference,
-  CompactJws,
   EtsiU,
   EtsiUClearInstance,
-  FlattenedJws,
-  GeneralJws,
   Oid,
   PkiObject,
   ProtectedHeader,
@@ -82,28 +75,27 @@ export type {
   SignaturePolicy,
   SignatureProductionPlace,
   SignerAttributes,
-  SignOptions,
   SigTst,
-  TokenContext,
   TstContainer,
   TstToken,
   TstTokens,
   UnprotectedHeaderParams,
   ValidationValues,
-  VerifyOptions,
   X5tO,
   XRefs,
   XVals,
 } from './types'
 // Utility functions
-export {
-  generateSigX5ts,
-  generateX5c,
-  generateX5tO,
-  generateX5tS256,
-  getLegacySigningTime,
-  getSigningTime,
-} from './utils'
-export type { VerifyResult } from './verifier'
-// Verifier functions
-export { decode, verify, verifyCompact, verifyFlattened, verifyGeneral } from './verifier'
+export { generateSigX5ts, generateX5c, generateX5tO, generateX5tS256, getSigningTime } from './utils'
+// Validation
+export type { JadesValidationCode, JadesValidationIssue, JadesValidationResult } from './validation'
+export { JADES_VALIDATION_CODES } from './validation'
+// Decoding and verification
+export type {
+  DecodedJades,
+  DecodeJadesOptions,
+  VerifyJadesJwtOptions,
+  VerifyJadesOptions,
+  VerifyJadesResult,
+} from './verify'
+export { decodeJades, verifyJades, verifyJadesJwt } from './verify'

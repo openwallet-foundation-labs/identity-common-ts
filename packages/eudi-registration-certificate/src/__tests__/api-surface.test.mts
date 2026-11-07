@@ -3,26 +3,26 @@
  * assertion helpers, identifier prefix mapping, and the remaining builder setters.
  */
 
-import { ES256 } from '@owf/crypto'
+import { pemToDer } from '@owf/crypto'
 import { base64urlEncode, ValidationError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
   assertValidRegistrationCertificate,
   createServiceProviderRegistrationCertificate,
   credential,
-  decodeRegistrationCertificate,
+  decodeRegistrationCertificateJwt,
   getIdentifierPrefix,
   IDENTIFIER_TYPES,
-  parseRegistrationCertificate,
+  parseRegistrationCertificateJwt,
   REGISTRATION_CERTIFICATE_VALIDATION_CODES,
-  RegistrationCertificateError,
   RegistrationCertificateValidationError,
   registrationCertificate,
-  signRegistrationCertificate,
+  signRegistrationCertificateJwt,
   validateRegistrationCertificate,
   validateRegistrationCertificatePayload,
   WRP_ENTITLEMENTS,
 } from '../index'
+import { signJwsCallback } from './context.mjs'
 
 const TEST_CERT = `-----BEGIN CERTIFICATE-----
 MIIBczCCARmgAwIBAgIUZt2jkmAgIIiw/wpvJU/4yL7ek/YwCgYIKoZIzj0EAwIw
@@ -44,8 +44,6 @@ const base = () =>
     .registryUri('https://registry.test/wrp')
     .addEntitlement(WRP_ENTITLEMENTS.SERVICE_PROVIDER)
     .issuedAt(1_700_000_000)
-
-const signerFor = async () => ES256.getSigner((await ES256.generateKeyPair()).privateKey)
 
 // ============================================================================
 // Semantic identifiers (Tables 2 and 4)
@@ -125,35 +123,35 @@ describe('semantic identifier initial characters', () => {
 // Signer error paths
 // ============================================================================
 
-describe('signRegistrationCertificate error paths', () => {
+describe('signRegistrationCertificateJwt error paths', () => {
   it('requires at least one certificate', async () => {
     await expect(
-      signRegistrationCertificate({
+      signRegistrationCertificateJwt({
         payload: base().build(),
         accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
         certificates: [],
-        signer: await signerFor(),
+        signJwsCallback,
       })
-    ).rejects.toThrow(RegistrationCertificateError)
+    ).rejects.toThrow(RegistrationCertificateValidationError)
   })
 
   it('rejects a malformed PEM certificate', async () => {
     await expect(
-      signRegistrationCertificate({
+      signRegistrationCertificateJwt({
         payload: base().build(),
         accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
         certificates: ['not a pem'],
-        signer: await signerFor(),
+        signJwsCallback,
       })
     ).rejects.toThrow(/PEM/)
   })
 
   it('honours an explicit signing time and key id', async () => {
-    const signed = await signRegistrationCertificate({
+    const signed = await signRegistrationCertificateJwt({
       payload: base().build(),
       accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
       certificates: [TEST_CERT],
-      signer: await signerFor(),
+      signJwsCallback,
       signingTime: 1_780_000_000,
       keyId: 'key-1',
     })
@@ -167,27 +165,28 @@ describe('signRegistrationCertificate error paths', () => {
 // Decoding and parsing
 // ============================================================================
 
-describe('decodeRegistrationCertificate and parseRegistrationCertificate', () => {
+describe('decodeRegistrationCertificateJwt and parseRegistrationCertificateJwt', () => {
   const compact = (header: object, payload: object) =>
     `${base64urlEncode(JSON.stringify(header))}.${base64urlEncode(JSON.stringify(payload))}.AAAA`
+  const x5c = [pemToDer(TEST_CERT)]
 
   it('rejects a token whose typ is not rc-wrp+jwt', () => {
-    const jws = compact({ typ: 'JWT', alg: 'ES256', x5c: ['MIIBkDCB'], iat: 1_780_000_000 }, base().build())
+    const jws = compact({ typ: 'JWT', alg: 'ES256', x5c, iat: 1_780_000_000 }, base().build())
 
-    expect(() => decodeRegistrationCertificate(jws, 'LEINL-529900T8BM49AURSDO55')).toThrow(/rc-wrp\+jwt/)
+    expect(() => decodeRegistrationCertificateJwt(jws, 'LEINL-529900T8BM49AURSDO55')).toThrow(/rc-wrp\+jwt/)
   })
 
   it('parses header and payload without validating them', () => {
     const payload = { not: 'a registration certificate' }
-    const jws = compact({ typ: 'JWT', alg: 'ES256', x5c: ['MIIBkDCB'], iat: 1_780_000_000 }, payload)
-    const parsed = parseRegistrationCertificate(jws)
+    const jws = compact({ typ: 'JWT', alg: 'ES256', x5c, iat: 1_780_000_000 }, payload)
+    const parsed = parseRegistrationCertificateJwt(jws)
 
     expect(parsed.payload).toEqual(payload)
     expect(parsed.signature).toBe('AAAA')
   })
 
   it('rejects a compact JWS that does not have three parts', () => {
-    expect(() => parseRegistrationCertificate('only.two')).toThrow(/3 parts/)
+    expect(() => parseRegistrationCertificateJwt('only.two')).toThrow(/three parts/)
   })
 })
 

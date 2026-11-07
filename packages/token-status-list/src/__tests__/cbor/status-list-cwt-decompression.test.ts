@@ -73,7 +73,9 @@ describe('StatusListCwt', () => {
       { sign1: sign1Context }
     )
     await expect(verification).rejects.toThrow(StatusListError)
-    await expect(verification).rejects.toThrow("Status list token claim verification failed. The 'Subject (2)' claim")
+    await expect(verification).rejects.toThrow(
+      'Status list token claim verification failed. Invalid CWT claims\n  - Subject (2)'
+    )
   })
 
   test('rejects a verified token whose status list cannot be decompressed', async () => {
