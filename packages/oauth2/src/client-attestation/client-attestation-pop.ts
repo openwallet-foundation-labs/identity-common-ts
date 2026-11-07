@@ -123,6 +123,8 @@ export interface VerifyClientAttestationPopJwtOptions {
 }
 
 export type VerifiedClientAttestationPopJwt = Awaited<ReturnType<typeof verifyClientAttestationPopJwt>>
+const MAX_POP_AGE_SECONDS = 300
+
 export async function verifyClientAttestationPopJwt(options: VerifyClientAttestationPopJwtOptions) {
   const decodedJwt = decodeJwt({
     jwt: options.clientAttestationPopJwt,
@@ -153,6 +155,8 @@ export async function verifyClientAttestationPopJwt(options: VerifyClientAttesta
     },
     now: options.now,
     jwt: decodedJwt,
+    // A PoP is created for each request, so an old one is a replayed one
+    maxAgeSeconds: MAX_POP_AGE_SECONDS,
     expectedAudience: options.expectedAudience ?? options.authorizationServer,
     verifyJwsCallback: options.callbacks.verifyJws,
     errorMessage: 'client attestation pop jwt verification failed',

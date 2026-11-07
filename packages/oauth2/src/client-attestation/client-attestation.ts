@@ -250,6 +250,12 @@ export interface VerifyClientAttestationOptions {
   expectedConfirmationJwkThumbprint?: string
 
   /**
+   * The challenge the authorization server issued, which the `challenge` of the client attestation PoP must
+   * equal (draft 09 §6). If not provided the challenge won't be validated.
+   */
+  expectedChallenge?: string
+
+  /**
    * Date to use for expiration. If not provided current date will be used.
    */
   now?: Date
@@ -270,6 +276,7 @@ export async function verifyClientAttestation({
   callbacks,
   expectedClientId,
   expectedConfirmationJwkThumbprint,
+  expectedChallenge,
   now,
   allowedSkewInSeconds,
 }: VerifyClientAttestationOptions) {
@@ -288,6 +295,7 @@ export async function verifyClientAttestation({
       authorizationServer,
       clientAttestation,
       clientAttestationPopJwt,
+      expectedChallenge,
       now,
       allowedSkewInSeconds,
     })

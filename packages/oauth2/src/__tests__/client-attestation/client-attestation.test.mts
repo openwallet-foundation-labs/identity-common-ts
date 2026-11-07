@@ -94,6 +94,64 @@ describe('Client (Wallet) Attestation', () => {
     ).resolves.toBeDefined()
   })
 
+  // A PoP is created for each request, so an old one, or one without `iat` (draft 09 §5.2), is a replayed one
+  test('rejects a PoP JWT created more than 300 seconds ago', async () => {
+    const clientAttestationPopJwt = await createClientAttestationPopJwt({
+      callbacks: { signJws, generateRandom: callbacks.generateRandom },
+      authorizationServer,
+      clientAttestation: clientAttestationJwt,
+      issuedAt: new Date(Date.now() - 400_000),
+    })
+
+    await expect(
+      verifyClientAttestationPopJwt({
+        callbacks: { verifyJws: callbacks.verifyJws },
+        authorizationServer,
+        clientAttestation,
+        clientAttestationPopJwt,
+      })
+    ).rejects.toThrow(/more than 300 seconds in the past/)
+  })
+
+  test('rejects a PoP JWT without iat', async () => {
+    const { jwt: clientAttestationPopJwt } = await signJwt({
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: instance.publicJwk },
+      signJwsCallback: signJws,
+      header: { typ: 'oauth-client-attestation-pop+jwt', alg: 'ES256' },
+      payload: { aud: authorizationServer, jti: 'jti-1' },
+    })
+
+    await expect(
+      verifyClientAttestationPopJwt({
+        callbacks: { verifyJws: callbacks.verifyJws },
+        authorizationServer,
+        clientAttestation,
+        clientAttestationPopJwt,
+      })
+    ).rejects.toThrow('iat')
+  })
+
+  // draft 09 §6: the server enforces the challenge it issued, which verifyClientAttestation could not
+  test('verifyClientAttestation rejects a PoP JWT with another challenge than the expected one', async () => {
+    const clientAttestationPopJwt = await createClientAttestationPopJwt({
+      callbacks: { signJws, generateRandom: callbacks.generateRandom },
+      authorizationServer,
+      clientAttestation: clientAttestationJwt,
+      challenge: 'stale-challenge',
+    })
+    const verify = (expectedChallenge: string) =>
+      verifyClientAttestation({
+        callbacks,
+        authorizationServer,
+        clientAttestationJwt,
+        clientAttestationPopJwt,
+        expectedChallenge,
+      })
+
+    await expect(verify('issued-challenge')).rejects.toThrow("'challenge' does not match expected value")
+    await expect(verify('stale-challenge')).resolves.toBeDefined()
+  })
+
   test('verifies a legacy (<= draft 07) PoP JWT carrying `iss` and `nonce`', async () => {
     const now = Math.floor(Date.now() / 1000)
     const { jwt: legacyPopJwt } = await signJwt({

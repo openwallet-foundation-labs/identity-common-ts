@@ -47,4 +47,19 @@ describe('verifyCredentialRequestJwtProof', () => {
       await expect(verify(0)).rejects.toThrow(/iat: .* \(not_yet_valid\)/)
     })
   })
+
+  // OpenID4VCI 1.0 Appendix F.4: the creation time of a proof must be within an acceptable window
+  test('rejects a proof created more than 300 seconds ago', async () => {
+    const now = new Date('2026-01-01T00:00:00Z')
+    const jwt = await createCredentialRequestJwtProof({
+      callbacks: { ...callbacks, signJws: getSignJwsCallback([proofJwk]) },
+      credentialIssuer,
+      issuedAt: addSecondsToDate(now, -400),
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: proofJwkPublic },
+    })
+
+    await expect(verifyCredentialRequestJwtProof({ callbacks, credentialIssuer, jwt, now })).rejects.toThrow(
+      /more than 300 seconds in the past/
+    )
+  })
 })

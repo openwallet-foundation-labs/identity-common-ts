@@ -112,11 +112,19 @@ export interface DpopVerificationOptions {
   allowedSigningAlgs?: string[]
 
   /**
-   * Maximum accepted age in seconds for the DPoP proof based on the `iat` claim.
+   * Maximum accepted age in seconds for the DPoP proof based on the `iat` claim. The proof is rejected
+   * when it is older than this value, as a server must accept a proof only for a limited time (RFC 9449
+   * Section 11.1).
    *
-   * If provided, the proof is rejected when it is older than this value.
+   * @default 300
    */
   maxProofAgeSeconds?: number
+
+  /**
+   * Expected nonce in the payload, as provided by the server (RFC 9449 Section 8). If not provided the
+   * nonce won't be validated.
+   */
+  expectedNonce?: string
 
   /**
    * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of the proof, including the
@@ -146,11 +154,6 @@ export interface VerifyDpopJwtOptions extends DpopVerificationOptions {
   request: RequestLike
 
   /**
-   * Expected nonce in the payload. If not provided the nonce won't be validated.
-   */
-  expectedNonce?: string
-
-  /**
    * Access token to which the dpop jwt is bound. If provided the sha-256 hash of the
    * access token needs to match the 'ath' claim.
    */
@@ -178,6 +181,9 @@ export interface DpopAssertJtiUniquenessOptions extends DecodeJwtResult<typeof z
 }
 
 export type DpopAssertJtiUniquenessCallback = (options: DpopAssertJtiUniquenessOptions) => OrPromise<boolean>
+
+// RFC 9449 Section 11.1: a proof is only accepted for a limited time, or a leaked proof could be replayed forever
+const DEFAULT_MAX_PROOF_AGE_SECONDS = 300
 
 export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
   try {
@@ -241,7 +247,7 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
       verifyJwsCallback: options.callbacks.verifyJws,
       errorMessage: 'dpop jwt verification failed',
       expectedNonce: options.expectedNonce,
-      maxAgeSeconds: options.maxProofAgeSeconds,
+      maxAgeSeconds: options.maxProofAgeSeconds ?? DEFAULT_MAX_PROOF_AGE_SECONDS,
       skewSeconds: options.allowedSkewInSeconds,
     })
 
