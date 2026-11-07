@@ -57,6 +57,8 @@ export interface VerifyClientAttestationJwtOptions {
 
   /**
    * Callbacks used for verifying client attestation jwt, and calculating the thumbprint of the `cnf` key.
+   * `verifyJws` decides whether the attester is trusted, for example by validating the `x5c` chain. A client
+   * attestation signed with a `jwk` or `did` signer is rejected before, as these can carry a key the client chose.
    */
   callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>
 
@@ -77,6 +79,10 @@ export async function verifyClientAttestationJwt(options: VerifyClientAttestatio
     jwt: decodedJwt,
     now: options.now,
     verifyJwsCallback: options.callbacks.verifyJws,
+    // The attester must be one the authorization server trusts, so its key cannot come from the attestation
+    // itself: `verifyJws` accepts a key from a `jwk` header, or a DID such as did:jwk, for DPoP and PoP JWTs,
+    // and with it any client could attest itself.
+    allowedSignerMethods: ['x5c', 'federation', 'custom'],
     errorMessage: 'client attestation jwt verification failed.',
     skewSeconds: options.allowedSkewInSeconds,
   })

@@ -19,6 +19,7 @@ import {
   getSignJwsCallback,
   parseXwwwFormUrlEncoded,
   callbacks as partialCallbacks,
+  testAttester,
 } from '../../../oauth2/src/__tests__/util.mjs'
 import {
   type CredentialConfigurationSupportedWithFormats,
@@ -57,21 +58,12 @@ const accessTokenJwk = {
 }
 const { d: __3, ...accessTokenJwkPublic } = accessTokenJwk
 
-const walletProviderJwk = {
-  kty: 'EC',
-  d: 'oXYK_EmjSLauIIkWF53DuRhZTx9SHg5lC5eWZmtWPxE',
-  crv: 'P-256',
-  x: '2l7WpVHYQoWWjHcB9MpfEylT7w-bhRbG3i-38Cel7EI',
-  y: 'm5c_gqV2sbLmGh4p1bhEANwyt0xtfacrc554SyomrX0',
-}
-const { d: __4, ...walletProviderJwkPublic } = walletProviderJwk
-
 const server = setupServer()
 
 const callbacks = {
   ...partialCallbacks,
   fetch,
-  signJws: getSignJwsCallback([credentialRequestProofJwk, dpopJwk, accessTokenJwk, walletProviderJwk]),
+  signJws: getSignJwsCallback([credentialRequestProofJwk, dpopJwk, accessTokenJwk]),
 }
 
 const issuer = new Openid4vciIssuer({
@@ -461,11 +453,7 @@ describe('Full E2E test', () => {
       // Valid one hour
       expiresAt: addSecondsToDate(new Date(), 3600),
       issuer: 'https://wallet-provider.com',
-      signer: {
-        method: 'jwk',
-        publicJwk: walletProviderJwkPublic,
-        alg: 'ES256',
-      },
+      signer: testAttester.signer,
       walletLink: 'https://wallet-provider.com/wallet',
       walletName: 'Wallet',
     })
@@ -559,7 +547,7 @@ describe('Full E2E test', () => {
             header: {
               alg: 'ES256',
               typ: 'oauth-client-attestation+jwt',
-              jwk: walletProviderJwkPublic,
+              kid: testAttester.signer.kid,
             },
             payload: {
               iss: 'https://wallet-provider.com',
@@ -572,11 +560,7 @@ describe('Full E2E test', () => {
               wallet_name: 'Wallet',
               wallet_link: 'https://wallet-provider.com/wallet',
             },
-            signer: {
-              alg: 'ES256',
-              method: 'jwk',
-              publicJwk: walletProviderJwkPublic,
-            },
+            signer: { ...testAttester.signer, publicJwk: testAttester.publicJwk },
             // The client instance key is the dpop key in this flow
             confirmationJwkThumbprint: verifiedParRequest.dpop?.jwkThumbprint,
           },

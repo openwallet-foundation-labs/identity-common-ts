@@ -13,6 +13,8 @@ An implementation of the [OpenID for Verifiable Credential Issuance](https://ope
 - Create and verify wallet attestations based on attestation-based client authentication
 - Resolve and create signed credential issuer metadata
 
+Wallet attestations, key attestations and signed credential issuer metadata must be signed by a signer that is identified by `x5c`, a federation `trust_chain`, or a `kid`. The `verifyJws` callback decides whether the signer is trusted, for example by validating the `x5c` chain. A JWT signed with a key from a `jwk` header or a DID is rejected, as whoever created it could choose that key itself.
+
 This package was previously developed in the [oid4vc-ts](https://github.com/openwallet-foundation-labs/oid4vc-ts) repository. The `@openid4vc/*` packages are versioned together, separately from the other packages in this repository.
 
 ## Installation

@@ -1,7 +1,12 @@
 import { type Jwk, signJwt } from '@owf/jose'
 import * as jose from 'jose'
 import { beforeAll, describe, expect, test } from 'vitest'
-import { callbacks, getSignJwsCallback } from '../../../../oauth2/src/__tests__/util.mjs'
+import {
+  callbacks,
+  getSignJwsCallback,
+  signerWithOwnKey,
+  testAttester,
+} from '../../../../oauth2/src/__tests__/util.mjs'
 import {
   createKeyAttestationJwt,
   parseKeyAttestationJwt,
@@ -19,14 +24,12 @@ async function generateEs256Key() {
 }
 
 describe('Key Attestation', () => {
-  let attester: Awaited<ReturnType<typeof generateEs256Key>>
   let attested: Awaited<ReturnType<typeof generateEs256Key>>
   let signJws: ReturnType<typeof getSignJwsCallback>
 
   beforeAll(async () => {
-    attester = await generateEs256Key()
     attested = await generateEs256Key()
-    signJws = getSignJwsCallback([attester.privateJwk])
+    signJws = getSignJwsCallback([])
   })
 
   test('creates a key attestation with the spec `key-attestation+jwt` typ', async () => {
@@ -35,7 +38,7 @@ describe('Key Attestation', () => {
       attestedKeys: [attested.publicJwk],
       expiresAt: new Date(Date.now() + 500 * 1000),
       use: 'proof_type.jwt',
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+      signer: testAttester.signer,
     })
 
     const { header } = parseKeyAttestationJwt({ keyAttestationJwt })
@@ -50,12 +53,35 @@ describe('Key Attestation', () => {
     ).resolves.toBeDefined()
   })
 
+  // The issuer must trust the attester (OpenID4VCI 1.0 Appendix D), but `verifyJws` accepts these keys for proofs,
+  // so a wallet could attest its own keys with them
+  test.each(['jwk', 'did'] as const)('rejects a key attestation signed with a %s signer', async (method) => {
+    const keyAttestationJwt = await createKeyAttestationJwt({
+      callbacks: { signJws: getSignJwsCallback([attested.privateJwk]) },
+      attestedKeys: [attested.publicJwk],
+      expiresAt: new Date(Date.now() + 500 * 1000),
+      use: 'proof_type.jwt',
+      keyStorage: ['iso_18045_high'],
+      userAuthentication: ['iso_18045_high'],
+      signer: signerWithOwnKey(method, attested.publicJwk),
+    })
+
+    await expect(
+      verifyKeyAttestationJwt({
+        callbacks: { verifyJws: callbacks.verifyJws },
+        keyAttestationJwt,
+        use: 'proof_type.jwt',
+        keyAttestationsRequired: { key_storage: ['iso_18045_high'], user_authentication: ['iso_18045_high'] },
+      })
+    ).rejects.toThrow(`method ${method}`)
+  })
+
   test('verifies a legacy `keyattestation+jwt` key attestation', async () => {
     const now = Math.floor(Date.now() / 1000)
     const { jwt: legacyKeyAttestationJwt } = await signJwt({
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+      signer: testAttester.signer,
       signJwsCallback: signJws,
-      header: { typ: 'keyattestation+jwt', alg: 'ES256', jwk: attester.publicJwk },
+      header: { typ: 'keyattestation+jwt', alg: 'ES256', kid: testAttester.signer.kid },
       payload: { iat: now, exp: now + 500, attested_keys: [attested.publicJwk] },
     })
 
@@ -73,9 +99,9 @@ describe('Key Attestation', () => {
     const signKeyAttestationJwt = async (typ: string) => {
       const now = Math.floor(Date.now() / 1000)
       const { jwt } = await signJwt({
-        signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+        signer: testAttester.signer,
         signJwsCallback: signJws,
-        header: { typ, alg: 'ES256', jwk: attester.publicJwk },
+        header: { typ, alg: 'ES256', kid: testAttester.signer.kid },
         payload: { iat: now, exp: now + 500, attested_keys: [attested.publicJwk] },
       })
 
@@ -121,7 +147,7 @@ describe('Key Attestation', () => {
           issuedAt: new Date(now.getTime() - 100 * 1000),
           expiresAt: new Date(now.getTime() - 10 * 1000),
           use: 'proof_type.jwt',
-          signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+          signer: testAttester.signer,
         }),
         use: 'proof_type.jwt',
         now,
