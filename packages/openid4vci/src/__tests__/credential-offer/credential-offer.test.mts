@@ -1,7 +1,7 @@
 import { authorizationCodeGrantIdentifier, preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { callbacks } from '../../../../oauth2/src/__tests__/util.mjs'
 import { createCredentialOffer, resolveCredentialOffer } from '../../credential-offer/credential-offer'
 import type { IssuerMetadataResult } from '../../metadata/fetch-issuer-metadata'
@@ -233,5 +233,15 @@ describe('Credential Offer', () => {
       expect(error).toBeInstanceOf(Error)
       expect(error.message).not.toContain(secret)
     }
+  })
+
+  // OpenID4VCI 1.0 Section 4.1: the offer comes from whoever crafted it, so a credential_offer_uri with another scheme
+  // would make the wallet request a URL of their choice, such as an internal endpoint
+  test('does not fetch a credential_offer_uri that is not an https url', async () => {
+    const fetch = vi.fn(async () => new Response(null, { status: 404 }))
+    const offer = `openid-credential-offer://?credential_offer_uri=${encodeURIComponent('http://169.254.169.254/latest/meta-data/')}`
+
+    await expect(resolveCredentialOffer(offer, { fetch })).rejects.toThrow('Invalid credential_offer_uri')
+    expect(fetch).not.toHaveBeenCalled()
   })
 })

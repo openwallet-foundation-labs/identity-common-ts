@@ -1,7 +1,7 @@
 import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
-import { addPaths, type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
+import { addPaths, type FetchCallback, fetcher, isSameEntityId, type VerifyCallback, zHttpsUrl } from '../utils'
 import { validate } from '../utils/validate'
 import { zEntityConfigurationJwt } from './entityConfigurationJwt'
 
@@ -21,6 +21,8 @@ export const fetchEntityConfiguration = async ({
   verifyJwtCallback,
   fetchCallback,
 }: FetchEntityConfigurationOptions) => {
+  validate({ schema: zHttpsUrl, data: entityId, errorMessage: `entity id '${entityId}' is not an https URL` })
+
   // Create the entity URL
   const federationUrl = addPaths(entityId, '.well-known', 'openid-federation')
 

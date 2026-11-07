@@ -1,6 +1,7 @@
 import { CommonMediaTypes } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
 import z from 'zod'
+import { InvalidFetchResponseError } from '../error/InvalidFetchResponseError.js'
 import { createZodFetcher } from '../fetcher.js'
 import type { Fetch } from '../globals.js'
 
@@ -78,4 +79,20 @@ describe('createZodFetcher', () => {
       ).resolves.toMatchObject({ result: { success: true, data: { hello: 'world' } } })
     }
   )
+
+  // The URL can be chosen by whoever sent the request, and the message may be returned to them, which would let them
+  // read the responses of internal endpoints
+  test.each([
+    ['another content type', 'text/plain'],
+    ['invalid JSON', 'application/json'],
+  ])('keeps the response body out of the error message for %s', async (_description, contentType) => {
+    const body = 'root:x:0:0:internal-secret'
+    const fetchWithZod = createZodFetcher(async () => new Response(body, { headers: { 'Content-Type': contentType } }))
+
+    const error = await fetchWithZod(z.object({}), CommonMediaTypes.Json, 'https://example.com').catch((error) => error)
+
+    expect(error).toBeInstanceOf(InvalidFetchResponseError)
+    expect(error.message).not.toContain('internal-secret')
+    expect(error.textResponse).toBe(body)
+  })
 })

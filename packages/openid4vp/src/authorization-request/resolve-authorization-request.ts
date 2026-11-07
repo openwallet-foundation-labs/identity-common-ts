@@ -119,7 +119,12 @@ export async function resolveOpenid4vpAuthorizationRequest(
       !clientMetadata &&
       authorizationRequestPayload.client_metadata_uri
     ) {
-      clientMetadata = await fetchClientMetadata({ clientMetadataUri: authorizationRequestPayload.client_metadata_uri })
+      // With the fetch of the wallet, which can restrict the URLs it requests: the URL is chosen by whoever crafted
+      // the request, which is not authenticated yet
+      clientMetadata = await fetchClientMetadata({
+        clientMetadataUri: authorizationRequestPayload.client_metadata_uri,
+        fetch: callbacks.fetch,
+      })
     }
 
     const client = await validateOpenid4vpClientId({

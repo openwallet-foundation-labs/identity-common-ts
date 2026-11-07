@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   createEntityConfiguration,
   type EntityConfigurationClaimsOptions,
@@ -15,6 +15,38 @@ describe('fetch entity configuration', () => {
   const verifyJwtCallback: VerifyCallback = () => Promise.resolve(true)
 
   const signJwtCallback: SignCallback = () => Promise.resolve(new Uint8Array(10).fill(42))
+
+  // OpenID Federation 1.0 Section 1.2 and 5.1.1: Entity Identifiers and federation endpoints are https URLs. They are
+  // fetched before the trust chain is trusted, so another scheme would let any entity make the resolver request, for
+  // example, an internal http endpoint.
+  it('should not fetch the entity configuration of an entity id that is not an https URL', async () => {
+    const fetchCallback = vi.fn()
+
+    await expect(
+      fetchEntityConfiguration({ entityId: 'http://10.0.0.5:8080', verifyJwtCallback, fetchCallback })
+    ).rejects.toThrow('is not an https URL')
+    expect(fetchCallback).not.toHaveBeenCalled()
+  })
+
+  it('should reject authority hints and federation endpoints that are not https URLs', () => {
+    const claims = {
+      iss: 'https://example.org',
+      sub: 'https://example.org',
+      iat: numericDate(),
+      exp: numericDate(),
+      jwks: { keys: [{ kid: 'a', kty: 'EC' }] },
+    }
+
+    expect(zEntityConfigurationClaims.safeParse({ ...claims, authority_hints: ['http://10.0.0.5'] }).success).toBe(
+      false
+    )
+    expect(
+      zEntityConfigurationClaims.safeParse({
+        ...claims,
+        metadata: { federation_entity: { federation_fetch_endpoint: 'http://10.0.0.5/fetch' } },
+      }).success
+    ).toBe(false)
+  })
 
   it('should fetch a simple entity configuration', async () => {
     const entityId = 'https://example.org'
