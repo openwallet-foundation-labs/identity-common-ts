@@ -17,7 +17,14 @@ import {
   zClientAttestationPopJwtPayload,
 } from '../../client-attestation/z-client-attestation'
 import { Oauth2Error } from '../../error/Oauth2Error'
-import { callbacks, getSignJwsCallback, signerWithOwnKey, testAttester } from '../util.mjs'
+import {
+  callbacks,
+  didJwk,
+  getSignJwsCallback,
+  signerWithOwnKey,
+  testAttester,
+  verifyJwsTrustingDids,
+} from '../util.mjs'
 
 const authorizationServer = 'https://oauth2-auth-server.com'
 
@@ -270,17 +277,42 @@ describe('Client (Wallet) Attestation', () => {
     )
 
     // The authorization server must trust the attester (draft-ietf-oauth-attestation-based-client-auth), but
-    // `verifyJws` accepts these keys for DPoP and PoP JWTs, so a client could attest itself with them
-    test.each(['jwk', 'did'] as const)('rejects a client attestation signed with a %s signer', async (method) => {
+    // `verifyJws` accepts a key from a `jwk` header for DPoP and PoP JWTs, so a client could attest itself with it
+    test('rejects a client attestation signed with a jwk signer', async () => {
       const clientAttestationJwt = await createClientAttestationJwt({
         callbacks: { signJws },
         clientId: 'wallet',
         confirmation: { jwk: instance.publicJwk },
         expiresAt: new Date(Date.now() + 3600 * 1000),
-        signer: signerWithOwnKey(method, instance.publicJwk),
+        signer: signerWithOwnKey('jwk', instance.publicJwk),
       })
 
-      await expect(verifyClientAttestationJwt({ callbacks, clientAttestationJwt })).rejects.toThrow(`method ${method}`)
+      await expect(verifyClientAttestationJwt({ callbacks, clientAttestationJwt })).rejects.toThrow('method jwk')
+    })
+
+    // A DID signer is passed to `verifyJws`, which must check that the DID belongs to a trusted attester
+    test('verifies a client attestation signed with a did signer only if verifyJws trusts the did', async () => {
+      const attester = await generateEs256Key()
+      const clientAttestationJwt = await createClientAttestationJwt({
+        callbacks: { signJws: getSignJwsCallback([attester.privateJwk]) },
+        clientId: 'wallet',
+        confirmation: { jwk: instance.publicJwk },
+        expiresAt: new Date(Date.now() + 3600 * 1000),
+        signer: signerWithOwnKey('did', attester.publicJwk),
+      })
+
+      const { signer } = await verifyClientAttestationJwt({
+        callbacks: { ...callbacks, verifyJws: verifyJwsTrustingDids([didJwk(attester.publicJwk)]) },
+        clientAttestationJwt,
+      })
+      expect(signer).toMatchObject({ method: 'did', didUrl: `${didJwk(attester.publicJwk)}#0` })
+
+      await expect(
+        verifyClientAttestationJwt({
+          callbacks: { ...callbacks, verifyJws: verifyJwsTrustingDids([didJwk(instance.publicJwk)]) },
+          clientAttestationJwt,
+        })
+      ).rejects.toThrow('client attestation jwt verification failed.')
     })
 
     test('rejects a client attestation with the typ of a client attestation PoP', async () => {
