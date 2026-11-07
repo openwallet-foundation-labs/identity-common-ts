@@ -72,20 +72,7 @@ export interface CreateInteractiveAuthorizationOpenid4vpInteractionOptions {
  * @param options - Response options
  * @returns The interaction required response
  *
- * @example With unsigned request
- * ```ts
- * const response = createInteractiveAuthorizationOpenid4vpInteraction({
- *   authSession: 'session-123',
- *   openid4vpRequest: {
- *     response_type: 'vp_token',
- *     response_mode: 'iae_post',
- *     nonce: 'n-0S6_WzA2Mj',
- *     dcql_query: { ... }
- *   }
- * })
- * ```
- *
- * @example With signed request
+ * @example
  * ```ts
  * const response = createInteractiveAuthorizationOpenid4vpInteraction({
  *   authSession: 'session-123',

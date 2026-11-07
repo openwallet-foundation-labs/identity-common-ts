@@ -1056,7 +1056,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
     throw new Error('encryptJwe not implemented in tests')
   }
 
-  test('should create openid4vp authorization request with IAE response mode', async () => {
+  test('should reject an unsigned openid4vp authorization request with IAE response mode', async () => {
     const keyPair = await generateJwkKeyPair()
     const signJws = getSignJwsCallback([keyPair.privateKey])
 
@@ -1076,19 +1076,15 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
       },
     } satisfies Openid4vpAuthorizationRequestIae
 
-    const result = await createOpenid4vpAuthorizationRequest({
-      authorizationRequestPayload,
-      callbacks: {
-        signJws,
-        encryptJwe,
-      },
-    })
-
-    expect(result.authorizationRequestPayload).toEqual(authorizationRequestPayload)
-    expect(result.authorizationRequest).toContain('openid4vp://')
-    expect(result.authorizationRequest).toContain('response_mode=iae_post')
-    expect(result.authorizationRequest).toContain('response_type=vp_token')
-    expect(result.jar).toBeUndefined()
+    await expect(
+      createOpenid4vpAuthorizationRequest({
+        authorizationRequestPayload,
+        callbacks: {
+          signJws,
+          encryptJwe,
+        },
+      })
+    ).rejects.toThrow("An authorization request with response_mode 'iae_post' must be signed.")
   })
 
   test('should create signed openid4vp authorization request with expected_url', async () => {
@@ -1119,7 +1115,10 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
 
     expect(result.jar).toBeDefined()
     expect(result.jar?.authorizationRequestJwt).toBeDefined()
-    expect(result.authorizationRequest).toContain('request=')
+    expect(result.authorizationRequest).toEqual({
+      client_id: 'issuer-client',
+      request: result.jar?.authorizationRequestJwt,
+    })
 
     // Verify JWT contains expected_url
     if (result.jar) {
@@ -1130,7 +1129,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
     }
   })
 
-  test('should validate openid4vp IAE request payload successfully', () => {
+  test('should fail validation of an unsigned openid4vp IAE request', () => {
     const params = {
       response_type: 'vp_token',
       client_id: 'issuer-client',
@@ -1145,7 +1144,7 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
         params,
         isJarRequest: false,
       })
-    ).not.toThrow()
+    ).toThrow("An authorization request with response_mode 'iae_post' must be signed.")
   })
 
   test('should validate signed openid4vp IAE request with expected_url', () => {
@@ -1194,15 +1193,17 @@ describe('Interactive Authorization Endpoint - OpenID4VP Integration', () => {
       client_id: 'issuer-client',
       response_mode: 'iae_post',
       nonce: 'test-nonce',
+      expected_url: 'https://example.com/interactive-authorization',
       client_metadata: {},
     } satisfies Partial<Openid4vpAuthorizationRequestIae>
 
     expect(() =>
       validateOpenid4vpAuthorizationRequestIaePayload({
         params: params as Openid4vpAuthorizationRequestIae,
-        isJarRequest: false,
+        isJarRequest: true,
+        disableExpectedUrlValidation: true,
       })
-    ).toThrow(Oauth2ServerErrorResponseError)
+    ).toThrow('dcql_query MUST be present when using iae_post response mode.')
   })
 
   test('should fail validation when expected_url does not match', () => {
