@@ -112,7 +112,10 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     return jwt
   }
 
-  private async VerifyJwt(jwt: Jwt, options?: T & VerifierOptions) {
+  /**
+   * Verifies the signature of the issuer-signed JWT with the configured verifier.
+   */
+  protected async VerifyJwt(jwt: Jwt, options?: T & VerifierOptions) {
     if (!this.userConfig.verifier) {
       throw new SdJwtError('Verifier not found', { code: 'VERIFIER_NOT_FOUND' })
     }

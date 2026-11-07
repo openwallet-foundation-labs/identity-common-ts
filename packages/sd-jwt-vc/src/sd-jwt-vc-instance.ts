@@ -21,6 +21,7 @@ import {
   SD_DIGEST,
   SD_LIST_KEY,
   SdJwt,
+  type SdJwtCompact,
   SdJwtError,
   SdJwtInstance,
   unpackObj,
@@ -80,6 +81,21 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
   }
 
   /**
+   * Issues the SD-JWT-VC like `SdJwtInstance.issue`, but refuses the `omitTyp` option: the issuer MUST include the
+   * `typ` header (SD-JWT VC draft 23, Section 2.2.1), and an SD-JWT-VC without it does not verify.
+   */
+  async issue<Payload extends SdJwtVcPayload>(
+    payload: Payload,
+    disclosureFrame?: DisclosureFrame<Payload>,
+    options?: { header?: object }
+  ): Promise<SdJwtCompact> {
+    if (this.userConfig.omitTyp) {
+      throw new SdJwtError(`An SD-JWT-VC must have the typ header '${this.type}', so omitTyp is not allowed`)
+    }
+    return super.issue(payload, disclosureFrame, options)
+  }
+
+  /**
    * Validates if the disclosure frame attempts to selectively disclose protected SD-JWT-VC claims.
    * @param disclosureFrame
    */
@@ -98,13 +114,29 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
   }
 
   /**
-   * Validates the SD-JWT-VC like `SdJwtInstance.validate`, and rejects it when a protected claim was selectively
-   * disclosed or has selectively disclosable parts.
+   * Validates the SD-JWT-VC like `SdJwtInstance.validate`, and rejects it when its `typ` header is not `dc+sd-jwt`, or
+   * a protected claim was selectively disclosed or has selectively disclosable parts.
    */
   async validate(encodedSdJwt: string, options?: T & VerifierOptions) {
     const result = await super.validate(encodedSdJwt, options)
+    this.validateTyp(result.header)
     this.validateProtectedClaims(result.payload, await this.issuerSignedPayload(encodedSdJwt))
     return result
+  }
+
+  /**
+   * Throws when the `typ` header is not `dc+sd-jwt` (SD-JWT VC draft 23, Section 2.2.1). Otherwise any other JWT signed
+   * with a key of the issuer, such as its Status List Token, would be accepted as an SD-JWT-VC.
+   */
+  private validateTyp(header: Record<string, unknown> | undefined) {
+    const typ = header?.typ
+    // RFC 7515 Section 4.1.9: a typ without a `/` is a media type with the `application/` prefix omitted
+    if (
+      typeof typ !== 'string' ||
+      !isMediaType(typ.includes('/') ? typ : `application/${typ}`, `application/${this.type}`)
+    ) {
+      throw new SdJwtError(`Invalid typ header '${String(typ)}': it must be '${this.type}'`, { code: 'INVALID_SD_JWT' })
+    }
   }
 
   /**
@@ -155,8 +187,10 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
         signal: controller.signal,
         headers: { Accept: StatusListMediaTypes.StatusListJwt },
       })
+      // Not with the body of the response: the error can reach whoever presented the credential, and the uri may be
+      // an internal endpoint when the verifier accepts credentials of issuers it does not know
       if (!response.ok) {
-        throw new Error(`Error fetching status list: ${response.status} ${await response.text()}`)
+        throw new Error(`Error fetching status list: ${response.status}`)
       }
 
       // according to the spec the content type should be application/statuslist+jwt
@@ -241,11 +275,19 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
 
     // Build partial result for additional verifications
     let result: VerificationResult | undefined
+    let isSdJwtVc = false
     if (baseResult.success) {
       result = {
         payload: baseResult.data.payload as SdJwtVcPayload,
         header: baseResult.data.header,
         kb: baseResult.data.kb as VerificationResult['kb'],
+      }
+      try {
+        this.validateTyp(result.header)
+        isSdJwtVc = true
+      } catch (e) {
+        const error = ensureError(e)
+        addError('INVALID_SD_JWT', error.message, error)
       }
       const signedPayload = await this.issuerSignedPayload(encodedSdJwt)
       try {
@@ -282,8 +324,9 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
     }
 
     // The claims of an SD-JWT-VC that failed verification are not the issuer's, so their status list and vct URIs
-    // are not fetched: anyone could make the verifier send requests to a URL of their choice.
-    if (result && baseResult.success) {
+    // are not fetched: anyone could make the verifier send requests to a URL of their choice. Neither are those of a
+    // JWT of another type, which are not the claims of an SD-JWT-VC.
+    if (result && isSdJwtVc) {
       try {
         await this.verifyStatus(result, options)
       } catch (e) {
@@ -350,14 +393,17 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
    *
    * @param encodedSdJwt The encoded SD-JWT VC or presentation.
    * @param typeMetadata The type metadata to verify against. Type metadata that extends other type metadata is
-   * resolved first. When not provided, the type metadata of the SD-JWT VC is fetched.
+   * resolved first. When not provided, the type metadata of the SD-JWT VC is fetched with `getVct`, which verifies
+   * its signature first.
+   * @param options Verification options for the signature check of `getVct`.
    * @returns The claims that do not conform to the type metadata.
    * @throws SdJwtError when the type metadata cannot be resolved, describes a different vct, or the disclosures
-   * are invalid.
+   * are invalid, or when the type metadata is fetched and the signature of the SD-JWT VC is invalid.
    */
   async verifyTypeMetadata(
     encodedSdJwt: string,
-    typeMetadata?: ResolvedTypeMetadata | TypeMetadataFormat
+    typeMetadata?: ResolvedTypeMetadata | TypeMetadataFormat,
+    options?: T & VerifierOptions
   ): Promise<TypeMetadataVerificationResult> {
     const sdjwt = await this.decodeForTypeMetadata(encodedSdJwt)
 
@@ -372,7 +418,7 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
 
     const resolvedMetadata = typeMetadata
       ? await this.toResolvedTypeMetadata(typeMetadata)
-      : await this.getVct(encodedSdJwt)
+      : await this.getVct(encodedSdJwt, options)
     if (!resolvedMetadata) {
       throw new SdJwtError('Type metadata not found or could not be resolved')
     }
@@ -417,24 +463,30 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
   }
 
   /**
-   * Gets VCT Metadata of the raw SD-JWT-VC. Returns the type metadata format. If the SD-JWT-VC is invalid or does not contain a vct claim, an error is thrown.
+   * Gets VCT Metadata of the raw SD-JWT-VC. Returns the type metadata format. If the signature or the `typ` header of
+   * the SD-JWT-VC is invalid or it does not contain a vct claim, an error is thrown. Its other claims, such as `exp`,
+   * are not validated.
    *
    * It may return `undefined` if the fetcher returned an undefined value (instead of throwing an error).
    *
    * @param encodedSdJwt
+   * @param options - Verification options for the signature check, e.g. `allowedIssuerAlgorithms`
    * @returns
    */
-  async getVct(encodedSdJwt: string): Promise<ResolvedTypeMetadata | undefined> {
-    // Call the parent class's verify method
-    const { payload, header } = await SdJwt.extractJwt<Record<string, unknown>, SdJwtVcPayload>(encodedSdJwt)
+  async getVct(encodedSdJwt: string, options?: T & VerifierOptions): Promise<ResolvedTypeMetadata | undefined> {
+    const jwt = await SdJwt.extractJwt<Record<string, unknown>, SdJwtVcPayload>(encodedSdJwt)
+    // The vct is fetched, so it has to be the issuer's (RFC 9901 Section 7.1 step 2): otherwise anyone could make the
+    // verifier send requests to a URL of their choice.
+    await this.VerifyJwt(jwt, { ...options, skipJwtClaimValidation: true } as T & VerifierOptions)
+    this.validateTyp(jwt.header)
 
-    if (!payload) {
+    if (!jwt.payload) {
       throw new SdJwtError('JWT payload is missing')
     }
 
     const result: VerificationResult = {
-      payload,
-      header,
+      payload: jwt.payload,
+      header: jwt.header,
       kb: undefined,
     }
 
@@ -486,14 +538,17 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
       const response = await fetch(url, {
         signal: AbortSignal.timeout(this.userConfig.timeout ?? 10000),
       })
+      // Not with the body of the response, as in statusListFetcher. Neither is response.json() used, as its
+      // SyntaxError quotes the start of the body.
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Error fetching ${url}: ${response.status} ${response.statusText} - ${errorText}`)
+        throw new Error(`Error fetching ${url}: ${response.status} ${response.statusText}`)
       }
       await this.validateIntegrity(response.clone(), url, integrity)
-      const data = await response.json()
-
-      return data
+      try {
+        return JSON.parse(await response.text())
+      } catch {
+        throw new SdJwtError(`The type metadata fetched from ${url} is not valid JSON`)
+      }
     } catch (e) {
       const error = ensureError(e)
       if (error.name === 'TimeoutError') {
