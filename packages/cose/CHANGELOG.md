@@ -1,5 +1,53 @@
 # @owf/cose
 
+## 0.8.0
+
+### Minor Changes
+
+- 90614a9: Abbreviations and names in exports are written as words, e.g. `SdJwt` instead of `SDJwt` or `SDJWT`, and `Openid` instead of `OpenId`.
+  
+  **Breaking:** rename the exports as follows. The `name` of the renamed errors changes with them. Property names that the specifications define, such as `schemaURIs`, `LoTEType` and `X509SKIs`, don't change.
+  
+  - `@sd-jwt/core`: `SDJwt` to `SdJwt`, `SDJwtInstance` to `SdJwtInstance`, `SDJWTError` to `SdJwtError`, `SDJWTConfig` to `SdJwtConfig`, `SDJWTCompact` to `SdJwtCompact`, `KBJwt` to `KbJwt`, `KBOptions` to `KbOptions`, `FlattenJSON` to `FlattenJson`, `GeneralJSON` to `GeneralJson`, `DecodedSDJwt` to `DecodedSdJwt` and `getSDAlgAndPayload` to `getSdAlgAndPayload`. The types `kbHeader` and `kbPayload` are now `KbJwtHeader` and `KbJwtPayload`. The methods `toFlattenJSON`, `toGeneralJSON`, `SDJwt.decodeSDJwt`, `SDJwt.encodeSDJwt`, `KBJwt.verifyKB`, `KBJwt.fromKBEncode`, `Jwt.decodeJWT` and the static `DEFAULT_hashAlg` of `SDJwtInstance` and `SDJwtGeneralJSONInstance` are now `toFlattenJson`, `toGeneralJson`, `SdJwt.decodeSdJwt`, `SdJwt.encodeSdJwt`, `KbJwt.verifyKb`, `KbJwt.fromKbEncode`, `Jwt.decodeJwt` and `defaultHashAlg`.
+  - `@sd-jwt/sd-jwt-vc`: `SDJwtVcInstance` to `SdJwtVcInstance`, `SDJWTVCConfig` to `SdJwtVcConfig`, `SDJWTVCStatusReference` to `SdJwtVcStatusReference` and `VCTFetcher` to `VctFetcher`.
+  - `@owf/token-status-list`: `getListFromStatusListJWT` to `getListFromStatusListJwt`, `getStatusListFromJWT` to `getStatusListFromJwt`, `JWTClaimNames` to `JwtClaimNames`, `StatusListJWTPayload` to `StatusListJwtPayload`, `StatusListJWTHeaderParameters` to `StatusListJwtHeaderParameters` and `JWTwithStatusListPayload` to `JwtWithStatusListPayload`.
+  - `@owf/eudi-lote`: `LoTE` to `Lote` in all exports, e.g. `validateLoTE` to `validateLote`, `createLoTE` to `createLote`, `LoTEError` to `LoteError` and `zLoTEDocument` to `zLoteDocument`. Also `JWKPublicKey` to `JwkPublicKey`, `LocalizedURI` to `LocalizedUri`, the builder method `addX509SKI` to `addX509Ski` and the profile option `requireNoPointersToOtherLoTE` to `requireNoPointersToOtherLote`. The list types are written the same way in the `LoteProfile` members and values, the `LOTE_TYPES` keys and the profile schemas, e.g. `LoteProfile.EUPIDProvidersList` to `LoteProfile.EuPidProvidersList`, `zEUPubEAAProvidersList` to `zEuPubEaaProvidersList` and `zMDLProvidersList` to `zMdlProvidersList`. The LoTEType URIs don't change.
+  - `@owf/eudi-jades`: `JAdESError` to `JadesError`, `JAdESProfile` to `JadesProfile`, `CommitmentOIDs` to `CommitmentOids`, `OId` and `zOId` to `Oid` and `zOid`, `CompactJWS`, `FlattenedJWS` and `GeneralJWS` (and their `z` schemas) to `CompactJws`, `FlattenedJws` and `GeneralJws`, and the method `toFlattenedJSON` to `toFlattenedJson`.
+  - `@owf/eudi-attestation-schema`: `SchemaURI` to `SchemaUri`, `SchemaURIMeta` to `SchemaUriMeta`, `SchemaURIBuilder` to `SchemaUriBuilder`, `schemaURI()` to `schemaUri()`, `zSchemaURI` to `zSchemaUri`, `AttestationLoS` to `AttestationLos`, `AttestationLoSValues` to `AttestationLosValues` and the builder method `addSchemaURI` to `addSchemaUri`.
+  - `@owf/eudi-registration-certificate`: `isPSPSubEntitlement` to `isPspSubEntitlement`, `validateRegistrationCertificateJWTHeader` to `validateRegistrationCertificateJwtHeader`, and `JWT` and `CWT` to `Jwt` and `Cwt` in the header and payload types and schemas, e.g. `zRegistrationCertificateJWTHeader` to `zRegistrationCertificateJwtHeader`.
+  - `@owf/eudi-tl`: `TSLType` to `TslType`.
+  - `@openid4vc/utils`: `OpenId4VcBaseError` to `Openid4vcBaseError`, and `ContentType.OAuthAuthorizationRequestJwt` to `ContentType.OauthAuthorizationRequestJwt`.
+  - `@openid4vc/openid4vp`: `parseOpenid4VpAuthorizationResponsePayload` to `parseOpenid4vpAuthorizationResponsePayload`, `ValidateOpenid4VpAuthorizationResponseResult` (and its `Dcql` and `Pex` variants) to `ValidateOpenid4vpAuthorizationResponseResult`, and the methods `Openid4vpVerifier.createOpenId4vpAuthorizationRequest` and `Openid4vpClient.resolveOpenId4vpAuthorizationRequest` to `createOpenid4vpAuthorizationRequest` and `resolveOpenid4vpAuthorizationRequest`.
+  - `@owf/openid-federation`: `OpenId` to `Openid` in all exports, e.g. `OpenIdFederationError` to `OpenidFederationError`, `OpenIdProviderMetadata` to `OpenidProviderMetadata` and `openIdProviderEntityMetadata` to `openidProviderEntityMetadata`.
+  - `@owf/cose`: `KeyOps.MACCreate` and `KeyOps.MACVerify` to `KeyOps.MacCreate` and `KeyOps.MacVerify`.
+- ec2ed51: `@owf/identity-common` exports `ValidationError`, which carries the validation `issues` of a value that does not validate, and `parseWithErrorHandling`, which parses with a zod schema and throws it. It also exports `zNumericDate`, `BaseSchema` and `zodErrorMap`, an error map to pass per parse. `parseWithSchema` without `codes` gives a custom issue that has no code `invalid_value` instead of throwing. With it, the messages of zod leave out their prefix, e.g. `Invalid input:`, as the code says it. An issue can have `pathLabels`, the path as a reader knows it, which the message of a validation error shows. The schema code `missing` is now `missing_value`, with the `expected` value as context. A union that no member matches has the issues of each member as `branches`, and a discriminated union the allowed discriminator values. A validation error message lists the members of such a union as numbered options, named by the labels of `unionParams(message, labels)`. New: `SchemaParseResult`. The output of `zTyp` is a `string`, so compare it with `isJwtTyp`.
+  
+  BREAKING: `@owf/cose` throws `CoseValidationError` instead of `ValidationError`. It extends the `ValidationError` of `@owf/identity-common`, whose `issues` replace `zodError`. Its issues have the CBOR keys as `path` and their names as `pathLabels`, and the unexpected keys of a map are one `unrecognized_keys` issue at the map, as zod reports them for an object. `@owf/cose` also no longer configures zod globally with `z.config` when it is imported, and no longer depends on `zod-validation-error`.
+- 04cfd04: Error classes are named `FooError` and zod schemas `zFoo` in all packages.
+  
+  **Breaking:** `*Exception` is renamed to `*Error`, e.g. `IdentityException` to `IdentityError`, `SDJWTException` to `SdJwtError`, `JwtTimeClaimException` to `JwtTimeClaimError`, `X509Exception` to `X509Error` and `SLException` to `StatusListError`. The `name` of the errors changes with it. Zod schemas are renamed from `FooSchema` (or `fooSchema`) to `zFoo`, e.g. `TypeMetadataFormatSchema` to `zTypeMetadataFormat`, `SchemaMetaSchema` to `zSchemaMeta`, `issuerSignedItemSchema` to `zIssuerSignedItem` and `Iso4217CurrencyCode` to `zIso4217CurrencyCode`.
+
+### Patch Changes
+
+- 4e50fca: Reject a COSE `crit` header parameter that is an empty array. RFC 9052 Section 3.1 requires the array to have at least one value.
+- ec2ed51: `CwtPayload.verifyClaims` rejects a token that does not carry a claim passed as `expectedIssuer`, `expectedSubject` or `expectedAudience`, where it used to skip the check.
+- ec2ed51: `CoseError` and `CborError` extend `IdentityError` and are exported, so every COSE or CBOR error can be caught without listing the subclasses. Their `name`, `message` and `cause` are unchanged.
+- 90614a9: `CoseKey.fromJwk` and `CoseKey.jwk` convert the JWK `key_ops` member (RFC 7517 Section 4.3). They used `keyOps` instead, so the key operations of a JWK were not converted, and the JWK of a COSE key had a `keyOps` member that JWK does not define. COSE `MAC create` and `MAC verify` (RFC 9052 Table 5) now become JWK `sign` and `verify` instead of `mACCreate` and `mACVerify`, and `sign` and `verify` of an `oct` JWK become `MAC create` and `MAC verify`.
+- 3127af9: `IssuerAuth.verify` and `ReaderAuth.verify` check a protected `x5t`, if present. It must use SHA-256, as the second edition of ISO/IEC 18013-5 (12.3.4 and 12.5.4) requires, and match the issuer or reader certificate. The new checks are `The x5t in the protected header, if present, must be SHA-256 and match the issuer certificate` and the same for the reader certificate. An IssuerAuth or ReaderAuth without an `x5t` still verifies.
+  
+  `ReaderAuth.verify` and `Holder.verifyDeviceRequest` now need `crypto` in their context.
+  
+  `Issuer.sign`, `IssuerSignedBuilder.sign` and the `readerAuth` option of `IsoMdocDcApi.createRequest` accept `includeX5t`. It adds a SHA-256 `x5t` of the leaf certificate to the protected header, as the second edition recommends. It's off by default, because the first edition has only `alg` in the protected header.
+  
+  `@owf/cose` exports `verifyX5t`, which checks the protected `x5t` of a COSE structure against a certificate, and a `HashAlgorithm` enum with the COSE value of SHA-256.
+- Updated dependencies [ebd0b4b]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [cb487f1]
+- Updated dependencies [5fff735]
+- Updated dependencies [04cfd04]
+  - @owf/identity-common@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

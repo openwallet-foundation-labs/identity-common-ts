@@ -1,5 +1,50 @@
 # @owf/mdoc
 
+## 0.10.0
+
+### Minor Changes
+
+- 5441d63: With `disableCertificateChainValidation`, `IssuerAuth.verify`, and through it `Verifier.verifyDeviceResponse`, `DeviceResponse.verify`, `IsoMdocDcApi.verifyResponse`, `Holder.verifyIssuerSigned` and `IssuerSigned.verify`, no longer fetch the status list or identifier list of the MSO, and report a `WARNING` check that the status was not checked. Without chain validation, the MSO is only known to be signed with the key of its own certificate, so whoever presented a self-signed MSO could make the verifier request a URI of their choice, and read its status code back from the failed check.
+  
+  **Breaking:** a verifier that establishes the trust in the issuer itself checks the status by calling `IssuerAuth.verifyStatus` after that, for example `issuerSigned.issuerAuth.verifyStatus({ disableCertificateChainValidation: true }, ctx)`.
+- 5fff735: Media types are compared with `isMediaType` and JOSE `typ` values with `isJwtTyp`, both from `@owf/identity-common`. New: `CommonMediaTypes` of `@owf/identity-common`, the media types that are not specific to one specification, and `Oauth2MediaTypes` of `@openid4vc/oauth2`, with the JAR request object media type. JARM accepts its `Content-Type` in any casing. A Key Binding JWT and a registration certificate accept their `typ` in any casing and with the `application/` prefix (RFC 7515 Section 4.1.9).
+  
+  **Breaking:** `isContentType` and `isResponseContentType` are removed from `@openid4vc/utils`. Replace `isContentType(contentType, value)` with `isMediaType(value, contentType)` and `isResponseContentType(contentType, response)` with `isMediaType(response.headers.get('Content-Type'), contentType)`. `MediaTypes` is renamed to `StatusListMediaTypes` in `@owf/token-status-list` and to `MdocMediaTypes` in `@owf/mdoc`. `ContentType` is removed from `@openid4vc/utils`: use `CommonMediaTypes`, and `Oauth2MediaTypes.AuthorizationRequestJwt` for `ContentType.OauthAuthorizationRequestJwt`. The `expectedContentType` of a `ZodFetcher` is a `string`.
+- 04cfd04: Error classes are named `FooError` and zod schemas `zFoo` in all packages.
+  
+  **Breaking:** `*Exception` is renamed to `*Error`, e.g. `IdentityException` to `IdentityError`, `SDJWTException` to `SdJwtError`, `JwtTimeClaimException` to `JwtTimeClaimError`, `X509Exception` to `X509Error` and `SLException` to `StatusListError`. The `name` of the errors changes with it. Zod schemas are renamed from `FooSchema` (or `fooSchema`) to `zFoo`, e.g. `TypeMetadataFormatSchema` to `zTypeMetadataFormat`, `SchemaMetaSchema` to `zSchemaMeta`, `issuerSignedItemSchema` to `zIssuerSignedItem` and `Iso4217CurrencyCode` to `zIso4217CurrencyCode`.
+
+### Patch Changes
+
+- ec2ed51: `MdlError` of `@owf/mdoc`, and `OpenidFederationError`, `PolicyValidationError` and `PolicyOperatorMergeError` of `@owf/openid-federation`, extend `IdentityError` instead of `Error`. The `name` of an `MdlError` is now its class, where it was `Error`.
+- 3127af9: `IssuerAuth.verify` and `ReaderAuth.verify` check a protected `x5t`, if present. It must use SHA-256, as the second edition of ISO/IEC 18013-5 (12.3.4 and 12.5.4) requires, and match the issuer or reader certificate. The new checks are `The x5t in the protected header, if present, must be SHA-256 and match the issuer certificate` and the same for the reader certificate. An IssuerAuth or ReaderAuth without an `x5t` still verifies.
+  
+  `ReaderAuth.verify` and `Holder.verifyDeviceRequest` now need `crypto` in their context.
+  
+  `Issuer.sign`, `IssuerSignedBuilder.sign` and the `readerAuth` option of `IsoMdocDcApi.createRequest` accept `includeX5t`. It adds a SHA-256 `x5t` of the leaf certificate to the protected header, as the second edition recommends. It's off by default, because the first edition has only `alg` in the protected header.
+  
+  `@owf/cose` exports `verifyX5t`, which checks the protected `x5t` of a COSE structure against a certificate, and a `HashAlgorithm` enum with the COSE value of SHA-256.
+- 3127af9: When the status of an mdoc can't be verified, the reason of the failed `Status information must be valid` check (and the message `IssuerAuth.verify` throws by default) now names the status list or identifier list and its URI.
+- 946d9af: A revocation list in JWT format is verified with `verifyStatusListJwt` of `@owf/token-status-list`. A malformed `x5c` now throws `InvalidRevocationListError` instead of `UnableToExtractX5ChainFromJwtError`. An `idx` outside the status list now throws `InvalidRevocationListError` instead of a plain `Error`.
+- Updated dependencies [90614a9]
+- Updated dependencies [4e50fca]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [90614a9]
+- Updated dependencies [ebd0b4b]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [3127af9]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [946d9af]
+- Updated dependencies [5441d63]
+- Updated dependencies [cb487f1]
+- Updated dependencies [5fff735]
+- Updated dependencies [04cfd04]
+  - @owf/token-status-list@0.8.0
+  - @owf/cose@0.8.0
+  - @owf/identity-common@0.8.0
+  - @owf/x509@0.8.0
+
 ## 0.9.3
 
 ### Patch Changes
