@@ -3,7 +3,7 @@ import { zConstraint } from '../constraints'
 import { zJsonWebKeySet } from '../jsonWeb'
 import { zMetadata, zMetadataPolicy } from '../metadata'
 import { zTrustMark, zTrustMarkIssuer, zTrustMarkOwner } from '../trustMark'
-import { zDate } from '../utils'
+import { zDate, zHttpsUrl } from '../utils'
 
 export const zEntityStatementClaims = z
   .object({
@@ -12,7 +12,7 @@ export const zEntityStatementClaims = z
     iat: zDate,
     exp: zDate,
     jwks: zJsonWebKeySet,
-    authority_hints: z.array(z.url()).optional(),
+    authority_hints: z.array(zHttpsUrl).optional(),
     metadata: zMetadata.optional(),
     metadata_policy: z.record(z.string(), z.record(z.string(), zMetadataPolicy.optional())).optional(),
     constraints: zConstraint.optional(),

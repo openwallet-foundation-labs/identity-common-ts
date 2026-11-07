@@ -6,6 +6,7 @@ import { decodeUnencodedPayload, encodeBase64UrlJson, unencodedCompactPayloadIss
 import { hasOwn } from '../utils/object'
 import { assertCriticalHeaderParameters, isPayloadBase64UrlEncoded } from './critical-headers'
 import type { JwsSigner } from './signer'
+import { assertHeaderIdentifiesSigner } from './signer-header'
 import {
   type FlattenedJws,
   type GeneralJws,
@@ -88,6 +89,8 @@ export interface SignGeneralJwsResult {
  * @throws JoseValidationError with an `invalid_crit` issue if `crit` is invalid.
  * @throws JoseNotSupportedError if the payload is unencoded (`b64` is false) and not valid UTF-8.
  * @throws JoseInvalidArgumentError if the signer uses another algorithm than the header names, the
+ *   header identifies another signer (a `kid`, `x5c`, `jwk` or `trust_chain` that is not the signer's, or
+ *   one of another signer method), the
  *   callback does not return a base64url encoded signature, or the payload is unencoded, not detached,
  *   and contains a character RFC 7797 does not allow in a compact serialization: a '.', or anything
  *   outside printable ASCII.
@@ -234,6 +237,14 @@ async function signJwsPart(
     )
   }
 
+  const jwtPayload =
+    typeof options.payload === 'object' && !(options.payload instanceof Uint8Array) ? options.payload : undefined
+  assertHeaderIdentifiesSigner(
+    protectedHeader,
+    options.signer,
+    typeof jwtPayload?.iss === 'string' ? jwtPayload.iss : undefined
+  )
+
   const payload =
     typeof options.payload === 'string'
       ? stringToBytes(options.payload)
@@ -264,8 +275,7 @@ async function signJwsPart(
     protectedHeader,
     unprotectedHeader,
     payload,
-    jwtPayload:
-      typeof options.payload === 'object' && !(options.payload instanceof Uint8Array) ? options.payload : undefined,
+    jwtPayload,
   })
 
   // The signature is written into the token as it is, so it has to be what a parser accepts there

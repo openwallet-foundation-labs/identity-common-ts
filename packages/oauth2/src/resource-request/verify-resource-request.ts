@@ -209,6 +209,7 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
         now: options.now,
         expectedJwkThumbprint: tokenPayload.cnf?.jkt,
         allowedSigningAlgs: authorizationServer.dpop_signing_alg_values_supported,
+        expectedNonce: options.dpop?.expectedNonce,
         maxProofAgeSeconds: options.dpop?.maxProofAgeSeconds,
         allowedSkewInSeconds: options.dpop?.allowedSkewInSeconds ?? options.allowedSkewInSeconds,
         assertJtiUniqueness: options.dpop?.assertJtiUniqueness,

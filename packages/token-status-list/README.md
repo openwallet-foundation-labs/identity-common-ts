@@ -7,10 +7,10 @@ with core bitstring handling, JWT transport, and CWT/CBOR transport — all in o
 
 - **Core StatusList**: Variable bit-width (1/2/4/8-bit) status entries with deflate compression
 - **Random index assignment**: Deterministic, non-repeating index allocation from a private seed
-- **JWT transport**: Create and decode Status List Tokens in JWT format
-- **CWT transport**: Create and decode Status List Tokens in CWT/CBOR format
-- **Referenced Token support**: Extract status claims from both JWT and CWT referenced tokens
-- **COSE algorithm constants**: Standard IANA COSE algorithm identifiers
+- **JWT transport**: Sign, decode and verify Status List Tokens in JWT format, on top of `@owf/jose`
+- **CWT transport**: Sign, decode and verify Status List Tokens in CWT format, on top of `@owf/cose`
+- **Referenced Token support**: Read the status list entry of a JWT referenced token, and the
+  `StatusListInfo` an ISO/IEC 18013-5 MSO refers to its status list with
 
 ## Installation
 
@@ -23,18 +23,18 @@ npm install @owf/token-status-list
 ### Core — create and query a status list
 
 ```typescript
-import { StatusList, StatusTypes } from '@owf/token-status-list'
+import { StatusList, StatusType } from '@owf/token-status-list'
 
 // Create a list of 100 000 entries at 1 bit each
-const list = new StatusList(new Array(100_000).fill(0), 1)
+const list = new StatusList(new Array(100_000).fill(StatusType.Valid), 1)
 
 // Mark some entries
-list.setStatus(42, StatusTypes.INVALID)
-list.setStatus(99, StatusTypes.INVALID)
+list.setStatus(42, StatusType.Invalid)
+list.setStatus(99, StatusType.Invalid)
 
 // Query a status
-list.getStatus(42) // 1 (INVALID)
-list.getStatus(0)  // 0 (VALID)
+list.getStatus(42) // 1 (Invalid)
+list.getStatus(0)  // 0 (Valid)
 
 // Compress / decompress for transport
 const compressed = list.compressStatusListToBytes()
@@ -163,6 +163,106 @@ notes they become feasible on small domains. NIST therefore requires FF1 to encr
 stricter. At that size NIST estimates an attack needs at least 2^77 known pairs to recover a single
 value, while a status list holds at most 2^32.
 
+### JWT transport — issue and verify a Status List Token
+
+The `signer`, `signJwsCallback` and `verifyJwsCallback` are the ones of `@owf/jose`.
+
+```typescript
+import { dateToSeconds } from '@owf/identity-common'
+import { StatusList, StatusType, signStatusListJwt, verifyStatusListJwt } from '@owf/token-status-list'
+
+const list = new StatusList(new Array(100_000).fill(StatusType.Valid), 1)
+list.setStatus(42, StatusType.Invalid)
+
+// `typ` is `statuslist+jwt`, and `alg` and the parameters that identify the signer come from the signer
+const { jwt } = await signStatusListJwt({
+  statusList: list,
+  payload: { iss: 'https://issuer.example', sub: 'https://issuer.example/statuslists/1', iat: dateToSeconds(new Date()) },
+  signer,
+  signJwsCallback,
+})
+
+// Verifies the signature, the claims (`sub` must be `uri`) and the status at `idx`
+const { statusList } = await verifyStatusListJwt({
+  jwt,
+  uri: 'https://issuer.example/statuslists/1',
+  idx: 7,
+  verifyJwsCallback,
+})
+statusList.getStatus(42) // 1
+```
+
+`signStatusListJwt` rejects a `header` that contradicts the signer, or that also identifies a signer of another method, such as a `jwk` next to the `x5c` of an `x5c` signer.
+
+`verifyStatusListJwt` decompresses the list only once the token verified, as a small `lst` can inflate to a very large list. `decodeStatusListJwt` reads a token without verifying it, for example to pick the key. Its `statusList` is decompressed when first read.
+
+A status that is not Valid, an `idx` outside the list and an `lst` that cannot be decompressed throw a `StatusListValidationError`. Check the `code` of its issue, one of `STATUS_LIST_VALIDATION_CODES`. `verify` of a `StatusListCwt` throws the same.
+
+```typescript
+import { StatusListValidationError } from '@owf/token-status-list'
+
+try {
+  await verifyStatusListJwt({ jwt, uri: 'https://issuer.example/statuslists/1', idx: 42, verifyJwsCallback })
+} catch (error) {
+  if (!(error instanceof StatusListValidationError)) throw error
+  const notValid = error.findIssue('status_not_valid')
+  if (notValid) notValid.context.status // 1, the token is revoked
+}
+```
+
+### JWT transport — read the status of a Referenced Token
+
+```typescript
+import { decodeJwt } from '@owf/jose'
+import { zReferencedTokenJwtPayload } from '@owf/token-status-list'
+
+const { payload } = decodeJwt({ jwt: referencedTokenJwt, payloadSchema: zReferencedTokenJwtPayload })
+payload.status.status_list // { idx, uri }
+```
+
+Add `status: zStatusClaim` to the payload schema of your own token instead to validate only the `status` claim.
+
+### CWT transport — issue and verify a Status List Token
+
+The `signingKey` and `issuerKey` are `CoseKey`s, and `sign1Context` holds the `sign` and `verify`
+callbacks of `@owf/cose`.
+
+```typescript
+import { SignatureAlgorithm } from '@owf/cose'
+import { StatusList, StatusListCwt, StatusType } from '@owf/token-status-list'
+
+const list = new StatusList(new Array(100_000).fill(StatusType.Valid), 1)
+list.setStatus(42, StatusType.Invalid)
+
+// `typ` (16) is set to `application/statuslist+cwt`, and `iat` defaults to now
+const cwt = new StatusListCwt({
+  payload: { subject: 'https://issuer.example/statuslists/1', statusList: list, timeToLive: 3600 },
+})
+const token = await cwt.signAndEncode({ signingKey, algorithm: SignatureAlgorithm.ES256 }, sign1Context)
+
+// Verify the signature, the claims (`sub` must equal the uri) and, when `idx` is given, that the
+// status at that index is valid
+const decoded = StatusListCwt.fromToken(token)
+await decoded.verify({ key: issuerKey, uri: 'https://issuer.example/statuslists/1', idx: 7 }, { sign1: sign1Context })
+decoded.payload.statusList.getStatus(42) // 1
+```
+
+The status list of a decoded token is decompressed when `payload.statusList` is first read, which
+`verify` does only once the signature and the claims have verified.
+
+### CWT transport — the status list entry of an mdoc
+
+ISO/IEC 18013-5 second edition refers to the status list entry of an mdoc from its Mobile Security
+Object with a `StatusListInfo`:
+
+```typescript
+import { StatusListInfo } from '@owf/token-status-list'
+
+const info = StatusListInfo.create({ uri: 'https://issuer.example/statuslists/1', idx: 42 })
+const decoded = StatusListInfo.decode(info.encode())
+// decoded.idx === 42, decoded.uri === 'https://issuer.example/statuslists/1'
+```
+
 ## Known limitation
 
 The compressed status-list format stores statuses in whole bytes, but does not
@@ -175,77 +275,6 @@ This is allowed by the specification: Section 4.1 permits the byte array to be
 the size of the number of Referenced Tokens multiplied by `bits` divided by 8,
 or greater. Section 13.4 recommends byte-aligned list sizes but does not require
 them. Callers that need the original logical length must preserve it separately.
-
-### JWT transport — issue and read a Status List Token
-
-```typescript
-import { StatusList, createHeaderAndPayload, getListFromStatusListJwt } from '@owf/token-status-list'
-
-const list = new StatusList(new Array(100_000).fill(0), 1)
-list.setStatus(42, 1)
-
-// Build header + payload (sign with your own JOSE library)
-const { header, payload } = createHeaderAndPayload(
-  list,
-  { iss: 'https://issuer.example', sub: 'https://issuer.example/statuslists/1', iat: Math.floor(Date.now() / 1000) },
-  { alg: 'ES256', typ: '' },
-)
-
-// Later — decode the list back from a JWT string
-const decoded = getListFromStatusListJwt(jwt)
-decoded.getStatus(42) // 1
-```
-
-### JWT transport — read a referenced token's status entry
-
-```typescript
-import { getStatusListFromJwt } from '@owf/token-status-list'
-
-const entry = getStatusListFromJwt(referencedTokenJWT)
-// entry.idx  — index into the status list
-// entry.uri  — URI of the Status List Token
-```
-
-### CWT transport — issue and read a Status List Token
-
-```typescript
-import {
-  StatusList,
-  COSEAlgorithms,
-  createStatusListCWTPayload,
-  createStatusListCWTHeader,
-  encodeCWTPayload,
-  decodeCWTPayload,
-} from '@owf/token-status-list'
-
-const list = new StatusList(new Array(100_000).fill(0), 1)
-list.setStatus(42, 1)
-
-// Build CWT claims and header (sign with your own COSE library)
-const payload = createStatusListCWTPayload(list, 'https://issuer.example/statuslists/1', Math.floor(Date.now() / 1000))
-const header = createStatusListCWTHeader(COSEAlgorithms.ES256, 'key-id-1')
-
-// Encode to CBOR
-const cborPayload = encodeCWTPayload(list, 'https://issuer.example/statuslists/1', Math.floor(Date.now() / 1000))
-
-// Decode
-const { subject, issuedAt, statusList } = decodeCWTPayload(cborPayload)
-statusList.getStatus(42) // 1
-```
-
-### CWT transport — referenced token status claim
-
-```typescript
-import { createCWTStatusClaim, encodeCWTStatusClaim, decodeCWTStatusClaim } from '@owf/token-status-list'
-
-// Create
-const claim = createCWTStatusClaim(42, 'https://issuer.example/statuslists/1')
-
-// Encode/decode via CBOR
-const encoded = encodeCWTStatusClaim(42, 'https://issuer.example/statuslists/1')
-const decoded = decodeCWTStatusClaim(encoded)
-// decoded.idx === 42, decoded.uri === '...'
-```
 
 ## API
 
@@ -262,33 +291,34 @@ const decoded = decodeCWTStatusClaim(encoded)
 | `FeistelStatusListIndexAllocatorState` | Restorable FF1 allocator state type |
 | `EncryptBlock` | Type of the `encryptBlock` callback: AES on one 16-byte block |
 | `StatusListError` | Error class thrown by status-list operations |
-| `StatusTypes` | Constants: `VALID`, `INVALID`, `SUSPENDED`, etc. |
+| `StatusListValidationError` | Thrown when a status list cannot be decompressed, or does not give a Referenced Token a Valid status |
+| `STATUS_LIST_VALIDATION_CODES` | Its issue codes: `invalid_status_list`, `index_out_of_range` (`{ idx, totalStatuses }`) and `status_not_valid` (`{ idx, status }`) |
+| `StatusType` | Enum of the status values: `Valid`, `Invalid`, `Suspended`, … |
 | `StatusListMediaTypes` | MIME types for JWT and CWT status list tokens |
 | `BitsPerStatus` | Type: `1 \| 2 \| 4 \| 8` |
-| `StatusListEntry` | Type: `{ idx: number; uri: string }` |
+| `fetchStatusList` | Fetch a Status List Token in JWT or CWT format by its uri |
 
 ### JWT Transport
 
 | Export | Description |
 |--------|-------------|
-| `createHeaderAndPayload` | Build JWT header + payload from a `StatusList` |
-| `getListFromStatusListJwt` | Decode a `StatusList` from a JWT string |
-| `getStatusListFromJwt` | Extract `StatusListEntry` from a referenced token JWT |
+| `signStatusListJwt` | Sign a Status List Token carrying a `StatusList` |
+| `decodeStatusListJwt` | Decode a Status List Token without verifying it |
+| `verifyStatusListJwt` | Verify a Status List Token, and optionally the status at an index |
+| `verifyStatusListJwtClaims` | Verify only the claims of a decoded Status List Token |
+| `zStatusListJwtHeader` / `zStatusListJwtPayload` | Schemas for a Status List Token |
+| `zReferencedTokenJwtPayload` / `zStatusClaim` / `zStatusListReference` | Schemas for a Referenced Token, its `status` claim and the `status_list` reference in it |
 | `JWT_STATUS_LIST_TYPE` | `"statuslist+jwt"` |
 | `JwtClaimNames` | Claim name constants |
+| `JoseError`, `JoseValidationError`, `JoseParseError`, … | The `@owf/jose` errors signing, decoding and verifying a Status List Token in JWT format raise. `JoseValidationError` is not a `JoseError`, so catch both |
 
 ### CWT Transport
 
 | Export | Description |
 |--------|-------------|
-| `createStatusListCWTPayload` | Build CWT claims from a `StatusList` |
-| `createStatusListCWTHeader` | Build COSE protected header |
-| `encodeCWTPayload` / `decodeCWTPayload` | CBOR encode/decode full payload |
-| `encodeStatusListToCBOR` / `decodeStatusListFromCBOR` | CBOR encode/decode the status list only |
-| `createCWTStatusClaim` | Build a referenced-token status claim object |
-| `encodeCWTStatusClaim` / `decodeCWTStatusClaim` | CBOR encode/decode a status claim |
-| `getListFromStatusListCWT` | Extract `StatusList` from CWT payload bytes |
-| `getStatusListFromCWT` | Extract `StatusListEntry` from CWT payload bytes |
-| `COSEAlgorithms` | IANA COSE algorithm identifiers (ES256, ES384, EdDSA, …) |
-| `CWT_STATUS_LIST_TYPE` | `"application/statuslist+cwt"` |
-| `CWTClaimKeys` / `CWTStatusListKeys` / `CWTStatusListInfoKeys` / `COSEHeaderKeys` | Numeric/string key constants |
+| `StatusListCwt` | Create, sign, decode (`fromToken`) and verify a Status List Token in CWT format |
+| `StatusListCwtPayload` | The claims of a Status List Token in CWT format, and `verifyClaims` |
+| `StatusListCwtProtectedHeaders` | The protected headers, which require `typ` to be `application/statuslist+cwt` |
+| `StatusListCbor` | The `status_list` claim, with its `StatusList` decompressed when read |
+| `StatusListCwtClaimKey` | The claim keys of `ttl` (65534) and `status_list` (65533) |
+| `StatusListInfo` | The status list entry an ISO/IEC 18013-5 MSO refers to |

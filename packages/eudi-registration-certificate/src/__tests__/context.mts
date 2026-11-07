@@ -1,9 +1,9 @@
 import { p256 } from '@noble/curves/nist.js'
 import { CoseKey, RegisteredCwtHeaderClaimKey, type Sign1Context, SignatureAlgorithm } from '@owf/cose'
 import { ES256, pemToDer } from '@owf/crypto'
-import { base64, base64urlEncode, secondsToDate } from '@owf/identity-common'
+import { base64, base64url, base64urlEncode, secondsToDate } from '@owf/identity-common'
 import type { Jwk, SignJwsCallback } from '@owf/jose'
-import { createHeaderAndPayload, StatusList, StatusListCwt } from '@owf/token-status-list'
+import { StatusList, StatusListCwt } from '@owf/token-status-list'
 import { registrationCertificate, type VerifyRegistrationCertificateCallbacks, WRP_ENTITLEMENTS } from '../index'
 
 export const sign1Context: Sign1Context = {
@@ -83,12 +83,12 @@ export const statusListJwt = async ({
   sub?: string
   typ?: string
 }) => {
-  const { header, payload } = createHeaderAndPayload(
-    statusList(),
-    { sub, iat },
-    { alg: 'ES256', typ: 'statuslist+jwt' }
-  )
-  const signingInput = `${base64urlEncode(JSON.stringify({ ...header, typ }))}.${base64urlEncode(JSON.stringify(payload))}`
+  const payload = {
+    sub,
+    iat,
+    status_list: { bits: 1, lst: base64url.encode(statusList().compressStatusListToBytes()) },
+  }
+  const signingInput = `${base64urlEncode(JSON.stringify({ alg: 'ES256', typ }))}.${base64urlEncode(JSON.stringify(payload))}`
   return `${signingInput}.${await jwsSigner(signingInput)}`
 }
 

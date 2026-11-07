@@ -49,6 +49,8 @@ export const zClientAttestationPopJwtPayload = z
     ...zJwtPayload.shape,
     aud: z.union([zHttpsUrl, z.array(zHttpsUrl)]),
 
+    // REQUIRED (draft 09 §5.2), as the freshness of the PoP is checked against it
+    iat: zNumericDate,
     jti: zNonEmptyString,
 
     // `challenge` (draft 06+) replaced `nonce`. Both are accepted on verification; `nonce`

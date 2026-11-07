@@ -1,6 +1,13 @@
-import { deflate, inflate } from 'pako'
-import { StatusListError } from './status-list-error'
-import type { BitsPerStatus, StatusType } from './types'
+import { concatBytes, ValidationIssues } from '@owf/identity-common'
+import { deflate, Inflate } from 'pako'
+import {
+  STATUS_LIST_VALIDATION_CODES,
+  StatusListError,
+  type StatusListValidationCode,
+  type StatusListValidationContexts,
+  StatusListValidationError,
+} from './status-list-error'
+import { type BitsPerStatus, StatusType } from './types'
 
 /**
  * A status takes exactly `bitsPerStatus` bits, so it must be an integer from 0 to 2^bitsPerStatus - 1.
@@ -13,6 +20,67 @@ function assertStatusValue(value: number, bitsPerStatus: BitsPerStatus, index: n
       `Status value out of range at index ${index} with value ${value}, expected an integer from 0 to ${max} for ${bitsPerStatus} bits per status`
     )
   }
+}
+
+type StatusListIssues = ValidationIssues<StatusListValidationCode, StatusListValidationContexts>
+
+// Draft 16 § 8.3: an index outside the list must reject the Referenced Token, and NaN or a fraction would read undefined
+function isIndexOf(statusList: StatusList, index: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index < statusList.totalStatuses
+}
+
+/**
+ * Verifies that the status at `idx`, the index of a Referenced Token, is Valid (Token Status List § 8.3).
+ *
+ * @throws StatusListValidationError with an `index_out_of_range` or `status_not_valid` issue.
+ */
+export function verifyStatusValid(statusList: StatusList, idx: number): void {
+  const issues: StatusListIssues = new ValidationIssues()
+  const { totalStatuses } = statusList
+
+  if (!isIndexOf(statusList, idx)) {
+    issues.add({
+      code: STATUS_LIST_VALIDATION_CODES.INDEX_OUT_OF_RANGE,
+      message: `Index out of bounds: ${idx} is not an index of a list of ${totalStatuses} statuses`,
+      context: { idx, totalStatuses },
+    })
+  } else {
+    const status = statusList.getStatus(idx)
+    if (status !== StatusType.Valid) {
+      issues.add({
+        code: STATUS_LIST_VALIDATION_CODES.STATUS_NOT_VALID,
+        message: `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`,
+        context: { idx, status },
+      })
+    }
+  }
+
+  if (issues.issues.length) throw new StatusListValidationError('The Referenced Token is not Valid', issues.issues)
+}
+
+/**
+ * The default maximum number of statuses read from a compressed status list: 16 MiB at 8 bits per status. A small
+ * compressed list can inflate to a list large enough to exhaust the memory of whoever reads it.
+ */
+const DEFAULT_MAX_STATUSES = 2 ** 24
+
+/**
+ * Inflate `compressed`, but stop with an error once the output exceeds `maxBytes`.
+ */
+function inflateAtMost(compressed: Uint8Array, maxBytes: number): Uint8Array {
+  const inflator = new Inflate()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  inflator.onData = (chunk) => {
+    length += chunk.length
+    if (length > maxBytes) {
+      throw new StatusListError(`The status list is larger than the maximum of ${maxBytes} bytes`)
+    }
+    chunks.push(chunk)
+  }
+  inflator.push(compressed, true)
+  if (inflator.err) throw new StatusListError(`The status list could not be inflated: ${inflator.msg}`)
+  return concatBytes(...chunks)
 }
 
 /**
@@ -59,20 +127,24 @@ export class StatusList {
 
   /** Get the status at a specific index. */
   getStatus(index: number): StatusType {
-    if (index < 0 || index >= this.totalStatuses) {
-      throw new Error('Index out of bounds')
-    }
+    this.assertIndex(index)
     return this._statusList[index]
   }
 
   /** Set the status at a specific index. */
   setStatus(index: number, value: StatusType | number): void {
-    if (index < 0 || index >= this.totalStatuses) {
-      throw new Error('Index out of bounds')
-    }
+    this.assertIndex(index)
     assertStatusValue(value, this.bitsPerStatus, index)
     this._statusList[index] = value
     this.#isModified = true
+  }
+
+  private assertIndex(index: number): void {
+    if (!isIndexOf(this, index)) {
+      throw new StatusListError(
+        `Index out of bounds: ${index} is not an index of a list of ${this.totalStatuses} statuses`
+      )
+    }
   }
 
   /** Compress the status list and return as raw bytes. */
@@ -81,18 +153,30 @@ export class StatusList {
     return deflate(byteArray, { level: 9 })
   }
 
-  /** Decompress a raw byte array and return a new StatusList instance. */
+  /**
+   * Decompress a raw byte array and return a new StatusList instance.
+   *
+   * @param options.maxStatuses - The maximum number of statuses the list may have, `2^24` by default.
+   * @throws StatusListValidationError with an `invalid_status_list` issue if the bytes are not a compressed status
+   *   list, or one of more than `maxStatuses` statuses.
+   */
   static decompressStatusListFromBytes(
     compressed: Uint8Array,
     bitsPerStatus: BitsPerStatus,
-    aggregationUri?: string
+    aggregationUri?: string,
+    { maxStatuses = DEFAULT_MAX_STATUSES }: { maxStatuses?: number } = {}
   ): StatusList {
     try {
-      const decompressed = inflate(compressed)
+      const decompressed = inflateAtMost(compressed, Math.ceil((maxStatuses * bitsPerStatus) / 8))
       const statusList = StatusList.decodeStatusListFromByteArray(decompressed, bitsPerStatus)
       return new StatusList(statusList, bitsPerStatus, aggregationUri)
     } catch (err: unknown) {
-      throw new Error(`Decompression failed: ${err}`)
+      const issues: StatusListIssues = new ValidationIssues()
+      issues.add({
+        code: STATUS_LIST_VALIDATION_CODES.INVALID_STATUS_LIST,
+        message: err instanceof Error ? err.message : String(err),
+      })
+      throw new StatusListValidationError('The status list cannot be decompressed', issues.issues)
     }
   }
 

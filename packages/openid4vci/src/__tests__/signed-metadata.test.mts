@@ -7,11 +7,17 @@ import { decodeJwt, signJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
-import { getSignJwsCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
+import {
+  getSignJwsCallback,
+  getVerifyJwsCallback,
+  callbacks as partialCallbacks,
+  signerWithOwnKey,
+} from '../../../oauth2/src/__tests__/util.mjs'
 import { type CredentialConfigurationSupportedWithFormats, Openid4vciClient, Openid4vciIssuer } from '../index.js'
 import { fetchCredentialIssuerMetadata } from '../metadata/credential-issuer/credential-issuer-metadata.js'
 
 const credentialIssuerJwk = {
+  kid: 'credential-issuer',
   kty: 'EC',
   d: 'IfSdct8njqWDcMaLIO3ZGG-8a61t9acXxxFWFVDFx6Y',
   crv: 'P-256',
@@ -19,6 +25,8 @@ const credentialIssuerJwk = {
   y: 'Xfx_VfGzNfRVT5cNbi8jKZ3KMgKzqPGHWCT1yklA0UE',
 }
 const { d: __, ...credentialIssuerJwkPublic } = credentialIssuerJwk
+// The wallet trusts the key of the credential issuer out of band
+const credentialIssuerSigner = { method: 'custom', alg: 'ES256', kid: credentialIssuerJwk.kid } as const
 
 const server = setupServer()
 
@@ -26,6 +34,7 @@ const callbacks = {
   ...partialCallbacks,
   fetch,
   signJws: getSignJwsCallback([credentialIssuerJwk]),
+  verifyJws: getVerifyJwsCallback({ publicJwks: [credentialIssuerJwkPublic] }),
 }
 
 const issuer = new Openid4vciIssuer({
@@ -94,11 +103,7 @@ describe('Signed Credential Issuer Metadata', () => {
   test('Create, resolve and verify signed credential issuer metadata', async () => {
     const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
       credentialIssuerMetadata,
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: credentialIssuerJwkPublic,
-      },
+      signer: credentialIssuerSigner,
     })
 
     expect(decodeJwt({ jwt: credentialIssuerMetadataJwt })).toMatchObject({
@@ -106,12 +111,7 @@ describe('Signed Credential Issuer Metadata', () => {
       signature: expect.any(String),
       header: {
         alg: 'ES256',
-        jwk: {
-          crv: 'P-256',
-          kty: 'EC',
-          x: 'ghHo8AZRPhIdmR9zO_aab0R7CsDah-XI5zht8GXo71w',
-          y: 'Xfx_VfGzNfRVT5cNbi8jKZ3KMgKzqPGHWCT1yklA0UE',
-        },
+        kid: credentialIssuerJwk.kid,
         typ: 'openidvci-issuer-metadata+jwt',
       },
       payload: {
@@ -156,12 +156,7 @@ describe('Signed Credential Issuer Metadata', () => {
         signature: expect.any(String),
         header: {
           alg: 'ES256',
-          jwk: {
-            crv: 'P-256',
-            kty: 'EC',
-            x: 'ghHo8AZRPhIdmR9zO_aab0R7CsDah-XI5zht8GXo71w',
-            y: 'Xfx_VfGzNfRVT5cNbi8jKZ3KMgKzqPGHWCT1yklA0UE',
-          },
+          kid: credentialIssuerJwk.kid,
           typ: 'openidvci-issuer-metadata+jwt',
         },
         payload: {
@@ -170,27 +165,14 @@ describe('Signed Credential Issuer Metadata', () => {
           sub: credentialIssuerMetadata.credential_issuer,
         },
       },
-      signer: {
-        alg: 'ES256',
-        method: 'jwk',
-        publicJwk: {
-          crv: 'P-256',
-          kty: 'EC',
-          x: 'ghHo8AZRPhIdmR9zO_aab0R7CsDah-XI5zht8GXo71w',
-          y: 'Xfx_VfGzNfRVT5cNbi8jKZ3KMgKzqPGHWCT1yklA0UE',
-        },
-      },
+      signer: { ...credentialIssuerSigner, publicJwk: credentialIssuerJwkPublic },
     })
   })
 
   test('Request only unsigned credential issuer metadata by default without a verifyJws callback', async () => {
     const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
       credentialIssuerMetadata,
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: credentialIssuerJwkPublic,
-      },
+      signer: credentialIssuerSigner,
     })
 
     const acceptHeaders: Array<string | null> = []
@@ -215,11 +197,7 @@ describe('Signed Credential Issuer Metadata', () => {
   test('Request only unsigned credential issuer metadata if signed metadata is disallowed', async () => {
     const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
       credentialIssuerMetadata,
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: credentialIssuerJwkPublic,
-      },
+      signer: credentialIssuerSigner,
     })
 
     const acceptHeaders: Array<string | null> = []
@@ -245,11 +223,7 @@ describe('Signed Credential Issuer Metadata', () => {
   test('Request only signed credential issuer metadata if signed metadata is required', async () => {
     const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
       credentialIssuerMetadata,
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: credentialIssuerJwkPublic,
-      },
+      signer: credentialIssuerSigner,
     })
 
     const acceptHeaders: Array<string | null> = []
@@ -312,13 +286,13 @@ describe('Signed Credential Issuer Metadata', () => {
     iat = Math.floor(Date.now() / 1000)
   ) => {
     const { jwt } = await signJwt({
-      header: { typ, alg: 'ES256', jwk: credentialIssuerJwkPublic },
+      header: { typ, alg: 'ES256', kid: credentialIssuerJwk.kid },
       payload: {
         ...credentialIssuerMetadata,
         sub,
         iat,
       },
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: credentialIssuerJwkPublic },
+      signer: credentialIssuerSigner,
       signJwsCallback: callbacks.signJws,
     })
 
@@ -368,6 +342,27 @@ describe('Signed Credential Issuer Metadata', () => {
       )
     })
   })
+
+  // OpenID4VCI 1.0 Section 12.2.3: the wallet must trust the signer of the metadata, but `verifyJws` accepts a key
+  // from a `jwk` header or a did:jwk, with which anyone could sign metadata for any credential issuer
+  test.each(['jwk', 'did'] as const)(
+    'rejects signed credential issuer metadata signed with a %s signer',
+    async (method) => {
+      serveSignedCredentialIssuerMetadata(
+        await issuer.createSignedCredentialIssuerMetadataJwt({
+          credentialIssuerMetadata,
+          signer: signerWithOwnKey(method, credentialIssuerJwkPublic),
+        })
+      )
+
+      await expect(
+        fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+          callbacks: { fetch, verifyJws: callbacks.verifyJws },
+          signedMetadata: 'required',
+        })
+      ).rejects.toThrow(`method ${method}`)
+    }
+  )
 
   describe('allowedSkewInSeconds', () => {
     const now = new Date('2026-01-01T00:00:00Z')

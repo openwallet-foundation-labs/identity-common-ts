@@ -9,9 +9,8 @@ import {
   type VerifyCwtClaimsOptions,
 } from '@owf/cose'
 import z from 'zod'
-import type { StatusList } from '../status-list'
+import { type StatusList, verifyStatusValid } from '../status-list'
 import { StatusListError } from '../status-list-error'
-import { StatusType } from '../types'
 import { StatusListCbor, type StatusListCborEncodedStructure } from './status-list-cbor'
 
 export enum StatusListCwtClaimKey {
@@ -29,7 +28,8 @@ const zStatusListCwtPayload = extendCwtPayloadClaims(
   [
     [RegisteredCwtClaimKey.Subject, z.string()],
     [RegisteredCwtClaimKey.IssuedAt, z.number()],
-    [StatusListCwtClaimKey.TimeToLive, z.number().exactOptional()],
+    // Draft 16 § 5.2: a positive number
+    [StatusListCwtClaimKey.TimeToLive, z.number().positive().exactOptional()],
     [StatusListCwtClaimKey.StatusList, z.instanceof(StatusListCbor)],
   ] as const,
   { keyLabels: StatusListCwtClaimKey }
@@ -141,14 +141,11 @@ export class StatusListCwtPayload extends CwtPayload<StatusListCwtPayloadDecoded
   /**
    * Verifies that the status at `idx` in this token's status list is `Valid`.
    *
-   * @throws StatusListError if it is any other status.
+   * @throws StatusListValidationError if the status list cannot be decompressed (`invalid_status_list`), or `idx`
+   *   is not in it (`index_out_of_range`) or its status is not `Valid` (`status_not_valid`).
    */
   public verifyStatus(idx: number): void {
-    const status = this.statusList.getStatus(idx)
-
-    if (status !== StatusType.Valid) {
-      throw new StatusListError(`Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`)
-    }
+    verifyStatusValid(this.statusList, idx)
   }
 
   public setStatusList(statusList: StatusList | StatusListCbor) {

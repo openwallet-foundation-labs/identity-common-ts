@@ -157,7 +157,8 @@ export class StatusListCwt extends Cwt<StatusListCwtPayload, StatusListCwtProtec
    * the issuer's if the token verifies.
    *
    * @throws CoseInvalidSignatureError if the signature or authentication tag does not verify.
-   * @throws StatusListError if the claims or the status at `idx` do not.
+   * @throws StatusListError if the claims do not.
+   * @throws StatusListValidationError if the status list cannot be decompressed, or the status at `idx` is not Valid.
    */
   public override async verify(
     { idx, ...options }: CwtVerifyOptions<StatusListCwtPayload> & { idx?: number },

@@ -1,4 +1,4 @@
-import { IdentityError } from '@owf/identity-common'
+import { IdentityError, ValidationError, type ValidationIssueOf } from '@owf/identity-common'
 
 /**
  * StatusListError is a custom error class for Status List related errors.
@@ -10,20 +10,30 @@ export class StatusListError extends IdentityError {
   }
 }
 
-/**
- * The status at an index of a status list that verified is not Valid. Unlike other `StatusListError`s,
- * this is a statement about the referenced token rather than about a status list that fails
- * verification (Token Status List § 7 and § 8.3), so `idx` and `status` are carried as data.
- */
-export class StatusListEntryNotValidError extends StatusListError {
-  public readonly idx: number
-  /** The status at `idx`, e.g. `1` for Invalid (revoked) or `2` for Suspended. */
-  public readonly status: number
+/** Codes for the checks of a status list and of the status of a Referenced Token in it */
+export const STATUS_LIST_VALIDATION_CODES = {
+  /** `lst` is not a status list compressed with zlib, or inflates to more statuses than the maximum */
+  INVALID_STATUS_LIST: 'invalid_status_list',
+  /** The `idx` of a Referenced Token is not an index of the status list (Token Status List § 8.3) */
+  INDEX_OUT_OF_RANGE: 'index_out_of_range',
+  /** The status at the `idx` of a Referenced Token is not Valid, e.g. `1` for Invalid (revoked) */
+  STATUS_NOT_VALID: 'status_not_valid',
+} as const
 
-  constructor(message: string, { idx, status }: { idx: number; status: number }) {
-    super(message, { idx, status })
-    this.name = 'StatusListEntryNotValidError'
-    this.idx = idx
-    this.status = status
-  }
+/** A code of {@link STATUS_LIST_VALIDATION_CODES} */
+export type StatusListValidationCode = (typeof STATUS_LIST_VALIDATION_CODES)[keyof typeof STATUS_LIST_VALIDATION_CODES]
+
+/** The context of the issues with a code of {@link STATUS_LIST_VALIDATION_CODES} */
+export interface StatusListValidationContexts {
+  index_out_of_range: { idx: number; totalStatuses: number }
+  status_not_valid: { idx: number; status: number }
 }
+
+/** An issue of a status list, or of the status of a Referenced Token in it */
+export type StatusListValidationIssue = ValidationIssueOf<StatusListValidationCode, StatusListValidationContexts>
+
+/**
+ * Thrown when a status list cannot be decompressed, or does not give a Referenced Token a Valid status,
+ * with the `issues` of the validation.
+ */
+export class StatusListValidationError extends ValidationError<StatusListValidationIssue> {}

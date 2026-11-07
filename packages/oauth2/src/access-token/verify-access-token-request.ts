@@ -72,6 +72,12 @@ export interface VerifyAccessTokenRequestClientAttestation {
   clientAttestationPopJwt?: string
 
   /**
+   * The challenge the authorization server issued, which the `challenge` of the client attestation PoP must
+   * equal (draft 09 §6). If not provided the challenge won't be validated.
+   */
+  expectedChallenge?: string
+
+  /**
    * The expected client id that is bound to the authorization session, and can be used to match the client id
    * provided in the authorization request to the client used for the access token request.
    */
@@ -378,6 +384,7 @@ async function verifyAccessTokenRequestClientAttestation(
     clientAttestationPopJwt: options.clientAttestationPopJwt,
     expectedClientId: options.expectedClientId,
     expectedConfirmationJwkThumbprint: options.expectedConfirmationJwkThumbprint,
+    expectedChallenge: options.expectedChallenge,
     now,
     allowedSkewInSeconds: options.allowedSkewInSeconds,
   })

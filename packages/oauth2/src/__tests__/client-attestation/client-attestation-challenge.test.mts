@@ -22,7 +22,7 @@ import { clientAuthenticationClientAttestationJwt } from '../../client-authentic
 import { Oauth2Error } from '../../error/Oauth2Error'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
 import { clientCredentialsGrantIdentifier } from '../../z-grant-type'
-import { callbacks, getSignJwsCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback, testAttester } from '../util.mjs'
 
 const server = setupServer()
 
@@ -51,7 +51,6 @@ function decodePop(compactPop: string) {
 }
 
 describe('Client Attestation challenge', () => {
-  let attester: Awaited<ReturnType<typeof generateEs256Key>>
   let instance: Awaited<ReturnType<typeof generateEs256Key>>
   let signJws: ReturnType<typeof getSignJwsCallback>
   let clientAttestationJwt: string
@@ -59,16 +58,15 @@ describe('Client Attestation challenge', () => {
   beforeAll(async () => {
     server.listen()
 
-    attester = await generateEs256Key()
     instance = await generateEs256Key()
-    signJws = getSignJwsCallback([attester.privateJwk, instance.privateJwk])
+    signJws = getSignJwsCallback([instance.privateJwk])
 
     clientAttestationJwt = await createClientAttestationJwt({
       callbacks: { signJws },
       clientId: 'wallet',
       confirmation: { jwk: instance.publicJwk },
       expiresAt: new Date(Date.now() + 3600 * 1000),
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+      signer: testAttester.signer,
     })
   })
 

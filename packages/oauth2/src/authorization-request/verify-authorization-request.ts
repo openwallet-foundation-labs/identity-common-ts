@@ -54,6 +54,12 @@ export interface VerifyAuthorizationRequestClientAttestation {
   clientAttestationPopJwt?: string
 
   /**
+   * The challenge the authorization server issued, which the `challenge` of the client attestation PoP must
+   * equal (draft 09 §6). If not provided the challenge won't be validated.
+   */
+  expectedChallenge?: string
+
+  /**
    * The expected JWK thumbprint of the client instance key (the `cnf` key of the client attestation), for example
    * from an earlier request of the same authorization session. A client attestation is required when this is set.
    */
@@ -174,6 +180,7 @@ async function verifyAuthorizationRequestClientAttestation(
     // Ensure the client id matches with the client id provided in the authorization request
     expectedClientId: requestClientId,
     expectedConfirmationJwkThumbprint: options.expectedConfirmationJwkThumbprint,
+    expectedChallenge: options.expectedChallenge,
     now,
     allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
@@ -215,6 +222,7 @@ async function verifyAuthorizationRequestDpop(
         dpopJwt: options.jwt,
         request,
         allowedSigningAlgs: options.allowedSigningAlgs,
+        expectedNonce: options.expectedNonce,
         maxProofAgeSeconds: options.maxProofAgeSeconds,
         allowedSkewInSeconds: options.allowedSkewInSeconds,
         assertJtiUniqueness: options.assertJtiUniqueness,

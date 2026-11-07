@@ -5,22 +5,16 @@
  * @see https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-21.html
  */
 
-import { zTyp } from '@owf/identity-common'
-import { verifyJwt, zJwtHeader } from '@owf/jose'
 import {
   fetchStatusList,
-  getListFromStatusListJwt,
   type StatusList,
   StatusListCwt,
-  StatusListMediaTypes,
   StatusType,
+  verifyStatusListJwt,
 } from '@owf/token-status-list'
-import { z } from 'zod'
 import { verifyCwtSignature } from './cwt'
 import type { Status, VerifyRegistrationCertificateCallbacks } from './types'
 import { validationError } from './validator'
-
-const zStatusListJwtHeader = z.object({ ...zJwtHeader.shape, typ: zTyp(StatusListMediaTypes.StatusListJwt) }).loose()
 
 /** Options for {@link verifyRegistrationCertificateStatus} */
 export interface VerifyRegistrationCertificateStatusOptions {
@@ -72,17 +66,14 @@ export async function verifyRegistrationCertificateStatus({
   try {
     let statusList: StatusList
     if (typeof token === 'string') {
-      await verifyJwt({
+      // Checks `typ`, the required `sub` and `iat`, and that `sub` is the uri the token was referenced by
+      ;({ statusList } = await verifyStatusListJwt({
         jwt: token,
-        headerSchema: zStatusListJwtHeader,
+        uri,
         verifyJwsCallback: callbacks.verifyJws,
-        // Token Status List section 5.1: `sub` and `iat` are required, and `sub` is the uri the token was referenced by
-        requiredClaims: ['sub', 'iat'],
-        expectedSubject: uri,
         now,
         skewSeconds,
-      })
-      statusList = getListFromStatusListJwt(token)
+      }))
     } else {
       // Decoding checks `typ`
       const statusListCwt = StatusListCwt.fromToken(token)

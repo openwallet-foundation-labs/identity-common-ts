@@ -276,7 +276,9 @@ async function verifyJarRequestObject(options: {
   const clientIdToSignerMethod: Record<UniformClientIdPrefix, JwsSigner['method'][]> = {
     decentralized_identifier: ['did'],
 
-    'pre-registered': ['custom', 'did', 'jwk'],
+    // The keys of a pre-registered client are registered with the wallet (OpenID4VP 1.0 Section 5.9), so they cannot
+    // come from the request: with a `jwk` header or a DID such as did:jwk, anyone could sign for any client_id
+    'pre-registered': ['custom', 'x5c'],
     origin: [], // no signing allowed
     redirect_uri: [], // no signing allowed
 

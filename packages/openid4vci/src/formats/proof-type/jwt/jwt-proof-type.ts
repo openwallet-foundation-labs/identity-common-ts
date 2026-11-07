@@ -151,6 +151,8 @@ export interface VerifyCredentialRequestJwtProofOptions {
   callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>
 }
 
+const MAX_PROOF_AGE_SECONDS = 300
+
 export async function verifyCredentialRequestJwtProof(options: VerifyCredentialRequestJwtProofOptions) {
   const decodedJwt = decodeJwt({
     jwt: options.jwt,
@@ -174,6 +176,9 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
     expectedNonce: options.expectedNonce,
     expectedAudience: options.credentialIssuer,
     expectedIssuer: options.clientId,
+    // OpenID4VCI 1.0 Appendix F.4: the creation time of the proof must be within an acceptable window, which
+    // limits the replay of a proof without a nonce
+    maxAgeSeconds: MAX_PROOF_AGE_SECONDS,
     now: options.now,
     skewSeconds: options.allowedSkewInSeconds,
   })

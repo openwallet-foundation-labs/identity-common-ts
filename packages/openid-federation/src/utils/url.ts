@@ -1,5 +1,13 @@
+import { z } from 'zod'
 import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
+
+/**
+ * An https URL, as OpenID Federation 1.0 requires for Entity Identifiers (Section 1.2) and the federation endpoints
+ * (Section 5.1.1). They are fetched while a trust chain is resolved, before it is trusted, so another scheme would let
+ * any entity make the resolver request, for example, an internal http endpoint.
+ */
+export const zHttpsUrl = z.url({ protocol: /^https$/, error: 'must be an https URL' })
 
 /**
  *
