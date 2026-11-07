@@ -58,7 +58,11 @@ export interface VerifyClientAttestationJwtOptions {
   /**
    * Callbacks used for verifying client attestation jwt, and calculating the thumbprint of the `cnf` key.
    * `verifyJws` decides whether the attester is trusted, for example by validating the `x5c` chain. A client
-   * attestation signed with a `jwk` or `did` signer is rejected before, as these can carry a key the client chose.
+   * attestation signed with a `jwk` signer is rejected before, as its key comes from the attestation itself.
+   *
+   * A client attestation signed with a `did` signer is passed to `verifyJws`, which must then check that
+   * `signer.didUrl` belongs to a client attester the authorization server trusts. Resolving the DID is not enough:
+   * anyone can create a did:jwk or did:key, or host a did:web, so any client could attest itself.
    */
   callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>
 
@@ -80,9 +84,9 @@ export async function verifyClientAttestationJwt(options: VerifyClientAttestatio
     now: options.now,
     verifyJwsCallback: options.callbacks.verifyJws,
     // The attester must be one the authorization server trusts, so its key cannot come from the attestation
-    // itself: `verifyJws` accepts a key from a `jwk` header, or a DID such as did:jwk, for DPoP and PoP JWTs,
-    // and with it any client could attest itself.
-    allowedSignerMethods: ['x5c', 'federation', 'custom'],
+    // itself: `verifyJws` accepts a key from a `jwk` header for DPoP and PoP JWTs, and with it any client could
+    // attest itself. A DID signer is allowed, and `verifyJws` must check that the DID is a trusted attester.
+    allowedSignerMethods: ['x5c', 'federation', 'custom', 'did'],
     errorMessage: 'client attestation jwt verification failed.',
     skewSeconds: options.allowedSkewInSeconds,
   })

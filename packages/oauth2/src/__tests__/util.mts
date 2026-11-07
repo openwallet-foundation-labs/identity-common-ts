@@ -48,7 +48,8 @@ const subtleAlgorithm = (alg: string): AlgorithmIdentifier | EcdsaParams | RsaPs
 
 /**
  * An attester the test callbacks trust by its `kid`, as a server trusts its attesters out of band. Client and key
- * attestations are signed with its `signer`, since a `jwk` or `did` signer is rejected for them.
+ * attestations are signed with its `signer`, since a `jwk` signer is rejected for them, and a `did` signer is only
+ * accepted by a `verifyJws` that trusts the DID (see `verifyJwsTrustingDids`).
  */
 export const testAttester = await (async () => {
   const kid = 'test-attester'
@@ -60,11 +61,12 @@ export const testAttester = await (async () => {
   }
 })()
 
+/** The did:jwk of a public jwk. */
+export const didJwk = (publicJwk: Jwk) => `did:jwk:${base64url.encode(stringToBytes(JSON.stringify(publicJwk)))}`
+
 /** A signer with a key its holder chose: in a `jwk` header, or in a did:jwk. */
 export const signerWithOwnKey = (method: 'jwk' | 'did', publicJwk: Jwk): JwsSigner =>
-  method === 'jwk'
-    ? { method, alg: 'ES256', publicJwk }
-    : { method, alg: 'ES256', didUrl: `did:jwk:${base64url.encode(stringToBytes(JSON.stringify(publicJwk)))}#0` }
+  method === 'jwk' ? { method, alg: 'ES256', publicJwk } : { method, alg: 'ES256', didUrl: `${didJwk(publicJwk)}#0` }
 
 /** The public jwk a signer identifies, for the signer methods these tests use. */
 function publicJwkForSigner(signer: Parameters<SignJwsCallback>[0], jwks: Jwk[]): Jwk {
@@ -126,6 +128,20 @@ export const callbacks = {
     return { decrypted: false as const }
   },
 } as const satisfies Partial<CallbackContext>
+
+/**
+ * A `verifyJws` that accepts a `did` signer only for the given DIDs, as a server must check that a DID-signed client
+ * or key attestation comes from an attester it trusts. Other signers are verified as by `callbacks.verifyJws`.
+ */
+export const verifyJwsTrustingDids =
+  (trustedDids: string[]): VerifyJwsCallback =>
+  async (signer, context) => {
+    if (signer.method === 'did' && !trustedDids.includes(signer.didUrl.split('#')[0])) {
+      return { verified: false }
+    }
+
+    return callbacks.verifyJws(signer, context)
+  }
 
 export const getSignJwsCallback = (callerPrivateJwks: Jwk[]): SignJwsCallback => {
   const privateJwks = [...callerPrivateJwks, testAttester.privateJwk]

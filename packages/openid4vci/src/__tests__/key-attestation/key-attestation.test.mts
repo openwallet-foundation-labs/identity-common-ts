@@ -3,9 +3,11 @@ import * as jose from 'jose'
 import { beforeAll, describe, expect, test } from 'vitest'
 import {
   callbacks,
+  didJwk,
   getSignJwsCallback,
   signerWithOwnKey,
   testAttester,
+  verifyJwsTrustingDids,
 } from '../../../../oauth2/src/__tests__/util.mjs'
 import {
   createKeyAttestationJwt,
@@ -53,9 +55,9 @@ describe('Key Attestation', () => {
     ).resolves.toBeDefined()
   })
 
-  // The issuer must trust the attester (OpenID4VCI 1.0 Appendix D), but `verifyJws` accepts these keys for proofs,
-  // so a wallet could attest its own keys with them
-  test.each(['jwk', 'did'] as const)('rejects a key attestation signed with a %s signer', async (method) => {
+  // The issuer must trust the attester (OpenID4VCI 1.0 Appendix D), but `verifyJws` accepts a key from a `jwk`
+  // header for proofs, so a wallet could attest its own keys with it
+  test('rejects a key attestation signed with a jwk signer', async () => {
     const keyAttestationJwt = await createKeyAttestationJwt({
       callbacks: { signJws: getSignJwsCallback([attested.privateJwk]) },
       attestedKeys: [attested.publicJwk],
@@ -63,7 +65,7 @@ describe('Key Attestation', () => {
       use: 'proof_type.jwt',
       keyStorage: ['iso_18045_high'],
       userAuthentication: ['iso_18045_high'],
-      signer: signerWithOwnKey(method, attested.publicJwk),
+      signer: signerWithOwnKey('jwk', attested.publicJwk),
     })
 
     await expect(
@@ -73,7 +75,35 @@ describe('Key Attestation', () => {
         use: 'proof_type.jwt',
         keyAttestationsRequired: { key_storage: ['iso_18045_high'], user_authentication: ['iso_18045_high'] },
       })
-    ).rejects.toThrow(`method ${method}`)
+    ).rejects.toThrow('method jwk')
+  })
+
+  // A key attestation may be signed with a `kid` (OpenID4VCI 1.0 Appendix D.1), such as a DID URL. It is passed to
+  // `verifyJws`, which must check that the DID belongs to a trusted attester
+  test('verifies a key attestation signed with a did signer only if verifyJws trusts the did', async () => {
+    const attester = await generateEs256Key()
+    const keyAttestationJwt = await createKeyAttestationJwt({
+      callbacks: { signJws: getSignJwsCallback([attester.privateJwk]) },
+      attestedKeys: [attested.publicJwk],
+      expiresAt: new Date(Date.now() + 500 * 1000),
+      use: 'proof_type.jwt',
+      signer: signerWithOwnKey('did', attester.publicJwk),
+    })
+
+    const { signer } = await verifyKeyAttestationJwt({
+      callbacks: { verifyJws: verifyJwsTrustingDids([didJwk(attester.publicJwk)]) },
+      keyAttestationJwt,
+      use: 'proof_type.jwt',
+    })
+    expect(signer).toMatchObject({ method: 'did', didUrl: `${didJwk(attester.publicJwk)}#0` })
+
+    await expect(
+      verifyKeyAttestationJwt({
+        callbacks: { verifyJws: verifyJwsTrustingDids([didJwk(attested.publicJwk)]) },
+        keyAttestationJwt,
+        use: 'proof_type.jwt',
+      })
+    ).rejects.toThrow('Error verifying key attestation jwt')
   })
 
   test('verifies a legacy `keyattestation+jwt` key attestation', async () => {
