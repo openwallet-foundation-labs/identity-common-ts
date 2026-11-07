@@ -8,7 +8,7 @@ import {
 import type z from 'zod'
 import { FetchError } from './error/FetchError'
 import { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
-import { type Fetch, Headers, URLSearchParams } from './globals'
+import { type Fetch, type FetchResponse, Headers, URLSearchParams } from './globals'
 
 /**
  * A type utility which represents the function returned
@@ -97,7 +97,24 @@ export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
 
     return {
       response,
-      result: response.ok ? parseWithSchema(schema, await response.json()) : undefined,
+      result: response.ok ? parseWithSchema(schema, await parseJsonResponse(response)) : undefined,
     }
+  }
+}
+
+/**
+ * The JSON of the response body. Not `response.json()`, as its `SyntaxError` quotes the start of the body, which may
+ * come from an internal endpoint.
+ */
+async function parseJsonResponse(response: FetchResponse): Promise<unknown> {
+  const text = await response.clone().text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new InvalidFetchResponseError(
+      'Expected the response body to be JSON, but it could not be parsed',
+      text,
+      response
+    )
   }
 }

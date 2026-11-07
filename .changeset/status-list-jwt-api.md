@@ -9,7 +9,8 @@ BREAKING: the Status List Token JWT API is built on `@owf/jose`:
 | `createHeaderAndPayload(list, payload, header)` | `signStatusListJwt({ statusList, payload, header, signer, signJwsCallback })` |
 | `getListFromStatusListJwt(jwt)` | `decodeStatusListJwt(jwt).statusList` |
 | `getStatusListFromJwt(jwt)` | `decodeJwt({ jwt, payloadSchema: zReferencedTokenJwtPayload }).payload.status.status_list` of `@owf/jose` |
-| `verifyStatus({ token, idx, uri })` | `verifyStatusListJwt({ jwt, idx, uri, verifyJwsCallback })`, which also verifies the signature |
+| `verifyStatus({ token, idx, uri, verifySignature })` | `verifyStatusListJwt({ jwt, idx, uri, verifyJwsCallback })` |
+| `VerifyStatusListJwtSignature` | `VerifyStatusListJwtOptions['verifyJwsCallback']` |
 | `verifyStatusListJwtHeader(header)` | `decodeStatusListJwt(jwt)` |
 | `StatusListEntry`, `JwtWithStatusListPayload` | `StatusListReference`, `ReferencedTokenJwtPayload` |
 
@@ -19,4 +20,4 @@ BREAKING: `verifyStatusListJwtClaims` takes the options of `verifyJwtClaims` of 
 
 `StatusList.getStatus` and `setStatus` throw a `StatusListError` for an index outside the list, a fraction or `NaN`, instead of a plain `Error`. A `ttl` that is not a positive number is rejected (draft 16 § 5.1 and § 5.2).
 
-BREAKING: `StatusListEntryNotValidError` is replaced by `StatusListValidationError`, with an issue code of `STATUS_LIST_VALIDATION_CODES`. Verifying the status at an `idx`, with `verifyStatusListJwt` or `verifyStatus` of a status list CWT, throws it with `status_not_valid` (`{ idx, status }`) for a status that is not Valid and `index_out_of_range` (`{ idx, totalStatuses }`) for an `idx` outside the list. `StatusList.decompressStatusListFromBytes` throws it with `invalid_status_list` for bytes that are not a compressed status list, instead of a plain `Error`.
+BREAKING: `StatusListEntryNotValidError` is replaced by `StatusListValidationError`, with an issue code of `STATUS_LIST_VALIDATION_CODES`. Verifying the status at an `idx`, with `verifyStatusListJwt` or `verifyStatus` of a status list CWT, throws it with `status_not_valid` (`{ idx, status }`) for a status that is not Valid and `index_out_of_range` (`{ idx, totalStatuses }`) for an `idx` outside the list. `StatusList.decompressStatusListFromBytes` throws it with `invalid_status_list` for bytes that are not a compressed status list, or of more than `maxStatuses` statuses, instead of a plain `Error`.

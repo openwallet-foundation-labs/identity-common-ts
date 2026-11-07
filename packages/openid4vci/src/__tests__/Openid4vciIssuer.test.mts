@@ -3,7 +3,7 @@ import { addSecondsToDate } from '@openid4vc/utils'
 import { CommonMediaTypes } from '@owf/identity-common'
 import { type JwsSigner, signJwt } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
-import { callbacks, getSignJwsCallback } from '../../../oauth2/src/__tests__/util.mjs'
+import { callbacks, getSignJwsCallback, testAttester } from '../../../oauth2/src/__tests__/util.mjs'
 import { parseCredentialRequestPayload } from '../credential-request/parse-credential-request-payload.js'
 import { createCredentialRequestJwtProof } from '../formats/proof-type/jwt/jwt-proof-type.js'
 import { createKeyAttestationJwt } from '../key-attestation/key-attestation.js'
@@ -19,15 +19,6 @@ const credentialRequestProofJwk = {
   y: 'LZ2D24wpGdrM4Ex71SU9uFobvHTLmwXza4uhFp9Bpg8',
 }
 const { d, ...credentialRequestProofJwkPublic } = credentialRequestProofJwk
-
-const keyAttestationJwk = {
-  kty: 'EC',
-  d: 'e3q7tfa5NRbTUAslncGRUEXe2uf-xKlBsRvLVBHwY0U',
-  crv: 'P-256',
-  x: 'fcwkU-4CswPMud4mTz0fZP9a-cfE00OG7dEkQlfPuk0',
-  y: 'Cs2h5PnM16hWXObTZGg8BQLbprCIQDebP1GH9oAvAq0',
-}
-const { d: _, ...keyAttestationJwkPublic } = keyAttestationJwk
 
 const issuer = new Openid4vciIssuer({
   callbacks: {
@@ -184,18 +175,14 @@ describe('Openid4vciIssuer', () => {
     const keyAttestationJwt = await createKeyAttestationJwt({
       callbacks: {
         ...callbacks,
-        signJws: getSignJwsCallback([keyAttestationJwk]),
+        signJws: getSignJwsCallback([]),
       },
       attestedKeys: [credentialRequestProofJwkPublic],
       expiresAt: addSecondsToDate(new Date(), 500),
       use: 'proof_type.jwt',
       keyStorage: ['iso_18045_high'],
       userAuthentication: ['iso_18045_high'],
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: keyAttestationJwkPublic,
-      },
+      signer: testAttester.signer,
       nonce: 'some-nonce',
     })
 
@@ -274,7 +261,7 @@ describe('Openid4vciIssuer', () => {
       keyAttestation: {
         header: {
           alg: 'ES256',
-          jwk: keyAttestationJwkPublic,
+          kid: testAttester.signer.kid,
           typ: 'key-attestation+jwt',
         },
         payload: {
@@ -285,11 +272,7 @@ describe('Openid4vciIssuer', () => {
           nonce: 'some-nonce',
           user_authentication: ['iso_18045_high'],
         },
-        signer: {
-          alg: 'ES256',
-          method: 'jwk',
-          publicJwk: keyAttestationJwkPublic,
-        },
+        signer: { ...testAttester.signer, publicJwk: testAttester.publicJwk },
       },
     })
 
@@ -352,16 +335,12 @@ describe('Openid4vciIssuer', () => {
     const attestationProof = await createKeyAttestationJwt({
       callbacks: {
         ...callbacks,
-        signJws: getSignJwsCallback([keyAttestationJwk]),
+        signJws: getSignJwsCallback([]),
       },
       attestedKeys: [credentialRequestProofJwkPublic],
       use: 'proof_type.attestation',
       keyStorage: ['iso_18045_basic'],
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: keyAttestationJwkPublic,
-      },
+      signer: testAttester.signer,
       nonce: 'some-nonce',
     })
     await expect(

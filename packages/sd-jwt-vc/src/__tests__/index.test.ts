@@ -37,6 +37,11 @@ const createSignerVerifier = () => {
   return { signer, verifier }
 }
 
+// A plain SD-JWT issuer does not apply the SD-JWT VC rules, so it can make a protected claim disclosable
+class PlainSdJwtVcIssuer extends SdJwtInstance<SdJwtVcPayload> {
+  protected type = 'dc+sd-jwt'
+}
+
 const signStatusList = (
   key: Crypto.KeyObject,
   statusList: StatusList,
@@ -113,8 +118,7 @@ describe('App', () => {
       hashAlg: 'sha-256' as const,
       saltGenerator: generateSalt,
     }
-    // A plain SD-JWT issuer does not apply the SD-JWT VC rule, so it can make a protected claim disclosable
-    const issuer = new SdJwtInstance<SdJwtVcPayload>(config)
+    const issuer = new PlainSdJwtVcIssuer(config)
     const sdjwt = new SdJwtVcInstance(config)
     const payload: SdJwtVcPayload = { iat, iss, vct, [claim]: value, nested: { [claim]: value } }
 
@@ -147,7 +151,7 @@ describe('App', () => {
       saltGenerator: generateSalt,
       statusListFetcher,
     }
-    const issuer = new SdJwtInstance<SdJwtVcPayload>(config)
+    const issuer = new PlainSdJwtVcIssuer(config)
     const sdjwt = new SdJwtVcInstance(config)
     const status = { status_list: { idx: 0, uri: 'https://example.com/status-list' } }
     const payload: SdJwtVcPayload = { iat, iss, vct, status }
@@ -179,7 +183,7 @@ describe('App', () => {
       saltGenerator: generateSalt,
       statusListFetcher,
     }
-    const issuer = new SdJwtInstance<SdJwtVcPayload>(config)
+    const issuer = new PlainSdJwtVcIssuer(config)
     const sdjwt = new SdJwtVcInstance(config)
     const jwk = { kty: 'OKP', crv: 'Ed25519', x: 'x' }
     const payload: SdJwtVcPayload = {
@@ -215,6 +219,66 @@ describe('App', () => {
     const control = await rejecting.safeVerify(await issuer.issue(payload, {}))
     expect(control.success).toBe(false)
     expect(control.errors?.map((e) => e.code)).not.toContain('INVALID_SD_JWT')
+  })
+
+  // SD-JWT VC draft 23, Section 2.2.1: the typ of an SD-JWT VC MUST be dc+sd-jwt, which replaced vc+sd-jwt
+  test.each([['statuslist+jwt'], ['vc+sd-jwt'], ['JWT'], [undefined]])(
+    'rejects a JWT of the issuer with the typ %s, as it is no SD-JWT VC',
+    async (typ) => {
+      const { signer, verifier } = createSignerVerifier()
+      const issuer = new SdJwtVcInstance({ signer, signAlg: 'EdDSA', hasher: digest, saltGenerator: generateSalt })
+      const statusListFetcher = vi.fn(async () => statusListJWT)
+      const vctFetcher = vi.fn(async () => undefined)
+      const sdjwt = new SdJwtVcInstance({
+        verifier,
+        hasher: digest,
+        statusListFetcher,
+        loadTypeMetadataFormat: true,
+        vctFetcher,
+      })
+      const credential = await issuer.issue(
+        { iat, iss, vct, status: { status_list: { idx: 0, uri: 'https://example.com/status-list' } } },
+        undefined,
+        { header: { typ } }
+      )
+
+      await expect(sdjwt.verify(credential)).rejects.toMatchObject({
+        code: 'INVALID_SD_JWT',
+        message: `Invalid typ header '${typ}': it must be 'dc+sd-jwt'`,
+      })
+      const result = await sdjwt.safeVerify(credential)
+      expect(result.success ? [] : result.errors.map((e) => e.code)).toEqual(['INVALID_SD_JWT'])
+      await expect(sdjwt.getVct(credential)).rejects.toThrowError('Invalid typ header')
+      expect(statusListFetcher).not.toHaveBeenCalled()
+      expect(vctFetcher).not.toHaveBeenCalled()
+    }
+  )
+
+  // SD-JWT VC draft 23, Section 2.2.1: the issuer MUST include the typ header
+  test('refuses to issue without the typ header', async () => {
+    const { signer } = createSignerVerifier()
+    const issuer = new SdJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      hasher: digest,
+      saltGenerator: generateSalt,
+      omitTyp: true,
+    })
+
+    await expect(issuer.issue({ iat, iss, vct })).rejects.toThrowError(
+      "An SD-JWT-VC must have the typ header 'dc+sd-jwt', so omitTyp is not allowed"
+    )
+  })
+
+  // RFC 7515 Section 4.1.9: the typ may carry the application/ prefix, and media types are case-insensitive
+  test.each([['application/dc+sd-jwt'], ['DC+SD-JWT']])('accepts the typ %s', async (typ) => {
+    const { signer, verifier } = createSignerVerifier()
+    const issuer = new SdJwtVcInstance({ signer, signAlg: 'EdDSA', hasher: digest, saltGenerator: generateSalt })
+    const sdjwt = new SdJwtVcInstance({ verifier, hasher: digest })
+    const credential = await issuer.issue({ iat, iss, vct }, undefined, { header: { typ } })
+
+    await expect(sdjwt.verify(credential)).resolves.toMatchObject({ header: { typ } })
+    await expect(sdjwt.safeVerify(credential)).resolves.toMatchObject({ success: true })
   })
 })
 

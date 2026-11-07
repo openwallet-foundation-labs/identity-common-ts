@@ -1,5 +1,5 @@
-import { ValidationIssues } from '@owf/identity-common'
-import { deflate, inflate } from 'pako'
+import { concatBytes, ValidationIssues } from '@owf/identity-common'
+import { deflate, Inflate } from 'pako'
 import {
   STATUS_LIST_VALIDATION_CODES,
   StatusListError,
@@ -56,6 +56,31 @@ export function verifyStatusValid(statusList: StatusList, idx: number): void {
   }
 
   if (issues.issues.length) throw new StatusListValidationError('The Referenced Token is not Valid', issues.issues)
+}
+
+/**
+ * The default maximum number of statuses read from a compressed status list: 16 MiB at 8 bits per status. A small
+ * compressed list can inflate to a list large enough to exhaust the memory of whoever reads it.
+ */
+const DEFAULT_MAX_STATUSES = 2 ** 24
+
+/**
+ * Inflate `compressed`, but stop with an error once the output exceeds `maxBytes`.
+ */
+function inflateAtMost(compressed: Uint8Array, maxBytes: number): Uint8Array {
+  const inflator = new Inflate()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  inflator.onData = (chunk) => {
+    length += chunk.length
+    if (length > maxBytes) {
+      throw new StatusListError(`The status list is larger than the maximum of ${maxBytes} bytes`)
+    }
+    chunks.push(chunk)
+  }
+  inflator.push(compressed, true)
+  if (inflator.err) throw new StatusListError(`The status list could not be inflated: ${inflator.msg}`)
+  return concatBytes(...chunks)
 }
 
 /**
@@ -131,22 +156,25 @@ export class StatusList {
   /**
    * Decompress a raw byte array and return a new StatusList instance.
    *
-   * @throws StatusListValidationError with an `invalid_status_list` issue if the bytes are not a compressed status list.
+   * @param options.maxStatuses - The maximum number of statuses the list may have, `2^24` by default.
+   * @throws StatusListValidationError with an `invalid_status_list` issue if the bytes are not a compressed status
+   *   list, or one of more than `maxStatuses` statuses.
    */
   static decompressStatusListFromBytes(
     compressed: Uint8Array,
     bitsPerStatus: BitsPerStatus,
-    aggregationUri?: string
+    aggregationUri?: string,
+    { maxStatuses = DEFAULT_MAX_STATUSES }: { maxStatuses?: number } = {}
   ): StatusList {
     try {
-      const decompressed = inflate(compressed)
+      const decompressed = inflateAtMost(compressed, Math.ceil((maxStatuses * bitsPerStatus) / 8))
       const statusList = StatusList.decodeStatusListFromByteArray(decompressed, bitsPerStatus)
       return new StatusList(statusList, bitsPerStatus, aggregationUri)
     } catch (err: unknown) {
       const issues: StatusListIssues = new ValidationIssues()
       issues.add({
         code: STATUS_LIST_VALIDATION_CODES.INVALID_STATUS_LIST,
-        message: `Not a status list compressed with zlib: ${err instanceof Error ? err.message : String(err)}`,
+        message: err instanceof Error ? err.message : String(err),
       })
       throw new StatusListValidationError('The status list cannot be decompressed', issues.issues)
     }

@@ -15,7 +15,7 @@ import { createDpopJwt } from '../../dpop/dpop'
 import { zDpopJwtHeader, zDpopJwtPayload } from '../../dpop/z-dpop'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
 import { preAuthorizedCodeGrantIdentifier } from '../../z-grant-type'
-import { callbacks, getSignJwsCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback, testAttester } from '../util.mjs'
 
 const request = {
   headers: new Headers(),
@@ -42,24 +42,22 @@ function decodeDpop(compact: string) {
 
 describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
   // Attester signs the client attestation; the instance key is both the confirmation key and the DPoP key.
-  let attester: Awaited<ReturnType<typeof generateEs256Key>>
   let instance: Awaited<ReturnType<typeof generateEs256Key>>
   let other: Awaited<ReturnType<typeof generateEs256Key>>
   let signJws: ReturnType<typeof getSignJwsCallback>
   let clientAttestationJwt: string
 
   beforeAll(async () => {
-    attester = await generateEs256Key()
     instance = await generateEs256Key()
     other = await generateEs256Key()
-    signJws = getSignJwsCallback([attester.privateJwk, instance.privateJwk, other.privateJwk])
+    signJws = getSignJwsCallback([instance.privateJwk, other.privateJwk])
 
     clientAttestationJwt = await createClientAttestationJwt({
       callbacks: { signJws },
       clientId: 'wallet',
       confirmation: { jwk: instance.publicJwk },
       expiresAt: new Date(Date.now() + 3600 * 1000),
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+      signer: testAttester.signer,
     })
   })
 
@@ -168,7 +166,7 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
     test('reports a client attestation that fails schema validation as invalid_client', async () => {
       const now = Math.floor(Date.now() / 1000)
       const { jwt: clientAttestationWithoutSub } = await signJwt({
-        signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+        signer: testAttester.signer,
         signJwsCallback: signJws,
         header: { typ: 'oauth-client-attestation+jwt', alg: 'ES256' },
         payload: { iat: now, exp: now + 300, cnf: { jwk: instance.publicJwk } },

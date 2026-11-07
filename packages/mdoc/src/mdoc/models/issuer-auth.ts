@@ -98,6 +98,10 @@ export class IssuerAuth extends Sign1 {
    * Verifies the MSO's revocation status. Throws on revocation or
    * a revocation list that fails verification; succeeds silently otherwise.
    *
+   * It fetches the revocation list URIs of the MSO, so call it only once the issuer is trusted: the
+   * URIs of a self-signed MSO are chosen by whoever presents it. `verify` does not check the status
+   * without certificate chain validation, and leaves it to this method.
+   *
    * @todo return the full verified chain for audit / compliance.
    */
   public async verifyStatus(
@@ -266,8 +270,17 @@ export class IssuerAuth extends Sign1 {
     let identifierList: IdentifierListCwt | undefined
     let trustedIdentifierListChain: Uint8Array[] | undefined
     // The revocation list URIs come from the MSO, so they are only fetched once the MSO is known to be
-    // signed by the issuer. A forged MSO must not make the verifier request a URI of its choosing.
-    if (!disableStatusValidation && isSignatureValid) {
+    // signed by a trusted issuer. A forged MSO must not make the verifier request a URI of its choosing.
+    // Without chain validation, the signature only shows that the MSO is signed with the key of its own
+    // certificate, so the status is left to `verifyStatus` once the caller trusts the issuer.
+    if (!disableStatusValidation && isSignatureValid && disableCertificateChainValidation) {
+      onCheck({
+        status: 'WARNING',
+        check: 'Status information must be valid',
+        reason:
+          'The status is not checked without certificate chain validation. Call IssuerAuth.verifyStatus once the issuer is trusted.',
+      })
+    } else if (!disableStatusValidation && isSignatureValid) {
       try {
         ;({ statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } = await this.verifyStatus(
           {
@@ -275,9 +288,6 @@ export class IssuerAuth extends Sign1 {
             skewSeconds,
             checkFreshness: true,
             trustedStatusCertificates,
-            // Without chain validation there is no trust anchor to take the status certificates from,
-            // so the chains of the revocation lists are not validated either.
-            disableCertificateChainValidation,
           },
           ctx
         ))

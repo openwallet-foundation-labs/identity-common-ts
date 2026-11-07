@@ -15,6 +15,7 @@ import {
   objectToQueryParams,
   URL,
   URLSearchParams,
+  zHttpsUrl,
 } from '@openid4vc/utils'
 import {
   base64url,
@@ -57,22 +58,25 @@ export async function resolveCredentialOffer(
   if (parsedQueryParams.credential_offer_uri) {
     const fetchWithZod = createZodFetcher(options?.fetch)
 
-    const credentialOfferUri = parsedQueryParams.credential_offer_uri
+    // OpenID4VCI 1.0 Section 4.1: a URL using the https scheme. The offer comes from whoever crafted it, so the
+    // wallet would otherwise request a URL of their choice, such as an internal endpoint.
+    const credentialOfferUri = parseWithErrorHandling(
+      zHttpsUrl,
+      parsedQueryParams.credential_offer_uri,
+      'Invalid credential_offer_uri'
+    )
     const { response, result } = await fetchWithZod(
       zCredentialOfferObject,
       CommonMediaTypes.Json,
       credentialOfferUri
     ).catch((error) => {
-      // The body of a successful response is the offer, which the fetch errors would put in their message
+      // The body of a successful response is the offer, which is kept out of the error as `textResponse`
       if (error instanceof InvalidFetchResponseError) {
         throw new InvalidFetchResponseError(
-          `The credential offer from '${credentialOfferUri}' has content type '${error.response.headers.get('Content-Type')}', expected '${CommonMediaTypes.Json}'`,
+          `The credential offer from '${credentialOfferUri}' could not be read. ${error.message}`,
           '',
           error.response
         )
-      }
-      if (error instanceof SyntaxError) {
-        throw new Oauth2Error(`The credential offer from '${credentialOfferUri}' is not valid JSON`)
       }
       throw error
     })
