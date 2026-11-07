@@ -1,3 +1,4 @@
+import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { parseWithErrorHandling } from '@owf/identity-common'
 import { decodeJwt } from '@owf/jose'
 import z from 'zod'
@@ -95,6 +96,16 @@ export function parseOpenid4vpAuthorizationRequest(
       provided,
       params: parsedRequest,
     }
+  }
+
+  if (
+    provided === 'uri' &&
+    (isOpenid4vpAuthorizationRequestDcApi(parsedRequest) || isOpenid4vpAuthorizationRequestIae(parsedRequest))
+  ) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequest,
+      error_description: `An authorization request with response_mode '${parsedRequest.response_mode}' must be passed as a JSON object, not as a URI.`,
+    })
   }
 
   if (isOpenid4vpAuthorizationRequestDcApi(parsedRequest)) {
