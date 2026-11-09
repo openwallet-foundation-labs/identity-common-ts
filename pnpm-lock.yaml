@@ -13,17 +13,17 @@ catalogs:
       specifier: ^2.4.0
       version: 2.4.0
     '@peculiar/asn1-schema':
-      specifier: ^2.11.1
-      version: 2.11.1
+      specifier: ^3.0.0
+      version: 3.0.0
     '@peculiar/asn1-x509':
-      specifier: ^2.11.1
-      version: 2.11.1
+      specifier: ^3.0.0
+      version: 3.0.0
     '@peculiar/asn1-x509-qualified':
-      specifier: ^2.11.1
-      version: 2.11.1
+      specifier: ^3.0.0
+      version: 3.0.0
     '@peculiar/asn1-x509-qualified-etsi':
-      specifier: ^2.11.1
-      version: 2.11.1
+      specifier: ^3.0.0
+      version: 3.0.0
     cbor-x:
       specifier: ^1.6.9
       version: 1.6.9
@@ -82,8 +82,8 @@ importers:
         specifier: ^1.2.1
         version: 1.2.1
       '@peculiar/x509':
-        specifier: ^3.0.0
-        version: 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
+        specifier: ^3.1.0
+        version: 3.1.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
       '@sd-jwt/core':
         specifier: workspace:*
         version: link:packages/sd-jwt-core
@@ -279,10 +279,10 @@ importers:
         version: link:../identity-common
       '@peculiar/asn1-schema':
         specifier: 'catalog:'
-        version: 2.11.1
+        version: 3.0.0(asn1js@4.0.0)
       '@peculiar/asn1-x509':
         specifier: 'catalog:'
-        version: 2.11.1
+        version: 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
       '@xmldom/xmldom':
         specifier: ^0.9.12
         version: 0.9.12
@@ -447,16 +447,16 @@ importers:
         version: link:../identity-common
       '@peculiar/asn1-schema':
         specifier: 'catalog:'
-        version: 2.11.1
+        version: 3.0.0(asn1js@4.0.0)
       '@peculiar/asn1-x509':
         specifier: 'catalog:'
-        version: 2.11.1
+        version: 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
       '@peculiar/asn1-x509-qualified':
         specifier: 'catalog:'
-        version: 2.11.1
+        version: 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
       '@peculiar/asn1-x509-qualified-etsi':
         specifier: 'catalog:'
-        version: 2.11.1
+        version: 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))
       asn1js:
         specifier: ^4.0.0
         version: 4.0.0
@@ -956,9 +956,11 @@ packages:
     peerDependencies:
       '@peculiar/asn1-schema': ^3.0.0
 
-  '@peculiar/asn1-schema@2.11.1':
-    resolution: {integrity: sha512-jaU9OaCcbZUdyXx9hMETZB9xoNmxTGjOGFqd3cOwKFkpKnyKd9WxF3uqj4PvX4cyOMP9bSdHg5YyML2qtx/d/g==}
-    engines: {node: '>=14'}
+  '@peculiar/asn1-schema@3.0.0':
+    resolution: {integrity: sha512-VQgBSyf3teIp7219Y0rHFruJUVY/teYkKvvvObuwtwx6+jOt1f1+jvZoTBRua370H0a8eYpnUWoe0G6GqV0yaA==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      asn1js: ^4.0.0
 
   '@peculiar/asn1-x509-attr@3.0.0':
     resolution: {integrity: sha512-5aLS6ICUdDB42Y3tGfCFAvUzw8SppVGsRogyc1ic4QOBlt358p7iInON4YQP+/V6wzFDWYAN/jfw9gQ/oSG6sg==}
@@ -972,17 +974,17 @@ packages:
     peerDependencies:
       '@peculiar/asn1-schema': ^3.0.0
 
-  '@peculiar/asn1-x509-qualified-etsi@2.11.1':
-    resolution: {integrity: sha512-s/MKDklY1EZL5TNVkIIWJ9OauJGGtTlrH+VhwUY5GT/L2IPih0ihtZ3nzUumm6bxagwq4HjM+MJQDWmg2uqxlQ==}
-    engines: {node: '>=14'}
+  '@peculiar/asn1-x509-qualified-etsi@3.0.0':
+    resolution: {integrity: sha512-FU/SYWboeMP8kBE4KAZ5W7uu55lSzCEzLjbh+5DQmukCItJlWqY7AVoSZdOQQynz4aJUQjF6qBz+q1uJ97MH4A==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      '@peculiar/asn1-schema': ^3.0.0
 
-  '@peculiar/asn1-x509-qualified@2.11.1':
-    resolution: {integrity: sha512-8h/M3Gv75aKxMixxoeeS4j1YfEGqi7qzKD+nky0LzP1kXbYtD/JJWiH8zzO0pAnuMX0Fg/zaRonzTopS5nXJ9w==}
-    engines: {node: '>=14'}
-
-  '@peculiar/asn1-x509@2.11.1':
-    resolution: {integrity: sha512-SXU4/X6B3FquqQAN6ARI0bFDUV7+L1WlvPEPMKzEMkstd2D7UyM0r93fv241+OjdhqAKYGx5MvV3gzZMAp0APA==}
-    engines: {node: '>=14'}
+  '@peculiar/asn1-x509-qualified@3.0.0':
+    resolution: {integrity: sha512-CK7f/lmR2YN+kFaLjUQJ8RFCuZWz9RL72XsenZkx7yPdeDAxc4Ywgv1iv6g8Jco7RV4bEG5XMux6lNrkNiDFSw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      '@peculiar/asn1-schema': ^3.0.0
 
   '@peculiar/asn1-x509@3.0.0':
     resolution: {integrity: sha512-2SiGmnk+qDtRfifIaGAShAIYJYXRU2DkInPzd+io8GiL9MIyf9RyGj/kcuWVOsdEEPDRm5xfNMVXCu9EQStzgA==}
@@ -991,15 +993,12 @@ packages:
       '@peculiar/asn1-schema': ^3.0.0
       asn1js: ^4.0.0
 
-  '@peculiar/utils@2.0.3':
-    resolution: {integrity: sha512-+oL3HPFRIZ1St2K50lWCXiioIgSoxzz7R1J3uF6neO2yl1sgmpgY6XXJH4BdpoDkMWznQTeYF6oWNDZLCdQ4eQ==}
-
   '@peculiar/utils@4.1.0':
     resolution: {integrity: sha512-y2oDqAwp+VPZMUYFGFFMYlXM8xinwb7ehb69+2EhbEL+n7KsykCQX5F0u3/B+BFHxCkwTyft3T1id0ugyzNHVQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
 
-  '@peculiar/x509@3.0.0':
-    resolution: {integrity: sha512-1zMViQ7z99f7sdV1SML7FAkzz7HWbovINN4hEvdPx47m3JGgxV9649L5Xpu7yVWdJa/n0UNIXV+NKRHVjXNEcQ==}
+  '@peculiar/x509@3.1.0':
+    resolution: {integrity: sha512-wjrnCx9lwiRyusHZcNuujCDQ5hplsVyH0j8KMkVGWYb+UwfbgS/0vfDnE72OpUMRJ5/Snz2Tz75LjqvZF8+tWw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@peculiar/asn1-schema': ^3.0.0
@@ -2881,133 +2880,119 @@ snapshots:
 
   '@panva/hkdf@1.2.1': {}
 
-  '@peculiar/asn1-asym-key@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
+  '@peculiar/asn1-asym-key@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/asn1-pkcs8': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
+      '@peculiar/asn1-pkcs8': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
     transitivePeerDependencies:
       - asn1js
 
-  '@peculiar/asn1-cms@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
+  '@peculiar/asn1-cms@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-x509-attr': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-x509-attr': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
     transitivePeerDependencies:
       - asn1js
 
-  '@peculiar/asn1-csr@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
+  '@peculiar/asn1-csr@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
     transitivePeerDependencies:
       - asn1js
 
-  '@peculiar/asn1-ecc@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
+  '@peculiar/asn1-ecc@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
     transitivePeerDependencies:
       - asn1js
 
-  '@peculiar/asn1-pfx@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
+  '@peculiar/asn1-pfx@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/asn1-cms': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-pkcs8': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-rsa': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-schema': 2.11.1
+      '@peculiar/asn1-cms': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-pkcs8': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-rsa': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
     transitivePeerDependencies:
       - asn1js
 
-  '@peculiar/asn1-pkcs8@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
+  '@peculiar/asn1-pkcs8@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
     transitivePeerDependencies:
       - asn1js
 
-  '@peculiar/asn1-pkcs9@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
+  '@peculiar/asn1-pkcs9@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/asn1-cms': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-pfx': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-pkcs8': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-x509-attr': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
+      '@peculiar/asn1-cms': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-pfx': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-pkcs8': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-x509-attr': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
     transitivePeerDependencies:
       - asn1js
 
-  '@peculiar/asn1-rsa@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
+  '@peculiar/asn1-rsa@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
     transitivePeerDependencies:
       - asn1js
 
-  '@peculiar/asn1-schema@2.11.1':
+  '@peculiar/asn1-schema@3.0.0(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/utils': 2.0.3
-      asn1js: 3.1.0
-      tslib: 2.9.1
-
-  '@peculiar/asn1-x509-attr@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
-    dependencies:
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-    transitivePeerDependencies:
-      - asn1js
-
-  '@peculiar/asn1-x509-post-quantum@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
-    dependencies:
-      '@peculiar/asn1-asym-key': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-    transitivePeerDependencies:
-      - asn1js
-
-  '@peculiar/asn1-x509-qualified-etsi@2.11.1':
-    dependencies:
-      '@peculiar/asn1-schema': 2.11.1
-      asn1js: 3.1.0
-      tslib: 2.9.1
-
-  '@peculiar/asn1-x509-qualified@2.11.1':
-    dependencies:
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 2.11.1
-      asn1js: 3.1.0
-      tslib: 2.9.1
-
-  '@peculiar/asn1-x509@2.11.1':
-    dependencies:
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/utils': 2.0.3
-      asn1js: 3.1.0
-      tslib: 2.9.1
-
-  '@peculiar/asn1-x509@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
-    dependencies:
-      '@peculiar/asn1-schema': 2.11.1
       '@peculiar/utils': 4.1.0
       asn1js: 4.0.0
 
-  '@peculiar/utils@2.0.3':
+  '@peculiar/asn1-x509-attr@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      tslib: 2.9.1
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+    transitivePeerDependencies:
+      - asn1js
+
+  '@peculiar/asn1-x509-post-quantum@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
+    dependencies:
+      '@peculiar/asn1-asym-key': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+    transitivePeerDependencies:
+      - asn1js
+
+  '@peculiar/asn1-x509-qualified-etsi@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))':
+    dependencies:
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+
+  '@peculiar/asn1-x509-qualified@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
+    dependencies:
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+    transitivePeerDependencies:
+      - asn1js
+
+  '@peculiar/asn1-x509@3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
+    dependencies:
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/utils': 4.1.0
+      asn1js: 4.0.0
 
   '@peculiar/utils@4.1.0': {}
 
-  '@peculiar/x509@3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)':
+  '@peculiar/x509@3.1.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)':
     dependencies:
-      '@peculiar/asn1-cms': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-csr': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-ecc': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-pkcs9': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-rsa': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-schema': 2.11.1
-      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
-      '@peculiar/asn1-x509-post-quantum': 3.0.0(@peculiar/asn1-schema@2.11.1)(asn1js@4.0.0)
+      '@peculiar/asn1-cms': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-csr': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-ecc': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-pkcs9': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-rsa': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-schema': 3.0.0(asn1js@4.0.0)
+      '@peculiar/asn1-x509': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
+      '@peculiar/asn1-x509-post-quantum': 3.0.0(@peculiar/asn1-schema@3.0.0(asn1js@4.0.0))(asn1js@4.0.0)
       '@peculiar/utils': 4.1.0
       tsyringe: 4.10.0
     transitivePeerDependencies:

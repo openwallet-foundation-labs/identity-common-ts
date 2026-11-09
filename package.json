@@ -43,7 +43,7 @@
     "@owf/jose": "workspace:*",
     "@owf/token-status-list": "workspace:*",
     "@panva/hkdf": "^1.2.1",
-    "@peculiar/x509": "^3.0.0",
+    "@peculiar/x509": "^3.1.0",
     "@sd-jwt/core": "workspace:*",
     "@sd-jwt/sd-jwt-vc": "workspace:*",
     "@types/node": "^26.6.6",
