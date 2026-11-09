@@ -287,8 +287,8 @@ importers:
         specifier: ^0.9.12
         version: 0.9.12
       xadesjs:
-        specifier: ^2.6.8
-        version: 2.6.8(@xmldom/xmldom@0.9.12)(xpath@0.0.36)
+        specifier: ^3.0.0
+        version: 3.0.0(xml-core@1.2.6(@xmldom/xmldom@0.9.12)(xpath@0.0.36))(xmldsigjs@2.8.8(@xmldom/xmldom@0.9.12))
       xpath:
         specifier: ^0.0.36
         version: 0.0.36
@@ -864,9 +864,9 @@ packages:
     resolution: {integrity: sha512-P4/62zrgfH33CneE3Dn4WhJVA22YUU0eR51wKIan4NVRvwsA0YnPTwWGpNbpuacSujmSFLvyzpyuR30+fbq2Ew==}
     engines: {node: '>= 20.19.0'}
 
-  '@noble/hashes@1.4.0':
-    resolution: {integrity: sha512-V1JJ1WTRUqHHrOSh597hURcMqVKVGL/ea3kv0gSnEdsEZ0/+VyPghM1lMNGc00z7CIQorSvbKpuJkxvuHbvdbg==}
-    engines: {node: '>= 16'}
+  '@noble/hashes@1.8.0':
+    resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
+    engines: {node: ^14.21.3 || >=16}
 
   '@noble/hashes@2.4.0':
     resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
@@ -2080,8 +2080,8 @@ packages:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
-  pkijs@3.4.0:
-    resolution: {integrity: sha512-emEcLuomt2j03vxD54giVB4SxTjnsqkU692xZOZXHDVoYyypEm+b3jpiTcc+Cf+myooc+/Ly0z01jqeNHVgJGw==}
+  pkijs@3.4.3:
+    resolution: {integrity: sha512-V9kOzaItwDgqlryhXysQsAXUEKi5O7kqWUaP3dXI7MLvkPqWWMb4wVb1QAtmEDCKI+XIAINsZoNKMFF7sZb1eg==}
     engines: {node: '>=16.0.0'}
 
   postcss@8.5.31:
@@ -2449,9 +2449,12 @@ packages:
     resolution: {integrity: sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==}
     engines: {node: '>=10'}
 
-  xadesjs@2.6.8:
-    resolution: {integrity: sha512-OM/jb1YB4Kim9XAA5QqnAmx2LMxNilvwa34EtewBtLedgf4+Y3sBqGg9Wcxutn2fEh1U6MaJ/A9C42+5iSWnIQ==}
-    engines: {node: '>=16.0.0'}
+  xadesjs@3.0.0:
+    resolution: {integrity: sha512-rnb0t4zRpc0zVPVsT4vgAqKtkUYtrM9OkopUz+PEQwMPJ/YhRjkIlqqBiKsL/2X9tJaExh1tGYRxxxIix3BlAg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      xml-core: ^3.0.0
+      xmldsigjs: ^3.0.0
 
   xml-core@1.2.6:
     resolution: {integrity: sha512-hNiMqDG28WKzpEgKY+kn06272c7Mx0A8NB+Hx706Uwbb2obNnxKc+g4NyBkw6gcbBJaYM5GpK8iKKJv02Vwbmw==}
@@ -2844,7 +2847,7 @@ snapshots:
     dependencies:
       '@noble/hashes': 2.4.0
 
-  '@noble/hashes@1.4.0': {}
+  '@noble/hashes@1.8.0': {}
 
   '@noble/hashes@2.4.0': {}
 
@@ -3916,9 +3919,9 @@ snapshots:
 
   picomatch@4.0.7: {}
 
-  pkijs@3.4.0:
+  pkijs@3.4.3:
     dependencies:
-      '@noble/hashes': 1.4.0
+      '@noble/hashes': 1.8.0
       asn1js: 3.1.0
       bytestreamjs: 2.0.1
       pvtsutils: 1.3.6
@@ -4242,13 +4245,10 @@ snapshots:
       string-width: 4.2.3
       strip-ansi: 6.0.1
 
-  xadesjs@2.6.8(@xmldom/xmldom@0.9.12)(xpath@0.0.36):
+  xadesjs@3.0.0(xml-core@1.2.6(@xmldom/xmldom@0.9.12)(xpath@0.0.36))(xmldsigjs@2.8.8(@xmldom/xmldom@0.9.12)):
     dependencies:
       xml-core: 1.2.6(@xmldom/xmldom@0.9.12)(xpath@0.0.36)
       xmldsigjs: 2.8.8(@xmldom/xmldom@0.9.12)
-    transitivePeerDependencies:
-      - '@xmldom/xmldom'
-      - xpath
 
   xml-core@1.2.6(@xmldom/xmldom@0.9.12)(xpath@0.0.34):
     dependencies:
@@ -4265,7 +4265,7 @@ snapshots:
   xmldsigjs@2.8.8(@xmldom/xmldom@0.9.12):
     dependencies:
       asn1js: 3.1.0
-      pkijs: 3.4.0
+      pkijs: 3.4.3
       pvtsutils: 1.3.6
       pvutils: 1.2.0
       tslib: 2.9.1
