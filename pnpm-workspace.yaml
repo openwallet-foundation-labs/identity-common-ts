@@ -10,7 +10,7 @@ catalog:
   '@peculiar/asn1-x509-qualified-etsi': ^3.0.0
   cbor-x: ^1.6.9
   typescript: ~7.0.2
-  vitest: ^5.0.5
+  vitest: ^5.1.0
   zod: ^4.6.7
 
 onlyBuiltDependencies:

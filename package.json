@@ -6,7 +6,7 @@
   "pnpm": {
     "overrides": {
       "smol-toml": "1.7.1",
-      "vite": "8.3.5"
+      "vite": "8.3.6"
     }
   },
   "repository": {
@@ -59,7 +59,7 @@
     "tsdown": "0.23.5",
     "tsx": "^4.23.15",
     "typescript": "catalog:",
-    "vite": "8.3.5",
+    "vite": "8.3.6",
     "vitest": "catalog:"
   },
   "engines": {
