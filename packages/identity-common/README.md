@@ -106,6 +106,8 @@ const zMetadata = z.union([zMetadataV1, zMetadataDraft11], unionParams('Invalid 
 
 `isMediaType(contentType, CommonMediaTypes.Json)` compares a `Content-Type` value with one or more media types, ignoring casing and parameters (RFC 9110 Section 8.3), so `application/json; charset=utf-8` matches and `application/json-seq` does not. `extractMediaType` returns the normalized `type/subtype`, and `createAcceptHeader` builds an `Accept` header with quality values in order of preference. `CommonMediaTypes` has the media types that are not specific to one specification, such as `Json`, `Jwt` and `JwkSet`.
 
+`readResponseBodyAtMost(response, maxBytes)` reads the body of a fetch `Response`, and rejects one larger than `maxBytes` with an `IdentityCommonError`. It checks `Content-Length` before reading, and cancels the body stream once it is larger. Where fetch has no body stream, as in React Native, it reads the body whole and checks it afterwards.
+
 ## Related Packages
 
 This package is part of the Identity Common TypeScript project:

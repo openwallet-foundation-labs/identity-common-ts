@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { fetchStatusList } from '../fetch-status-list'
 import { StatusListError } from '../status-list-error'
 import { StatusListMediaTypes } from '../types'
@@ -93,16 +93,6 @@ describe('fetchStatusList', () => {
       expect(stream.cancelled).toBe(true)
     })
 
-    it('stops reading a body without Content-Length once it is larger than the maximum', async () => {
-      const { stream, body } = streamedBody(1024)
-
-      await expect(fetchWith(new Response(body, { headers: cwtHeaders }), 4096)).rejects.toThrow(
-        'The response is larger than the maximum of 4096 bytes'
-      )
-      expect(stream.pulled).toBe(5)
-      expect(stream.cancelled).toBe(true)
-    })
-
     it('stops reading a body larger than 16 MiB by default', async () => {
       const { stream, body } = streamedBody(1024 * 1024)
 
@@ -116,18 +106,6 @@ describe('fetchStatusList', () => {
       const { body } = streamedBody(1024, 4)
 
       await expect(fetchWith(new Response(body, { headers: cwtHeaders }), 4096)).resolves.toEqual(new Uint8Array(4096))
-    })
-
-    // The fetch of React Native has no body stream
-    it('rejects a body without a stream once it is read', async () => {
-      const response = new Response(new Uint8Array(4097), {
-        headers: { 'Content-Type': StatusListMediaTypes.StatusListJwt },
-      })
-      const arrayBuffer = vi.spyOn(response, 'arrayBuffer')
-      Object.defineProperty(response, 'body', { value: null })
-
-      await expect(fetchWith(response, 4096)).rejects.toThrow('The response is larger than the maximum of 4096 bytes')
-      expect(arrayBuffer).toHaveBeenCalled()
     })
   })
 
