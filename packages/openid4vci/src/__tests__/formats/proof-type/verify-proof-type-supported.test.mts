@@ -16,6 +16,7 @@ import {
   createCredentialRequestJwtProof,
   verifyCredentialRequestJwtProof,
 } from '../../../formats/proof-type/jwt/jwt-proof-type'
+import { verifyBindingMethodSupported } from '../../../formats/proof-type/verify-proof-type-supported'
 
 const credentialIssuer = 'https://credential-issuer.com'
 
@@ -164,6 +165,18 @@ describe('verifying credential request proofs against the credential configurati
       await expect(verifyAttestationProof({ cryptographic_binding_methods_supported: ['did:key'] })).rejects.toThrow(
         "Proof key binding method 'jwk' is not supported for the credential configuration"
       )
+    })
+  })
+
+  describe('binding method of other proof keys', () => {
+    test('rejects an x5c proof key when binding methods are advertised, as there is no binding method for it', () => {
+      expect(() =>
+        verifyBindingMethodSupported({ cryptographic_binding_methods_supported: ['jwk', 'did'] }, { method: 'x5c' })
+      ).toThrow("Proof key binding method 'x5c' is not supported for the credential configuration")
+    })
+
+    test('accepts an x5c proof key when no binding methods are advertised', () => {
+      expect(() => verifyBindingMethodSupported({}, { method: 'x5c' })).not.toThrow()
     })
   })
 })
