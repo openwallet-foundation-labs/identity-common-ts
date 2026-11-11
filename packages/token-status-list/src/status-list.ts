@@ -1,5 +1,5 @@
 import { concatBytes, ValidationIssues } from '@owf/identity-common'
-import { deflate, Inflate } from 'pako'
+import { deflate, Inflate, type ZStream } from 'pako'
 import {
   STATUS_LIST_VALIDATION_CODES,
   StatusListError,
@@ -74,10 +74,16 @@ export type DecompressStatusListOptions = {
 }
 
 /**
- * Inflate `compressed`, but stop with an error once the output exceeds `maxBytes`.
+ * Inflate `compressed`, which must be one ZLIB stream (Token Status List § 4.1), but stop with an error once the
+ * output exceeds `maxBytes`.
  */
 function inflateAtMost(compressed: Uint8Array, maxBytes: number): Uint8Array {
-  const inflator = new Inflate()
+  // With `windowBits` set, pako no longer detects and inflates a gzip stream, but only the ZLIB format
+  const inflator = new Inflate({ windowBits: 15 })
+  let stream: ZStream | undefined
+  inflator.onStart = (strm) => {
+    stream = strm
+  }
   const chunks: Uint8Array[] = []
   let length = 0
   inflator.onData = (chunk) => {
@@ -90,6 +96,10 @@ function inflateAtMost(compressed: Uint8Array, maxBytes: number): Uint8Array {
   }
   inflator.push(compressed, true)
   if (inflator.err) throw new StatusListError(`The status list could not be inflated: ${inflator.msg}`)
+  // pako stops at the end of the ZLIB stream and ignores what follows it
+  if (stream?.avail_in) {
+    throw new StatusListError(`The status list has ${stream.avail_in} bytes after the end of its ZLIB stream`)
+  }
   return concatBytes(...chunks)
 }
 
@@ -201,8 +211,8 @@ export class StatusList {
    * Decompress a raw byte array and return a new StatusList instance, which reads its statuses from the
    * decompressed bytes.
    *
-   * @throws StatusListValidationError with an `invalid_status_list` issue if the bytes are not a compressed status
-   *   list, or inflate to more than `maxDecompressedBytes`, 16 MiB by default.
+   * @throws StatusListValidationError with an `invalid_status_list` issue if the bytes are not one ZLIB stream of a
+   *   status list, or inflate to more than `maxDecompressedBytes`, 16 MiB by default.
    */
   static decompressStatusListFromBytes(
     compressed: Uint8Array,

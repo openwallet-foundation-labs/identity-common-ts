@@ -196,7 +196,7 @@ statusList.getStatus(42) // 1
 
 `verifyStatusListJwt` decompresses the list only once the token verified, as a small `lst` can inflate to a very large list. `decodeStatusListJwt` reads a token without verifying it, for example to pick the key. Its `statusList` is decompressed when first read.
 
-Decompressing stops at `maxDecompressedBytes`, 16 MiB by default, which is 2^27 statuses at 1 bit per status. `verifyStatusListJwt`, `decodeStatusListJwt`, `StatusList.decompressStatusListFromBytes` and the `verify` and `verifyStatus` of a `StatusListCwt` take it as an option. A decompressed list reads and sets each status in its bytes, so it takes no more memory than its decompressed size. Its `statusList` array takes about 8 bytes per status, so read a status with `getStatus` instead.
+An `lst` must be one stream in the ZLIB format (Token Status List § 4.1): gzip, raw DEFLATE and bytes after the end of the stream are rejected. Decompressing stops at `maxDecompressedBytes`, 16 MiB by default, which is 2^27 statuses at 1 bit per status. `verifyStatusListJwt`, `decodeStatusListJwt`, `StatusList.decompressStatusListFromBytes` and the `verify` and `verifyStatus` of a `StatusListCwt` take it as an option. A decompressed list reads and sets each status in its bytes, so it takes no more memory than its decompressed size. Its `statusList` array takes about 8 bytes per status, so read a status with `getStatus` instead.
 
 A status that is not Valid, an `idx` outside the list and an `lst` that cannot be decompressed throw a `StatusListValidationError`. Check the `code` of its issue, one of `STATUS_LIST_VALIDATION_CODES`. `verify` of a `StatusListCwt` throws the same.
 

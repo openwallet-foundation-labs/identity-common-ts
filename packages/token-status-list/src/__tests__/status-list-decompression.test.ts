@@ -1,5 +1,5 @@
-import { base64url } from '@owf/identity-common'
-import { deflate, Inflate, inflate } from 'pako'
+import { base64url, concatBytes } from '@owf/identity-common'
+import { deflate, deflateRaw, gzip, Inflate, inflate } from 'pako'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { StatusList } from '../status-list'
 import { StatusType } from '../types'
@@ -69,6 +69,32 @@ describe('decompressStatusListFromBytes', () => {
         maxDecompressedBytes: Number.NaN,
       })
     ).toThrow(statusListIssue('invalid_status_list'))
+  })
+
+  // Token Status List § 4.1: the byte array is compressed with DEFLATE in the ZLIB format
+  describe('of a list that is not one ZLIB stream', () => {
+    const byteArray = new Uint8Array([0xb9, 0xa3])
+    const decompress = (compressed: Uint8Array) => () => StatusList.decompressStatusListFromBytes(compressed, 1)
+
+    it('reads the list in the ZLIB format', () => {
+      expect(decompress(deflate(byteArray))()).toMatchObject({ totalStatuses: 16 })
+    })
+
+    it.each([
+      ['gzip', gzip(byteArray)],
+      ['raw DEFLATE', deflateRaw(byteArray)],
+    ])('rejects the list in the %s format', (_, compressed) => {
+      expect(decompress(compressed)).toThrow(statusListIssue('invalid_status_list'))
+      expect(decompress(compressed)).toThrow('The status list could not be inflated: incorrect header check')
+    })
+
+    it.each([
+      ['a byte', concatBytes(deflate(byteArray), new Uint8Array([0]))],
+      ['a second ZLIB stream', concatBytes(deflate(byteArray), deflate(byteArray))],
+    ])('rejects the list followed by %s', (_, compressed) => {
+      expect(decompress(compressed)).toThrow(statusListIssue('invalid_status_list'))
+      expect(decompress(compressed)).toThrow('bytes after the end of its ZLIB stream')
+    })
   })
 
   it('reads a list of 16 MiB, 2^27 statuses at 1 bit, in the memory of its bytes', () => {
