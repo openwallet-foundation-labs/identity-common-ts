@@ -31,6 +31,10 @@ export interface VerifyRegistrationCertificateOptions {
   now?: Date
   /** Clock tolerance for `exp` and `iat`, in seconds; defaults to 30 */
   skewSeconds?: number
+  /** The maximum size in bytes of the response that serves the status list; defaults to 16 MiB */
+  maxStatusListResponseBytes?: number
+  /** The maximum size in bytes the status list may inflate to; defaults to 16 MiB */
+  maxStatusListDecompressedBytes?: number
 }
 
 /**
@@ -48,6 +52,8 @@ export async function verifyRegistrationCertificate({
   callbacks,
   now,
   skewSeconds,
+  maxStatusListResponseBytes,
+  maxStatusListDecompressedBytes,
 }: VerifyRegistrationCertificateOptions): Promise<SignedRegistrationCertificateJwt | SignedRegistrationCertificateCwt> {
   const serialized =
     typeof registrationCertificate === 'string' || registrationCertificate instanceof Uint8Array
@@ -100,7 +106,14 @@ export async function verifyRegistrationCertificate({
     })
   }
   try {
-    await verifyRegistrationCertificateStatus({ status, callbacks, now, skewSeconds })
+    await verifyRegistrationCertificateStatus({
+      status,
+      callbacks,
+      now,
+      skewSeconds,
+      maxResponseBytes: maxStatusListResponseBytes,
+      maxDecompressedBytes: maxStatusListDecompressedBytes,
+    })
   } catch (error) {
     throw asValidationError(error, (error as Error).message.split('\n')[0], {
       code: 'invalid_status_list',

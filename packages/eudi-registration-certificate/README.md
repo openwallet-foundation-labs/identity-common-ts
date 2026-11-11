@@ -348,6 +348,8 @@ Anything that does not verify throws a `RegistrationCertificateValidationError` 
 
 `verifyRegistrationCertificateStatus` checks the status on its own, with the same callbacks.
 
+The status list response and the list it inflates to are each limited to 16 MiB, as a status list could otherwise exhaust the memory of the verifier. `maxStatusListResponseBytes` and `maxStatusListDecompressedBytes` of `verifyRegistrationCertificate` set other limits, as do `maxResponseBytes` and `maxDecompressedBytes` of `verifyRegistrationCertificateStatus`. A larger response is reported as `status_list_unavailable`, and a larger list as `invalid_status_list`.
+
 ### Validating a registration certificate
 
 ```typescript
