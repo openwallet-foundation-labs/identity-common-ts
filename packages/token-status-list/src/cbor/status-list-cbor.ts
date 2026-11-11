@@ -1,6 +1,6 @@
 import { CborStructure, TypedMap, typedMap, zUint8Array } from '@owf/cose'
 import { z } from 'zod'
-import { StatusList } from '../status-list'
+import { type DecompressStatusListOptions, StatusList } from '../status-list'
 import type { BitsPerStatus, StatusType } from '../types'
 
 export const zStatusListCbor = typedMap([
@@ -51,12 +51,25 @@ export class StatusListCbor extends CborStructure<StatusListCborEncodedStructure
     return this.structure.get('lst')
   }
 
+  /** The status list, see {@link getStatusList}. */
   public get statusList(): StatusList {
+    return this.getStatusList()
+  }
+
+  /**
+   * The status list, inflated from `lst` on the first call. `maxDecompressedBytes` limits that inflation, so pass it
+   * on the first call; later calls return the same list.
+   *
+   * @throws StatusListValidationError with an `invalid_status_list` issue if `lst` is not a compressed status list,
+   *   or inflates to more than `maxDecompressedBytes`, 16 MiB by default.
+   */
+  public getStatusList(options?: DecompressStatusListOptions): StatusList {
     if (!this.#statusList) {
       this.#statusList = StatusList.decompressStatusListFromBytes(
         this.structure.get('lst'),
         this.structure.get('bits'),
-        this.structure.get('aggregation_uri')
+        this.structure.get('aggregation_uri'),
+        options
       )
     }
 

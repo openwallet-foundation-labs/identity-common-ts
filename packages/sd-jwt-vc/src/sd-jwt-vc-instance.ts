@@ -817,7 +817,9 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
           })
 
         // check the claims required for a Status List Token, e.g. that `sub` matches the referenced uri
-        const decodedStatusListJwt = decodeStatusListJwt(statusListJwt)
+        const decodedStatusListJwt = decodeStatusListJwt(statusListJwt, {
+          maxDecompressedBytes: this.userConfig.maxStatusListDecompressedBytes,
+        })
         verifyStatusListJwtClaims(decodedStatusListJwt.payload, {
           uri,
           now: options?.currentDate !== undefined ? secondsToDate(options.currentDate) : undefined,

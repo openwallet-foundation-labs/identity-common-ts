@@ -416,7 +416,10 @@ suite('Verification', () => {
     return IssuerSigned.fromEncodedForOid4Vci(issuerSigned.encodedForOid4Vci)
   }
 
-  const verifyIssuerSigned = (credential: IssuerSigned, options: { skewSeconds?: number } = {}) =>
+  const verifyIssuerSigned = (
+    credential: IssuerSigned,
+    options: { skewSeconds?: number; maxStatusListDecompressedBytes?: number } = {}
+  ) =>
     Holder.verifyIssuerSigned(
       { issuerSigned: credential, trustedCertificates: validTrustedCertificates, ...options },
       mdocContext
@@ -622,6 +625,60 @@ suite('Verification', () => {
     await expect(verification).rejects.toMatchObject({
       assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Invalid } },
     })
+  })
+
+  // Ten statuses of 2 bits inflate to 3 bytes
+  test('Verify mdoc with a status list larger than maxStatusListDecompressedBytes', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/too-large', { idx, status: StatusType.Valid })
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 2 })).rejects.toThrow(
+      `Verifying the status list ${uri} failed: The status list cannot be decompressed`
+    )
+    await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 3 })).resolves.toBeDefined()
+
+    const sessionTranscript = await SessionTranscript.forOid4Vp(
+      { clientId: 'my-client-id', responseUri: 'my-response-uri.com', nonce: 'my-random-nonce' },
+      mdocContext
+    )
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: { 'org.iso.18013.5.1.mDL': { first_name: true } },
+          }),
+        }),
+      ],
+    })
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [
+          {
+            issuerSigned: credential,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    await expect(
+      Verifier.verifyDeviceResponse(
+        {
+          deviceResponse,
+          sessionTranscript,
+          trustedCertificates: validTrustedCertificates,
+          maxStatusListDecompressedBytes: 2,
+        },
+        mdocContext
+      )
+    ).rejects.toThrow(`Verifying the status list ${uri} failed: The status list cannot be decompressed`)
   })
 
   // An expired list says nothing about the status it carries (Token Status List § 8.3), so the

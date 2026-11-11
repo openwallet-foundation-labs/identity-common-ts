@@ -19,7 +19,7 @@ import {
   zStatusListJwtHeader,
   zStatusListJwtPayload,
 } from './jwt-types'
-import { StatusList, verifyStatusValid } from './status-list'
+import { type DecompressStatusListOptions, StatusList, verifyStatusValid } from './status-list'
 
 type StatusListJwtHeaderSchema = typeof zStatusListJwtHeader
 type StatusListJwtPayloadSchema = typeof zStatusListJwtPayload
@@ -86,10 +86,12 @@ export type DecodeStatusListJwtResult = DecodeJwtResult<StatusListJwtHeaderSchem
 /**
  * Decodes a Status List Token in JWT format without verifying the signature, see {@link verifyStatusListJwt}.
  *
+ * @param options.maxDecompressedBytes - The maximum size the status list may inflate to when it is read, 16 MiB by
+ *   default.
  * @throws JoseParseError if the token is not well-formed.
  * @throws JoseValidationError if the token is not a Status List Token.
  */
-export function decodeStatusListJwt(jwt: string): DecodeStatusListJwtResult {
+export function decodeStatusListJwt(jwt: string, options: DecompressStatusListOptions = {}): DecodeStatusListJwtResult {
   const decoded = decodeJwt({ jwt, headerSchema: zStatusListJwtHeader, payloadSchema: zStatusListJwtPayload })
   const { bits, lst, aggregation_uri } = decoded.payload.status_list
 
@@ -98,7 +100,7 @@ export function decodeStatusListJwt(jwt: string): DecodeStatusListJwtResult {
     ...decoded,
     get statusList() {
       if (statusList) return statusList
-      statusList = StatusList.decompressStatusListFromBytes(base64url.decode(lst), bits, aggregation_uri)
+      statusList = StatusList.decompressStatusListFromBytes(base64url.decode(lst), bits, aggregation_uri, options)
       return statusList
     },
   }
@@ -134,7 +136,7 @@ export type VerifyStatusListJwtOptions = Omit<
 
   /** When given, the status at this index must be `Valid`. */
   idx?: number
-}
+} & DecompressStatusListOptions
 
 export type VerifyStatusListJwtResult = VerifyJwtResult<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema> & {
   statusList: StatusList
@@ -145,16 +147,18 @@ export type VerifyStatusListJwtResult = VerifyJwtResult<StatusListJwtHeaderSchem
  * `uri`, and the status at `idx` when given. The list is decompressed only once the token verified.
  *
  * @throws JoseParseError, JoseValidationError or JoseVerificationError if the token does not verify.
- * @throws StatusListValidationError if the status list cannot be decompressed (`invalid_status_list`), or `idx`
- *   is not in it (`index_out_of_range`) or its status is not `Valid` (`status_not_valid`).
+ * @throws StatusListValidationError if the status list cannot be decompressed or inflates to more than
+ *   `maxDecompressedBytes`, 16 MiB by default (`invalid_status_list`), or `idx` is not in it (`index_out_of_range`) or
+ *   its status is not `Valid` (`status_not_valid`).
  */
 export async function verifyStatusListJwt({
   jwt,
   uri,
   idx,
+  maxDecompressedBytes,
   ...options
 }: VerifyStatusListJwtOptions): Promise<VerifyStatusListJwtResult> {
-  const decoded = decodeStatusListJwt(typeof jwt === 'string' ? jwt : jwt.compact)
+  const decoded = decodeStatusListJwt(typeof jwt === 'string' ? jwt : jwt.compact, { maxDecompressedBytes })
 
   const verified = await verifyJwt<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema>({
     ...options,

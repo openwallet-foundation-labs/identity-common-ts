@@ -59,10 +59,19 @@ export function verifyStatusValid(statusList: StatusList, idx: number): void {
 }
 
 /**
- * The default maximum number of statuses read from a compressed status list: 16 MiB at 8 bits per status. A small
- * compressed list can inflate to a list large enough to exhaust the memory of whoever reads it.
+ * The default maximum size of a decompressed status list. A small compressed list can inflate to a list large enough
+ * to exhaust the memory of whoever reads it.
  */
-const DEFAULT_MAX_STATUSES = 2 ** 24
+const DEFAULT_MAX_DECOMPRESSED_BYTES = 16 * 1024 * 1024
+
+/** Options to decompress a status list. */
+export type DecompressStatusListOptions = {
+  /**
+   * The maximum size in bytes a status list may inflate to, 16 MiB by default: 2^27 statuses at 1 bit per status, or
+   * 2^24 at 8 bits. Inflating stops with an error once the list is larger.
+   */
+  maxDecompressedBytes?: number
+}
 
 /**
  * Inflate `compressed`, but stop with an error once the output exceeds `maxBytes`.
@@ -73,7 +82,8 @@ function inflateAtMost(compressed: Uint8Array, maxBytes: number): Uint8Array {
   let length = 0
   inflator.onData = (chunk) => {
     length += chunk.length
-    if (length > maxBytes) {
+    // Negated, so that a `maxBytes` of NaN rejects every list rather than none
+    if (!(length <= maxBytes)) {
       throw new StatusListError(`The status list is larger than the maximum of ${maxBytes} bytes`)
     }
     chunks.push(chunk)
@@ -83,13 +93,32 @@ function inflateAtMost(compressed: Uint8Array, maxBytes: number): Uint8Array {
   return concatBytes(...chunks)
 }
 
+// Token Status List § 4.1: the statuses of a byte are counted from its least significant bit
+function readStatus(byteArray: Uint8Array, bitsPerStatus: BitsPerStatus, index: number): number {
+  const statusesPerByte = 8 / bitsPerStatus
+  const shift = (index % statusesPerByte) * bitsPerStatus
+  return (byteArray[Math.floor(index / statusesPerByte)] >> shift) & (2 ** bitsPerStatus - 1)
+}
+
+function writeStatus(byteArray: Uint8Array, bitsPerStatus: BitsPerStatus, index: number, value: number): void {
+  const statusesPerByte = 8 / bitsPerStatus
+  const byteIndex = Math.floor(index / statusesPerByte)
+  const shift = (index % statusesPerByte) * bitsPerStatus
+  byteArray[byteIndex] = (byteArray[byteIndex] & ~((2 ** bitsPerStatus - 1) << shift)) | (value << shift)
+}
+
 /**
  * StatusList is a class that manages a list of statuses with variable bit size.
  */
 export class StatusList {
   private _statusList: Array<StatusType | number>
+  /**
+   * The statuses of a decompressed list, encoded as in `lst`. They are read and set in place until `statusList`
+   * decodes them into `_statusList`, so that reading a list takes no more memory than its decompressed size.
+   */
+  #byteArray?: Uint8Array
   private bitsPerStatus: BitsPerStatus
-  public readonly totalStatuses: number
+  #totalStatuses: number
   public aggregationUri?: string
   #isModified = false
 
@@ -102,12 +131,24 @@ export class StatusList {
     }
     this._statusList = statusList
     this.bitsPerStatus = bitsPerStatus
-    this.totalStatuses = statusList.length
+    this.#totalStatuses = statusList.length
     this.aggregationUri = aggregationUri
   }
 
-  /** Get the status list. */
+  /** The number of statuses in the list. */
+  get totalStatuses(): number {
+    return this.#totalStatuses
+  }
+
+  /**
+   * Get the status list. A decompressed list is decoded into this array on first use, which takes about 8 bytes per
+   * status: to read the status of a Referenced Token, use `getStatus`.
+   */
   get statusList(): number[] {
+    if (this.#byteArray) {
+      this._statusList = StatusList.decodeStatusListFromByteArray(this.#byteArray, this.bitsPerStatus)
+      this.#byteArray = undefined
+    }
     return this._statusList
   }
 
@@ -128,14 +169,18 @@ export class StatusList {
   /** Get the status at a specific index. */
   getStatus(index: number): StatusType {
     this.assertIndex(index)
-    return this._statusList[index]
+    return this.#byteArray ? readStatus(this.#byteArray, this.bitsPerStatus, index) : this._statusList[index]
   }
 
   /** Set the status at a specific index. */
   setStatus(index: number, value: StatusType | number): void {
     this.assertIndex(index)
     assertStatusValue(value, this.bitsPerStatus, index)
-    this._statusList[index] = value
+    if (this.#byteArray) {
+      writeStatus(this.#byteArray, this.bitsPerStatus, index, value)
+    } else {
+      this._statusList[index] = value
+    }
     this.#isModified = true
   }
 
@@ -149,27 +194,28 @@ export class StatusList {
 
   /** Compress the status list and return as raw bytes. */
   compressStatusListToBytes(): Uint8Array {
-    const byteArray = this.encodeStatusListIntoByteArray()
-    return deflate(byteArray, { level: 9 })
+    return deflate(this.#byteArray ?? this.encodeStatusListIntoByteArray(), { level: 9 })
   }
 
   /**
-   * Decompress a raw byte array and return a new StatusList instance.
+   * Decompress a raw byte array and return a new StatusList instance, which reads its statuses from the
+   * decompressed bytes.
    *
-   * @param options.maxStatuses - The maximum number of statuses the list may have, `2^24` by default.
    * @throws StatusListValidationError with an `invalid_status_list` issue if the bytes are not a compressed status
-   *   list, or one of more than `maxStatuses` statuses.
+   *   list, or inflate to more than `maxDecompressedBytes`, 16 MiB by default.
    */
   static decompressStatusListFromBytes(
     compressed: Uint8Array,
     bitsPerStatus: BitsPerStatus,
     aggregationUri?: string,
-    { maxStatuses = DEFAULT_MAX_STATUSES }: { maxStatuses?: number } = {}
+    { maxDecompressedBytes = DEFAULT_MAX_DECOMPRESSED_BYTES }: DecompressStatusListOptions = {}
   ): StatusList {
     try {
-      const decompressed = inflateAtMost(compressed, Math.ceil((maxStatuses * bitsPerStatus) / 8))
-      const statusList = StatusList.decodeStatusListFromByteArray(decompressed, bitsPerStatus)
-      return new StatusList(statusList, bitsPerStatus, aggregationUri)
+      const statusList = new StatusList([], bitsPerStatus, aggregationUri)
+      const byteArray = inflateAtMost(compressed, maxDecompressedBytes)
+      statusList.#byteArray = byteArray
+      statusList.#totalStatuses = (byteArray.length * 8) / bitsPerStatus
+      return statusList
     } catch (err: unknown) {
       const issues: StatusListIssues = new ValidationIssues()
       issues.add({
@@ -182,6 +228,8 @@ export class StatusList {
 
   /** Encode the status list into a byte array. */
   public encodeStatusListIntoByteArray(): Uint8Array {
+    if (this.#byteArray) return this.#byteArray.slice()
+
     const numBits = this.bitsPerStatus
     const numBytes = Math.ceil((this.totalStatuses * numBits) / 8)
     const byteArray = new Uint8Array(numBytes)
@@ -211,23 +259,8 @@ export class StatusList {
 
   /** Decode the byte array into a status list. */
   private static decodeStatusListFromByteArray(byteArray: Uint8Array, bitsPerStatus: BitsPerStatus): StatusType[] {
-    const numBits = bitsPerStatus
-    const totalStatuses = (byteArray.length * 8) / numBits
-    const statusList = new Array<number>(totalStatuses)
-    let bitIndex = 0
-    for (let i = 0; i < totalStatuses; i++) {
-      const byte = byteArray[Math.floor((i * numBits) / 8)]
-      let byteString = byte.toString(2)
-      if (byteString.length < 8) {
-        byteString = '0'.repeat(8 - byteString.length) + byteString
-      }
-      const status = byteString.slice(bitIndex, bitIndex + numBits)
-      const group = Math.floor(i / (8 / numBits))
-      const indexInGroup = i % (8 / numBits)
-      const position = group * (8 / numBits) + (8 / numBits + -1 - indexInGroup)
-      statusList[position] = Number.parseInt(status, 2)
-      bitIndex = (bitIndex + numBits) % 8
-    }
-    return statusList
+    return Array.from({ length: (byteArray.length * 8) / bitsPerStatus }, (_, index) =>
+      readStatus(byteArray, bitsPerStatus, index)
+    )
   }
 }

@@ -39,6 +39,8 @@ export type SdJwtVcConfig<T = unknown> = SdJwtConfig<T> & {
   vctFetcher?: VctFetcher
   // a function that verifies the signature of the status list JWT. It gets the verification options. If not provided, the verifier is used.
   statusVerifier?: Verifier<T>
+  // maximum size in bytes the status list may inflate to. If not provided, it will default to 16 MiB, 2^27 statuses at 1 bit per status.
+  maxStatusListDecompressedBytes?: number
   // if set to true, it will load the metadata format based on the vct value. If not provided, it will default to false.
   loadTypeMetadataFormat?: boolean
   // timeout value in milliseconds when to abort the fetch request. If not provided, it will default to 10000.

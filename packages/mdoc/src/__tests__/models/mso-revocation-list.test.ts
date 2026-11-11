@@ -142,7 +142,11 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
   const idx = 3
 
   const verify = async (
-    { status, expirationTime = new Date(Date.now() + 3_600_000) }: { status: StatusType; expirationTime?: Date },
+    {
+      status,
+      expirationTime = new Date(Date.now() + 3_600_000),
+      maxDecompressedBytes,
+    }: { status: StatusType; expirationTime?: Date; maxDecompressedBytes?: number },
     statusListInfo = { uri, idx }
   ) => {
     const statusListCwt = new StatusListCwt({
@@ -164,7 +168,10 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
         headers: { 'Content-Type': StatusListMediaTypes.StatusListCwt },
       })) as typeof globalThis.fetch
 
-    return verifyStatusListToken({ statusListInfo, trustedCertificates: [certificate] }, { ...mdocContext, fetch })
+    return verifyStatusListToken(
+      { statusListInfo, trustedCertificates: [certificate], maxDecompressedBytes },
+      { ...mdocContext, fetch }
+    )
   }
 
   test('Verify a status list with a revoked entry', async () => {
@@ -197,6 +204,16 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
     await expect(verification).rejects.toThrow(InvalidRevocationListError)
     await expect(verification).rejects.toThrow('Index out of bounds')
     await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
+  })
+
+  // Ten statuses of 2 bits inflate to 3 bytes. A list that inflates to more than the maximum is not read.
+  test('Verify a status list larger than maxDecompressedBytes', async () => {
+    const verification = verify({ status: StatusType.Invalid, maxDecompressedBytes: 2 })
+
+    await expect(verification).rejects.toThrow(InvalidRevocationListError)
+    await expect(verification).rejects.toThrow('The status list is larger than the maximum of 2 bytes')
+    await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
+    await expect(verify({ status: StatusType.Valid, maxDecompressedBytes: 3 })).resolves.toBeDefined()
   })
 })
 
@@ -274,12 +291,16 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
     return uri
   }
 
-  const verify = (uri: string, options: { trustedCertificates?: Uint8Array[]; disable?: boolean } = {}) =>
+  const verify = (
+    uri: string,
+    options: { trustedCertificates?: Uint8Array[]; disable?: boolean; maxDecompressedBytes?: number } = {}
+  ) =>
     verifyStatusListToken(
       {
         statusListInfo: { uri, idx },
         trustedCertificates: options.disable ? undefined : (options.trustedCertificates ?? [certificate]),
         disableCertificateChainValidation: options.disable,
+        maxDecompressedBytes: options.maxDecompressedBytes,
       },
       mdocContext
     )
@@ -290,6 +311,17 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
     expect(statusListJwt?.statusList.getStatus(idx)).toBe(StatusType.Valid)
     expect(statusListCwt).toBeUndefined()
     expect(chain?.[0]).toEqual(certificate)
+  })
+
+  // Ten statuses of 1 bit inflate to 2 bytes
+  test('Verify a JWT status list larger than maxDecompressedBytes', async () => {
+    const uri = await mockStatusList('/too-large', { status: StatusType.Invalid })
+
+    const verification = verify(uri, { maxDecompressedBytes: 1 })
+
+    await expect(verification).rejects.toThrow(InvalidRevocationListError)
+    await expect(verification).rejects.toThrow('The status list is larger than the maximum of 1 bytes')
+    await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
   })
 
   test('Verify a JWT status list without certificate chain validation', async () => {

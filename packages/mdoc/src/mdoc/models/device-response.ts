@@ -244,6 +244,8 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       now?: Date
       onCheck?: VerificationCallback
       skewSeconds?: number
+      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
+      maxStatusListDecompressedBytes?: number
     },
     ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch'>
   ): Promise<DeviceResponseVerificationResult> {
@@ -296,6 +298,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
             trustedCertificates: options.trustedCertificates,
             skewSeconds: options.skewSeconds,
             disableStatusValidation: options.disableStatusValidation,
+            maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
           },
           ctx
         )

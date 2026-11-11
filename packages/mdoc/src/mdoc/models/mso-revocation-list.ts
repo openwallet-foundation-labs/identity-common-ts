@@ -170,6 +170,7 @@ async function verifyStatusListJwt(
     now,
     skewSeconds,
     checkFreshness,
+    maxDecompressedBytes,
   }: { jwt: string; uri: string; idx: number; now: Date } & Omit<
     VerifyStatusListTokenOptions,
     'statusListInfo' | 'now'
@@ -229,6 +230,7 @@ async function verifyStatusListJwt(
         requiredClaims: ['exp'],
         allowedAlgorithms: [...jwsSignatureAlgorithms.keys()],
         verifyJwsCallback,
+        maxDecompressedBytes,
       }),
     InvalidSignatureError
   )
@@ -252,6 +254,8 @@ export type VerifyStatusListTokenOptions = {
   now?: Date
   skewSeconds?: number
   checkFreshness?: boolean
+  /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
+  maxDecompressedBytes?: number
 }
 
 /** A status list served in JWT format, once verified. */
@@ -296,6 +300,7 @@ export async function verifyStatusListToken(
     now = new Date(),
     skewSeconds,
     checkFreshness,
+    maxDecompressedBytes,
   }: VerifyStatusListTokenOptions,
   ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'crypto'>
 ): Promise<VerifyStatusListTokenResult> {
@@ -323,6 +328,7 @@ export async function verifyStatusListToken(
         now,
         skewSeconds,
         checkFreshness,
+        maxDecompressedBytes,
       },
       ctx
     )
@@ -373,7 +379,11 @@ export async function verifyStatusListToken(
     InvalidSignatureError
   )
 
-  await assertStatusValid(statusListCwt.payload.statusList, uri, idx)
+  const statusList = await asMdlRevocationListError(
+    () => statusListCwt.payload.getStatusList({ maxDecompressedBytes }),
+    InvalidSignatureError
+  )
+  await assertStatusValid(statusList, uri, idx)
 
   return { statusListCwt, chain }
 }
