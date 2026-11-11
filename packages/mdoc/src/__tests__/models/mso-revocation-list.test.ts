@@ -146,7 +146,8 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
       status,
       expirationTime = new Date(Date.now() + 3_600_000),
       maxDecompressedBytes,
-    }: { status: StatusType; expirationTime?: Date; maxDecompressedBytes?: number },
+      maxResponseBytes,
+    }: { status: StatusType; expirationTime?: Date; maxDecompressedBytes?: number; maxResponseBytes?: number },
     statusListInfo = { uri, idx }
   ) => {
     const statusListCwt = new StatusListCwt({
@@ -169,7 +170,7 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
       })) as typeof globalThis.fetch
 
     return verifyStatusListToken(
-      { statusListInfo, trustedCertificates: [certificate], maxDecompressedBytes },
+      { statusListInfo, trustedCertificates: [certificate], maxDecompressedBytes, maxResponseBytes },
       { ...mdocContext, fetch }
     )
   }
@@ -214,6 +215,14 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
     await expect(verification).rejects.toThrow('The status list is larger than the maximum of 2 bytes')
     await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
     await expect(verify({ status: StatusType.Valid, maxDecompressedBytes: 3 })).resolves.toBeDefined()
+  })
+
+  // The signed CWT, with its certificate, is far larger than 100 bytes
+  test('Verify a status list served in a response larger than maxResponseBytes', async () => {
+    const verification = verify({ status: StatusType.Invalid, maxResponseBytes: 100 })
+
+    await expect(verification).rejects.toThrow('The response is larger than the maximum of 100 bytes')
+    await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
   })
 })
 

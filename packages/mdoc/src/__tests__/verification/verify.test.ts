@@ -418,7 +418,7 @@ suite('Verification', () => {
 
   const verifyIssuerSigned = (
     credential: IssuerSigned,
-    options: { skewSeconds?: number; maxStatusListDecompressedBytes?: number } = {}
+    options: { skewSeconds?: number; maxStatusListDecompressedBytes?: number; maxStatusListResponseBytes?: number } = {}
   ) =>
     Holder.verifyIssuerSigned(
       { issuerSigned: credential, trustedCertificates: validTrustedCertificates, ...options },
@@ -628,15 +628,19 @@ suite('Verification', () => {
   })
 
   // Ten statuses of 2 bits inflate to 3 bytes
-  test('Verify mdoc with a status list larger than maxStatusListDecompressedBytes', async () => {
+  test('Verify mdoc with a status list larger than its maximum sizes', async () => {
     const idx = 3
     const uri = await mockStatusList('/status-list/too-large', { idx, status: StatusType.Valid })
+    const decompressedError = `Verifying the status list ${uri} failed: The status list cannot be decompressed`
+    // The signed CWT, with its certificate, is far larger than 100 bytes
+    const responseError = 'The response is larger than the maximum of 100 bytes'
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
     await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 2 })).rejects.toThrow(
-      `Verifying the status list ${uri} failed: The status list cannot be decompressed`
+      decompressedError
     )
+    await expect(verifyIssuerSigned(credential, { maxStatusListResponseBytes: 100 })).rejects.toThrow(responseError)
     await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 3 })).resolves.toBeDefined()
 
     const sessionTranscript = await SessionTranscript.forOid4Vp(
@@ -668,17 +672,16 @@ suite('Verification', () => {
       mdocContext
     )
 
-    await expect(
+    const verifyDeviceResponse = (options: {
+      maxStatusListDecompressedBytes?: number
+      maxStatusListResponseBytes?: number
+    }) =>
       Verifier.verifyDeviceResponse(
-        {
-          deviceResponse,
-          sessionTranscript,
-          trustedCertificates: validTrustedCertificates,
-          maxStatusListDecompressedBytes: 2,
-        },
+        { deviceResponse, sessionTranscript, trustedCertificates: validTrustedCertificates, ...options },
         mdocContext
       )
-    ).rejects.toThrow(`Verifying the status list ${uri} failed: The status list cannot be decompressed`)
+    await expect(verifyDeviceResponse({ maxStatusListDecompressedBytes: 2 })).rejects.toThrow(decompressedError)
+    await expect(verifyDeviceResponse({ maxStatusListResponseBytes: 100 })).rejects.toThrow(responseError)
   })
 
   // An expired list says nothing about the status it carries (Token Status List § 8.3), so the

@@ -30,6 +30,8 @@ export class Verifier {
       skewSeconds?: number
       /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
       maxStatusListDecompressedBytes?: number
+      /** The maximum size in bytes of the response that serves the status list of an mdoc, 16 MiB by default. */
+      maxStatusListResponseBytes?: number
     },
     ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch'>
   ): Promise<DeviceResponseVerificationResult> {

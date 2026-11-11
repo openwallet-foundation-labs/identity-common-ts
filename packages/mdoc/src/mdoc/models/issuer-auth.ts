@@ -112,6 +112,7 @@ export class IssuerAuth extends Sign1 {
       trustedStatusCertificates,
       disableCertificateChainValidation,
       maxStatusListDecompressedBytes,
+      maxStatusListResponseBytes,
     }: {
       now?: Date
       /** Tolerance applied to the `exp` and `iat` of a revocation list. Defaults to 30 seconds. */
@@ -125,6 +126,8 @@ export class IssuerAuth extends Sign1 {
       disableCertificateChainValidation?: boolean
       /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
       maxStatusListDecompressedBytes?: number
+      /** The maximum size in bytes of the response that serves the status list, 16 MiB by default. */
+      maxStatusListResponseBytes?: number
     },
     ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'crypto'>
   ): Promise<{
@@ -146,6 +149,7 @@ export class IssuerAuth extends Sign1 {
             skewSeconds,
             checkFreshness,
             maxDecompressedBytes: maxStatusListDecompressedBytes,
+            maxResponseBytes: maxStatusListResponseBytes,
           },
           ctx
         )
@@ -201,6 +205,8 @@ export class IssuerAuth extends Sign1 {
       skewSeconds?: number
       /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
       maxStatusListDecompressedBytes?: number
+      /** The maximum size in bytes of the response that serves the status list of an mdoc, 16 MiB by default. */
+      maxStatusListResponseBytes?: number
     },
     ctx: Pick<MdocContext, 'x509' | 'cose' | 'fetch' | 'crypto'>
   ): Promise<IssuerAuthVerificationResult> {
@@ -295,6 +301,7 @@ export class IssuerAuth extends Sign1 {
             checkFreshness: true,
             trustedStatusCertificates,
             maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
+            maxStatusListResponseBytes: options.maxStatusListResponseBytes,
           },
           ctx
         ))

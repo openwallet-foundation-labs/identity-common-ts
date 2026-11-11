@@ -470,6 +470,8 @@ export class IsoMdocDcApi {
       skewSeconds?: number
       /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
       maxStatusListDecompressedBytes?: number
+      /** The maximum size in bytes of the response that serves the status list of an mdoc, 16 MiB by default. */
+      maxStatusListResponseBytes?: number
     },
     ctx: Pick<MdocContext, 'crypto' | 'cose' | 'x509' | 'fetch'>
   ): Promise<{
@@ -490,6 +492,7 @@ export class IsoMdocDcApi {
         now: options.now,
         skewSeconds: options.skewSeconds,
         maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
+        maxStatusListResponseBytes: options.maxStatusListResponseBytes,
       },
       ctx
     )

@@ -256,6 +256,8 @@ export type VerifyStatusListTokenOptions = {
   checkFreshness?: boolean
   /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
   maxDecompressedBytes?: number
+  /** The maximum size in bytes of the response that serves the status list, 16 MiB by default. */
+  maxResponseBytes?: number
 }
 
 /** A status list served in JWT format, once verified. */
@@ -301,6 +303,7 @@ export async function verifyStatusListToken(
     skewSeconds,
     checkFreshness,
     maxDecompressedBytes,
+    maxResponseBytes,
   }: VerifyStatusListTokenOptions,
   ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'crypto'>
 ): Promise<VerifyStatusListTokenResult> {
@@ -313,6 +316,7 @@ export async function verifyStatusListToken(
     uri,
     customFetcher: (input, init) => ctx.fetch(input, init, { type: 'statusList' }),
     acceptedFormats: ['cwt', 'jwt'],
+    maxResponseBytes,
   })
 
   // NOTE: a JWT is NOT allowed by § 12.3.6.3, but some issuers serve the status list of an mdoc
