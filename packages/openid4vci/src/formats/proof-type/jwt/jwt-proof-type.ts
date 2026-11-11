@@ -13,6 +13,12 @@ import {
   zKeyAttestationJwtPayload,
 } from '../../../key-attestation/z-key-attestation'
 import {
+  type CredentialRequestProofConfiguration,
+  getSupportedProofType,
+  verifyBindingMethodSupported,
+  verifyProofSigningAlgSupported,
+} from '../verify-proof-type-supported'
+import {
   type CredentialRequestJwtProofTypeHeader,
   type CredentialRequestJwtProofTypePayload,
   zCredentialRequestJwtProofTypeHeader,
@@ -143,6 +149,8 @@ export interface VerifyCredentialRequestJwtProofOptions {
    */
   keyAttestationsRequired?: KeyAttestationsRequired
 
+  credentialConfiguration?: CredentialRequestProofConfiguration
+
   /**
    * Callbacks required for the jwt verification.
    *
@@ -160,6 +168,10 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
     payloadSchema: zCredentialRequestJwtProofTypePayload,
   })
   const { header, payload } = decodedJwt
+
+  const supportedProofType = getSupportedProofType(options.credentialConfiguration, 'jwt')
+  verifyProofSigningAlgSupported(supportedProofType, 'jwt', header.alg)
+  const keyAttestationsRequired = options.keyAttestationsRequired ?? supportedProofType?.key_attestations_required
 
   const now = options.now?.getTime() ?? Date.now()
   if (options.nonceExpiresAt && now > options.nonceExpiresAt.getTime()) {
@@ -192,7 +204,7 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
       use: 'proof_type.jwt',
       now: options.now,
       allowedSkewInSeconds: options.allowedSkewInSeconds,
-      keyAttestationsRequired: options.keyAttestationsRequired,
+      keyAttestationsRequired,
     })
 
     const isSignedWithAttestedKey = await isJwkInSet({
@@ -210,8 +222,10 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
 
   // Throws if a key attestation is required but the proof does not contain one
   if (!keyAttestationResult) {
-    verifyKeyAttestationRequirements({ keyAttestationsRequired: options.keyAttestationsRequired })
+    verifyKeyAttestationRequirements({ keyAttestationsRequired })
   }
+
+  verifyBindingMethodSupported(options.credentialConfiguration, signer)
 
   return {
     header,

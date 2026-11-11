@@ -321,6 +321,21 @@ describe('Openid4vciIssuer', () => {
         expectedNonce: 'some-nonce',
         issuerMetadata,
         jwt: credentialRequestJwtWithoutKeyAttestation,
+        credentialConfiguration: { cryptographic_binding_methods_supported: ['did:key'] },
+      })
+    ).rejects.toMatchObject({
+      errorResponse: {
+        error: 'invalid_proof',
+        error_description:
+          "Proof key binding method 'jwk' is not supported for the credential configuration. Supported binding methods are did:key",
+      },
+    })
+
+    await expect(
+      issuer.verifyCredentialRequestJwtProof({
+        expectedNonce: 'some-nonce',
+        issuerMetadata,
+        jwt: credentialRequestJwtWithoutKeyAttestation,
         keyAttestationsRequired: {},
       })
     ).rejects.toMatchObject({
