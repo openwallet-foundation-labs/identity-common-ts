@@ -108,6 +108,7 @@ describe('App', () => {
     ['cnf', { jwk: { kty: 'OKP', crv: 'Ed25519', x: 'x' } }],
     ['vct', vct],
     ['vct#integrity', 'sha256-example'],
+    ['aka_vcts', ['urn:example:other-type']],
   ])('rejects a credential in which %s was selectively disclosed', async (claim, value) => {
     const { signer, verifier } = createSignerVerifier()
     const config = {
@@ -171,6 +172,7 @@ describe('App', () => {
     ['status', { status: { _sd: ['status_list'] } }],
     ['cnf', { cnf: { _sd: ['jwk'] } }],
     ['cnf', { cnf: { keys: { _sd: [0] } } }],
+    ['aka_vcts', { aka_vcts: { _sd: [0] } }],
   ])('rejects a credential in which a part of %s is selectively disclosable', async (claim, frame) => {
     const { signer, verifier } = createSignerVerifier()
     const statusListFetcher = vi.fn(async () => statusListJWT)
@@ -192,6 +194,7 @@ describe('App', () => {
       vct,
       status: { status_list: { idx: 0, uri: 'https://example.com/status-list' } },
       cnf: { jwk, keys: [jwk, jwk] },
+      aka_vcts: ['urn:example:other-type'],
     }
     const disclosureFrame = frame as unknown as DisclosureFrame<SdJwtVcPayload>
 

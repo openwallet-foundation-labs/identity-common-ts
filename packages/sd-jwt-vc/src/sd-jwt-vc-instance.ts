@@ -54,8 +54,8 @@ import type { VerificationResult } from './verification-result'
 // SRI hash algorithms, ordered from weakest to strongest
 const SRI_ALGORITHMS = ['sha256', 'sha384', 'sha512']
 
-// Claims that SD-JWT VC forbids to be selectively disclosed
-const PROTECTED_CLAIMS = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'vct#integrity', 'status']
+// Claims that SD-JWT VC forbids to be selectively disclosed (SD-JWT VC draft 23, Section 2.2.2.3)
+const PROTECTED_CLAIMS = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'vct#integrity', 'aka_vcts', 'status']
 
 // Whether a value has selectively disclosable parts: an `_sd` digest list or an array element digest
 const hasSelectivelyDisclosableParts = (value: unknown): boolean => {
