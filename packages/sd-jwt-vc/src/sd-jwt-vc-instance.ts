@@ -1,10 +1,10 @@
 import { base64, isMediaType, secondsToDate } from '@owf/identity-common'
 import {
   decodeStatusListJwt,
+  fetchStatusList,
   StatusListError,
   type StatusListJwtHeaderParameters,
   type StatusListJwtPayload,
-  StatusListMediaTypes,
   StatusType,
   verifyStatusListJwtClaims,
 } from '@owf/token-status-list'
@@ -173,34 +173,27 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
   }
 
   /**
-   * Fetches the status list from the uri with a timeout of 10 seconds.
+   * Fetches the status list from the uri with a timeout of 10 seconds, and a response of at most
+   * `maxStatusListResponseBytes`. The errors of `fetchStatusList` leave out the body of the response, which can reach
+   * whoever presented the credential, while the uri may be an internal endpoint when the verifier accepts credentials
+   * of issuers it does not know.
    * @param uri The URI to fetch from.
    * @returns A promise that resolves to a compact JWT.
    */
   private async statusListFetcher(uri: string): Promise<string> {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    const statusList = await fetchStatusList({
+      uri,
+      acceptedFormats: ['jwt'],
+      customFetcher: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(10000) }),
+      maxResponseBytes: this.userConfig.maxStatusListResponseBytes,
+    })
 
-    try {
-      const response = await fetch(uri, {
-        signal: controller.signal,
-        headers: { Accept: StatusListMediaTypes.StatusListJwt },
-      })
-      // Not with the body of the response: the error can reach whoever presented the credential, and the uri may be
-      // an internal endpoint when the verifier accepts credentials of issuers it does not know
-      if (!response.ok) {
-        throw new Error(`Error fetching status list: ${response.status}`)
-      }
-
-      // according to the spec the content type should be application/statuslist+jwt
-      if (!isMediaType(response.headers.get('content-type'), StatusListMediaTypes.StatusListJwt)) {
-        throw new Error('Invalid content type')
-      }
-
-      return response.text()
-    } finally {
-      clearTimeout(timeoutId)
+    // according to the spec the content type should be application/statuslist+jwt
+    if (typeof statusList !== 'string') {
+      throw new StatusListError('The status list was not served as application/statuslist+jwt')
     }
+
+    return statusList
   }
 
   /**

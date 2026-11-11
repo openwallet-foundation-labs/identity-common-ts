@@ -431,8 +431,38 @@ describe('App', () => {
     })
 
     const error = await sdjwt.verify(encodedSdjwt).catch((e) => e)
-    expect(error.message).toContain('Error fetching status list: 500')
+    expect(error.message).toContain("Could not fetch status list, response status '500'")
     expect(error.message).not.toContain('internal-secret')
+  })
+
+  test('rejects a status list response larger than maxStatusListResponseBytes', async () => {
+    server.use(
+      http.get(
+        'http://example.com/status-list',
+        () => new HttpResponse('a'.repeat(1025), { headers: { 'Content-Type': 'application/statuslist+jwt' } }),
+        { once: true }
+      )
+    )
+    const sdjwtWithLimit = new SdJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      maxStatusListResponseBytes: 1024,
+    })
+    const encodedSdjwt = await sdjwtWithLimit.issue({
+      iat,
+      iss,
+      vct,
+      status: { status_list: { uri: 'http://example.com/status-list', idx: 0 } },
+      ...claims,
+    })
+
+    await expect(sdjwtWithLimit.verify(encodedSdjwt)).rejects.toThrow(
+      'The response is larger than the maximum of 1024 bytes'
+    )
   })
 
   test('VCT Metadata retrieval fails when fetched type metadata is invalid', async () => {
