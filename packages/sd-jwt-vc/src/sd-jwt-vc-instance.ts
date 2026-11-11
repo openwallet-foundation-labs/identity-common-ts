@@ -1,4 +1,4 @@
-import { base64, isMediaType, secondsToDate } from '@owf/identity-common'
+import { base64, isMediaType, readResponseBodyAtMost, secondsToDate } from '@owf/identity-common'
 import {
   decodeStatusListJwt,
   fetchStatusList,
@@ -53,6 +53,12 @@ import type { VerificationResult } from './verification-result'
 
 // SRI hash algorithms, ordered from weakest to strongest
 const SRI_ALGORITHMS = ['sha256', 'sha384', 'sha512']
+
+/**
+ * The default maximum size of a type metadata response. Type metadata refers to its logos and templates by URI, so
+ * a document of 1 MiB leaves room for a few embedded in `data:` URIs.
+ */
+const DEFAULT_MAX_TYPE_METADATA_RESPONSE_BYTES = 1024 * 1024
 
 // Claims that SD-JWT VC forbids to be selectively disclosed (SD-JWT VC draft 23, Section 2.2.2.3)
 const PROTECTED_CLAIMS = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'vct#integrity', 'aka_vcts', 'status']
@@ -486,11 +492,11 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
   }
 
   /**
-   * Validates the integrity of the response if the integrity is passed. If the integrity does not match, an error is thrown.
+   * Validates the integrity of the response body if the integrity is passed. If the integrity does not match, an error is thrown.
+   * @param body
    * @param integrity
-   * @param response
    */
-  private async validateIntegrity(response: Response, url: string, integrity?: string) {
+  private async validateIntegrity(body: Uint8Array<ArrayBuffer>, url: string, integrity?: string) {
     if (!integrity) return
 
     // validate the integrity of the response according to https://www.w3.org/TR/SRI/
@@ -513,15 +519,15 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
     if (!this.userConfig.hasher) {
       throw new SdJwtError('Hasher not found')
     }
-    const arrayBuffer = await response.arrayBuffer()
-    const hash = base64.encode(await this.userConfig.hasher(arrayBuffer, alg))
+    const hash = base64.encode(await this.userConfig.hasher(body.buffer, alg))
     if (!expected.includes(hash)) {
       throw new Error(`Integrity check for ${url} failed: is ${hash}, but expected ${expected.join(' or ')}`)
     }
   }
 
   /**
-   * Fetches the content from the url with a timeout of 10 seconds.
+   * Fetches the content from the url with a timeout of 10 seconds, and a response of at most
+   * `maxTypeMetadataResponseBytes`.
    * @param url
    * @returns
    */
@@ -535,9 +541,14 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
       if (!response.ok) {
         throw new Error(`Error fetching ${url}: ${response.status} ${response.statusText}`)
       }
-      await this.validateIntegrity(response.clone(), url, integrity)
+      const body = await readResponseBodyAtMost(
+        response,
+        this.userConfig.maxTypeMetadataResponseBytes ?? DEFAULT_MAX_TYPE_METADATA_RESPONSE_BYTES
+      )
+      await this.validateIntegrity(body, url, integrity)
       try {
-        return JSON.parse(await response.text())
+        // Not `bytesToString`: TextDecoder strips a byte order mark, as `response.text()` does
+        return JSON.parse(new TextDecoder().decode(body))
       } catch {
         throw new SdJwtError(`The type metadata fetched from ${url} is not valid JSON`)
       }

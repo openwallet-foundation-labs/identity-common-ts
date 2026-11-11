@@ -300,7 +300,7 @@ describe('App', () => {
     await sdjwt.verify(encodedSdjwt)
 
     // Ensure validateIntegrity method was called
-    expect(validateIntegritySpy).toHaveBeenCalledWith(expect.any(Response), vct, vctIntegrity)
+    expect(validateIntegritySpy).toHaveBeenCalledWith(expect.any(Uint8Array), vct, vctIntegrity)
   })
 
   describe('VCT integrity', () => {
@@ -433,6 +433,31 @@ describe('App', () => {
     const error = await sdjwt.verify(encodedSdjwt).catch((e) => e)
     expect(error.message).toContain("Could not fetch status list, response status '500'")
     expect(error.message).not.toContain('internal-secret')
+  })
+
+  test('rejects type metadata larger than maxTypeMetadataResponseBytes', async () => {
+    server.use(
+      http.get('http://example.com/large', () =>
+        HttpResponse.json({ vct: 'http://example.com/large', description: 'a'.repeat(1024) })
+      )
+    )
+    const sdjwtWithLimit = (maxTypeMetadataResponseBytes: number) =>
+      new SdJwtVcInstance({
+        signer,
+        signAlg: 'EdDSA',
+        verifier,
+        hasher: digest,
+        hashAlg: 'sha-256',
+        saltGenerator: generateSalt,
+        loadTypeMetadataFormat: true,
+        maxTypeMetadataResponseBytes,
+      })
+    const encodedSdjwt = await sdjwtWithLimit(1024).issue({ iat, iss, vct: 'http://example.com/large', ...claims })
+
+    await expect(sdjwtWithLimit(1024).verify(encodedSdjwt)).rejects.toThrow(
+      'The response is larger than the maximum of 1024 bytes'
+    )
+    await expect(sdjwtWithLimit(2048).verify(encodedSdjwt)).resolves.toBeDefined()
   })
 
   test('rejects a status list response larger than maxStatusListResponseBytes', async () => {

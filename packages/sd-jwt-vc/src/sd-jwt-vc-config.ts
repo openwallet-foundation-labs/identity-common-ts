@@ -37,6 +37,8 @@ export type SdJwtVcConfig<T = unknown> = SdJwtConfig<T> & {
   // validte the status and decide if the status is valid or not. If not provided, the code will continue if it is 0, otherwise it will throw an error.
   // To have safeVerify report an invalid status as STATUS_INVALID, throw an SdJwtError with the code 'STATUS_INVALID'.
   statusValidator?: StatusValidator
+  // maximum size in bytes of a type metadata response, for the default vctFetcher. If not provided, it will default to 1 MiB.
+  maxTypeMetadataResponseBytes?: number
   // a function that fetches the type metadata format from the uri. If not provided, the library will assume that the response is a TypeMetadataFormat. Caching has to be implemented in this function. If the integrity value is passed, it to be validated according to https://www.w3.org/TR/SRI/
   vctFetcher?: VctFetcher
   // a function that verifies the signature of the status list JWT. It gets the verification options. If not provided, the verifier is used.
