@@ -300,7 +300,7 @@ them. Callers that need the original logical length must preserve it separately.
 | `StatusType` | Enum of the status values: `Valid`, `Invalid`, `Suspended`, … |
 | `StatusListMediaTypes` | MIME types for JWT and CWT status list tokens |
 | `BitsPerStatus` | Type: `1 \| 2 \| 4 \| 8` |
-| `fetchStatusList` | Fetch a Status List Token in JWT or CWT format by its uri |
+| `fetchStatusList` | Fetch a Status List Token in JWT or CWT format by its uri, with a response of at most `maxResponseBytes`, 16 MiB by default |
 
 ### JWT Transport
 
