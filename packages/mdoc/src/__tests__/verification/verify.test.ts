@@ -418,7 +418,11 @@ suite('Verification', () => {
 
   const verifyIssuerSigned = (
     credential: IssuerSigned,
-    options: { skewSeconds?: number; maxStatusListDecompressedBytes?: number; maxStatusListResponseBytes?: number } = {}
+    options: {
+      skewSeconds?: number
+      maxStatusListDecompressedBytes?: number
+      maxRevocationListResponseBytes?: number
+    } = {}
   ) =>
     Holder.verifyIssuerSigned(
       { issuerSigned: credential, trustedCertificates: validTrustedCertificates, ...options },
@@ -640,7 +644,7 @@ suite('Verification', () => {
     await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 2 })).rejects.toThrow(
       decompressedError
     )
-    await expect(verifyIssuerSigned(credential, { maxStatusListResponseBytes: 100 })).rejects.toThrow(responseError)
+    await expect(verifyIssuerSigned(credential, { maxRevocationListResponseBytes: 100 })).rejects.toThrow(responseError)
     await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 3 })).resolves.toBeDefined()
 
     const sessionTranscript = await SessionTranscript.forOid4Vp(
@@ -674,14 +678,14 @@ suite('Verification', () => {
 
     const verifyDeviceResponse = (options: {
       maxStatusListDecompressedBytes?: number
-      maxStatusListResponseBytes?: number
+      maxRevocationListResponseBytes?: number
     }) =>
       Verifier.verifyDeviceResponse(
         { deviceResponse, sessionTranscript, trustedCertificates: validTrustedCertificates, ...options },
         mdocContext
       )
     await expect(verifyDeviceResponse({ maxStatusListDecompressedBytes: 2 })).rejects.toThrow(decompressedError)
-    await expect(verifyDeviceResponse({ maxStatusListResponseBytes: 100 })).rejects.toThrow(responseError)
+    await expect(verifyDeviceResponse({ maxRevocationListResponseBytes: 100 })).rejects.toThrow(responseError)
   })
 
   // An expired list says nothing about the status it carries (Token Status List § 8.3), so the
@@ -762,6 +766,19 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
 
+    await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
+  })
+
+  test('Verify mdoc with an identifier list larger than maxRevocationListResponseBytes', async () => {
+    const id = new Uint8Array([0xab, 0xcd])
+    const uri = await mockIdentifierList('/identifier-list/too-large', { identifiers: [new Uint8Array([0x01])] })
+
+    const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+
+    // The signed CWT, with its certificate, is far larger than 100 bytes
+    await expect(verifyIssuerSigned(credential, { maxRevocationListResponseBytes: 100 })).rejects.toThrow(
+      `Verifying the identifier list ${uri} failed: Identifier list at ${uri}: The response is larger than the maximum of 100 bytes`
+    )
     await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
   })
 

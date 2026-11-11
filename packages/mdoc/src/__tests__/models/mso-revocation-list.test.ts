@@ -457,6 +457,28 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
   })
 })
 
+// The response is rejected before its body is read whole, whatever it carries
+suite('verifyIdentifierListToken with a response larger than maxResponseBytes', () => {
+  test('Verify an identifier list served in a response larger than maxResponseBytes', async () => {
+    const fetch = (async () =>
+      new Response(new Uint8Array(1024), {
+        headers: { 'Content-Type': IdentifierListMediaTypes.IdentifierListCwt },
+      })) as typeof globalThis.fetch
+
+    const verification = verifyIdentifierListToken(
+      {
+        identifierListInfo: { uri: 'https://example.org/identifier-list/too-large', id: new Uint8Array([0x01]) },
+        trustedCertificates: [certificate],
+        maxResponseBytes: 100,
+      },
+      { ...mdocContext, fetch }
+    )
+
+    await expect(verification).rejects.toThrow(InvalidRevocationListError)
+    await expect(verification).rejects.toThrow('The response is larger than the maximum of 100 bytes')
+  })
+})
+
 // RFC 9864 § 2.1: ESP256 (-9) is ECDSA with P-256 and SHA-256, the fully-specified form of ES256.
 // The Multipaz test issuer signs its identifier list with it.
 suite('revocation lists signed with ESP256', () => {

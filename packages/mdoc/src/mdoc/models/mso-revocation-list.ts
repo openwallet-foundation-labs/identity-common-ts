@@ -406,6 +406,8 @@ export type VerifyIdentifierListTokenOptions = {
   now?: Date
   skewSeconds?: number
   checkFreshness?: boolean
+  /** The maximum size in bytes of the response that serves the identifier list, 16 MiB by default. */
+  maxResponseBytes?: number
 }
 
 export type VerifyIdentifierListTokenResult = {
@@ -432,13 +434,14 @@ export async function verifyIdentifierListToken(
     now = new Date(),
     skewSeconds,
     checkFreshness,
+    maxResponseBytes,
   }: VerifyIdentifierListTokenOptions,
   ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose'>
 ): Promise<VerifyIdentifierListTokenResult> {
   if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
 
   const { uri, id } = identifierListInfo
-  const identifierListCwt = await IdentifierListCwt.fetch(uri, ctx)
+  const identifierListCwt = await IdentifierListCwt.fetch(uri, ctx, { maxResponseBytes })
 
   const x5chain = identifierListCwt.x5chain
   if (!x5chain || x5chain.length === 0) {
