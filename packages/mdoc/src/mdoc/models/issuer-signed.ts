@@ -93,10 +93,8 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
       skewSeconds?: number
       /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
       maxStatusListDecompressedBytes?: number
-      /** The maximum size in bytes of the response that serves the status list or identifier list of an mdoc, 16 MiB by default. */
-      maxRevocationListResponseBytes?: number
     },
-    ctx: Pick<MdocContext, 'x509' | 'crypto' | 'cose' | 'fetch'>
+    ctx: Pick<MdocContext, 'x509' | 'crypto' | 'cose' | 'fetch' | 'fetchLimits'>
   ): Promise<IssuerSignedVerificationResult> {
     const { valueDigests, digestAlgorithm } = this.issuerAuth.mobileSecurityObject
 

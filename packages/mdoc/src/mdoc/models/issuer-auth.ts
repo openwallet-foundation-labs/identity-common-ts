@@ -112,7 +112,6 @@ export class IssuerAuth extends Sign1 {
       trustedStatusCertificates,
       disableCertificateChainValidation,
       maxStatusListDecompressedBytes,
-      maxRevocationListResponseBytes,
     }: {
       now?: Date
       /** Tolerance applied to the `exp` and `iat` of a revocation list. Defaults to 30 seconds. */
@@ -126,10 +125,8 @@ export class IssuerAuth extends Sign1 {
       disableCertificateChainValidation?: boolean
       /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
       maxStatusListDecompressedBytes?: number
-      /** The maximum size in bytes of the response that serves the status list or identifier list, 16 MiB by default. */
-      maxRevocationListResponseBytes?: number
     },
-    ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'crypto'>
+    ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose' | 'crypto'>
   ): Promise<{
     statusList?: StatusListCwt
     trustedStatusListChain?: Uint8Array[]
@@ -149,7 +146,6 @@ export class IssuerAuth extends Sign1 {
             skewSeconds,
             checkFreshness,
             maxDecompressedBytes: maxStatusListDecompressedBytes,
-            maxResponseBytes: maxRevocationListResponseBytes,
           },
           ctx
         )
@@ -164,7 +160,6 @@ export class IssuerAuth extends Sign1 {
             now,
             skewSeconds,
             checkFreshness,
-            maxResponseBytes: maxRevocationListResponseBytes,
           },
           ctx
         )
@@ -206,10 +201,8 @@ export class IssuerAuth extends Sign1 {
       skewSeconds?: number
       /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
       maxStatusListDecompressedBytes?: number
-      /** The maximum size in bytes of the response that serves the status list or identifier list of an mdoc, 16 MiB by default. */
-      maxRevocationListResponseBytes?: number
     },
-    ctx: Pick<MdocContext, 'x509' | 'cose' | 'fetch' | 'crypto'>
+    ctx: Pick<MdocContext, 'x509' | 'cose' | 'fetch' | 'fetchLimits' | 'crypto'>
   ): Promise<IssuerAuthVerificationResult> {
     const verificationCallback = options.verificationCallback ?? defaultVerificationCallback
     const now = options.now ?? new Date()
@@ -302,7 +295,6 @@ export class IssuerAuth extends Sign1 {
             checkFreshness: true,
             trustedStatusCertificates,
             maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
-            maxRevocationListResponseBytes: options.maxRevocationListResponseBytes,
           },
           ctx
         ))

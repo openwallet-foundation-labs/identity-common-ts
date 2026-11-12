@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { base64, base64url, stringToBytes } from '@owf/identity-common'
+import { base64, base64url, type FetchLimits, stringToBytes } from '@owf/identity-common'
 import { StatusList, StatusListCwt, StatusListInfo, StatusListMediaTypes, StatusType } from '@owf/token-status-list'
 import { X509Certificate } from '@peculiar/x509'
 import { HttpResponse, http } from 'msw'
@@ -418,15 +418,18 @@ suite('Verification', () => {
 
   const verifyIssuerSigned = (
     credential: IssuerSigned,
-    options: {
+    {
+      fetchLimits,
+      ...options
+    }: {
       skewSeconds?: number
       maxStatusListDecompressedBytes?: number
-      maxRevocationListResponseBytes?: number
+      fetchLimits?: FetchLimits
     } = {}
   ) =>
     Holder.verifyIssuerSigned(
       { issuerSigned: credential, trustedCertificates: validTrustedCertificates, ...options },
-      mdocContext
+      { ...mdocContext, fetchLimits }
     )
 
   const signStatusListCwt = async ({
@@ -644,7 +647,9 @@ suite('Verification', () => {
     await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 2 })).rejects.toThrow(
       decompressedError
     )
-    await expect(verifyIssuerSigned(credential, { maxRevocationListResponseBytes: 100 })).rejects.toThrow(responseError)
+    await expect(verifyIssuerSigned(credential, { fetchLimits: { maxResponseBytes: 100 } })).rejects.toThrow(
+      responseError
+    )
     await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 3 })).resolves.toBeDefined()
 
     const sessionTranscript = await SessionTranscript.forOid4Vp(
@@ -676,16 +681,19 @@ suite('Verification', () => {
       mdocContext
     )
 
-    const verifyDeviceResponse = (options: {
+    const verifyDeviceResponse = ({
+      fetchLimits,
+      ...options
+    }: {
       maxStatusListDecompressedBytes?: number
-      maxRevocationListResponseBytes?: number
+      fetchLimits?: FetchLimits
     }) =>
       Verifier.verifyDeviceResponse(
         { deviceResponse, sessionTranscript, trustedCertificates: validTrustedCertificates, ...options },
-        mdocContext
+        { ...mdocContext, fetchLimits }
       )
     await expect(verifyDeviceResponse({ maxStatusListDecompressedBytes: 2 })).rejects.toThrow(decompressedError)
-    await expect(verifyDeviceResponse({ maxRevocationListResponseBytes: 100 })).rejects.toThrow(responseError)
+    await expect(verifyDeviceResponse({ fetchLimits: { maxResponseBytes: 100 } })).rejects.toThrow(responseError)
   })
 
   // An expired list says nothing about the status it carries (Token Status List § 8.3), so the
@@ -769,14 +777,16 @@ suite('Verification', () => {
     await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
   })
 
-  test('Verify mdoc with an identifier list larger than maxRevocationListResponseBytes', async () => {
+  test('Verify mdoc with an identifier list larger than its limit', async () => {
     const id = new Uint8Array([0xab, 0xcd])
     const uri = await mockIdentifierList('/identifier-list/too-large', { identifiers: [new Uint8Array([0x01])] })
 
     const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
 
     // The signed CWT, with its certificate, is far larger than 100 bytes
-    await expect(verifyIssuerSigned(credential, { maxRevocationListResponseBytes: 100 })).rejects.toThrow(
+    await expect(
+      verifyIssuerSigned(credential, { fetchLimits: { maxResponseBytesByType: { identifierList: 100 } } })
+    ).rejects.toThrow(
       `Verifying the identifier list ${uri} failed: Identifier list at ${uri}: The response is larger than the maximum of 100 bytes`
     )
     await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()

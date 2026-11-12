@@ -1,4 +1,5 @@
 import type { CoseKey, DigestAlgorithm, Mac0Context, MacAlgorithm, Sign1Context, SignatureAlgorithm } from '@owf/cose'
+import type { FetchCallback, FetchContext, FetchLimits } from '@owf/identity-common'
 
 type MaybePromise<T> = Promise<T> | T
 
@@ -61,22 +62,23 @@ export interface HpkeContext {
  * What a {@link MdocContext.fetch} call is retrieving. Lets an implementation apply policy —
  * caching, timeouts, retries — per resource rather than to every request alike.
  */
-export type MdocFetchContext = {
-  type: 'statusList' | 'identifierList'
-}
+export type MdocFetchContext = FetchContext<'statusList' | 'identifierList'>
 
 export interface MdocContext {
   /**
    * Retrieves a resource over HTTP. `context` names what is being retrieved; the revocation lists
-   * an MSO references are the only resources this library fetches.
+   * an MSO references are the only resources this library fetches. The body of the response is
+   * read within {@link MdocContext.fetchLimits}, so `fetch` does not have to limit it.
    *
    * The global `fetch` satisfies this, as it ignores the third argument.
    */
-  fetch: (
-    input: Parameters<typeof fetch>[0],
-    init: Parameters<typeof fetch>[1],
-    context: MdocFetchContext
-  ) => Promise<Response>
+  fetch: FetchCallback<'statusList' | 'identifierList'>
+
+  /**
+   * The maximum sizes of the status list and identifier list responses, 16 MiB each by default
+   * (see `FetchLimits` of `@owf/identity-common`).
+   */
+  fetchLimits?: FetchLimits
 
   crypto: {
     random: (length: number) => Uint8Array
