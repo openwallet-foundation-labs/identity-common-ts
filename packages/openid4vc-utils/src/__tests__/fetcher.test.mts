@@ -1,9 +1,9 @@
-import { CommonMediaTypes } from '@owf/identity-common'
+import { CommonMediaTypes, IdentityCommonError } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
 import z from 'zod'
+import { FetchError } from '../error/FetchError.js'
 import { InvalidFetchResponseError } from '../error/InvalidFetchResponseError.js'
-import { createZodFetcher } from '../fetcher.js'
-import type { Fetch } from '../globals.js'
+import { createFetcher, createZodFetcher, type Fetch } from '../fetcher.js'
 
 function createRecordingFetch() {
   const acceptHeaders: Array<string | null> = []
@@ -18,7 +18,7 @@ function createRecordingFetch() {
 describe('createZodFetcher', () => {
   test('sends the expected content types as the Accept header in order of preference', async () => {
     const { fetch, acceptHeaders } = createRecordingFetch()
-    const fetchWithZod = createZodFetcher(fetch)
+    const fetchWithZod = createZodFetcher({ fetch }, 'jwks')
 
     await fetchWithZod(z.object({ hello: z.string() }), CommonMediaTypes.Json, 'https://example.com')
     await fetchWithZod(
@@ -45,7 +45,7 @@ describe('createZodFetcher', () => {
 
   test('keeps an Accept header set by the caller', async () => {
     const { fetch, acceptHeaders } = createRecordingFetch()
-    const fetchWithZod = createZodFetcher(fetch)
+    const fetchWithZod = createZodFetcher({ fetch }, 'jwks')
 
     await fetchWithZod(z.object({ hello: z.string() }), CommonMediaTypes.Json, 'https://example.com', {
       headers: new Headers({ Accept: 'application/json;q=0.9' }),
@@ -58,7 +58,8 @@ describe('createZodFetcher', () => {
     'rejects a lookalike response Content-Type: %s',
     async (contentType) => {
       const fetchWithZod = createZodFetcher(
-        async () => new Response('{"hello":"world"}', { headers: { 'Content-Type': contentType } })
+        { fetch: async () => new Response('{"hello":"world"}', { headers: { 'Content-Type': contentType } }) },
+        'jwks'
       )
 
       await expect(
@@ -71,7 +72,8 @@ describe('createZodFetcher', () => {
     'accepts a matching response Content-Type: %s',
     async (contentType) => {
       const fetchWithZod = createZodFetcher(
-        async () => new Response('{"hello":"world"}', { headers: { 'Content-Type': contentType } })
+        { fetch: async () => new Response('{"hello":"world"}', { headers: { 'Content-Type': contentType } }) },
+        'jwks'
       )
 
       await expect(
@@ -87,12 +89,59 @@ describe('createZodFetcher', () => {
     ['invalid JSON', 'application/json'],
   ])('keeps the response body out of the error message for %s', async (_description, contentType) => {
     const body = 'root:x:0:0:internal-secret'
-    const fetchWithZod = createZodFetcher(async () => new Response(body, { headers: { 'Content-Type': contentType } }))
+    const fetchWithZod = createZodFetcher(
+      { fetch: async () => new Response(body, { headers: { 'Content-Type': contentType } }) },
+      'jwks'
+    )
 
     const error = await fetchWithZod(z.object({}), CommonMediaTypes.Json, 'https://example.com').catch((error) => error)
 
     expect(error).toBeInstanceOf(InvalidFetchResponseError)
     expect(error.message).not.toContain('internal-secret')
     expect(error.textResponse).toBe(body)
+  })
+})
+
+describe('createFetcher', () => {
+  test('tells the fetch what it fetches, and sends a URLSearchParams body as a string', async () => {
+    const requests: Array<{ url: string; body: unknown; type: string }> = []
+    const fetch: Fetch = async (url, init, { type }) => {
+      requests.push({ url, body: init.body, type })
+      return new Response(null, { status: 204 })
+    }
+
+    await createFetcher({ fetch }, 'notification')('https://example.com/notification', {
+      method: 'POST',
+      body: new URLSearchParams({ event: 'credential_accepted' }),
+    })
+
+    expect(requests).toEqual([
+      { url: 'https://example.com/notification', body: 'event=credential_accepted', type: 'notification' },
+    ])
+  })
+
+  test('rejects a response larger than the limit of its type', async () => {
+    const fetch: Fetch = async () => new Response('a'.repeat(101))
+
+    await expect(
+      createFetcher(
+        { fetch, fetchLimits: { maxResponseBytesByType: { credential: 100 } } },
+        'credential'
+      )('https://example.com/credential')
+    ).rejects.toThrow(new IdentityCommonError('The response is larger than the maximum of 100 bytes'))
+    await expect(
+      createFetcher(
+        { fetch, fetchLimits: { maxResponseBytesByType: { credential: 100 } } },
+        'nonce'
+      )('https://example.com/nonce')
+    ).resolves.toBeInstanceOf(Response)
+  })
+
+  test('wraps an error of the fetch in a FetchError', async () => {
+    const fetch: Fetch = async () => {
+      throw new TypeError('fetch failed')
+    }
+
+    await expect(createFetcher({ fetch }, 'nonce')('https://example.com/nonce')).rejects.toThrow(FetchError)
   })
 })

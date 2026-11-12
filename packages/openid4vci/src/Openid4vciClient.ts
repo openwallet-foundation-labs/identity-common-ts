@@ -93,6 +93,7 @@ export class Openid4vciClient {
   public async resolveCredentialOffer(credentialOffer: string): Promise<CredentialOfferObject> {
     return resolveCredentialOffer(credentialOffer, {
       fetch: this.options.callbacks.fetch,
+      fetchLimits: this.options.callbacks.fetchLimits,
     })
   }
 
@@ -562,6 +563,7 @@ export class Openid4vciClient {
     return requestNonce({
       ...options,
       fetch: this.options.callbacks.fetch,
+      fetchLimits: this.options.callbacks.fetchLimits,
     })
   }
 

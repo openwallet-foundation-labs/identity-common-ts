@@ -46,7 +46,10 @@ interface RetrieveAccessTokenBaseOptions {
   /**
    * Callbacks to use for requesting access token
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJws' | 'clientAuthentication'>
+  callbacks: Pick<
+    CallbackContext,
+    'fetch' | 'fetchLimits' | 'generateRandom' | 'hash' | 'signJws' | 'clientAuthentication'
+  >
 
   /**
    * The resource to which access is being requested. This can help the authorization
@@ -215,7 +218,7 @@ interface RetrieveAccessTokenOptions extends RetrieveAccessTokenBaseOptions {
  * Internal method
  */
 async function retrieveAccessToken(options: RetrieveAccessTokenOptions): Promise<RetrieveAccessTokenReturn> {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'accessToken')
 
   const accessTokenRequest = parseWithErrorHandling(
     zAccessTokenRequest,

@@ -20,6 +20,7 @@ import {
 import {
   base64url,
   CommonMediaTypes,
+  type FetchLimits,
   parseWithErrorHandling,
   parseWithSchema,
   type SchemaParseResult,
@@ -41,6 +42,12 @@ export interface ResolveCredentialOfferOptions {
    * Custom fetch implementation to use
    */
   fetch?: Fetch
+
+  /**
+   * The maximum size of the response of the `credential_offer_uri`, 10 MiB by default (see `FetchLimits` of
+   * `@owf/identity-common`)
+   */
+  fetchLimits?: FetchLimits
 }
 
 /**
@@ -56,7 +63,7 @@ export async function resolveCredentialOffer(
   let credentialOfferParseResult: SchemaParseResult<z.infer<typeof zCredentialOfferObject>>
 
   if (parsedQueryParams.credential_offer_uri) {
-    const fetchWithZod = createZodFetcher(options?.fetch)
+    const fetchWithZod = createZodFetcher(options, 'credentialOffer')
 
     // OpenID4VCI 1.0 Section 4.1: a URL using the https scheme. The offer comes from whoever crafted it, so the
     // wallet would otherwise request a URL of their choice, such as an internal endpoint.

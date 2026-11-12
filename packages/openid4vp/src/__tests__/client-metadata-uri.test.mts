@@ -23,7 +23,9 @@ describe('client metadata URLs', () => {
       responseMode: { type: 'direct_post' },
     }).catch(() => undefined)
 
-    expect(fetch).toHaveBeenCalledWith('https://verifier.example/metadata', expect.anything())
+    expect(fetch).toHaveBeenCalledWith('https://verifier.example/metadata', expect.anything(), {
+      type: 'clientMetadata',
+    })
   })
 
   test('rejects a jwks_uri that is not an https url', () => {

@@ -32,11 +32,11 @@ export interface IntrospectTokenOptions {
    */
   additionalPayload?: Record<string, unknown>
 
-  callbacks: Pick<CallbackContext, 'fetch' | 'clientAuthentication'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'clientAuthentication'>
 }
 
 export async function introspectToken(options: IntrospectTokenOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'tokenIntrospection')
 
   const introspectionRequest = parseWithErrorHandling(zTokenIntrospectionRequest, {
     token: options.token,

@@ -55,7 +55,7 @@ export interface VerifyJarRequestOptions {
    */
   allowRequestUri?: boolean
 
-  callbacks: Pick<CallbackContext, 'verifyJws' | 'decryptJwe' | 'fetch'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'decryptJwe' | 'fetch' | 'fetchLimits'>
   wallet?: {
     metadata?: WalletMetadata
     nonce?: string
@@ -125,6 +125,7 @@ export async function verifyJarRequest(options: VerifyJarRequestOptions): Promis
       method,
       wallet,
       fetch: callbacks.fetch,
+      fetchLimits: callbacks.fetchLimits,
     }))
 
   const requestObjectIsEncrypted = zCompactJwe.safeParse(requestObject).success

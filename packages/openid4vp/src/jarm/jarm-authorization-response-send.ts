@@ -8,7 +8,7 @@ interface JarmAuthorizationResponseSendOptions {
     redirect_uri?: string
   }
   jarmAuthorizationResponseJwt: string
-  callbacks: Pick<CallbackContext, 'fetch'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits'>
 }
 
 export const jarmAuthorizationResponseSend = (options: JarmAuthorizationResponseSendOptions) => {
@@ -26,9 +26,9 @@ export const jarmAuthorizationResponseSend = (options: JarmAuthorizationResponse
 async function handleDirectPostJwt(
   responseEndpoint: URL,
   responseJwt: string,
-  callbacks: Pick<CallbackContext, 'fetch'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits'>
 ) {
-  const response = await createFetcher(callbacks.fetch)(responseEndpoint, {
+  const response = await createFetcher(callbacks, 'authorizationResponse')(responseEndpoint.toString(), {
     method: 'POST',
     headers: { 'Content-Type': CommonMediaTypes.XWwwFormUrlencoded },
     body: `response=${responseJwt}`,

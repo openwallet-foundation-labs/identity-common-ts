@@ -113,7 +113,7 @@ interface RetrieveCredentialsBaseOptions {
   /**
    * Callbacks used in retrieve credentials endpoints.
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJws' | 'decryptJwe'> &
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'generateRandom' | 'hash' | 'signJws' | 'decryptJwe'> &
     Partial<Pick<CallbackContext, 'encryptJwe'>>
 
   /**
@@ -317,6 +317,7 @@ async function retrieveCredentials(
     accessToken: options.accessToken,
     callbacks: options.callbacks,
     url: credentialEndpoint,
+    type: 'credential',
     requestOptions: {
       method: 'POST',
       headers: {
@@ -427,6 +428,7 @@ export async function retrieveDeferredCredentials(
     accessToken: options.accessToken,
     callbacks: options.callbacks,
     url: credentialEndpoint,
+    type: 'deferredCredential',
     requestOptions: {
       method: 'POST',
       headers: {
