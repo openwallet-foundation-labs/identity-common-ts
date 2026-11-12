@@ -127,7 +127,7 @@ const fetchLimits: FetchLimits = {
 
 The limit for a `FetchType` is `maxResponseBytesByType[type]`, else `maxResponseBytes`, else its default: 16 MiB for `statusList` and `identifierList`, 1 MiB for `typeMetadata` and 10 MiB for every other type. A response with a larger `Content-Length` is rejected before its body is read, and a body stream is cancelled once it is larger, with an `IdentityCommonError`. Where fetch has no body stream, as in React Native without Expo, the body is read whole and checked afterwards. The fetch callback therefore does not have to limit the size itself.
 
-`fetchWithLimits(options, { type, url, init, accept })` returns a `Response` that holds the body in memory. `fetchAndParse` also parses the body of a response with a 2xx status and, when `accept` is given, one of its media types with `parse`, e.g. with a zod schema or into a class instance:
+`fetchWithLimits(options, { type, url, init, accept })` returns a `Response` that holds the body in memory. `fetchAndParse` also parses the body of a response with a 2xx status with `parse`, e.g. with a zod schema or into a class instance. When `accept` is given, a response with a 2xx status of another media type is rejected with an `IdentityCommonError`, while a response with another status is returned without `data`, whatever its media type:
 
 ```typescript
 import { fetchAndParse } from '@owf/identity-common'

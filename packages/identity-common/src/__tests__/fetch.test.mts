@@ -268,16 +268,35 @@ describe('fetchAndParse', () => {
     expect(parse).not.toHaveBeenCalled()
   })
 
-  it('does not parse a response of another media type than accepted', async () => {
+  it('rejects a response with a 2xx status of another media type than accepted, without its body', async () => {
     const parse = vi.fn()
 
+    const error = await fetchAndParse(
+      { fetch: fetchReturning(() => new Response('internal-secret', { headers: { 'Content-Type': 'text/html' } })) },
+      { type: 'clientMetadata', url: 'https://example.com', accept: ['application/jwt', 'application/json'], parse }
+    ).catch((error) => error)
+
+    expect(error).toEqual(
+      new IdentityCommonError(
+        "Expected response to match content type application/jwt | application/json, but received 'text/html'"
+      )
+    )
+    expect(error.message).not.toContain('internal-secret')
+    expect(parse).not.toHaveBeenCalled()
+  })
+
+  it('returns a response with another status of any media type', async () => {
     const result = await fetchAndParse(
-      { fetch: fetchReturning(() => new Response('<html></html>', { headers: { 'Content-Type': 'text/html' } })) },
-      { type: 'clientMetadata', url: 'https://example.com', accept: 'application/json', parse }
+      {
+        fetch: fetchReturning(
+          () => new Response('<html></html>', { status: 502, headers: { 'Content-Type': 'text/html' } })
+        ),
+      },
+      { type: 'clientMetadata', url: 'https://example.com', accept: 'application/json', parse: vi.fn() }
     )
 
     expect(result.data).toBeUndefined()
-    expect(parse).not.toHaveBeenCalled()
+    expect(result.response.status).toBe(502)
   })
 
   it('passes an error of parse on', async () => {

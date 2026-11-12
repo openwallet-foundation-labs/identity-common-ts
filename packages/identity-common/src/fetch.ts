@@ -139,12 +139,12 @@ export type FetchAndParseResult<T> = { response: Response; data: T } | { respons
 
 /**
  * Fetches `url` as {@link fetchWithLimits} does, and parses the body of a response with a 2xx status with `parse`,
- * e.g. with a zod schema or into a class instance. When `accept` is given, only a response of one of its media types
- * is parsed.
+ * e.g. with a zod schema or into a class instance.
  *
- * @returns The response, and `data` if the body was parsed. Without `data`, the response has another status or
- *   media type, and the caller decides what that means, e.g. reads an error response from the body.
- * @throws IdentityCommonError as {@link fetchWithLimits} does. Errors of `fetch` and `parse` are passed on.
+ * @returns The response, and `data` if its status is 2xx. Without `data`, the caller decides what the status means,
+ *   e.g. reads an error response from the body, which may be of any media type.
+ * @throws IdentityCommonError as {@link fetchWithLimits} does, and if `accept` is given and a response with a 2xx
+ *   status is not of one of its media types. Errors of `fetch` and `parse` are passed on.
  */
 export async function fetchAndParse<T, Type extends FetchType>(
   options: FetchOptions<Type>,
@@ -155,8 +155,14 @@ export async function fetchAndParse<T, Type extends FetchType>(
 ): Promise<FetchAndParseResult<T>> {
   const { response, body } = await fetchBody(options, request)
   if (!response.ok) return { response }
-  if (request.accept !== undefined && !isMediaType(response.headers.get('Content-Type'), request.accept)) {
-    return { response }
+
+  const contentType = response.headers.get('Content-Type')
+  if (request.accept !== undefined && !isMediaType(contentType, request.accept)) {
+    // Not with the body, which may come from an internal endpoint
+    const accept = typeof request.accept === 'string' ? [request.accept] : request.accept
+    throw new IdentityCommonError(
+      `Expected response to match content type ${accept.join(' | ')}, but received '${contentType}'`
+    )
   }
 
   return { response, data: await parse(body, response) }

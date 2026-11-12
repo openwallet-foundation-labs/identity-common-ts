@@ -84,13 +84,10 @@ describe('createZodFetcher', () => {
 
   // The URL can be chosen by whoever sent the request, and the message may be returned to them, which would let them
   // read the responses of internal endpoints
-  test.each([
-    ['another content type', 'text/plain'],
-    ['invalid JSON', 'application/json'],
-  ])('keeps the response body out of the error message for %s', async (_description, contentType) => {
+  test('keeps the response body out of the error message for invalid JSON', async () => {
     const body = 'root:x:0:0:internal-secret'
     const fetchWithZod = createZodFetcher(
-      { fetch: async () => new Response(body, { headers: { 'Content-Type': contentType } }) },
+      { fetch: async () => new Response(body, { headers: { 'Content-Type': 'application/json' } }) },
       'jwks'
     )
 
@@ -99,6 +96,18 @@ describe('createZodFetcher', () => {
     expect(error).toBeInstanceOf(InvalidFetchResponseError)
     expect(error.message).not.toContain('internal-secret')
     expect(error.textResponse).toBe(body)
+  })
+
+  test('keeps the response body out of the error message for another content type', async () => {
+    const fetchWithZod = createZodFetcher(
+      { fetch: async () => new Response('root:x:0:0:internal-secret', { headers: { 'Content-Type': 'text/plain' } }) },
+      'jwks'
+    )
+
+    const error = await fetchWithZod(z.object({}), CommonMediaTypes.Json, 'https://example.com').catch((error) => error)
+
+    expect(error).toBeInstanceOf(IdentityCommonError)
+    expect(error.message).not.toContain('internal-secret')
   })
 })
 

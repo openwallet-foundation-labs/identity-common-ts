@@ -81,6 +81,9 @@ export function createFetcher(
  * already has one. The order of the expected content types is the order of preference, expressed with decreasing
  * `q` values. The body of the response is read within the limit of `callbacks.fetchLimits` for `type`.
  *
+ * @throws IdentityCommonError (from `@owf/identity-common`) if a response with a 2xx status is not of one of the
+ *   expected content types, or is larger than its limit.
+ *
  * @example
  *
  * const fetchWithZod = createZodFetcher(callbacks, 'jwks')
@@ -105,14 +108,6 @@ export function createZodFetcher(callbacks: FetchCallbacks | undefined, type: Fe
         )
       },
     })
-
-    if (response.ok && data === undefined) {
-      throw new InvalidFetchResponseError(
-        `Expected response to match content type ${expectedContentTypeArray.join(' | ')}, but received '${response.headers.get('Content-Type')}'`,
-        await response.clone().text(),
-        response
-      )
-    }
 
     return { response, result: data }
   }
