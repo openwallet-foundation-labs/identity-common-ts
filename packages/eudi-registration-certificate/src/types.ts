@@ -8,7 +8,7 @@
  */
 
 import type { CoseKey, Sign1Context, SignatureAlgorithm } from '@owf/cose'
-import type { OrPromise } from '@owf/identity-common'
+import type { FetchCallback, FetchLimits, OrPromise } from '@owf/identity-common'
 import type { SignJwsCallback, VerifyJwsCallback } from '@owf/jose'
 import type { z } from 'zod'
 import type { RegistrationCertificateCwtPayload } from './cwt'
@@ -183,8 +183,10 @@ export interface VerifyRegistrationCertificateCallbacks {
   verifyJws: VerifyJwsCallback
   /** The same for a CWT */
   verifyCose: VerifyCoseCallback
-  /** Fetches the status list; defaults to the global `fetch` */
-  fetch?: typeof fetch
+  /** Fetches the status list, with `{ type: 'statusList' }` as its third argument; defaults to the global `fetch` */
+  fetch?: FetchCallback<'statusList'>
+  /** The maximum size of the status list response; 16 MiB by default (see `FetchLimits` of `@owf/identity-common`) */
+  fetchLimits?: FetchLimits
 }
 
 // ============================================================================

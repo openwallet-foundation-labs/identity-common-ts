@@ -31,8 +31,6 @@ export interface VerifyRegistrationCertificateOptions {
   now?: Date
   /** Clock tolerance for `exp` and `iat`, in seconds; defaults to 30 */
   skewSeconds?: number
-  /** The maximum size in bytes of the response that serves the status list; defaults to 16 MiB */
-  maxStatusListResponseBytes?: number
   /** The maximum size in bytes the status list may inflate to; defaults to 16 MiB */
   maxStatusListDecompressedBytes?: number
 }
@@ -52,7 +50,6 @@ export async function verifyRegistrationCertificate({
   callbacks,
   now,
   skewSeconds,
-  maxStatusListResponseBytes,
   maxStatusListDecompressedBytes,
 }: VerifyRegistrationCertificateOptions): Promise<SignedRegistrationCertificateJwt | SignedRegistrationCertificateCwt> {
   const serialized =
@@ -111,7 +108,6 @@ export async function verifyRegistrationCertificate({
       callbacks,
       now,
       skewSeconds,
-      maxResponseBytes: maxStatusListResponseBytes,
       maxDecompressedBytes: maxStatusListDecompressedBytes,
     })
   } catch (error) {

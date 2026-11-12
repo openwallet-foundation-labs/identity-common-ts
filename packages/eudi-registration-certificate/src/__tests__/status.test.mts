@@ -17,7 +17,7 @@ const verify = (
   fetch: typeof globalThis.fetch,
   overrides: Partial<VerifyRegistrationCertificateCallbacks> = {},
   at = now,
-  limits: Pick<VerifyRegistrationCertificateStatusOptions, 'maxResponseBytes' | 'maxDecompressedBytes'> = {}
+  limits: Pick<VerifyRegistrationCertificateStatusOptions, 'maxDecompressedBytes'> = {}
 ) =>
   verifyRegistrationCertificateStatus({
     status: { status_list: { idx, uri: STATUS_LIST_URI } },
@@ -67,8 +67,9 @@ describe('verifyRegistrationCertificateStatus', () => {
     })
 
     // The signed token is far larger than 100 bytes
-    it('reports a status list response larger than maxResponseBytes', async () => {
-      const error = await verify(0, await fetch(), {}, now, { maxResponseBytes: 100 }).catch((error) => error)
+    it('reports a status list response larger than its limit', async () => {
+      const fetchLimits = { maxResponseBytesByType: { statusList: 100 } }
+      const error = await verify(0, await fetch(), { fetchLimits }).catch((error) => error)
 
       expect(error.findIssue('status_list_unavailable')).toMatchObject({ path: ['status_list', 'uri'] })
       expect(error.findIssue('status_list_unavailable').message).toContain('larger than the maximum of 100 bytes')
