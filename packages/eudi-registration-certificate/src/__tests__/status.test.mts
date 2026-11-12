@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   RegistrationCertificateValidationError,
   type VerifyRegistrationCertificateCallbacks,
+  type VerifyRegistrationCertificateStatusOptions,
   verifyRegistrationCertificateStatus,
   zStatus,
 } from '../index'
@@ -15,12 +16,14 @@ const verify = (
   idx: number,
   fetch: typeof globalThis.fetch,
   overrides: Partial<VerifyRegistrationCertificateCallbacks> = {},
-  at = now
+  at = now,
+  limits: Pick<VerifyRegistrationCertificateStatusOptions, 'maxResponseBytes' | 'maxDecompressedBytes'> = {}
 ) =>
   verifyRegistrationCertificateStatus({
     status: { status_list: { idx, uri: STATUS_LIST_URI } },
     callbacks: { ...callbacks, fetch, ...overrides },
     now: at,
+    ...limits,
   })
 
 describe('verifyRegistrationCertificateStatus', () => {
@@ -53,6 +56,22 @@ describe('verifyRegistrationCertificateStatus', () => {
 
     it('rejects a status list issued after now', async () => {
       await expect(verify(0, await fetch(), {}, new Date((iat - 3600) * 1000))).rejects.toThrow('in the future')
+    })
+
+    // The list of four statuses of 1 bit inflates to one byte
+    it('rejects a status list that inflates to more than maxDecompressedBytes', async () => {
+      const error = await verify(0, await fetch(), {}, now, { maxDecompressedBytes: 0 }).catch((error) => error)
+
+      expect(error.findIssue('invalid_status_list')).toMatchObject({ path: ['status_list', 'uri'] })
+      expect(error.findIssue('invalid_status_list').message).toContain('larger than the maximum of 0 bytes')
+    })
+
+    // The signed token is far larger than 100 bytes
+    it('reports a status list response larger than maxResponseBytes', async () => {
+      const error = await verify(0, await fetch(), {}, now, { maxResponseBytes: 100 }).catch((error) => error)
+
+      expect(error.findIssue('status_list_unavailable')).toMatchObject({ path: ['status_list', 'uri'] })
+      expect(error.findIssue('status_list_unavailable').message).toContain('larger than the maximum of 100 bytes')
     })
 
     it('rejects an index outside the status list', async () => {

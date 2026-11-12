@@ -48,6 +48,8 @@ You can confirm this by checking if `global.TextDecoder` is available. It should
 
 If it is not available, make sure to add a polyfill like [this one](https://github.com/EvanBacon/text-decoder).
 
+The `fetch` of React Native without Expo does not stream the body of a response, so a response is read whole before its size can be checked. Use a `fetch` that streams the body, such as the one of Expo (`expo/fetch`) or [`react-native-nitro-fetch`](https://github.com/margelo/react-native-nitro-fetch), so that the packages that limit the size of a response, such as `@owf/token-status-list`, stop reading a response once it is larger.
+
 ## API Reference
 
 ### Validation
@@ -105,6 +107,8 @@ const zMetadata = z.union([zMetadataV1, zMetadataDraft11], unionParams('Invalid 
 `zTyp('dpop+jwt')` validates a JOSE `typ` header and `isJwtTyp(typ, 'dpop+jwt')` compares one. Both accept the `typ` in any casing and with the `application/` prefix (RFC 7515 Section 4.1.9), so compare a parsed `typ` with `isJwtTyp`, not with `===`.
 
 `isMediaType(contentType, CommonMediaTypes.Json)` compares a `Content-Type` value with one or more media types, ignoring casing and parameters (RFC 9110 Section 8.3), so `application/json; charset=utf-8` matches and `application/json-seq` does not. `extractMediaType` returns the normalized `type/subtype`, and `createAcceptHeader` builds an `Accept` header with quality values in order of preference. `CommonMediaTypes` has the media types that are not specific to one specification, such as `Json`, `Jwt` and `JwkSet`.
+
+`readResponseBodyAtMost(response, maxBytes)` reads the body of a fetch `Response`, and rejects one larger than `maxBytes` with an `IdentityCommonError`. It checks `Content-Length` before reading, and cancels the body stream once it is larger. Where fetch has no body stream, as in React Native, it reads the body whole and checks it afterwards.
 
 ## Related Packages
 

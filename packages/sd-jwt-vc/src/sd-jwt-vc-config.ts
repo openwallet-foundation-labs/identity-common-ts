@@ -32,13 +32,19 @@ export type StatusListVerificationErrorDetails = {
 export type SdJwtVcConfig<T = unknown> = SdJwtConfig<T> & {
   // A function that fetches the status list from the uri. If not provided, the library will assume that the response is a compact JWT.
   statusListFetcher?: StatusListFetcher
+  // maximum size in bytes of the status list response, for the default statusListFetcher. If not provided, it will default to 16 MiB.
+  maxStatusListResponseBytes?: number
   // validte the status and decide if the status is valid or not. If not provided, the code will continue if it is 0, otherwise it will throw an error.
   // To have safeVerify report an invalid status as STATUS_INVALID, throw an SdJwtError with the code 'STATUS_INVALID'.
   statusValidator?: StatusValidator
+  // maximum size in bytes of a type metadata response, for the default vctFetcher. If not provided, it will default to 1 MiB.
+  maxTypeMetadataResponseBytes?: number
   // a function that fetches the type metadata format from the uri. If not provided, the library will assume that the response is a TypeMetadataFormat. Caching has to be implemented in this function. If the integrity value is passed, it to be validated according to https://www.w3.org/TR/SRI/
   vctFetcher?: VctFetcher
   // a function that verifies the signature of the status list JWT. It gets the verification options. If not provided, the verifier is used.
   statusVerifier?: Verifier<T>
+  // maximum size in bytes the status list may inflate to. If not provided, it will default to 16 MiB, 2^27 statuses at 1 bit per status.
+  maxStatusListDecompressedBytes?: number
   // if set to true, it will load the metadata format based on the vct value. If not provided, it will default to false.
   loadTypeMetadataFormat?: boolean
   // timeout value in milliseconds when to abort the fetch request. If not provided, it will default to 10000.

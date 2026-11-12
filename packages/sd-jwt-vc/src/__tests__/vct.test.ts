@@ -300,7 +300,7 @@ describe('App', () => {
     await sdjwt.verify(encodedSdjwt)
 
     // Ensure validateIntegrity method was called
-    expect(validateIntegritySpy).toHaveBeenCalledWith(expect.any(Response), vct, vctIntegrity)
+    expect(validateIntegritySpy).toHaveBeenCalledWith(expect.any(Uint8Array), vct, vctIntegrity)
   })
 
   describe('VCT integrity', () => {
@@ -431,8 +431,79 @@ describe('App', () => {
     })
 
     const error = await sdjwt.verify(encodedSdjwt).catch((e) => e)
-    expect(error.message).toContain('Error fetching status list: 500')
+    expect(error.message).toContain("Could not fetch status list, response status '500'")
     expect(error.message).not.toContain('internal-secret')
+  })
+
+  test('reads type metadata served with a byte order mark', async () => {
+    const typeMetadata = new TextEncoder().encode(JSON.stringify({ vct: 'http://example.com/bom' }))
+    server.use(
+      http.get(
+        'http://example.com/bom',
+        () =>
+          new HttpResponse(new Uint8Array([0xef, 0xbb, 0xbf, ...typeMetadata]), {
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+    )
+    const encodedSdjwt = await sdjwt.issue({ iat, iss, vct: 'http://example.com/bom', ...claims })
+
+    await expect(sdjwt.verify(encodedSdjwt)).resolves.toBeDefined()
+  })
+
+  test('rejects type metadata larger than maxTypeMetadataResponseBytes', async () => {
+    server.use(
+      http.get('http://example.com/large', () =>
+        HttpResponse.json({ vct: 'http://example.com/large', description: 'a'.repeat(1024) })
+      )
+    )
+    const sdjwtWithLimit = (maxTypeMetadataResponseBytes: number) =>
+      new SdJwtVcInstance({
+        signer,
+        signAlg: 'EdDSA',
+        verifier,
+        hasher: digest,
+        hashAlg: 'sha-256',
+        saltGenerator: generateSalt,
+        loadTypeMetadataFormat: true,
+        maxTypeMetadataResponseBytes,
+      })
+    const encodedSdjwt = await sdjwtWithLimit(1024).issue({ iat, iss, vct: 'http://example.com/large', ...claims })
+
+    await expect(sdjwtWithLimit(1024).verify(encodedSdjwt)).rejects.toThrow(
+      'The response is larger than the maximum of 1024 bytes'
+    )
+    await expect(sdjwtWithLimit(2048).verify(encodedSdjwt)).resolves.toBeDefined()
+  })
+
+  test('rejects a status list response larger than maxStatusListResponseBytes', async () => {
+    server.use(
+      http.get(
+        'http://example.com/status-list',
+        () => new HttpResponse('a'.repeat(1025), { headers: { 'Content-Type': 'application/statuslist+jwt' } }),
+        { once: true }
+      )
+    )
+    const sdjwtWithLimit = new SdJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      maxStatusListResponseBytes: 1024,
+    })
+    const encodedSdjwt = await sdjwtWithLimit.issue({
+      iat,
+      iss,
+      vct,
+      status: { status_list: { uri: 'http://example.com/status-list', idx: 0 } },
+      ...claims,
+    })
+
+    await expect(sdjwtWithLimit.verify(encodedSdjwt)).rejects.toThrow(
+      'The response is larger than the maximum of 1024 bytes'
+    )
   })
 
   test('VCT Metadata retrieval fails when fetched type metadata is invalid', async () => {

@@ -416,7 +416,14 @@ suite('Verification', () => {
     return IssuerSigned.fromEncodedForOid4Vci(issuerSigned.encodedForOid4Vci)
   }
 
-  const verifyIssuerSigned = (credential: IssuerSigned, options: { skewSeconds?: number } = {}) =>
+  const verifyIssuerSigned = (
+    credential: IssuerSigned,
+    options: {
+      skewSeconds?: number
+      maxStatusListDecompressedBytes?: number
+      maxRevocationListResponseBytes?: number
+    } = {}
+  ) =>
     Holder.verifyIssuerSigned(
       { issuerSigned: credential, trustedCertificates: validTrustedCertificates, ...options },
       mdocContext
@@ -624,6 +631,63 @@ suite('Verification', () => {
     })
   })
 
+  // Ten statuses of 2 bits inflate to 3 bytes
+  test('Verify mdoc with a status list larger than its maximum sizes', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/too-large', { idx, status: StatusType.Valid })
+    const decompressedError = `Verifying the status list ${uri} failed: The status list cannot be decompressed`
+    // The signed CWT, with its certificate, is far larger than 100 bytes
+    const responseError = 'The response is larger than the maximum of 100 bytes'
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 2 })).rejects.toThrow(
+      decompressedError
+    )
+    await expect(verifyIssuerSigned(credential, { maxRevocationListResponseBytes: 100 })).rejects.toThrow(responseError)
+    await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 3 })).resolves.toBeDefined()
+
+    const sessionTranscript = await SessionTranscript.forOid4Vp(
+      { clientId: 'my-client-id', responseUri: 'my-response-uri.com', nonce: 'my-random-nonce' },
+      mdocContext
+    )
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: { 'org.iso.18013.5.1.mDL': { first_name: true } },
+          }),
+        }),
+      ],
+    })
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [
+          {
+            issuerSigned: credential,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    const verifyDeviceResponse = (options: {
+      maxStatusListDecompressedBytes?: number
+      maxRevocationListResponseBytes?: number
+    }) =>
+      Verifier.verifyDeviceResponse(
+        { deviceResponse, sessionTranscript, trustedCertificates: validTrustedCertificates, ...options },
+        mdocContext
+      )
+    await expect(verifyDeviceResponse({ maxStatusListDecompressedBytes: 2 })).rejects.toThrow(decompressedError)
+    await expect(verifyDeviceResponse({ maxRevocationListResponseBytes: 100 })).rejects.toThrow(responseError)
+  })
+
   // An expired list says nothing about the status it carries (Token Status List § 8.3), so the
   // revoked entry on it is not reported.
   test('Verify mdoc with a revoked entry in an expired status list', async () => {
@@ -702,6 +766,19 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
 
+    await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
+  })
+
+  test('Verify mdoc with an identifier list larger than maxRevocationListResponseBytes', async () => {
+    const id = new Uint8Array([0xab, 0xcd])
+    const uri = await mockIdentifierList('/identifier-list/too-large', { identifiers: [new Uint8Array([0x01])] })
+
+    const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+
+    // The signed CWT, with its certificate, is far larger than 100 bytes
+    await expect(verifyIssuerSigned(credential, { maxRevocationListResponseBytes: 100 })).rejects.toThrow(
+      `Verifying the identifier list ${uri} failed: Identifier list at ${uri}: The response is larger than the maximum of 100 bytes`
+    )
     await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
   })
 

@@ -12,7 +12,7 @@ import {
   type UnprotectedHeaderOptions,
   type UnprotectedHeaders,
 } from '@owf/cose'
-import { hex, isMediaType } from '@owf/identity-common'
+import { hex, IdentityCommonError, isMediaType, readResponseBodyAtMost } from '@owf/identity-common'
 import type { MdocContext } from '../../context'
 import { IdentifierFoundInRevokedListError, InvalidRevocationListError } from '../errors'
 import { IdentifierListCwtProtectedHeaders, MdocMediaTypes } from './identifier-list-cwt-headers'
@@ -21,6 +21,9 @@ import {
   IdentifierListCwtClaimKey,
   IdentifierListCwtPayload,
 } from './identifier-list-cwt-payload'
+
+/** The default maximum size of an identifier list response, as of a status list response. */
+const DEFAULT_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 
 export type IdentifierListCwtOptions = Omit<
   CwtOptions<IdentifierListCwtPayload, IdentifierListCwtProtectedHeaders>,
@@ -96,13 +99,19 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
   }
 
   /**
-   * Fetches the identifier list published at `uri`.
+   * Fetches the identifier list published at `uri`, in a response of at most `maxResponseBytes`, 16 MiB by default.
    *
    * The counterpart of `fetchStatusList`, which the Token Status List specification's own media
    * type has; an identifier list is an ISO addition that `@owf/token-status-list` does not know
    * about, so the content type negotiation for it lives here.
+   *
+   * @throws InvalidRevocationListError if the response is not an identifier list, or larger than `maxResponseBytes`.
    */
-  public static async fetch(uri: string, ctx: Pick<MdocContext, 'fetch'>): Promise<IdentifierListCwt> {
+  public static async fetch(
+    uri: string,
+    ctx: Pick<MdocContext, 'fetch'>,
+    { maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES }: { maxResponseBytes?: number } = {}
+  ): Promise<IdentifierListCwt> {
     const response = await ctx.fetch(
       uri,
       { headers: { Accept: MdocMediaTypes.IdentifierListCwt } },
@@ -123,7 +132,15 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
       )
     }
 
-    return IdentifierListCwt.fromToken(new Uint8Array(await response.arrayBuffer()))
+    let token: Uint8Array
+    try {
+      token = await readResponseBodyAtMost(response, maxResponseBytes)
+    } catch (error) {
+      if (!(error instanceof IdentityCommonError)) throw error
+      throw new InvalidRevocationListError(`Identifier list at ${uri}: ${error.message}`)
+    }
+
+    return IdentifierListCwt.fromToken(token)
   }
 
   /** Leaf certificate and chain from the CWT's protected `x5chain` header, normalized to an array. */

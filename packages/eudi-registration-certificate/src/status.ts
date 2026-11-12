@@ -29,6 +29,10 @@ export interface VerifyRegistrationCertificateStatusOptions {
   now?: Date
   /** Clock tolerance for `exp` and `iat` of the status list, in seconds; defaults to 30 */
   skewSeconds?: number
+  /** The maximum size in bytes of the response that serves the status list; defaults to 16 MiB */
+  maxResponseBytes?: number
+  /** The maximum size in bytes the status list may inflate to; defaults to 16 MiB */
+  maxDecompressedBytes?: number
 }
 
 /**
@@ -40,20 +44,23 @@ export interface VerifyRegistrationCertificateStatusOptions {
  * status at `idx`.
  *
  * @throws RegistrationCertificateValidationError with a `revoked` issue if the status is not valid, a
- *   `status_list_unavailable` issue if the status list cannot be fetched, and an `invalid_status_list` issue if it does
- *   not verify. Paths are below `status`.
+ *   `status_list_unavailable` issue if the status list cannot be fetched or its response is larger than
+ *   `maxResponseBytes`, and an `invalid_status_list` issue if it does not verify or inflates to more than
+ *   `maxDecompressedBytes`. Paths are below `status`.
  */
 export async function verifyRegistrationCertificateStatus({
   status,
   callbacks,
   now,
   skewSeconds,
+  maxResponseBytes,
+  maxDecompressedBytes,
 }: VerifyRegistrationCertificateStatusOptions): Promise<void> {
   const { idx, uri } = status.status_list
 
   let token: string | Uint8Array
   try {
-    token = await fetchStatusList({ uri, customFetcher: callbacks.fetch })
+    token = await fetchStatusList({ uri, customFetcher: callbacks.fetch, maxResponseBytes })
   } catch (error) {
     throw validationError('Could not verify the status of the registration certificate', {
       code: 'status_list_unavailable',
@@ -73,13 +80,14 @@ export async function verifyRegistrationCertificateStatus({
         verifyJwsCallback: callbacks.verifyJws,
         now,
         skewSeconds,
+        maxDecompressedBytes,
       }))
     } else {
       // Decoding checks `typ`
       const statusListCwt = StatusListCwt.fromToken(token)
       await verifyCwtSignature(statusListCwt, callbacks.verifyCose)
       statusListCwt.verifyClaims({ uri, now, skewSeconds })
-      statusList = statusListCwt.payload.statusList
+      statusList = statusListCwt.payload.getStatusList({ maxDecompressedBytes })
     }
 
     value = statusList.getStatus(idx)

@@ -170,6 +170,7 @@ async function verifyStatusListJwt(
     now,
     skewSeconds,
     checkFreshness,
+    maxDecompressedBytes,
   }: { jwt: string; uri: string; idx: number; now: Date } & Omit<
     VerifyStatusListTokenOptions,
     'statusListInfo' | 'now'
@@ -229,6 +230,7 @@ async function verifyStatusListJwt(
         requiredClaims: ['exp'],
         allowedAlgorithms: [...jwsSignatureAlgorithms.keys()],
         verifyJwsCallback,
+        maxDecompressedBytes,
       }),
     InvalidSignatureError
   )
@@ -252,6 +254,10 @@ export type VerifyStatusListTokenOptions = {
   now?: Date
   skewSeconds?: number
   checkFreshness?: boolean
+  /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
+  maxDecompressedBytes?: number
+  /** The maximum size in bytes of the response that serves the status list, 16 MiB by default. */
+  maxResponseBytes?: number
 }
 
 /** A status list served in JWT format, once verified. */
@@ -296,6 +302,8 @@ export async function verifyStatusListToken(
     now = new Date(),
     skewSeconds,
     checkFreshness,
+    maxDecompressedBytes,
+    maxResponseBytes,
   }: VerifyStatusListTokenOptions,
   ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'crypto'>
 ): Promise<VerifyStatusListTokenResult> {
@@ -308,6 +316,7 @@ export async function verifyStatusListToken(
     uri,
     customFetcher: (input, init) => ctx.fetch(input, init, { type: 'statusList' }),
     acceptedFormats: ['cwt', 'jwt'],
+    maxResponseBytes,
   })
 
   // NOTE: a JWT is NOT allowed by § 12.3.6.3, but some issuers serve the status list of an mdoc
@@ -323,6 +332,7 @@ export async function verifyStatusListToken(
         now,
         skewSeconds,
         checkFreshness,
+        maxDecompressedBytes,
       },
       ctx
     )
@@ -373,7 +383,11 @@ export async function verifyStatusListToken(
     InvalidSignatureError
   )
 
-  await assertStatusValid(statusListCwt.payload.statusList, uri, idx)
+  const statusList = await asMdlRevocationListError(
+    () => statusListCwt.payload.getStatusList({ maxDecompressedBytes }),
+    InvalidSignatureError
+  )
+  await assertStatusValid(statusList, uri, idx)
 
   return { statusListCwt, chain }
 }
@@ -392,6 +406,8 @@ export type VerifyIdentifierListTokenOptions = {
   now?: Date
   skewSeconds?: number
   checkFreshness?: boolean
+  /** The maximum size in bytes of the response that serves the identifier list, 16 MiB by default. */
+  maxResponseBytes?: number
 }
 
 export type VerifyIdentifierListTokenResult = {
@@ -418,13 +434,14 @@ export async function verifyIdentifierListToken(
     now = new Date(),
     skewSeconds,
     checkFreshness,
+    maxResponseBytes,
   }: VerifyIdentifierListTokenOptions,
   ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose'>
 ): Promise<VerifyIdentifierListTokenResult> {
   if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
 
   const { uri, id } = identifierListInfo
-  const identifierListCwt = await IdentifierListCwt.fetch(uri, ctx)
+  const identifierListCwt = await IdentifierListCwt.fetch(uri, ctx, { maxResponseBytes })
 
   const x5chain = identifierListCwt.x5chain
   if (!x5chain || x5chain.length === 0) {

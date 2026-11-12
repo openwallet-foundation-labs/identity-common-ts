@@ -42,6 +42,7 @@ export {
   zStatusListJwtPayload,
   zStatusListReference,
 } from './jwt-types'
+export type { DecompressStatusListOptions } from './status-list'
 export { StatusList } from './status-list'
 export type {
   StatusListValidationCode,

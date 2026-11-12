@@ -375,6 +375,41 @@ describe('Revocation', () => {
     expect(safeResult.errors?.map((e) => e.code)).toEqual(['STATUS_INVALID'])
   })
 
+  test('Test with a status list larger than maxStatusListDecompressedBytes', async () => {
+    const { signer, verifier } = createSignerVerifier()
+    // 1024 statuses of 1 bit inflate to 128 bytes
+    const largeStatusListJWT = await signStatusList(statusListPrivateKey, new StatusList(new Array(1024).fill(0), 1), {
+      sub: 'https://example.com/status-list',
+      iat,
+    })
+    const createInstance = (maxStatusListDecompressedBytes: number) =>
+      new SdJwtVcInstance({
+        signer,
+        signAlg: 'EdDSA',
+        verifier,
+        hasher: digest,
+        hashAlg: 'sha-256',
+        saltGenerator: generateSalt,
+        statusListFetcher: () => Promise.resolve(largeStatusListJWT),
+        statusVerifier: async (data: string, sig: string) =>
+          Crypto.verify(null, Buffer.from(data), statusListPublicKey, Buffer.from(sig, 'base64url')),
+        maxStatusListDecompressedBytes,
+      })
+    const encodedSdjwt = await createInstance(127).issue({
+      iat,
+      iss,
+      vct,
+      status: { status_list: { uri: 'https://example.com/status-list', idx: 6 } },
+    })
+
+    await expect(createInstance(127).verify(encodedSdjwt)).rejects.toThrow(
+      'The status list is larger than the maximum of 127 bytes'
+    )
+    const safeResult = await createInstance(127).safeVerify(encodedSdjwt)
+    expect(safeResult.errors?.map((e) => e.code)).toEqual(['STATUS_VERIFICATION_FAILED'])
+    await expect(createInstance(128).verify(encodedSdjwt)).resolves.toBeDefined()
+  })
+
   test('Test with a custom status validator', async () => {
     const statusValidator = vi.fn(async () => {})
     const { signer, verifier } = createSignerVerifier()

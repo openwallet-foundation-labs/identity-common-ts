@@ -14,7 +14,7 @@ import {
   type UnprotectedHeaderOptions,
   type UnprotectedHeaders,
 } from '@owf/cose'
-import { StatusList } from '../status-list'
+import { type DecompressStatusListOptions, StatusList } from '../status-list'
 import { StatusListError } from '../status-list-error'
 import { type BitsPerStatus, StatusListMediaTypes } from '../types'
 import { StatusListCbor } from './status-list-cbor'
@@ -158,21 +158,26 @@ export class StatusListCwt extends Cwt<StatusListCwtPayload, StatusListCwtProtec
    *
    * @throws CoseInvalidSignatureError if the signature or authentication tag does not verify.
    * @throws StatusListError if the claims do not.
-   * @throws StatusListValidationError if the status list cannot be decompressed, or the status at `idx` is not Valid.
+   * @throws StatusListValidationError if the status list cannot be decompressed or inflates to more than
+   *   `maxDecompressedBytes`, 16 MiB by default, or the status at `idx` is not Valid.
    */
   public override async verify(
-    { idx, ...options }: CwtVerifyOptions<StatusListCwtPayload> & { idx?: number },
+    {
+      idx,
+      maxDecompressedBytes,
+      ...options
+    }: CwtVerifyOptions<StatusListCwtPayload> & { idx?: number } & DecompressStatusListOptions,
     ctx: CwtVerifyContext
   ): Promise<void> {
     await super.verify(options, ctx)
 
-    if (idx !== undefined) this.payload.verifyStatus(idx)
+    if (idx !== undefined) this.payload.verifyStatus(idx, { maxDecompressedBytes })
   }
 
   /**
    * Verify the token's status at `idx`, without verifying the remaining claims or signature.
    */
-  public verifyStatus(idx: number) {
-    this.payload.verifyStatus(idx)
+  public verifyStatus(idx: number, options?: DecompressStatusListOptions) {
+    this.payload.verifyStatus(idx, options)
   }
 }
