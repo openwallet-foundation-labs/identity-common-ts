@@ -4,7 +4,6 @@ import {
   type FetchCallback,
   type FetchLimits,
   type FetchOptions,
-  type FetchType,
   fetchAndParse,
   fetchWithLimits,
   isMediaType,
@@ -17,13 +16,38 @@ import { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
 import { type FetchRequestInit, type FetchResponse, URLSearchParams } from './globals'
 
 /**
- * The fetch the packages take. The global `fetch` satisfies it, and it gets what is fetched as its third argument,
+ * What the OAuth 2.0, OpenID4VCI and OpenID4VP packages request: a resource they fetch, such as `jwks`, or the
+ * request they send to an endpoint, named as the specification names it, such as `credentialRequest`.
+ */
+export type Openid4vcFetchType =
+  | 'authorizationServerMetadata'
+  | 'credentialIssuerMetadata'
+  | 'jwks'
+  | 'clientMetadata'
+  | 'requestObject'
+  | 'credentialOffer'
+  | 'accessTokenRequest'
+  | 'tokenIntrospectionRequest'
+  | 'pushedAuthorizationRequest'
+  | 'authorizationChallengeRequest'
+  | 'interactiveAuthorizationRequest'
+  | 'clientAttestationChallengeRequest'
+  | 'nonceRequest'
+  | 'credentialRequest'
+  | 'deferredCredentialRequest'
+  | 'notificationRequest'
+  | 'authorizationResponse'
+  // Any other request with an access token, through `resourceRequest`
+  | 'resourceRequest'
+
+/**
+ * The fetch the packages take. The global `fetch` satisfies it, and it gets what is requested as its third argument,
  * `{ type }`. The packages read the body of a response within {@link FetchLimits}, so it does not have to limit it.
  */
-export type Fetch = FetchCallback
+export type Fetch = FetchCallback<Openid4vcFetchType>
 
 /** The `fetch` and `fetchLimits` of the callbacks, through which a request is made. */
-export type FetchCallbacks = { fetch?: Fetch; fetchLimits?: FetchLimits }
+export type FetchCallbacks = { fetch?: Fetch; fetchLimits?: FetchLimits<Openid4vcFetchType> }
 
 /**
  * A type utility which represents the function returned
@@ -43,7 +67,7 @@ export type ZodFetcher = <Schema extends z.ZodTypeAny>(
 const defaultFetcher: Fetch = (input, init) => globalThis.fetch(input, init)
 
 /** The options of the fetch layer, with the errors of `fetch` wrapped in a `FetchError`. */
-function fetchOptions({ fetch = defaultFetcher, fetchLimits }: FetchCallbacks = {}): FetchOptions {
+function fetchOptions({ fetch = defaultFetcher, fetchLimits }: FetchCallbacks = {}): FetchOptions<Openid4vcFetchType> {
   return {
     fetchLimits,
     fetch: async (input, init, context) => {
@@ -70,7 +94,7 @@ const requestInit = (init?: FetchRequestInit): FetchRequestInit | undefined =>
  */
 export function createFetcher(
   callbacks: FetchCallbacks | undefined,
-  type: FetchType
+  type: Openid4vcFetchType
 ): (input: string, init?: FetchRequestInit) => Promise<FetchResponse> {
   return (input, init) => fetchWithLimits(fetchOptions(callbacks), { type, url: input, init: requestInit(init) })
 }
@@ -90,7 +114,7 @@ export function createFetcher(
  *
  * const { response, result } = await fetchWithZod(zJwkSet, CommonMediaTypes.JwkSet, 'https://example.com/jwks')
  */
-export function createZodFetcher(callbacks: FetchCallbacks | undefined, type: FetchType): ZodFetcher {
+export function createZodFetcher(callbacks: FetchCallbacks | undefined, type: Openid4vcFetchType): ZodFetcher {
   return async (schema, expectedContentType, input, init) => {
     const expectedContentTypeArray = Array.isArray(expectedContentType) ? expectedContentType : [expectedContentType]
 

@@ -101,7 +101,7 @@ export async function sendNotification(
     accessToken: options.accessToken,
     callbacks: options.callbacks,
     url: notificationEndpoint,
-    type: 'notification',
+    type: 'notificationRequest',
     requestOptions: {
       method: 'POST',
       headers: {

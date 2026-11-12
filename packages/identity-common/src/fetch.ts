@@ -3,44 +3,10 @@ import { IdentityCommonError } from './identity-common-error'
 import { readResponseBodyAtMost } from './response-body'
 
 /**
- * What a library of this repository fetches. A fetch callback gets it in its {@link FetchContext}, and
- * {@link FetchLimits} can limit each type on its own.
+ * What is fetched, passed to a {@link FetchCallback} as its third argument. Each library defines the types it fetches,
+ * e.g. `'statusList'`, so a callback passed to a library only gets the types of that library.
  */
-export type FetchType =
-  // Token Status List, by token-status-list, mdoc, sd-jwt-vc and eudi-registration-certificate
-  | 'statusList'
-  // ISO/IEC 18013-5 identifier list, by mdoc
-  | 'identifierList'
-  // SD-JWT VC type metadata, by sd-jwt-vc
-  | 'typeMetadata'
-  // Credential metadata, by eudi-sca
-  | 'credentialMetadata'
-  // OpenID Federation, by openid-federation
-  | 'entityConfiguration'
-  | 'entityStatement'
-  // OAuth 2.0, OpenID4VCI and OpenID4VP
-  | 'authorizationServerMetadata'
-  | 'credentialIssuerMetadata'
-  | 'jwks'
-  | 'clientMetadata'
-  | 'requestObject'
-  | 'credentialOffer'
-  | 'accessToken'
-  | 'tokenIntrospection'
-  | 'pushedAuthorizationRequest'
-  | 'authorizationChallenge'
-  | 'interactiveAuthorization'
-  | 'clientAttestationChallenge'
-  | 'nonce'
-  | 'credential'
-  | 'deferredCredential'
-  | 'notification'
-  | 'authorizationResponse'
-  // Any other resource requested with an access token
-  | 'resource'
-
-/** What is fetched, passed to a {@link FetchCallback} as its third argument. */
-export interface FetchContext<Type extends FetchType = FetchType> {
+export interface FetchContext<Type extends string = string> {
   type: Type
 }
 
@@ -53,7 +19,7 @@ export interface FetchContext<Type extends FetchType = FetchType> {
  * streams the body, such as the one of Expo (`expo/fetch`) or `react-native-nitro-fetch`: the body of a fetch without
  * a body stream is read whole before its size can be checked.
  */
-export type FetchCallback<Type extends FetchType = FetchType> = (
+export type FetchCallback<Type extends string = string> = (
   input: string,
   init: RequestInit,
   context: FetchContext<Type>
@@ -61,45 +27,35 @@ export type FetchCallback<Type extends FetchType = FetchType> = (
 
 /**
  * The maximum sizes of the response bodies a library reads. The limit for a type is `maxResponseBytesByType[type]`,
- * else `maxResponseBytes`, else its default: 16 MiB for `statusList` and `identifierList`, 1 MiB for `typeMetadata`,
- * and 10 MiB for every other type.
+ * else `maxResponseBytes`, else the default of the library for the type, else 10 MiB.
  */
-export interface FetchLimits {
+export interface FetchLimits<Type extends string = string> {
   /** The maximum size in bytes of every response body, unless `maxResponseBytesByType` has one for its type. */
   maxResponseBytes?: number
   /** The maximum size in bytes of the response body per type. */
-  maxResponseBytesByType?: Partial<Record<FetchType, number>>
+  maxResponseBytesByType?: Partial<Record<Type, number>>
 }
 
 /** How a library fetches. */
-export interface FetchOptions<Type extends FetchType = FetchType> {
+export interface FetchOptions<Type extends string = string> {
   /** Defaults to the global `fetch`. */
   fetch?: FetchCallback<Type>
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<Type>
 }
 
 /** A request of {@link fetchWithLimits}. */
-export interface FetchRequest<Type extends FetchType = FetchType> {
+export interface FetchRequest<Type extends string = string> {
   type: Type
   url: string
   init?: RequestInit
   /** The media types to ask for, in order of preference. Sent as `Accept`, unless `init` sets that header. */
   accept?: string | ReadonlyArray<string>
+  /** The limit of the library for `type`, when `fetchLimits` sets none. 10 MiB by default. */
+  defaultMaxResponseBytes?: number
 }
 
-const MiB = 1024 * 1024
-
-/** As the agent default of Credo. */
-const DEFAULT_MAX_RESPONSE_BYTES = 10 * MiB
-
-const DEFAULT_MAX_RESPONSE_BYTES_BY_TYPE: Partial<Record<FetchType, number>> = {
-  // The largest list of Token Status List draft 16 Appendix B, 100 million statuses of which half are revoked,
-  // compresses to 11.9 MB, about 15.1 MiB as a JWT. An identifier list is limited as a status list.
-  statusList: 16 * MiB,
-  identifierList: 16 * MiB,
-  // Type metadata refers to its logos and templates by URI, so 1 MiB leaves room for a few embedded in `data:` URIs
-  typeMetadata: MiB,
-}
+/** The limit when neither the caller nor the library sets one, as the agent default of Credo. */
+const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 
 /**
  * A copy of `init`. Not `new Headers(init)`, which can drop headers of a `Headers` of another implementation, e.g. of
@@ -127,7 +83,7 @@ const globalFetch: FetchCallback = (input, init) => globalThis.fetch(input, init
  * @throws IdentityCommonError if the limit is not a number of 0 or more, or the body is larger. An error of `fetch`
  *   is passed on.
  */
-export async function fetchWithLimits<Type extends FetchType>(
+export async function fetchWithLimits<Type extends string>(
   options: FetchOptions<Type>,
   request: FetchRequest<Type>
 ): Promise<Response> {
@@ -146,7 +102,7 @@ export type FetchAndParseResult<T> = { response: Response; data: T } | { respons
  * @throws IdentityCommonError as {@link fetchWithLimits} does, and if `accept` is given and a response with a 2xx
  *   status is not of one of its media types. Errors of `fetch` and `parse` are passed on.
  */
-export async function fetchAndParse<T, Type extends FetchType>(
+export async function fetchAndParse<T, Type extends string>(
   options: FetchOptions<Type>,
   {
     parse,
@@ -168,15 +124,12 @@ export async function fetchAndParse<T, Type extends FetchType>(
   return { response, data: await parse(body, response) }
 }
 
-async function fetchBody<Type extends FetchType>(
+async function fetchBody<Type extends string>(
   { fetch = globalFetch, fetchLimits }: FetchOptions<Type>,
-  { type, url, init, accept }: FetchRequest<Type>
+  { type, url, init, accept, defaultMaxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES }: FetchRequest<Type>
 ): Promise<{ response: Response; body: Uint8Array<ArrayBuffer> }> {
   const maxResponseBytes =
-    fetchLimits?.maxResponseBytesByType?.[type] ??
-    fetchLimits?.maxResponseBytes ??
-    DEFAULT_MAX_RESPONSE_BYTES_BY_TYPE[type] ??
-    DEFAULT_MAX_RESPONSE_BYTES
+    fetchLimits?.maxResponseBytesByType?.[type] ?? fetchLimits?.maxResponseBytes ?? defaultMaxResponseBytes
   // Before the request is made, rather than once its body is read
   if (Number.isNaN(maxResponseBytes) || maxResponseBytes < 0) {
     throw new IdentityCommonError(

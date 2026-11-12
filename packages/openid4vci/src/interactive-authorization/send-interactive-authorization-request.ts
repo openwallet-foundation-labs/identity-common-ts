@@ -94,7 +94,7 @@ export interface SendInteractiveAuthorizationRequestOptions {
  * ```
  */
 export async function sendInteractiveAuthorizationRequest(options: SendInteractiveAuthorizationRequestOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks, 'interactiveAuthorization')
+  const fetchWithZod = createZodFetcher(options.callbacks, 'interactiveAuthorizationRequest')
 
   const authorizationServerMetadata = options.authorizationServerMetadata
   const interactiveAuthorizationEndpoint = authorizationServerMetadata.interactive_authorization_endpoint

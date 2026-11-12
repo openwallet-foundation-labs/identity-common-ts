@@ -12,6 +12,7 @@ import {
   createZodFetcher,
   type Fetch,
   getQueryParams,
+  type Openid4vcFetchType,
   objectToQueryParams,
   URL,
   URLSearchParams,
@@ -47,7 +48,7 @@ export interface ResolveCredentialOfferOptions {
    * The maximum size of the response of the `credential_offer_uri`, 10 MiB by default (see `FetchLimits` of
    * `@owf/identity-common`)
    */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<Openid4vcFetchType>
 }
 
 /**

@@ -3,7 +3,7 @@ import { type EntityConfigurationClaims, fetchEntityConfiguration } from '../ent
 import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
-import { type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
+import { type FederationFetchType, type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
 import { validate } from '../utils/validate'
 import { zEntityStatementJwt } from './entityStatementJwt'
 
@@ -13,7 +13,7 @@ export type FetchEntityStatementOptions = {
   verifyJwtCallback: VerifyCallback
   fetchCallback?: FetchCallback
   /** The maximum sizes of the responses, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`) */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<FederationFetchType>
   /**
    *
    * The issuers entity configuration

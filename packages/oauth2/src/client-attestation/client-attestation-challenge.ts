@@ -29,7 +29,7 @@ export interface RequestClientAttestationChallengeOptions {
  * @throws {ValidationError} if the response could not be validated
  */
 export async function requestClientAttestationChallenge(options: RequestClientAttestationChallengeOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks, 'clientAttestationChallenge')
+  const fetchWithZod = createZodFetcher(options.callbacks, 'clientAttestationChallengeRequest')
 
   const { authorizationServerMetadata } = options
   const challengeEndpoint = authorizationServerMetadata.challenge_endpoint

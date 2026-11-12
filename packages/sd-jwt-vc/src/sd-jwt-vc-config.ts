@@ -3,6 +3,9 @@ import type { SdJwtConfig, Verifier } from '@sd-jwt/core'
 import type { VctFetcher } from './sd-jwt-vc-vct'
 
 export type StatusListFetcher = (uri: string) => Promise<string>
+
+/** What the default `statusListFetcher` and `vctFetcher` fetch. */
+export type SdJwtVcFetchType = 'statusList' | 'typeMetadata'
 /** Where the status passed to a {@link StatusValidator} was read from. */
 export type StatusValidatorContext = {
   /** URI of the status list. */
@@ -47,9 +50,9 @@ export type SdJwtVcConfig<T = unknown> = SdJwtConfig<T> & {
   // timeout value in milliseconds when to abort the fetch request. If not provided, it will default to 10000.
   timeout?: number
   // the fetch of the default statusListFetcher and vctFetcher, which gets { type: 'statusList' } or { type: 'typeMetadata' } as its third argument. If not provided, the global fetch is used.
-  fetch?: FetchCallback<'statusList' | 'typeMetadata'>
+  fetch?: FetchCallback<SdJwtVcFetchType>
   // maximum sizes of the responses of the default statusListFetcher and vctFetcher (see FetchLimits of @owf/identity-common). If not provided, 16 MiB for a status list and 1 MiB for type metadata.
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<SdJwtVcFetchType>
   // maximum depth of extends chain to resolve. If not provided, it will default to 5. Set to -1 to not limit the vct extends depth.
   maxVctExtendsDepth?: number
 }

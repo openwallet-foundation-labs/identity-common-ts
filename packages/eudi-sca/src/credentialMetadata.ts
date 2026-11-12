@@ -82,7 +82,7 @@ export async function fetchCredentialMetadata(
   credentialMetadataSource: string | IssuerMetadataWithCredentialMetadataUri,
   customFetcher?: FetchCallback<'credentialMetadata'>,
   langCode?: string,
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<'credentialMetadata'>
 ): Promise<CredentialMetadata & CredentialIssuerMetadata> {
   const uri =
     typeof credentialMetadataSource === 'string'

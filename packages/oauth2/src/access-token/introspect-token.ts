@@ -36,7 +36,7 @@ export interface IntrospectTokenOptions {
 }
 
 export async function introspectToken(options: IntrospectTokenOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks, 'tokenIntrospection')
+  const fetchWithZod = createZodFetcher(options.callbacks, 'tokenIntrospectionRequest')
 
   const introspectionRequest = parseWithErrorHandling(zTokenIntrospectionRequest, {
     token: options.token,

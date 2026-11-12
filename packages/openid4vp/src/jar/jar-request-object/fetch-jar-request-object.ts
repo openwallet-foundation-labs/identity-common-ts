@@ -1,5 +1,5 @@
 import { Oauth2ErrorCodes, Oauth2MediaTypes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { createFetcher, type Fetch, objectToQueryParams } from '@openid4vc/utils'
+import { createFetcher, type Fetch, type Openid4vcFetchType, objectToQueryParams } from '@openid4vc/utils'
 import { CommonMediaTypes, createAcceptHeader, type FetchLimits } from '@owf/identity-common'
 import type { ClientIdPrefix } from '../../client-identifier-prefix/z-client-id-prefix'
 import type { WalletMetadata } from '../../models/z-wallet-metadata'
@@ -25,7 +25,7 @@ export async function fetchJarRequestObject(options: {
   }
   fetch?: Fetch
   /** The maximum size of the response, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`) */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<Openid4vcFetchType>
 }): Promise<string> {
   const { requestUri, clientIdPrefix, method, wallet } = options
 

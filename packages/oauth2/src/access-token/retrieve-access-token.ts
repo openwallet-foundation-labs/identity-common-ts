@@ -218,7 +218,7 @@ interface RetrieveAccessTokenOptions extends RetrieveAccessTokenBaseOptions {
  * Internal method
  */
 async function retrieveAccessToken(options: RetrieveAccessTokenOptions): Promise<RetrieveAccessTokenReturn> {
-  const fetchWithZod = createZodFetcher(options.callbacks, 'accessToken')
+  const fetchWithZod = createZodFetcher(options.callbacks, 'accessTokenRequest')
 
   const accessTokenRequest = parseWithErrorHandling(
     zAccessTokenRequest,

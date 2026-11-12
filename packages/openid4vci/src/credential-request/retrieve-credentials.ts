@@ -317,7 +317,7 @@ async function retrieveCredentials(
     accessToken: options.accessToken,
     callbacks: options.callbacks,
     url: credentialEndpoint,
-    type: 'credential',
+    type: 'credentialRequest',
     requestOptions: {
       method: 'POST',
       headers: {
@@ -428,7 +428,7 @@ export async function retrieveDeferredCredentials(
     accessToken: options.accessToken,
     callbacks: options.callbacks,
     url: credentialEndpoint,
-    type: 'deferredCredential',
+    type: 'deferredCredentialRequest',
     requestOptions: {
       method: 'POST',
       headers: {

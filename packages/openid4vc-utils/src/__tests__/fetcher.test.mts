@@ -119,13 +119,13 @@ describe('createFetcher', () => {
       return new Response(null, { status: 204 })
     }
 
-    await createFetcher({ fetch }, 'notification')('https://example.com/notification', {
+    await createFetcher({ fetch }, 'notificationRequest')('https://example.com/notification', {
       method: 'POST',
       body: new URLSearchParams({ event: 'credential_accepted' }),
     })
 
     expect(requests).toEqual([
-      { url: 'https://example.com/notification', body: 'event=credential_accepted', type: 'notification' },
+      { url: 'https://example.com/notification', body: 'event=credential_accepted', type: 'notificationRequest' },
     ])
   })
 
@@ -134,14 +134,14 @@ describe('createFetcher', () => {
 
     await expect(
       createFetcher(
-        { fetch, fetchLimits: { maxResponseBytesByType: { credential: 100 } } },
-        'credential'
+        { fetch, fetchLimits: { maxResponseBytesByType: { credentialRequest: 100 } } },
+        'credentialRequest'
       )('https://example.com/credential')
     ).rejects.toThrow(new IdentityCommonError('The response is larger than the maximum of 100 bytes'))
     await expect(
       createFetcher(
-        { fetch, fetchLimits: { maxResponseBytesByType: { credential: 100 } } },
-        'nonce'
+        { fetch, fetchLimits: { maxResponseBytesByType: { credentialRequest: 100 } } },
+        'nonceRequest'
       )('https://example.com/nonce')
     ).resolves.toBeInstanceOf(Response)
   })
@@ -151,6 +151,6 @@ describe('createFetcher', () => {
       throw new TypeError('fetch failed')
     }
 
-    await expect(createFetcher({ fetch }, 'nonce')('https://example.com/nonce')).rejects.toThrow(FetchError)
+    await expect(createFetcher({ fetch }, 'nonceRequest')('https://example.com/nonce')).rejects.toThrow(FetchError)
   })
 })

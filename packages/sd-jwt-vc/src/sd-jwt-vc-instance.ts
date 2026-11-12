@@ -38,6 +38,7 @@ import {
 import z from 'zod'
 import type {
   SdJwtVcConfig,
+  SdJwtVcFetchType,
   StatusInvalidErrorDetails,
   StatusListFetcher,
   StatusListVerificationErrorDetails,
@@ -60,6 +61,12 @@ import type { VerificationResult } from './verification-result'
 
 // SRI hash algorithms, ordered from weakest to strongest
 const SRI_ALGORITHMS = ['sha256', 'sha384', 'sha512']
+
+/**
+ * The default maximum size of a type metadata response. Type metadata refers to its logos and templates by URI, so
+ * a document of 1 MiB leaves room for a few embedded in `data:` URIs.
+ */
+const DEFAULT_MAX_TYPE_METADATA_RESPONSE_BYTES = 1024 * 1024
 
 // Claims that SD-JWT VC forbids to be selectively disclosed (SD-JWT VC draft 23, Section 2.2.2.3)
 const PROTECTED_CLAIMS = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'vct#integrity', 'aka_vcts', 'status']
@@ -185,8 +192,7 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
    */
   private fetchOptions(
     timeoutMs: number
-  ): Required<Pick<FetchOptions<'statusList' | 'typeMetadata'>, 'fetch'>> &
-    FetchOptions<'statusList' | 'typeMetadata'> {
+  ): Required<Pick<FetchOptions<SdJwtVcFetchType>, 'fetch'>> & FetchOptions<SdJwtVcFetchType> {
     const fetch = this.userConfig.fetch ?? ((input, init) => globalThis.fetch(input, init))
     return {
       fetch: (input, init, context) => fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) }, context),
@@ -548,6 +554,7 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
       const response = await fetchWithLimits(this.fetchOptions(this.userConfig.timeout ?? 10000), {
         type: 'typeMetadata',
         url,
+        defaultMaxResponseBytes: DEFAULT_MAX_TYPE_METADATA_RESPONSE_BYTES,
       })
       // Not with the body of the response, as in statusListFetcher. Neither is response.json() used, as its
       // SyntaxError quotes the start of the body.

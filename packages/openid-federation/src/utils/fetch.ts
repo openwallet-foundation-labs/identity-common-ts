@@ -1,18 +1,18 @@
 import { type FetchLimits, fetchWithLimits, isMediaType } from '@owf/identity-common'
 import type { z } from 'zod'
-import type { FetchCallback } from './types'
+import type { FederationFetchType, FetchCallback } from './types'
 import { addSearchParams } from './url'
 import { validate } from './validate'
 
 type GetOptions = {
-  type: 'entityConfiguration' | 'entityStatement'
+  type: FederationFetchType
   url: string
   searchParams?: Record<string, string>
   requiredContentType?: string
   /** Defaults to the global `fetch` */
   fetchCallback?: FetchCallback
   /** 10 MiB by default */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<FederationFetchType>
 }
 
 /**
@@ -80,14 +80,14 @@ const post = async ({
   fetchCallback,
   fetchLimits,
 }: {
-  type: 'entityConfiguration' | 'entityStatement'
+  type: FederationFetchType
   url: string
   body?: Record<string, unknown>
   responseValidationSchema?: z.ZodType
   /** Defaults to the global `fetch` */
   fetchCallback?: FetchCallback
   /** 10 MiB by default */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<FederationFetchType>
 }) => {
   const response = await fetchWithLimits(
     { fetch: fetchCallback, fetchLimits },

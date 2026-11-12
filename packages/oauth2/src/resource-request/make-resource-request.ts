@@ -1,5 +1,10 @@
-import { createFetcher, type FetchRequestInit, type FetchResponse, type HttpMethod } from '@openid4vc/utils'
-import type { FetchType } from '@owf/identity-common'
+import {
+  createFetcher,
+  type FetchRequestInit,
+  type FetchResponse,
+  type HttpMethod,
+  type Openid4vcFetchType,
+} from '@openid4vc/utils'
 import type { CallbackContext } from '../callbacks'
 import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
 import { shouldRetryResourceRequestWithDpopNonce } from '../dpop/dpop-retry'
@@ -38,9 +43,9 @@ export interface ResourceRequestOptions {
   /**
    * What is requested, passed to `fetch` as its third argument and the key of its limit in `fetchLimits`
    *
-   * @default 'resource'
+   * @default 'resourceRequest'
    */
-  type?: FetchType
+  type?: Openid4vcFetchType
 }
 
 interface ResourceRequestResponseBase {
@@ -86,7 +91,7 @@ export async function resourceRequest(
       })
     : undefined
 
-  const response = await createFetcher(options.callbacks, options.type ?? 'resource')(options.url, {
+  const response = await createFetcher(options.callbacks, options.type ?? 'resourceRequest')(options.url, {
     ...options.requestOptions,
     headers: {
       ...options.requestOptions.headers,

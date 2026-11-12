@@ -8,7 +8,14 @@ import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import type { JsonWebKeySetOptions } from '../jsonWeb'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
 import type { Metadata } from '../metadata'
-import { addPaths, type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
+import {
+  addPaths,
+  type FederationFetchType,
+  type FetchCallback,
+  fetcher,
+  isSameEntityId,
+  type VerifyCallback,
+} from '../utils'
 import { validate } from '../utils/validate'
 import { applyMetadataPolicyToMetadata, combineMetadataPolicies } from './policies'
 import { mergeMetadata } from './policies/utils'
@@ -39,7 +46,7 @@ export type ResolveTrustChainsOptions = {
    *
    * @default 10 MiB per response
    */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<FederationFetchType>
   /**
    * @default new Date()
    */
@@ -168,11 +175,7 @@ export const resolveTrustChainsWithFailures = async (
   const failures: Array<TrustChainFailure> = []
   let requests = 0
   let visits = 0
-  const get = async (
-    type: 'entityConfiguration' | 'entityStatement',
-    url: string,
-    searchParams?: Record<string, string>
-  ) => {
+  const get = async (type: FederationFetchType, url: string, searchParams?: Record<string, string>) => {
     requests++
     if (requests > maxRequests) {
       throw fail(`trust chain resolution exceeded ${maxRequests} requests`)

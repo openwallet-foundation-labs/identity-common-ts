@@ -110,7 +110,7 @@ const zMetadata = z.union([zMetadataV1, zMetadataDraft11], unionParams('Invalid 
 
 ### Fetching
 
-The packages of this repository fetch through `fetchWithLimits`, which reads the body of every response within a maximum size. They take a `fetch` (`FetchCallback`) and `fetchLimits` (`FetchLimits`), and pass them on:
+The packages of this repository fetch through `fetchWithLimits`, which reads the body of every response within a maximum size. They take a `fetch` (`FetchCallback`) and `fetchLimits` (`FetchLimits`), and pass them on. Each package defines the types of what it fetches, e.g. `MdocFetchType` of `@owf/mdoc` or `Openid4vcFetchType` of `@openid4vc/utils`, so a callback passed to a package only gets the types of that package:
 
 ```typescript
 import type { FetchCallback, FetchLimits } from '@owf/identity-common'
@@ -125,9 +125,9 @@ const fetchLimits: FetchLimits = {
 }
 ```
 
-The limit for a `FetchType` is `maxResponseBytesByType[type]`, else `maxResponseBytes`, else its default: 16 MiB for `statusList` and `identifierList`, 1 MiB for `typeMetadata` and 10 MiB for every other type. A response with a larger `Content-Length` is rejected before its body is read, and a body stream is cancelled once it is larger, with an `IdentityCommonError`. Where fetch has no body stream, as in React Native without Expo, the body is read whole and checked afterwards. The fetch callback therefore does not have to limit the size itself.
+The limit for a type is `maxResponseBytesByType[type]`, else `maxResponseBytes`, else the default of the package for the type, such as 16 MiB for a status list, else 10 MiB. A response with a larger `Content-Length` is rejected before its body is read, and a body stream is cancelled once it is larger, with an `IdentityCommonError`. Where fetch has no body stream, as in React Native without Expo, the body is read whole and checked afterwards. The fetch callback therefore does not have to limit the size itself.
 
-`fetchWithLimits(options, { type, url, init, accept })` returns a `Response` that holds the body in memory. `fetchAndParse` also parses the body of a response with a 2xx status with `parse`, e.g. with a zod schema or into a class instance. When `accept` is given, a response with a 2xx status of another media type is rejected with an `IdentityCommonError`, while a response with another status is returned without `data`, whatever its media type:
+`fetchWithLimits(options, { type, url, init, accept, defaultMaxResponseBytes })` returns a `Response` that holds the body in memory. `fetchAndParse` also parses the body of a response with a 2xx status with `parse`, e.g. with a zod schema or into a class instance. When `accept` is given, a response with a 2xx status of another media type is rejected with an `IdentityCommonError`, while a response with another status is returned without `data`, whatever its media type:
 
 ```typescript
 import { fetchAndParse } from '@owf/identity-common'

@@ -86,7 +86,7 @@ export interface SendAuthorizationChallengeRequestOptions {
  * @throws {ValidationError} if a successful response was received but an error occurred during verification of the {@link AuthorizationChallengeResponse}
  */
 export async function sendAuthorizationChallengeRequest(options: SendAuthorizationChallengeRequestOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks, 'authorizationChallenge')
+  const fetchWithZod = createZodFetcher(options.callbacks, 'authorizationChallengeRequest')
 
   const authorizationServerMetadata = options.authorizationServerMetadata
   const authorizationChallengeEndpoint = authorizationServerMetadata.authorization_challenge_endpoint

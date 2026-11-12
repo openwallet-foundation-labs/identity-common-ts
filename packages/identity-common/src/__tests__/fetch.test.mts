@@ -1,12 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  type FetchCallback,
-  type FetchLimits,
-  type FetchType,
-  fetchAndParse,
-  fetchWithLimits,
-  IdentityCommonError,
-} from '../../src'
+import { type FetchCallback, type FetchLimits, fetchAndParse, fetchWithLimits, IdentityCommonError } from '../../src'
 
 const MiB = 1024 * 1024
 
@@ -54,7 +47,10 @@ describe('fetchWithLimits', () => {
       },
     } as unknown as Headers
 
-    await fetchWithLimits({ fetch }, { type: 'accessToken', url: 'https://example.com/token', init: { headers } })
+    await fetchWithLimits(
+      { fetch },
+      { type: 'accessTokenRequest', url: 'https://example.com/token', init: { headers } }
+    )
 
     expect(Object.fromEntries(new Headers(fetch.mock.calls[0][1].headers))).toEqual({
       'content-type': 'application/x-www-form-urlencoded',
@@ -88,24 +84,22 @@ describe('fetchWithLimits', () => {
     expect(fetch).toHaveBeenCalledOnce()
   })
 
-  it.each<[FetchType, number]>([
-    ['statusList', 16 * MiB],
-    ['identifierList', 16 * MiB],
-    ['typeMetadata', MiB],
-    ['jwks', 10 * MiB],
-    ['credential', 10 * MiB],
-  ])('limits a %s response to %i bytes by default', async (type, limit) => {
-    await expect(
-      fetchWithLimits({ fetch: fetchReturning(withContentLength(limit)) }, { type, url: 'https://example.com' })
-    ).resolves.toBeInstanceOf(Response)
+  it.each<[string, number | undefined, number]>([
+    ['10 MiB', undefined, 10 * MiB],
+    ['the default of the library', 16 * MiB, 16 * MiB],
+  ])('limits a response to %s by default', async (_, defaultMaxResponseBytes, limit) => {
+    const request = { type: 'statusList', url: 'https://example.com', defaultMaxResponseBytes }
 
-    await expect(
-      fetchWithLimits({ fetch: fetchReturning(withContentLength(limit + 1)) }, { type, url: 'https://example.com' })
-    ).rejects.toThrow(new IdentityCommonError(`The response is larger than the maximum of ${limit} bytes`))
+    await expect(fetchWithLimits({ fetch: fetchReturning(withContentLength(limit)) }, request)).resolves.toBeInstanceOf(
+      Response
+    )
+    await expect(fetchWithLimits({ fetch: fetchReturning(withContentLength(limit + 1)) }, request)).rejects.toThrow(
+      new IdentityCommonError(`The response is larger than the maximum of ${limit} bytes`)
+    )
   })
 
-  it.each<[string, FetchLimits, FetchType, number]>([
-    ['the global limit over the default of the type', { maxResponseBytes: 1000 }, 'statusList', 1000],
+  it.each<[string, FetchLimits<'statusList' | 'jwks'>, 'statusList' | 'jwks', number]>([
+    ['the global limit over the default of the library', { maxResponseBytes: 1000 }, 'statusList', 1000],
     [
       'the limit of the type over the global limit',
       { maxResponseBytes: 1000, maxResponseBytesByType: { statusList: 2000 } },
@@ -119,24 +113,19 @@ describe('fetchWithLimits', () => {
       1000,
     ],
     [
-      'the limit of the type over its default',
-      { maxResponseBytesByType: { typeMetadata: 2 * MiB } },
-      'typeMetadata',
-      2 * MiB,
+      'the limit of the type over the default of the library',
+      { maxResponseBytesByType: { statusList: MiB } },
+      'statusList',
+      MiB,
     ],
   ])('applies %s', async (_, fetchLimits, type, limit) => {
-    await expect(
-      fetchWithLimits(
-        { fetch: fetchReturning(withContentLength(limit)), fetchLimits },
-        { type, url: 'https://example.com' }
-      )
-    ).resolves.toBeInstanceOf(Response)
+    const request = { type, url: 'https://example.com', defaultMaxResponseBytes: 16 * MiB }
 
     await expect(
-      fetchWithLimits(
-        { fetch: fetchReturning(withContentLength(limit + 1)), fetchLimits },
-        { type, url: 'https://example.com' }
-      )
+      fetchWithLimits({ fetch: fetchReturning(withContentLength(limit)), fetchLimits }, request)
+    ).resolves.toBeInstanceOf(Response)
+    await expect(
+      fetchWithLimits({ fetch: fetchReturning(withContentLength(limit + 1)), fetchLimits }, request)
     ).rejects.toThrow(`The response is larger than the maximum of ${limit} bytes`)
   })
 
@@ -155,7 +144,7 @@ describe('fetchWithLimits', () => {
     await expect(
       fetchWithLimits(
         { fetch: fetchReturning(() => new Response(body)), fetchLimits: { maxResponseBytes: 4096 } },
-        { type: 'credential', url: 'https://example.com' }
+        { type: 'credentialRequest', url: 'https://example.com' }
       )
     ).rejects.toThrow('The response is larger than the maximum of 4096 bytes')
     expect(pulled).toBe(5)
@@ -165,10 +154,13 @@ describe('fetchWithLimits', () => {
     const fetch = fetchReturning(() => new Response('{}'))
 
     await expect(
-      fetchWithLimits({ fetch, fetchLimits: { maxResponseBytes } }, { type: 'nonce', url: 'https://example.com' })
+      fetchWithLimits(
+        { fetch, fetchLimits: { maxResponseBytes } },
+        { type: 'nonceRequest', url: 'https://example.com' }
+      )
     ).rejects.toThrow(
       new IdentityCommonError(
-        `The maximum size of a nonce response must be a number of 0 or more, but is ${maxResponseBytes}`
+        `The maximum size of a nonceRequest response must be a number of 0 or more, but is ${maxResponseBytes}`
       )
     )
     expect(fetch).not.toHaveBeenCalled()
@@ -216,7 +208,7 @@ describe('fetchWithLimits', () => {
   it('returns a response without a body for a status that cannot have one', async () => {
     const response = await fetchWithLimits(
       { fetch: async () => new Response(null, { status: 204 }) },
-      { type: 'notification', url: 'https://example.com' }
+      { type: 'notificationRequest', url: 'https://example.com' }
     )
 
     expect(response.status).toBe(204)
@@ -259,7 +251,7 @@ describe('fetchAndParse', () => {
 
     const result = await fetchAndParse(
       { fetch: fetchReturning(json('{"error":"invalid_request"}', { status: 400 })) },
-      { type: 'accessToken', url: 'https://example.com', accept: 'application/json', parse }
+      { type: 'accessTokenRequest', url: 'https://example.com', accept: 'application/json', parse }
     )
 
     expect(result.data).toBeUndefined()

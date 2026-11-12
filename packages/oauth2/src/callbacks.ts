@@ -1,4 +1,4 @@
-import type { Fetch } from '@openid4vc/utils'
+import type { Fetch, Openid4vcFetchType } from '@openid4vc/utils'
 import type { FetchLimits, Hasher, OrPromise } from '@owf/identity-common'
 import type { DecryptJweCallback, EncryptJweCallback, Jwk, JwkSet, SignJwsCallback, VerifyJwsCallback } from '@owf/jose'
 import type { ClientAuthenticationCallback } from './client-authentication'
@@ -75,8 +75,8 @@ export type GetJwksCallback = (jwksUri: string) => OrPromise<JwkSet | undefined>
  */
 export interface CallbackContext {
   /**
-   * Custom fetch implementation to use. It gets what is fetched as its third argument, `{ type }`, e.g.
-   * `{ type: 'accessToken' }`.
+   * Custom fetch implementation to use. It gets what is requested as its third argument, `{ type }`, e.g.
+   * `{ type: 'accessTokenRequest' }`.
    */
   fetch?: Fetch
 
@@ -84,7 +84,7 @@ export interface CallbackContext {
    * The maximum sizes of the response bodies, per type of request. By default 10 MiB per response (see `FetchLimits`
    * of `@owf/identity-common`).
    */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<Openid4vcFetchType>
 
   /**
    * Optional callback to resolve authorization server metadata without performing a well-known

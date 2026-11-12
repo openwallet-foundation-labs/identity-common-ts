@@ -1,4 +1,4 @@
-import { createZodFetcher, type Fetch, InvalidFetchResponseError } from '@openid4vc/utils'
+import { createZodFetcher, type Fetch, InvalidFetchResponseError, type Openid4vcFetchType } from '@openid4vc/utils'
 import { type BaseSchema, CommonMediaTypes, type FetchLimits, ValidationError } from '@owf/identity-common'
 import type z from 'zod'
 
@@ -16,7 +16,7 @@ export interface FetchWellKnownMetadataOptions {
   /**
    * The maximum size of the response, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`)
    */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<Openid4vcFetchType>
 
   /**
    * The accepted content types. If not provided a default of `CommonMediaTypes.Json`

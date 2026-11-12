@@ -2,6 +2,12 @@ import { bytesToString, type FetchCallback, type FetchLimits, fetchWithLimits, i
 import { StatusListError } from './status-list-error'
 import { StatusListMediaTypes } from './types'
 
+/**
+ * The default maximum size of a status list response. The largest list of Token Status List draft 16 Appendix B,
+ * 100 million statuses of which half are revoked, compresses to 11.9 MB, about 15.1 MiB as a JWT.
+ */
+const DEFAULT_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+
 export const fetchStatusList = async ({
   uri,
   customFetcher,
@@ -19,7 +25,7 @@ export const fetchStatusList = async ({
    * The maximum size of the response, 16 MiB for a status list by default. A larger response is rejected, without
    * reading more of it than the maximum where the platform streams the body.
    */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<'statusList'>
 }): Promise<string | Uint8Array> => {
   try {
     if (acceptedFormats.length === 0) {
@@ -31,6 +37,7 @@ export const fetchStatusList = async ({
       {
         type: 'statusList',
         url: uri,
+        defaultMaxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
         accept: acceptedFormats.map((format) =>
           format === 'jwt' ? StatusListMediaTypes.StatusListJwt : StatusListMediaTypes.StatusListCwt
         ),

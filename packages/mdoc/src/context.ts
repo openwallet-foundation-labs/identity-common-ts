@@ -62,7 +62,10 @@ export interface HpkeContext {
  * What a {@link MdocContext.fetch} call is retrieving. Lets an implementation apply policy —
  * caching, timeouts, retries — per resource rather than to every request alike.
  */
-export type MdocFetchContext = FetchContext<'statusList' | 'identifierList'>
+export type MdocFetchContext = FetchContext<MdocFetchType>
+
+/** What this library fetches: the status lists and identifier lists an MSO references. */
+export type MdocFetchType = 'statusList' | 'identifierList'
 
 export interface MdocContext {
   /**
@@ -72,13 +75,13 @@ export interface MdocContext {
    *
    * The global `fetch` satisfies this, as it ignores the third argument.
    */
-  fetch: FetchCallback<'statusList' | 'identifierList'>
+  fetch: FetchCallback<MdocFetchType>
 
   /**
    * The maximum sizes of the status list and identifier list responses, 16 MiB each by default
    * (see `FetchLimits` of `@owf/identity-common`).
    */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<MdocFetchType>
 
   crypto: {
     random: (length: number) => Uint8Array

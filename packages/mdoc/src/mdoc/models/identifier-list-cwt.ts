@@ -22,6 +22,9 @@ import {
   IdentifierListCwtPayload,
 } from './identifier-list-cwt-payload'
 
+/** The default maximum size of an identifier list response, as of a status list response. */
+const DEFAULT_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+
 export type IdentifierListCwtOptions = Omit<
   CwtOptions<IdentifierListCwtPayload, IdentifierListCwtProtectedHeaders>,
   'payload' | 'protectedHeaders'
@@ -112,6 +115,7 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
         type: 'identifierList',
         url: uri,
         accept: MdocMediaTypes.IdentifierListCwt,
+        defaultMaxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
       })
     } catch (error) {
       if (!(error instanceof IdentityCommonError)) throw error

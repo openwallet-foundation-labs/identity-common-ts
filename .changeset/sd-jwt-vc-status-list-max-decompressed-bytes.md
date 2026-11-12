@@ -8,4 +8,4 @@ The default `statusListFetcher` fetches the status list with `fetchStatusList` o
 
 The default `vctFetcher` rejects a type metadata response larger than 1 MiB, or the `typeMetadata` limit of `fetchLimits`. Before, it read a response of any size.
 
-Both default fetchers fetch with the new `fetch` of `SdJwtVcConfig`, the global `fetch` by default, which gets `{ type: 'statusList' }` or `{ type: 'typeMetadata' }` as its third argument.
+Both default fetchers fetch with the new `fetch` of `SdJwtVcConfig`, the global `fetch` by default, which gets `{ type: 'statusList' }` or `{ type: 'typeMetadata' }`, the new `SdJwtVcFetchType`, as its third argument.

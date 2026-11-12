@@ -186,7 +186,7 @@ export interface VerifyRegistrationCertificateCallbacks {
   /** Fetches the status list, with `{ type: 'statusList' }` as its third argument; defaults to the global `fetch` */
   fetch?: FetchCallback<'statusList'>
   /** The maximum size of the status list response; 16 MiB by default (see `FetchLimits` of `@owf/identity-common`) */
-  fetchLimits?: FetchLimits
+  fetchLimits?: FetchLimits<'statusList'>
 }
 
 // ============================================================================

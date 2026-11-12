@@ -14,8 +14,11 @@ export type VerifyCallback = (options: {
   jwk: JsonWebKey
 }) => Promise<boolean>
 
+/** What this library fetches. */
+export type FederationFetchType = 'entityConfiguration' | 'entityStatement'
+
 /**
  * Fetches an entity configuration or an entity statement. It gets `{ type: 'entityConfiguration' }` or
  * `{ type: 'entityStatement' }` as its third argument, and the global `fetch` satisfies it.
  */
-export type FetchCallback = IdentityCommonFetchCallback<'entityConfiguration' | 'entityStatement'>
+export type FetchCallback = IdentityCommonFetchCallback<FederationFetchType>
