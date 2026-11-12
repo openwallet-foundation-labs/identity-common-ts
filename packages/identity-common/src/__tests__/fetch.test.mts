@@ -44,6 +44,24 @@ describe('fetchWithLimits', () => {
     expect(context).toEqual({ type: 'statusList' })
   })
 
+  it('keeps the headers of a Headers of another implementation', async () => {
+    const fetch = fetchReturning(() => new Response('{}'))
+    // As the Headers of a polyfill, which the global Headers does not know
+    const headers = {
+      forEach: (callback: (value: string, name: string) => void) => {
+        callback('application/x-www-form-urlencoded', 'Content-Type')
+        callback('proof', 'DPoP')
+      },
+    } as unknown as Headers
+
+    await fetchWithLimits({ fetch }, { type: 'accessToken', url: 'https://example.com/token', init: { headers } })
+
+    expect(Object.fromEntries(new Headers(fetch.mock.calls[0][1].headers))).toEqual({
+      'content-type': 'application/x-www-form-urlencoded',
+      dpop: 'proof',
+    })
+  })
+
   it('keeps an Accept header that the request sets', async () => {
     const fetch = fetchReturning(() => new Response('{}'))
 

@@ -101,6 +101,22 @@ const DEFAULT_MAX_RESPONSE_BYTES_BY_TYPE: Partial<Record<FetchType, number>> = {
   typeMetadata: MiB,
 }
 
+/**
+ * A copy of `init`. Not `new Headers(init)`, which can drop headers of a `Headers` of another implementation, e.g. of
+ * a polyfill that replaced the global after it was created.
+ */
+function copyHeaders(init: HeadersInit | undefined): Headers {
+  if (init === undefined || Array.isArray(init) || typeof (init as Headers).forEach !== 'function') {
+    return new Headers(init)
+  }
+
+  const headers = new Headers()
+  ;(init as Headers).forEach((value, name) => {
+    headers.append(name, value)
+  })
+  return headers
+}
+
 /** Resolved on every call, so a fetch that is set or replaced after this module is loaded is used. */
 const globalFetch: FetchCallback = (input, init) => globalThis.fetch(input, init)
 
@@ -162,7 +178,7 @@ async function fetchBody<Type extends FetchType>(
     )
   }
 
-  const headers = new Headers(init?.headers)
+  const headers = copyHeaders(init?.headers)
   if (accept !== undefined && !headers.has('Accept')) {
     headers.set('Accept', createAcceptHeader(typeof accept === 'string' ? [accept] : accept))
   }
@@ -171,7 +187,7 @@ async function fetchBody<Type extends FetchType>(
   const body = await readResponseBodyAtMost(fetched, maxResponseBytes)
 
   // The body is decoded, so these headers no longer describe it
-  const bufferedHeaders = new Headers(fetched.headers)
+  const bufferedHeaders = copyHeaders(fetched.headers)
   bufferedHeaders.delete('Content-Encoding')
   bufferedHeaders.delete('Content-Length')
 
