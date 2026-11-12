@@ -22,7 +22,7 @@ yarn add @owf/mdoc
 
 ## Usage
 
-The `Issuer`, `Holder` and `Verifier` classes cover issuing, presenting and verifying mDOCs. Cryptographic operations, X.509 certificate handling and `fetch` are provided through an `MdocContext`. See the [tests](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/mdoc/src/__tests__) for complete flows, and an example `MdocContext` in [`context.ts`](https://github.com/openwallet-foundation-labs/identity-common-ts/blob/main/packages/mdoc/src/__tests__/context.ts).
+The `Issuer`, `Holder` and `Verifier` classes cover issuing, presenting and verifying mDOCs. Cryptographic operations, X.509 certificate handling and `fetch` are provided through an `MdocContext`. Its `fetch` gets `{ type: 'statusList' }` or `{ type: 'identifierList' }` as its third argument, and the responses are read within its `fetchLimits`, 16 MiB each by default (see `FetchLimits` of `@owf/identity-common`). See the [tests](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/mdoc/src/__tests__) for complete flows, and an example `MdocContext` in [`context.ts`](https://github.com/openwallet-foundation-labs/identity-common-ts/blob/main/packages/mdoc/src/__tests__/context.ts).
 
 ## Dependencies
 

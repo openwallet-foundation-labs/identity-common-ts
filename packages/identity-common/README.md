@@ -37,7 +37,7 @@ This library is **platform agnostic** and works in:
 Your environment must provide:
 
 - `URL` and `URLSearchParams` implementations
-- A global `fetch` implementation (or provide it via callbacks)
+- A global `fetch` implementation (or provide it via callbacks), and global `Headers` and `Response`
 - Global `TextEncoder` and `TextDecoder` implementations
 
 ### React Native
@@ -47,6 +47,8 @@ When using these libraries in React Native you may need to add a polyfill for `T
 You can confirm this by checking if `global.TextDecoder` is available. It should be available for React Native > 0.85 or Expo SDK > 52.
 
 If it is not available, make sure to add a polyfill like [this one](https://github.com/EvanBacon/text-decoder).
+
+The `fetch` of React Native without Expo does not stream the body of a response, so a response is read whole before its size can be checked. Use a `fetch` that streams the body, such as the one of Expo (`expo/fetch`) or [`react-native-nitro-fetch`](https://github.com/margelo/react-native-nitro-fetch), so that the packages stop reading a response once it is larger than its limit (see [Fetching](#fetching)).
 
 ## API Reference
 
@@ -105,6 +107,36 @@ const zMetadata = z.union([zMetadataV1, zMetadataDraft11], unionParams('Invalid 
 `zTyp('dpop+jwt')` validates a JOSE `typ` header and `isJwtTyp(typ, 'dpop+jwt')` compares one. Both accept the `typ` in any casing and with the `application/` prefix (RFC 7515 Section 4.1.9), so compare a parsed `typ` with `isJwtTyp`, not with `===`.
 
 `isMediaType(contentType, CommonMediaTypes.Json)` compares a `Content-Type` value with one or more media types, ignoring casing and parameters (RFC 9110 Section 8.3), so `application/json; charset=utf-8` matches and `application/json-seq` does not. `extractMediaType` returns the normalized `type/subtype`, and `createAcceptHeader` builds an `Accept` header with quality values in order of preference. `CommonMediaTypes` has the media types that are not specific to one specification, such as `Json`, `Jwt` and `JwkSet`.
+
+### Fetching
+
+The packages of this repository fetch through `fetchWithLimits`, which reads the body of every response within a maximum size. They take a `fetch` (`FetchCallback`) and `fetchLimits` (`FetchLimits`), and pass them on. Each package defines the types of what it fetches, e.g. `MdocFetchType` of `@owf/mdoc` or `Openid4vcFetchType` of `@openid4vc/utils`, so a callback passed to a package only gets the types of that package:
+
+```typescript
+import type { FetchCallback, FetchLimits } from '@owf/identity-common'
+
+// Gets what is fetched as its third argument, e.g. to apply a timeout or a cache per type. The global fetch fits too.
+const fetch: FetchCallback = (input, init, { type }) =>
+  globalThis.fetch(input, { ...init, signal: AbortSignal.timeout(type === 'statusList' ? 30_000 : 10_000) })
+
+const fetchLimits: FetchLimits = {
+  maxResponseBytes: 5 * 1024 * 1024,
+  maxResponseBytesByType: { statusList: 16 * 1024 * 1024 },
+}
+```
+
+The limit for a type is `maxResponseBytesByType[type]`, else `maxResponseBytes`, else the default of the package for the type, such as 16 MiB for a status list, else 10 MiB. A response with a larger `Content-Length` is rejected before its body is read, and a body stream is cancelled once it is larger, with an `IdentityCommonError`. Where fetch has no body stream, as in React Native without Expo, the body is read whole and checked afterwards. The fetch callback therefore does not have to limit the size itself.
+
+`fetchWithLimits(options, { type, url, init, accept, defaultMaxResponseBytes })` returns a `Response` that holds the body in memory. `fetchAndParse` also parses the body of a response with a 2xx status with `parse`, e.g. with a zod schema or into a class instance. When `accept` is given, a response with a 2xx status of another media type is rejected with an `IdentityCommonError`, while a response with another status is returned without `data`, whatever its media type:
+
+```typescript
+import { fetchAndParse } from '@owf/identity-common'
+
+const { response, data } = await fetchAndParse(
+  { fetch, fetchLimits },
+  { type: 'identifierList', url, accept: 'application/identifierlist+cwt', parse: (body) => IdentifierListCwt.fromToken(body) }
+)
+```
 
 ## Related Packages
 

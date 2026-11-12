@@ -1,6 +1,6 @@
 import { InvalidFetchResponseError } from '@openid4vc/oauth2'
-import { createZodFetcher, type Fetch } from '@openid4vc/utils'
-import { CommonMediaTypes, parseWithErrorHandling, ValidationError } from '@owf/identity-common'
+import { createZodFetcher, type Fetch, type Openid4vcFetchType } from '@openid4vc/utils'
+import { CommonMediaTypes, type FetchLimits, parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import { Openid4vciError } from '../error/Openid4vciError'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { type NonceResponse, zNonceResponse } from './z-nonce'
@@ -12,6 +12,11 @@ export interface RequestNonceOptions {
    * Custom fetch implementation to use
    */
   fetch?: Fetch
+
+  /**
+   * The maximum size of the nonce response, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`)
+   */
+  fetchLimits?: FetchLimits<Openid4vcFetchType>
 }
 
 /**
@@ -22,7 +27,7 @@ export interface RequestNonceOptions {
  * @throws ValidationError - if validating the nonce response failed
  */
 export async function requestNonce(options: RequestNonceOptions): Promise<NonceResponse> {
-  const fetchWithZod = createZodFetcher(options?.fetch)
+  const fetchWithZod = createZodFetcher(options, 'nonceRequest')
   const nonceEndpoint = options.issuerMetadata.credentialIssuer.nonce_endpoint
 
   if (!nonceEndpoint) {

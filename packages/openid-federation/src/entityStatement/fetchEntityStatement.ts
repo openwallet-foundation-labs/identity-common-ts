@@ -1,8 +1,9 @@
+import type { FetchLimits } from '@owf/identity-common'
 import { type EntityConfigurationClaims, fetchEntityConfiguration } from '../entityConfiguration'
 import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
-import { type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
+import { type FederationFetchType, type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
 import { validate } from '../utils/validate'
 import { zEntityStatementJwt } from './entityStatementJwt'
 
@@ -11,6 +12,8 @@ export type FetchEntityStatementOptions = {
   sub: string
   verifyJwtCallback: VerifyCallback
   fetchCallback?: FetchCallback
+  /** The maximum sizes of the responses, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`) */
+  fetchLimits?: FetchLimits<FederationFetchType>
   /**
    *
    * The issuers entity configuration
@@ -36,9 +39,11 @@ export const fetchEntityStatement = async ({
   endpoint,
   issEntityConfiguration,
   fetchCallback,
+  fetchLimits,
 }: FetchEntityStatementOptions) => {
   const issEntityConfigurationClaims =
-    issEntityConfiguration ?? (await fetchEntityConfiguration({ entityId: iss, verifyJwtCallback, fetchCallback }))
+    issEntityConfiguration ??
+    (await fetchEntityConfiguration({ entityId: iss, verifyJwtCallback, fetchCallback, fetchLimits }))
 
   const fetchEndpoint = endpoint ?? issEntityConfigurationClaims.metadata?.federation_entity?.federation_fetch_endpoint
 
@@ -47,10 +52,12 @@ export const fetchEntityStatement = async ({
   }
 
   const entityStatementJwt = await fetcher.get({
+    type: 'entityStatement',
     url: fetchEndpoint,
     searchParams: { sub },
     requiredContentType: 'application/entity-statement+jwt',
     fetchCallback,
+    fetchLimits,
   })
 
   // Parse the JWT into its claims and header claims

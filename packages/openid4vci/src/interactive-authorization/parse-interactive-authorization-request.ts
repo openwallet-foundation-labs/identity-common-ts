@@ -42,7 +42,7 @@ export interface ParseInteractiveAuthorizationRequestOptions {
   /**
    * Callbacks. JAR request objects passed by reference (`request_uri`) are not supported.
    */
-  callbacks: Pick<CallbackContext, 'fetch'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits'>
 }
 
 export interface ParseInteractiveAuthorizationInitialRequestResult extends ParseAuthorizationRequestResult {

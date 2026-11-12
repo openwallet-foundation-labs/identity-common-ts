@@ -4,9 +4,15 @@ export { addSecondsToDate } from './date'
 export { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
 export { JsonParseError } from './error/JsonParseError'
 export { Openid4vcBaseError } from './error/Openid4vcBaseError'
-export { createFetcher, createZodFetcher, type ZodFetcher } from './fetcher'
 export {
+  createFetcher,
+  createZodFetcher,
   type Fetch,
+  type FetchCallbacks,
+  type Openid4vcFetchType,
+  type ZodFetcher,
+} from './fetcher'
+export {
   type FetchHeaders,
   type FetchRequestInit,
   type FetchResponse,

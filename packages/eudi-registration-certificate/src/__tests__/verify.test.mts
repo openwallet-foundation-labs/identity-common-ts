@@ -99,6 +99,20 @@ describe.each([
     })
   })
 
+  it.each([
+    [
+      'status list response',
+      { callbacks: { ...callbacks, fetch, fetchLimits: { maxResponseBytes: 100 } } },
+      'larger than the maximum of 100 bytes',
+    ],
+    ['decompressed status list', { maxStatusListDecompressedBytes: 0 }, 'larger than the maximum of 0 bytes'],
+  ])('passes the maximum size of the %s on', async (_, limit, message) => {
+    const error = await verify(await sign(), limit).catch((error) => error)
+
+    expect(error).toBeInstanceOf(RegistrationCertificateValidationError)
+    expect(error.message).toContain(message)
+  })
+
   it('rejects a revoked registration certificate', async () => {
     const revoked = { ...payload, status: { status_list: { idx: 1, uri: STATUS_LIST_URI } } }
 

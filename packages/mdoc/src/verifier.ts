@@ -28,8 +28,10 @@ export class Verifier {
       now?: Date
       onCheck?: VerificationCallback
       skewSeconds?: number
+      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
+      maxStatusListDecompressedBytes?: number
     },
-    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch'>
+    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch' | 'fetchLimits'>
   ): Promise<DeviceResponseVerificationResult> {
     const deviceResponse =
       options.deviceResponse instanceof DeviceResponse

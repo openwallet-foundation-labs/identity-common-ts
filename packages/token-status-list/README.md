@@ -196,6 +196,8 @@ statusList.getStatus(42) // 1
 
 `verifyStatusListJwt` decompresses the list only once the token verified, as a small `lst` can inflate to a very large list. `decodeStatusListJwt` reads a token without verifying it, for example to pick the key. Its `statusList` is decompressed when first read.
 
+An `lst` must be one stream in the ZLIB format (Token Status List § 4.1): gzip, raw DEFLATE and bytes after the end of the stream are rejected. Decompressing stops at `maxDecompressedBytes`, 16 MiB by default, which is 2^27 statuses at 1 bit per status. `verifyStatusListJwt`, `decodeStatusListJwt`, `StatusList.decompressStatusListFromBytes` and the `verify` and `verifyStatus` of a `StatusListCwt` take it as an option. A decompressed list reads and sets each status in its bytes, so it takes no more memory than its decompressed size. Its `statusList` array takes about 8 bytes per status, so read a status with `getStatus` instead.
+
 A status that is not Valid, an `idx` outside the list and an `lst` that cannot be decompressed throw a `StatusListValidationError`. Check the `code` of its issue, one of `STATUS_LIST_VALIDATION_CODES`. `verify` of a `StatusListCwt` throws the same.
 
 ```typescript
@@ -248,7 +250,8 @@ decoded.payload.statusList.getStatus(42) // 1
 ```
 
 The status list of a decoded token is decompressed when `payload.statusList` is first read, which
-`verify` does only once the signature and the claims have verified.
+`verify` does only once the signature and the claims have verified. Pass `maxDecompressedBytes` to
+`verify`, or read the list with `payload.getStatusList({ maxDecompressedBytes })`.
 
 ### CWT transport — the status list entry of an mdoc
 
@@ -283,6 +286,7 @@ them. Callers that need the original logical length must preserve it separately.
 | Export | Description |
 |--------|-------------|
 | `StatusList` | Main class — construct, get/set status, compress/decompress |
+| `DecompressStatusListOptions` | `maxDecompressedBytes`, the size a status list may inflate to, 16 MiB by default |
 | `createStatusListIndexAllocator` | Create a seeded allocator that returns each status-list index once |
 | `StatusListIndexAllocator` | Allocator class with `next()`, `remaining()`, and `getState()` |
 | `StatusListIndexAllocatorState` | Restorable allocator state type |
@@ -296,7 +300,7 @@ them. Callers that need the original logical length must preserve it separately.
 | `StatusType` | Enum of the status values: `Valid`, `Invalid`, `Suspended`, … |
 | `StatusListMediaTypes` | MIME types for JWT and CWT status list tokens |
 | `BitsPerStatus` | Type: `1 \| 2 \| 4 \| 8` |
-| `fetchStatusList` | Fetch a Status List Token in JWT or CWT format by its uri |
+| `fetchStatusList` | Fetch a Status List Token in JWT or CWT format by its uri, with a `customFetcher` and `fetchLimits` (see `@owf/identity-common`). The response is at most 16 MiB by default |
 
 ### JWT Transport
 

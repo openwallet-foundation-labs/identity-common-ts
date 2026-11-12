@@ -48,7 +48,7 @@ export interface SendNotificationOptions {
   /**
    * Callback used in notification endpoint
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJws'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'generateRandom' | 'hash' | 'signJws'>
 
   /**
    * Access token authorized to retrieve the credential(s)
@@ -101,6 +101,7 @@ export async function sendNotification(
     accessToken: options.accessToken,
     callbacks: options.callbacks,
     url: notificationEndpoint,
+    type: 'notificationRequest',
     requestOptions: {
       method: 'POST',
       headers: {

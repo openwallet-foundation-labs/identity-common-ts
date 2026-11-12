@@ -105,13 +105,24 @@ export type BytesToStringOptions = {
    * @default false
    */
   fatal?: boolean
+
+  /**
+   * Remove a leading byte order mark, as `Response.text()` does, for text that may have been saved with one, such as
+   * a JSON document served over HTTP.
+   *
+   * @default false
+   */
+  stripByteOrderMark?: boolean
 }
 
 export const stringToBytes = (input: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(input)
 
 export const bytesToString = (bytes: Uint8Array, options?: BytesToStringOptions): string => {
-  // ignoreBOM keeps a leading byte order mark in the output, so the string represents the exact bytes
-  const decoder = new TextDecoder('utf-8', { fatal: options?.fatal ?? false, ignoreBOM: true })
+  // ignoreBOM keeps a leading byte order mark in the output, so that by default the string represents the exact bytes
+  const decoder = new TextDecoder('utf-8', {
+    fatal: options?.fatal ?? false,
+    ignoreBOM: !options?.stripByteOrderMark,
+  })
   try {
     return decoder.decode(bytes)
   } catch {

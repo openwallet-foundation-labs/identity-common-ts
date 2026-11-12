@@ -87,6 +87,23 @@ describe('verifyStatusListJwt', () => {
 
     await expect(verification).rejects.toEqual(statusListIssue('invalid_status_list'))
   })
+
+  it('rejects a verified token whose status list inflates to more than maxDecompressedBytes', async () => {
+    const jwt = await signStatusListToken({ status_list: { bits: 1, lst: largeListLst } })
+
+    await expect(
+      verifyStatusListJwt({
+        jwt,
+        uri,
+        now,
+        idx: 0,
+        verifyJwsCallback: verifyJws,
+        maxDecompressedBytes: 1024 * 1024 - 1,
+      })
+    ).rejects.toEqual(statusListIssue('invalid_status_list'))
+    const { statusList } = await verifyStatusListJwt({ jwt, uri, now, idx: 0, verifyJwsCallback: verifyJws })
+    expect(statusList.totalStatuses).toBe(8 * 1024 * 1024)
+  })
 })
 
 describe('decodeStatusListJwt', () => {
@@ -110,6 +127,17 @@ describe('decodeStatusListJwt', () => {
     const decoded = decodeStatusListJwt(await signStatusListToken({ status_list: { bits: 1, lst: notCompressedLst } }))
 
     expect(() => decoded.statusList).toThrow(statusListIssue('invalid_status_list'))
+  })
+
+  it('decompresses the status list to at most maxDecompressedBytes', async () => {
+    const jwt = await signStatusListToken({ status_list: { bits: 1, lst: largeListLst } })
+
+    expect(() => decodeStatusListJwt(jwt, { maxDecompressedBytes: 1024 * 1024 - 1 }).statusList).toThrow(
+      statusListIssue('invalid_status_list')
+    )
+    expect(decodeStatusListJwt(jwt, { maxDecompressedBytes: 1024 * 1024 }).statusList.totalStatuses).toBe(
+      8 * 1024 * 1024
+    )
   })
 
   it('returns the same status list every time it is read', async () => {

@@ -9,7 +9,7 @@ export interface SubmitOpenid4vpAuthorizationResponseOptions {
   authorizationRequestPayload: Pick<Openid4vpAuthorizationRequest, 'response_uri'>
   authorizationResponsePayload: Openid4vpAuthorizationResponse | Openid4vpAuthorizationErrorResponse
   jarm?: { responseJwt: string }
-  callbacks: Pick<CallbackContext, 'fetch'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits'>
 }
 
 export async function submitOpenid4vpAuthorizationResponse(options: SubmitOpenid4vpAuthorizationResponseOptions) {
@@ -30,7 +30,7 @@ export async function submitOpenid4vpAuthorizationResponse(options: SubmitOpenid
     )
   }
 
-  const fetch = createFetcher(callbacks.fetch)
+  const fetch = createFetcher(callbacks, 'authorizationResponse')
   const encodedResponse = objectToQueryParams(authorizationResponsePayload)
   const submissionResponse = await fetch(url, {
     method: 'POST',

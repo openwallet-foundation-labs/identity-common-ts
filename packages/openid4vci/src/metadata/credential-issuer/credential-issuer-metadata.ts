@@ -26,7 +26,7 @@ export interface FetchCredentialIssuerMetadataOptions {
    * Callbacks for fetching the credential issuer metadata. The `verifyJws`
    * callback is required unless `signedMetadata` is `disallowed`.
    */
-  callbacks?: Partial<Pick<CallbackContext, 'fetch' | 'verifyJws'>>
+  callbacks?: Partial<Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'verifyJws'>>
 
   /**
    * Whether the credential issuer metadata must be signed. This is sent as the `Accept` header.
@@ -123,7 +123,9 @@ export async function fetchCredentialIssuerMetadata(
 
   try {
     result = await fetchWellKnownMetadata(wellKnownMetadataUrl, zResponse, {
+      type: 'credentialIssuerMetadata',
       fetch: options?.callbacks?.fetch,
+      fetchLimits: options?.callbacks?.fetchLimits,
       acceptedContentType,
     })
   } catch (error) {
@@ -142,7 +144,9 @@ export async function fetchCredentialIssuerMetadata(
     metadataUrl = legacyWellKnownMetadataUrl
     try {
       result = await fetchWellKnownMetadata(legacyWellKnownMetadataUrl, zResponse, {
+        type: 'credentialIssuerMetadata',
         fetch: options?.callbacks?.fetch,
+        fetchLimits: options?.callbacks?.fetchLimits,
         acceptedContentType,
       })
     } catch (error) {

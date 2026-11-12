@@ -62,7 +62,7 @@ export interface CreateOpenid4vpAuthorizationResponseOptions<
     audience?: string // The client_id of the client the response is intended for
     expiresInSeconds?: number // The JWT lifetime in seconds. Defaults to, and RECOMMENDED to be at most, 10 minutes.
   }
-  callbacks: Pick<CallbackContext, 'signJws' | 'encryptJwe' | 'fetch' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'encryptJwe' | 'fetch' | 'fetchLimits' | 'getJwks'>
 }
 
 export interface CreateOpenid4vpAuthorizationResponseResult<

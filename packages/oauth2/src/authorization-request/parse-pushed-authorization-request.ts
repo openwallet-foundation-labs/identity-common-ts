@@ -17,7 +17,7 @@ import {
 export interface ParsePushedAuthorizationRequestOptions {
   request: RequestLike
   authorizationRequest: unknown
-  callbacks: Pick<CallbackContext, 'fetch'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits'>
 }
 export interface ParsePushedAuthorizationRequestResult extends ParseAuthorizationRequestResult {
   authorizationRequest: AuthorizationRequest

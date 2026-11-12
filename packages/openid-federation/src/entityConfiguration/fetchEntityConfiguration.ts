@@ -1,7 +1,16 @@
+import type { FetchLimits } from '@owf/identity-common'
 import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
-import { addPaths, type FetchCallback, fetcher, isSameEntityId, type VerifyCallback, zHttpsUrl } from '../utils'
+import {
+  addPaths,
+  type FederationFetchType,
+  type FetchCallback,
+  fetcher,
+  isSameEntityId,
+  type VerifyCallback,
+  zHttpsUrl,
+} from '../utils'
 import { validate } from '../utils/validate'
 import { zEntityConfigurationJwt } from './entityConfigurationJwt'
 
@@ -9,6 +18,8 @@ export type FetchEntityConfigurationOptions = {
   entityId: string
   verifyJwtCallback: VerifyCallback
   fetchCallback?: FetchCallback
+  /** The maximum size of the response, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`) */
+  fetchLimits?: FetchLimits<FederationFetchType>
 }
 
 /**
@@ -20,6 +31,7 @@ export const fetchEntityConfiguration = async ({
   entityId,
   verifyJwtCallback,
   fetchCallback,
+  fetchLimits,
 }: FetchEntityConfigurationOptions) => {
   validate({ schema: zHttpsUrl, data: entityId, errorMessage: `entity id '${entityId}' is not an https URL` })
 
@@ -28,9 +40,11 @@ export const fetchEntityConfiguration = async ({
 
   // Fetch the JWT entity configuration
   const entityConfigurationJwt = await fetcher.get({
+    type: 'entityConfiguration',
     url: federationUrl,
     requiredContentType: 'application/entity-statement+jwt',
     fetchCallback,
+    fetchLimits,
   })
 
   // Parse the JWT into its claims

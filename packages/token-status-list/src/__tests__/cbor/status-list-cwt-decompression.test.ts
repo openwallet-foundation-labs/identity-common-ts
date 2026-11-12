@@ -6,6 +6,7 @@ import {
   Sign1,
   SignatureAlgorithm,
 } from '@owf/cose'
+import { deflate } from 'pako'
 import { describe, expect, test } from 'vitest'
 import { StatusListCwt } from '../../cbor/status-list-cwt'
 import { StatusListCwtClaimKey } from '../../cbor/status-list-cwt-payload'
@@ -84,5 +85,16 @@ describe('StatusListCwt', () => {
     await expect(cwt.verify({ key: signKey, uri, now, idx: 0 }, { sign1: sign1Context })).rejects.toEqual(
       statusListIssue('invalid_status_list')
     )
+  })
+
+  test('rejects a verified token whose status list inflates to more than maxDecompressedBytes', async () => {
+    const cwt = StatusListCwt.fromToken(await signedToken({ lst: deflate(new Uint8Array(1024)) }))
+
+    await expect(
+      cwt.verify({ key: signKey, uri, now, idx: 0, maxDecompressedBytes: 1023 }, { sign1: sign1Context })
+    ).rejects.toEqual(statusListIssue('invalid_status_list'))
+    expect(() => cwt.verifyStatus(0, { maxDecompressedBytes: 1023 })).toThrow(statusListIssue('invalid_status_list'))
+    await cwt.verify({ key: signKey, uri, now, idx: 0, maxDecompressedBytes: 1024 }, { sign1: sign1Context })
+    expect(cwt.payload.statusList.totalStatuses).toBe(8 * 1024)
   })
 })

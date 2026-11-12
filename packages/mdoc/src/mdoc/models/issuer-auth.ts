@@ -111,6 +111,7 @@ export class IssuerAuth extends Sign1 {
       checkFreshness,
       trustedStatusCertificates,
       disableCertificateChainValidation,
+      maxStatusListDecompressedBytes,
     }: {
       now?: Date
       /** Tolerance applied to the `exp` and `iat` of a revocation list. Defaults to 30 seconds. */
@@ -122,8 +123,10 @@ export class IssuerAuth extends Sign1 {
        * certificate chain against `trustedStatusCertificates`. The revocation status is still checked.
        */
       disableCertificateChainValidation?: boolean
+      /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
+      maxStatusListDecompressedBytes?: number
     },
-    ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'crypto'>
+    ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose' | 'crypto'>
   ): Promise<{
     statusList?: StatusListCwt
     trustedStatusListChain?: Uint8Array[]
@@ -142,6 +145,7 @@ export class IssuerAuth extends Sign1 {
             now,
             skewSeconds,
             checkFreshness,
+            maxDecompressedBytes: maxStatusListDecompressedBytes,
           },
           ctx
         )
@@ -195,8 +199,10 @@ export class IssuerAuth extends Sign1 {
       disableCertificateChainValidation?: boolean
       disableStatusValidation?: boolean
       skewSeconds?: number
+      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
+      maxStatusListDecompressedBytes?: number
     },
-    ctx: Pick<MdocContext, 'x509' | 'cose' | 'fetch' | 'crypto'>
+    ctx: Pick<MdocContext, 'x509' | 'cose' | 'fetch' | 'fetchLimits' | 'crypto'>
   ): Promise<IssuerAuthVerificationResult> {
     const verificationCallback = options.verificationCallback ?? defaultVerificationCallback
     const now = options.now ?? new Date()
@@ -288,6 +294,7 @@ export class IssuerAuth extends Sign1 {
             skewSeconds,
             checkFreshness: true,
             trustedStatusCertificates,
+            maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
           },
           ctx
         ))

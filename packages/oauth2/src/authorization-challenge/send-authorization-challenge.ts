@@ -18,7 +18,10 @@ export interface SendAuthorizationChallengeRequestOptions {
   /**
    * Callback context
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'hash' | 'generateRandom' | 'signJws' | 'clientAuthentication'>
+  callbacks: Pick<
+    CallbackContext,
+    'fetch' | 'fetchLimits' | 'hash' | 'generateRandom' | 'signJws' | 'clientAuthentication'
+  >
 
   /**
    * Metadata of the authorization server where to perform the authorization challenge
@@ -83,7 +86,7 @@ export interface SendAuthorizationChallengeRequestOptions {
  * @throws {ValidationError} if a successful response was received but an error occurred during verification of the {@link AuthorizationChallengeResponse}
  */
 export async function sendAuthorizationChallengeRequest(options: SendAuthorizationChallengeRequestOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'authorizationChallengeRequest')
 
   const authorizationServerMetadata = options.authorizationServerMetadata
   const authorizationChallengeEndpoint = authorizationServerMetadata.authorization_challenge_endpoint

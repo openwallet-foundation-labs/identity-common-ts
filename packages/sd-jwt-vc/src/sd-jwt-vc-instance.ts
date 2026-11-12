@@ -1,10 +1,17 @@
-import { base64, isMediaType, secondsToDate } from '@owf/identity-common'
+import {
+  base64,
+  bytesToString,
+  type FetchOptions,
+  fetchWithLimits,
+  isMediaType,
+  secondsToDate,
+} from '@owf/identity-common'
 import {
   decodeStatusListJwt,
+  fetchStatusList,
   StatusListError,
   type StatusListJwtHeaderParameters,
   type StatusListJwtPayload,
-  StatusListMediaTypes,
   StatusType,
   verifyStatusListJwtClaims,
 } from '@owf/token-status-list'
@@ -31,6 +38,7 @@ import {
 import z from 'zod'
 import type {
   SdJwtVcConfig,
+  SdJwtVcFetchType,
   StatusInvalidErrorDetails,
   StatusListFetcher,
   StatusListVerificationErrorDetails,
@@ -54,8 +62,14 @@ import type { VerificationResult } from './verification-result'
 // SRI hash algorithms, ordered from weakest to strongest
 const SRI_ALGORITHMS = ['sha256', 'sha384', 'sha512']
 
-// Claims that SD-JWT VC forbids to be selectively disclosed
-const PROTECTED_CLAIMS = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'vct#integrity', 'status']
+/**
+ * The default maximum size of a type metadata response. Type metadata refers to its logos and templates by URI, so
+ * a document of 1 MiB leaves room for a few embedded in `data:` URIs.
+ */
+const DEFAULT_MAX_TYPE_METADATA_RESPONSE_BYTES = 1024 * 1024
+
+// Claims that SD-JWT VC forbids to be selectively disclosed (SD-JWT VC draft 23, Section 2.2.2.3)
+const PROTECTED_CLAIMS = ['iss', 'nbf', 'exp', 'cnf', 'vct', 'vct#integrity', 'aka_vcts', 'status']
 
 // Whether a value has selectively disclosable parts: an `_sd` digest list or an array element digest
 const hasSelectivelyDisclosableParts = (value: unknown): boolean => {
@@ -173,34 +187,37 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
   }
 
   /**
-   * Fetches the status list from the uri with a timeout of 10 seconds.
+   * The `fetch` of the configuration, or the global fetch, aborted after `timeoutMs`, with the `fetchLimits` of the
+   * configuration.
+   */
+  private fetchOptions(
+    timeoutMs: number
+  ): Required<Pick<FetchOptions<SdJwtVcFetchType>, 'fetch'>> & FetchOptions<SdJwtVcFetchType> {
+    const fetch = this.userConfig.fetch ?? ((input, init) => globalThis.fetch(input, init))
+    return {
+      fetch: (input, init, context) => fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) }, context),
+      fetchLimits: this.userConfig.fetchLimits,
+    }
+  }
+
+  /**
+   * Fetches the status list from the uri with a timeout of 10 seconds, and a response within the `fetchLimits` of the
+   * configuration. The errors of `fetchStatusList` leave out the body of the response, which can reach whoever
+   * presented the credential, while the uri may be an internal endpoint when the verifier accepts credentials of
+   * issuers it does not know.
    * @param uri The URI to fetch from.
    * @returns A promise that resolves to a compact JWT.
    */
   private async statusListFetcher(uri: string): Promise<string> {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    const { fetch, fetchLimits } = this.fetchOptions(10000)
+    const statusList = await fetchStatusList({ uri, acceptedFormats: ['jwt'], customFetcher: fetch, fetchLimits })
 
-    try {
-      const response = await fetch(uri, {
-        signal: controller.signal,
-        headers: { Accept: StatusListMediaTypes.StatusListJwt },
-      })
-      // Not with the body of the response: the error can reach whoever presented the credential, and the uri may be
-      // an internal endpoint when the verifier accepts credentials of issuers it does not know
-      if (!response.ok) {
-        throw new Error(`Error fetching status list: ${response.status}`)
-      }
-
-      // according to the spec the content type should be application/statuslist+jwt
-      if (!isMediaType(response.headers.get('content-type'), StatusListMediaTypes.StatusListJwt)) {
-        throw new Error('Invalid content type')
-      }
-
-      return response.text()
-    } finally {
-      clearTimeout(timeoutId)
+    // according to the spec the content type should be application/statuslist+jwt
+    if (typeof statusList !== 'string') {
+      throw new StatusListError('The status list was not served as application/statuslist+jwt')
     }
+
+    return statusList
   }
 
   /**
@@ -493,11 +510,11 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
   }
 
   /**
-   * Validates the integrity of the response if the integrity is passed. If the integrity does not match, an error is thrown.
+   * Validates the integrity of the response body if the integrity is passed. If the integrity does not match, an error is thrown.
+   * @param body
    * @param integrity
-   * @param response
    */
-  private async validateIntegrity(response: Response, url: string, integrity?: string) {
+  private async validateIntegrity(body: Uint8Array<ArrayBuffer>, url: string, integrity?: string) {
     if (!integrity) return
 
     // validate the integrity of the response according to https://www.w3.org/TR/SRI/
@@ -520,31 +537,34 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
     if (!this.userConfig.hasher) {
       throw new SdJwtError('Hasher not found')
     }
-    const arrayBuffer = await response.arrayBuffer()
-    const hash = base64.encode(await this.userConfig.hasher(arrayBuffer, alg))
+    const hash = base64.encode(await this.userConfig.hasher(body.buffer, alg))
     if (!expected.includes(hash)) {
       throw new Error(`Integrity check for ${url} failed: is ${hash}, but expected ${expected.join(' or ')}`)
     }
   }
 
   /**
-   * Fetches the content from the url with a timeout of 10 seconds.
+   * Fetches the content from the url with a timeout of `timeout`, 10 seconds by default, and a response within the
+   * `fetchLimits` of the configuration.
    * @param url
    * @returns
    */
   private async fetchWithIntegrity(url: string, integrity?: string): Promise<unknown> {
     try {
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(this.userConfig.timeout ?? 10000),
+      const response = await fetchWithLimits(this.fetchOptions(this.userConfig.timeout ?? 10000), {
+        type: 'typeMetadata',
+        url,
+        defaultMaxResponseBytes: DEFAULT_MAX_TYPE_METADATA_RESPONSE_BYTES,
       })
       // Not with the body of the response, as in statusListFetcher. Neither is response.json() used, as its
       // SyntaxError quotes the start of the body.
       if (!response.ok) {
         throw new Error(`Error fetching ${url}: ${response.status} ${response.statusText}`)
       }
-      await this.validateIntegrity(response.clone(), url, integrity)
+      const body = new Uint8Array(await response.arrayBuffer())
+      await this.validateIntegrity(body, url, integrity)
       try {
-        return JSON.parse(await response.text())
+        return JSON.parse(bytesToString(body, { stripByteOrderMark: true }))
       } catch {
         throw new SdJwtError(`The type metadata fetched from ${url} is not valid JSON`)
       }
@@ -817,7 +837,9 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
           })
 
         // check the claims required for a Status List Token, e.g. that `sub` matches the referenced uri
-        const decodedStatusListJwt = decodeStatusListJwt(statusListJwt)
+        const decodedStatusListJwt = decodeStatusListJwt(statusListJwt, {
+          maxDecompressedBytes: this.userConfig.maxStatusListDecompressedBytes,
+        })
         verifyStatusListJwtClaims(decodedStatusListJwt.payload, {
           uri,
           now: options?.currentDate !== undefined ? secondsToDate(options.currentDate) : undefined,

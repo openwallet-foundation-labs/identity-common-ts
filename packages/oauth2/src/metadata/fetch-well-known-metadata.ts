@@ -1,12 +1,22 @@
-import { createZodFetcher, type Fetch, InvalidFetchResponseError } from '@openid4vc/utils'
-import { type BaseSchema, CommonMediaTypes, ValidationError } from '@owf/identity-common'
+import { createZodFetcher, type Fetch, InvalidFetchResponseError, type Openid4vcFetchType } from '@openid4vc/utils'
+import { type BaseSchema, CommonMediaTypes, type FetchLimits, ValidationError } from '@owf/identity-common'
 import type z from 'zod'
 
 export interface FetchWellKnownMetadataOptions {
   /**
+   * What metadata is fetched, passed to `fetch` as its third argument and the key of its limit in `fetchLimits`
+   */
+  type: 'authorizationServerMetadata' | 'credentialIssuerMetadata'
+
+  /**
    * Custom fetch implementation to use for fetching the metadata
    */
   fetch?: Fetch
+
+  /**
+   * The maximum size of the response, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`)
+   */
+  fetchLimits?: FetchLimits<Openid4vcFetchType>
 
   /**
    * The accepted content types. If not provided a default of `CommonMediaTypes.Json`
@@ -30,11 +40,11 @@ export interface FetchWellKnownMetadataOptions {
 export async function fetchWellKnownMetadata<Schema extends BaseSchema>(
   wellKnownMetadataUrl: string,
   schema: Schema,
-  options?: FetchWellKnownMetadataOptions
+  options: FetchWellKnownMetadataOptions
 ): Promise<z.infer<Schema> | null> {
-  const fetcher = createZodFetcher(options?.fetch)
+  const fetcher = createZodFetcher(options, options.type)
 
-  const acceptedContentType = options?.acceptedContentType ?? [CommonMediaTypes.Json]
+  const acceptedContentType = options.acceptedContentType ?? [CommonMediaTypes.Json]
 
   const { result, response } = await fetcher(schema, acceptedContentType, wellKnownMetadataUrl)
   if (response.status === 404) {

@@ -348,6 +348,8 @@ Anything that does not verify throws a `RegistrationCertificateValidationError` 
 
 `verifyRegistrationCertificateStatus` checks the status on its own, with the same callbacks.
 
+The status list response and the list it inflates to are each limited to 16 MiB, as a status list could otherwise exhaust the memory of the verifier. `fetchLimits` of the callbacks sets another limit for the response (see `FetchLimits` of `@owf/identity-common`), and `maxStatusListDecompressedBytes` of `verifyRegistrationCertificate` or `maxDecompressedBytes` of `verifyRegistrationCertificateStatus` for the list. A larger response is reported as `status_list_unavailable`, and a larger list as `invalid_status_list`.
+
 ### Validating a registration certificate
 
 ```typescript
@@ -532,7 +534,7 @@ This library is **platform agnostic** and works in:
 
 - `verifyRegistrationCertificate(options)` - Verify a JWT or CWT registration certificate, including its status
 - `verifyRegistrationCertificateStatus(options)` - Check the status of a registration certificate in its status list
-- `VerifyRegistrationCertificateCallbacks` - The `verifyJws`, `verifyCose` and `fetch` callbacks
+- `VerifyRegistrationCertificateCallbacks` - The `verifyJws`, `verifyCose` and `fetch` callbacks, and the `fetchLimits` of `fetch`
 
 ## Contributing
 

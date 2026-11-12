@@ -7,8 +7,6 @@ const _URL = URL
 const _URLSearchParams = URLSearchParams
 
 // biome-ignore lint/style/noRestrictedGlobals: no explanation
-export type Fetch = typeof fetch
-// biome-ignore lint/style/noRestrictedGlobals: no explanation
 export type FetchResponse = Response
 // biome-ignore lint/style/noRestrictedGlobals: no explanation
 const _Headers = Headers as typeof globalThis.Headers

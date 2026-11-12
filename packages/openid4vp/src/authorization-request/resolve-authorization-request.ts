@@ -38,7 +38,10 @@ export interface ResolveOpenid4vpAuthorizationRequestOptions {
    */
   responseMode: ExpectedResponseMode
 
-  callbacks: Pick<CallbackContext, 'verifyJws' | 'decryptJwe' | 'getX509CertificateMetadata' | 'fetch' | 'hash'>
+  callbacks: Pick<
+    CallbackContext,
+    'verifyJws' | 'decryptJwe' | 'getX509CertificateMetadata' | 'fetch' | 'fetchLimits' | 'hash'
+  >
 
   /**
    * Date to verify the `exp`, `nbf` and `iat` of a signed request object against. If not provided the
@@ -124,6 +127,7 @@ export async function resolveOpenid4vpAuthorizationRequest(
       clientMetadata = await fetchClientMetadata({
         clientMetadataUri: authorizationRequestPayload.client_metadata_uri,
         fetch: callbacks.fetch,
+        fetchLimits: callbacks.fetchLimits,
       })
     }
 

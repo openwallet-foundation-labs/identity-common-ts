@@ -175,6 +175,37 @@ describe('resolve trust chains with validation', () => {
     expect(federation.requested.length > 0).toBeTruthy()
   })
 
+  it('should tell the fetch callback whether it fetches an entity configuration or an entity statement', async () => {
+    const requests: Array<{ url: string; type: string }> = []
+    const fetchCallback: FetchCallback = (url, init, context) => {
+      requests.push({ url, type: context.type })
+      return federation.fetchCallback(url, init, context)
+    }
+
+    await resolveTrustChains(federation.options({ entityId: leaf.id, fetchCallback }))
+
+    expect(requests).toContainEqual({
+      url: 'https://leaf.example.org/.well-known/openid-federation',
+      type: 'entityConfiguration',
+    })
+    expect(requests).toContainEqual({
+      url: `https://intermediate.example.org/fetch?${new URLSearchParams({ sub: leaf.id })}`,
+      type: 'entityStatement',
+    })
+  })
+
+  // An entity configuration is far larger than 100 bytes
+  it('should reject a path with a response larger than its limit', async () => {
+    const { trustChains, failures } = await resolveTrustChainsWithFailures(
+      federation.options({ entityId: leaf.id, fetchLimits: { maxResponseBytesByType: { entityStatement: 100 } } })
+    )
+
+    expect(trustChains).toStrictEqual([])
+    expect(failures.map(({ reason }) => reason)).toContainEqual(
+      expect.stringContaining('The response is larger than the maximum of 100 bytes')
+    )
+  })
+
   it('should resolve when the trust anchor keys are pinned', async () => {
     const trustChains = await resolveTrustChains(
       federation.options({

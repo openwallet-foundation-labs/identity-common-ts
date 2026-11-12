@@ -20,7 +20,7 @@ export interface VerifyJwtProfileAccessTokenOptions {
   /**
    * Callbacks used for verifying the access token
    */
-  callbacks: Pick<CallbackContext, 'verifyJws' | 'fetch' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'fetch' | 'fetchLimits' | 'getJwks'>
 
   /**
    * If not provided current time will be used
