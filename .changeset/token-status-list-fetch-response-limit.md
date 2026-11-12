@@ -1,5 +1,5 @@
 ---
-'@owf/token-status-list': patch
+'@owf/token-status-list': minor
 ---
 
-`fetchStatusList` rejects a response larger than `maxResponseBytes`, 16 MiB by default, which fits the largest list of Token Status List draft 16 Appendix B in either format. It checks the `Content-Length` header before reading the body, and stops reading a streamed body once it is larger than the maximum. Before, it read a body of any size into memory. `@owf/mdoc` and `@owf/eudi-registration-certificate` fetch status lists with it, and use the default.
+`fetchStatusList` rejects a response larger than 16 MiB, which fits the largest list of Token Status List draft 16 Appendix B in either format, or than the `statusList` limit of its new `fetchLimits` option (see `FetchLimits` of `@owf/identity-common`). It checks the `Content-Length` header before reading the body, and stops reading a streamed body once it is larger than the maximum. Before, it read a body of any size into memory. Its `customFetcher` gets `{ type: 'statusList' }` as its third argument.

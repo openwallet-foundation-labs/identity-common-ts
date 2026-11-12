@@ -58,7 +58,7 @@ describe('fetchStatusList', () => {
     expect(sentAccept).toBe(accept)
   })
 
-  describe('with a response larger than maxResponseBytes', () => {
+  describe('with a response larger than its limit', () => {
     const uri = 'https://example.org/statuslists/1'
     const cwtHeaders = { 'Content-Type': StatusListMediaTypes.StatusListCwt }
 
@@ -82,7 +82,12 @@ describe('fetchStatusList', () => {
     }
 
     const fetchWith = (response: Response, maxResponseBytes?: number) =>
-      fetchStatusList({ uri, customFetcher: (async () => response) as typeof fetch, maxResponseBytes })
+      fetchStatusList({
+        uri,
+        customFetcher: async () => response,
+        fetchLimits:
+          maxResponseBytes === undefined ? undefined : { maxResponseBytesByType: { statusList: maxResponseBytes } },
+      })
 
     it('rejects the response by its Content-Length, before reading the body', async () => {
       const { stream, body } = streamedBody(1024)
@@ -102,11 +107,24 @@ describe('fetchStatusList', () => {
       expect(stream.pulled).toBe(17)
     })
 
-    it('reads a body of maxResponseBytes', async () => {
+    it('reads a body of the limit', async () => {
       const { body } = streamedBody(1024, 4)
 
       await expect(fetchWith(new Response(body, { headers: cwtHeaders }), 4096)).resolves.toEqual(new Uint8Array(4096))
     })
+  })
+
+  it('tells the fetch callback that it fetches a status list', async () => {
+    let context: unknown
+    await fetchStatusList({
+      uri: 'https://example.org/statuslists/1',
+      customFetcher: async (_uri, _init, fetchContext) => {
+        context = fetchContext
+        return new Response('a.b.c', { headers: { 'Content-Type': StatusListMediaTypes.StatusListJwt } })
+      },
+    })
+
+    expect(context).toEqual({ type: 'statusList' })
   })
 
   it('should throw when the content type is not a status list media type', async () => {

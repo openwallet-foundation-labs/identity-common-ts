@@ -18,7 +18,7 @@ const wellKnownOpenidConfigurationServerSuffix = '.well-known/openid-configurati
  */
 export async function fetchAuthorizationServerMetadata(
   issuer: string,
-  callbacksOrFetch?: Fetch | Pick<CallbackContext, 'fetch' | 'getAuthorizationServerMetadata'>
+  callbacksOrFetch?: Fetch | Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'getAuthorizationServerMetadata'>
 ): Promise<AuthorizationServerMetadata | null> {
   const callbacks = typeof callbacksOrFetch === 'function' ? { fetch: callbacksOrFetch } : callbacksOrFetch
   const providedMetadata = await callbacks?.getAuthorizationServerMetadata?.(issuer)
@@ -45,6 +45,7 @@ export async function fetchAuthorizationServerMetadata(
   }
 
   const fetch = callbacks?.fetch
+  const fetchLimits = callbacks?.fetchLimits
   const parsedIssuerUrl = new URL(issuer)
 
   const openidConfigurationWellKnownMetadataUrl = joinUriParts(issuer, [wellKnownOpenidConfigurationServerSuffix])
@@ -66,7 +67,9 @@ export async function fetchAuthorizationServerMetadata(
     authorizationServerWellKnownMetadataUrl,
     zAuthorizationServerMetadata,
     {
+      type: 'authorizationServerMetadata',
       fetch,
+      fetchLimits,
     }
   ).catch((error) => {
     // A library error, such as invalid metadata (a `ValidationError`) or an error response, is thrown.
@@ -86,7 +89,9 @@ export async function fetchAuthorizationServerMetadata(
       nonCompliantAuthorizationServerWellKnownMetadataUrl,
       zAuthorizationServerMetadata,
       {
+        type: 'authorizationServerMetadata',
         fetch,
+        fetchLimits,
       }
     ).catch((error) => {
       // Similar to above, if there was a library error, we throw it.
@@ -100,7 +105,9 @@ export async function fetchAuthorizationServerMetadata(
       openidConfigurationWellKnownMetadataUrl,
       zAuthorizationServerMetadata,
       {
+        type: 'authorizationServerMetadata',
         fetch,
+        fetchLimits,
       }
     ).catch((error) => {
       throw firstError ?? error

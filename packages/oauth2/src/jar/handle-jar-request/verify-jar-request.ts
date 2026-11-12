@@ -1,4 +1,4 @@
-import { createFetcher, type Fetch, zHttpsUrl } from '@openid4vc/utils'
+import { createFetcher, type FetchCallbacks, zHttpsUrl } from '@openid4vc/utils'
 import { CommonMediaTypes, createAcceptHeader, zTyp } from '@owf/identity-common'
 import { decodeJwt, type JwsSigner, type JwsSignerWithJwk, verifyJwt, zCompactJwe, zCompactJwt } from '@owf/jose'
 import type { CallbackContext } from '../../callbacks'
@@ -15,7 +15,7 @@ import {
 
 export interface ParsedJarRequestOptions {
   jarRequestParams: JarAuthorizationRequest
-  callbacks: Pick<CallbackContext, 'fetch'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits'>
 
   /**
    * Whether the request object may be passed by reference using `request_uri`. If allowed,
@@ -81,7 +81,7 @@ export async function parseJarRequest(options: ParsedJarRequestOptions): Promise
     jarRequestParams.request ??
     (await fetchJarRequestObject({
       requestUri: jarRequestParams.request_uri,
-      fetch: callbacks.fetch,
+      callbacks,
     }))
 
   return { sendBy, authorizationRequestJwt }
@@ -144,8 +144,8 @@ export async function verifyJarRequest(options: VerifyJarRequestOptions): Promis
   }
 }
 
-async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetch }): Promise<string> {
-  const { requestUri, fetch } = options
+async function fetchJarRequestObject(options: { requestUri: string; callbacks: FetchCallbacks }): Promise<string> {
+  const { requestUri, callbacks } = options
 
   if (!zHttpsUrl.safeParse(requestUri).success) {
     throw new Oauth2ServerErrorResponseError({
@@ -154,7 +154,7 @@ async function fetchJarRequestObject(options: { requestUri: string; fetch?: Fetc
     })
   }
 
-  const response = await createFetcher(fetch)(requestUri, {
+  const response = await createFetcher(callbacks, 'requestObject')(requestUri, {
     method: 'get',
     headers: {
       Accept: createAcceptHeader([

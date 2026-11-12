@@ -1,17 +1,18 @@
-import { isMediaType } from '@owf/identity-common'
+import { type FetchLimits, fetchWithLimits, isMediaType } from '@owf/identity-common'
 import type { z } from 'zod'
-import type { FetchCallback } from './types'
+import type { FederationFetchType, FetchCallback } from './types'
 import { addSearchParams } from './url'
 import { validate } from './validate'
 
-// Resolved on every call, so a fetch that is set or replaced after this module is loaded is used
-const defaultFetch: FetchCallback = (input, init) => globalThis.fetch(input, init)
-
 type GetOptions = {
+  type: FederationFetchType
   url: string
   searchParams?: Record<string, string>
   requiredContentType?: string
+  /** Defaults to the global `fetch` */
   fetchCallback?: FetchCallback
+  /** 10 MiB by default */
+  fetchLimits?: FetchLimits<FederationFetchType>
 }
 
 /**
@@ -22,18 +23,21 @@ type GetOptions = {
 async function get<T extends z.ZodType>(options: GetOptions & { responseValidationSchema: T }): Promise<z.output<T>>
 async function get(options: GetOptions & { responseValidationSchema?: undefined }): Promise<string>
 async function get({
+  type,
   url,
   searchParams,
   responseValidationSchema,
   requiredContentType,
-  fetchCallback = defaultFetch,
+  fetchCallback,
+  fetchLimits,
 }: GetOptions & { responseValidationSchema?: z.ZodType }): Promise<unknown> {
   // Fetch the url with the search params
   const urlSearchParams = new URLSearchParams(searchParams)
   const urlWithSearchParams = urlSearchParams.toString() ? addSearchParams(url, urlSearchParams) : url
-  const response = await fetchCallback(urlWithSearchParams, {
-    method: 'GET',
-  })
+  const response = await fetchWithLimits(
+    { fetch: fetchCallback, fetchLimits },
+    { type, url: urlWithSearchParams, init: { method: 'GET' } }
+  )
 
   if (!response.ok) {
     throw new Error(`request to '${urlWithSearchParams}' failed with status ${response.status}`)
@@ -69,21 +73,34 @@ async function get({
  *
  */
 const post = async ({
+  type,
   url,
   body,
   responseValidationSchema,
-  fetchCallback = defaultFetch,
+  fetchCallback,
+  fetchLimits,
 }: {
+  type: FederationFetchType
   url: string
   body?: Record<string, unknown>
   responseValidationSchema?: z.ZodType
+  /** Defaults to the global `fetch` */
   fetchCallback?: FetchCallback
+  /** 10 MiB by default */
+  fetchLimits?: FetchLimits<FederationFetchType>
 }) => {
-  const response = await fetchCallback(url, {
-    method: 'POST',
-    body: body ? JSON.stringify(body) : undefined,
-    headers: { 'Content-Type': 'application/json' },
-  })
+  const response = await fetchWithLimits(
+    { fetch: fetchCallback, fetchLimits },
+    {
+      type,
+      url,
+      init: {
+        method: 'POST',
+        body: body ? JSON.stringify(body) : undefined,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    }
+  )
 
   if (responseValidationSchema) {
     const json = await response.json()

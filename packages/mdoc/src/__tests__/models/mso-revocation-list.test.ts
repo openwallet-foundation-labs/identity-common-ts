@@ -170,8 +170,8 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
       })) as typeof globalThis.fetch
 
     return verifyStatusListToken(
-      { statusListInfo, trustedCertificates: [certificate], maxDecompressedBytes, maxResponseBytes },
-      { ...mdocContext, fetch }
+      { statusListInfo, trustedCertificates: [certificate], maxDecompressedBytes },
+      { ...mdocContext, fetch, fetchLimits: { maxResponseBytesByType: { statusList: maxResponseBytes } } }
     )
   }
 
@@ -218,7 +218,7 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
   })
 
   // The signed CWT, with its certificate, is far larger than 100 bytes
-  test('Verify a status list served in a response larger than maxResponseBytes', async () => {
+  test('Verify a status list served in a response larger than its limit', async () => {
     const verification = verify({ status: StatusType.Invalid, maxResponseBytes: 100 })
 
     await expect(verification).rejects.toThrow('The response is larger than the maximum of 100 bytes')
@@ -458,8 +458,8 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
 })
 
 // The response is rejected before its body is read whole, whatever it carries
-suite('verifyIdentifierListToken with a response larger than maxResponseBytes', () => {
-  test('Verify an identifier list served in a response larger than maxResponseBytes', async () => {
+suite('verifyIdentifierListToken with a response larger than its limit', () => {
+  test('Verify an identifier list served in a response larger than its limit', async () => {
     const fetch = (async () =>
       new Response(new Uint8Array(1024), {
         headers: { 'Content-Type': IdentifierListMediaTypes.IdentifierListCwt },
@@ -469,9 +469,8 @@ suite('verifyIdentifierListToken with a response larger than maxResponseBytes', 
       {
         identifierListInfo: { uri: 'https://example.org/identifier-list/too-large', id: new Uint8Array([0x01]) },
         trustedCertificates: [certificate],
-        maxResponseBytes: 100,
       },
-      { ...mdocContext, fetch }
+      { ...mdocContext, fetch, fetchLimits: { maxResponseBytesByType: { identifierList: 100 } } }
     )
 
     await expect(verification).rejects.toThrow(InvalidRevocationListError)

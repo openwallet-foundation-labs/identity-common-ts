@@ -1,6 +1,11 @@
 import {
+  bytesToString,
   CommonMediaTypes,
-  createAcceptHeader,
+  type FetchCallback,
+  type FetchLimits,
+  type FetchOptions,
+  fetchAndParse,
+  fetchWithLimits,
   isMediaType,
   parseWithSchema,
   type SchemaParseResult,
@@ -8,7 +13,41 @@ import {
 import type z from 'zod'
 import { FetchError } from './error/FetchError'
 import { InvalidFetchResponseError } from './error/InvalidFetchResponseError'
-import { type Fetch, type FetchResponse, Headers, URLSearchParams } from './globals'
+import { type FetchRequestInit, type FetchResponse, URLSearchParams } from './globals'
+
+/**
+ * What the OAuth 2.0, OpenID4VCI and OpenID4VP packages request: a resource they fetch, such as `jwks`, or the
+ * request they send to an endpoint, named as the specification names it, such as `credentialRequest`.
+ */
+export type Openid4vcFetchType =
+  | 'authorizationServerMetadata'
+  | 'credentialIssuerMetadata'
+  | 'jwks'
+  | 'clientMetadata'
+  | 'requestObject'
+  | 'credentialOffer'
+  | 'accessTokenRequest'
+  | 'tokenIntrospectionRequest'
+  | 'pushedAuthorizationRequest'
+  | 'authorizationChallengeRequest'
+  | 'interactiveAuthorizationRequest'
+  | 'clientAttestationChallengeRequest'
+  | 'nonceRequest'
+  | 'credentialRequest'
+  | 'deferredCredentialRequest'
+  | 'notificationRequest'
+  | 'authorizationResponse'
+  // Any other request with an access token, through `resourceRequest`
+  | 'resourceRequest'
+
+/**
+ * The fetch the packages take. The global `fetch` satisfies it, and it gets what is requested as its third argument,
+ * `{ type }`. The packages read the body of a response within {@link FetchLimits}, so it does not have to limit it.
+ */
+export type Fetch = FetchCallback<Openid4vcFetchType>
+
+/** The `fetch` and `fetchLimits` of the callbacks, through which a request is made. */
+export type FetchCallbacks = { fetch?: Fetch; fetchLimits?: FetchLimits<Openid4vcFetchType> }
 
 /**
  * A type utility which represents the function returned
@@ -17,88 +56,84 @@ import { type Fetch, type FetchResponse, Headers, URLSearchParams } from './glob
 export type ZodFetcher = <Schema extends z.ZodTypeAny>(
   schema: Schema,
   expectedContentType: string | string[],
-  ...args: Parameters<Fetch>
-) => Promise<{ response: Awaited<ReturnType<Fetch>>; result?: SchemaParseResult<z.infer<Schema>> }>
+  input: string,
+  init?: FetchRequestInit
+) => Promise<{ response: FetchResponse; result?: SchemaParseResult<z.infer<Schema>> }>
 
 /**
- * The default fetcher used by createZodFetcher when no
- * fetcher is provided.
+ * The default fetcher used by createFetcher when no fetcher is provided. Resolved on every call, so a fetch that is
+ * set or replaced after this module is loaded is used.
  */
-// biome-ignore lint/style/noRestrictedGlobals: this is the only place where we use the global
-const defaultFetcher = fetch
+const defaultFetcher: Fetch = (input, init) => globalThis.fetch(input, init)
 
-export function createFetcher(fetcher = defaultFetcher): Fetch {
-  return (input, init, ...args) => {
-    return fetcher(
-      input,
-      init
-        ? {
-            ...init,
-            // React Native does not seem to handle the toString(). This is hard to catch when running
-            // tests in Node.JS where this does work correctly. so we handle it here.
-            body: init.body instanceof URLSearchParams ? init.body.toString() : init.body,
-          }
-        : undefined,
-      ...args
-    ).catch((error) => {
-      throw new FetchError(`Unknown error occurred during fetch to '${input}'`, { cause: error })
-    })
+/** The options of the fetch layer, with the errors of `fetch` wrapped in a `FetchError`. */
+function fetchOptions({ fetch = defaultFetcher, fetchLimits }: FetchCallbacks = {}): FetchOptions<Openid4vcFetchType> {
+  return {
+    fetchLimits,
+    fetch: async (input, init, context) => {
+      try {
+        return await fetch(input, init, context)
+      } catch (error) {
+        throw new FetchError(`Unknown error occurred during fetch to '${input}'`, { cause: error as Error })
+      }
+    },
   }
 }
 
+// React Native does not seem to handle the toString(). This is hard to catch when running
+// tests in Node.JS where this does work correctly. so we handle it here.
+const requestInit = (init?: FetchRequestInit): FetchRequestInit | undefined =>
+  init && { ...init, body: init.body instanceof URLSearchParams ? init.body.toString() : init.body }
+
 /**
- * Creates a `fetchWithZod` function that takes in a schema of
- * the expected response, and the arguments to the fetcher
- * you provided. The expected content types are sent as the
- * `Accept` header, unless the request already has one. The
- * order of the expected content types is the order of preference,
- * expressed with decreasing `q` values.
+ * Creates a fetch for requests of `type`, which reads the body of the response within the limit of
+ * `callbacks.fetchLimits` for `type`, and returns a response that holds it.
+ *
+ * @throws FetchError if `callbacks.fetch` fails, and the `IdentityCommonError` of `@owf/identity-common` if the
+ *   response is larger than its limit.
+ */
+export function createFetcher(
+  callbacks: FetchCallbacks | undefined,
+  type: Openid4vcFetchType
+): (input: string, init?: FetchRequestInit) => Promise<FetchResponse> {
+  return (input, init) => fetchWithLimits(fetchOptions(callbacks), { type, url: input, init: requestInit(init) })
+}
+
+/**
+ * Creates a `fetchWithZod` function for requests of `type`, that takes in a schema of the expected response, and
+ * the arguments of the request. The expected content types are sent as the `Accept` header, unless the request
+ * already has one. The order of the expected content types is the order of preference, expressed with decreasing
+ * `q` values. The body of the response is read within the limit of `callbacks.fetchLimits` for `type`.
+ *
+ * @throws IdentityCommonError (from `@owf/identity-common`) if a response with a 2xx status is not of one of the
+ *   expected content types, or is larger than its limit.
  *
  * @example
  *
- * const fetchWithZod = createZodFetcher((url) => {
- *   return fetch(url).then((res) => res.json());
- * });
+ * const fetchWithZod = createZodFetcher(callbacks, 'jwks')
  *
- * const response = await fetchWithZod(
- *   z.object({
- *     hello: z.string(),
- *   }),
- *   "https://example.com",
- * );
+ * const { response, result } = await fetchWithZod(zJwkSet, CommonMediaTypes.JwkSet, 'https://example.com/jwks')
  */
-export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
+export function createZodFetcher(callbacks: FetchCallbacks | undefined, type: Openid4vcFetchType): ZodFetcher {
   return async (schema, expectedContentType, input, init) => {
     const expectedContentTypeArray = Array.isArray(expectedContentType) ? expectedContentType : [expectedContentType]
 
-    // Ask for the expected content types in order of preference, unless the caller already set an Accept header
-    const headers = new Headers(init?.headers)
-    if (!headers.has('Accept')) {
-      headers.set('Accept', createAcceptHeader(expectedContentTypeArray))
-    }
+    const { response, data } = await fetchAndParse(fetchOptions(callbacks), {
+      type,
+      url: input,
+      init: requestInit(init),
+      accept: expectedContentTypeArray,
+      parse: (body, response) => {
+        const text = bytesToString(body, { stripByteOrderMark: true })
+        // A compact JWT is text, not JSON (RFC 7519 Section 1)
+        return parseWithSchema(
+          schema,
+          isMediaType(response.headers.get('Content-Type'), CommonMediaTypes.Jwt) ? text : parseJson(text, response)
+        )
+      },
+    })
 
-    const response = await createFetcher(fetcher)(input, { ...init, headers })
-
-    if (response.ok && !isMediaType(response.headers.get('Content-Type'), expectedContentTypeArray)) {
-      throw new InvalidFetchResponseError(
-        `Expected response to match content type ${expectedContentTypeArray.join(' | ')}, but received '${response.headers.get('Content-Type')}'`,
-        await response.clone().text(),
-        response
-      )
-    }
-
-    // A compact JWT is text, not JSON (RFC 7519 Section 1)
-    if (isMediaType(response.headers.get('Content-Type'), CommonMediaTypes.Jwt)) {
-      return {
-        response,
-        result: response.ok ? parseWithSchema(schema, await response.text()) : undefined,
-      }
-    }
-
-    return {
-      response,
-      result: response.ok ? parseWithSchema(schema, await parseJsonResponse(response)) : undefined,
-    }
+    return { response, result: data }
   }
 }
 
@@ -106,8 +141,7 @@ export function createZodFetcher(fetcher?: Fetch): ZodFetcher {
  * The JSON of the response body. Not `response.json()`, as its `SyntaxError` quotes the start of the body, which may
  * come from an internal endpoint.
  */
-async function parseJsonResponse(response: FetchResponse): Promise<unknown> {
-  const text = await response.clone().text()
+function parseJson(text: string, response: FetchResponse): unknown {
   try {
     return JSON.parse(text)
   } catch {

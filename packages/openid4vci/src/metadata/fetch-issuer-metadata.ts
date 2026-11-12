@@ -41,7 +41,7 @@ export interface ResolveIssuerMetadataOptions {
    * Callbacks for fetching the credential issuer metadata. The `verifyJws` callback is
    * required unless `signedMetadata` is `disallowed`.
    */
-  callbacks: Partial<Pick<CallbackContext, 'fetch' | 'verifyJws' | 'getAuthorizationServerMetadata'>>
+  callbacks: Partial<Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'verifyJws' | 'getAuthorizationServerMetadata'>>
 
   /**
    * Whether the credential issuer metadata must be signed. This is sent as the `Accept` header.

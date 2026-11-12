@@ -100,7 +100,11 @@ describe.each([
   })
 
   it.each([
-    ['status list response', { maxStatusListResponseBytes: 100 }, 'larger than the maximum of 100 bytes'],
+    [
+      'status list response',
+      { callbacks: { ...callbacks, fetch, fetchLimits: { maxResponseBytes: 100 } } },
+      'larger than the maximum of 100 bytes',
+    ],
     ['decompressed status list', { maxStatusListDecompressedBytes: 0 }, 'larger than the maximum of 0 bytes'],
   ])('passes the maximum size of the %s on', async (_, limit, message) => {
     const error = await verify(await sign(), limit).catch((error) => error)

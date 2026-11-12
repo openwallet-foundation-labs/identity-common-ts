@@ -145,7 +145,9 @@ The resolver follows the `authority_hints` of the leaf to the trust anchors and 
 Trust marks are not verified.
 
 The entity configurations name the URLs that are fetched. Pass a `fetchCallback` that applies your outbound request
-policy (allowed hosts, timeouts, response size). `maxDepth` (default 8), `maxRequests` (default 64) and
+policy (allowed hosts, timeouts). It gets `{ type: 'entityConfiguration' }` or `{ type: 'entityStatement' }` as its
+third argument. Every response is read within 10 MiB, or the limits of `fetchLimits` (see `FetchLimits` of
+`@owf/identity-common`). `maxDepth` (default 8), `maxRequests` (default 64) and
 `maxAuthorityHints` (default 10) bound the resolution.
 
 `resolveTrustChainsWithFailures` also returns why each path was rejected:

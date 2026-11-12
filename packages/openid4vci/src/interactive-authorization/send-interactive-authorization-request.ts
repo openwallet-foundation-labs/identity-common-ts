@@ -23,7 +23,7 @@ export interface SendInteractiveAuthorizationRequestOptions {
   /**
    * Callback context
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'signJws' | 'hash' | 'generateRandom'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'signJws' | 'hash' | 'generateRandom'>
 
   /**
    * Authorization server metadata containing the interactive_authorization_endpoint
@@ -94,7 +94,7 @@ export interface SendInteractiveAuthorizationRequestOptions {
  * ```
  */
 export async function sendInteractiveAuthorizationRequest(options: SendInteractiveAuthorizationRequestOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'interactiveAuthorizationRequest')
 
   const authorizationServerMetadata = options.authorizationServerMetadata
   const interactiveAuthorizationEndpoint = authorizationServerMetadata.interactive_authorization_endpoint

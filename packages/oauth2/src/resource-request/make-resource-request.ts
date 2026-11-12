@@ -1,4 +1,10 @@
-import { createFetcher, type FetchRequestInit, type FetchResponse, type HttpMethod } from '@openid4vc/utils'
+import {
+  createFetcher,
+  type FetchRequestInit,
+  type FetchResponse,
+  type HttpMethod,
+  type Openid4vcFetchType,
+} from '@openid4vc/utils'
 import type { CallbackContext } from '../callbacks'
 import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
 import { shouldRetryResourceRequestWithDpopNonce } from '../dpop/dpop-retry'
@@ -24,7 +30,7 @@ export interface ResourceRequestOptions {
   /**
    * Callbacks
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'signJws' | 'hash'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'generateRandom' | 'signJws' | 'hash'>
 
   /**
    * Access token
@@ -33,6 +39,13 @@ export interface ResourceRequestOptions {
 
   url: string
   requestOptions: FetchRequestInit
+
+  /**
+   * What is requested, passed to `fetch` as its third argument and the key of its limit in `fetchLimits`
+   *
+   * @default 'resourceRequest'
+   */
+  type?: Openid4vcFetchType
 }
 
 interface ResourceRequestResponseBase {
@@ -78,7 +91,7 @@ export async function resourceRequest(
       })
     : undefined
 
-  const response = await createFetcher(options.callbacks.fetch)(options.url, {
+  const response = await createFetcher(options.callbacks, options.type ?? 'resourceRequest')(options.url, {
     ...options.requestOptions,
     headers: {
       ...options.requestOptions.headers,

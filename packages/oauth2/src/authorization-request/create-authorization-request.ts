@@ -19,7 +19,10 @@ export interface CreateAuthorizationRequestUrlOptions {
   /**
    * Callback context mostly for crypto related functionality
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'hash' | 'generateRandom' | 'signJws' | 'clientAuthentication'>
+  callbacks: Pick<
+    CallbackContext,
+    'fetch' | 'fetchLimits' | 'hash' | 'generateRandom' | 'signJws' | 'clientAuthentication'
+  >
 
   /**
    * Metadata of the authorization server for which to create the authorization request url
@@ -189,11 +192,11 @@ interface PushAuthorizationRequestOptions {
    */
   headers?: Record<string, unknown>
 
-  callbacks: Pick<CallbackContext, 'fetch' | 'clientAuthentication'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'clientAuthentication'>
 }
 
 async function pushAuthorizationRequest(options: PushAuthorizationRequestOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'pushedAuthorizationRequest')
 
   if (options.authorizationRequest.request_uri) {
     throw new Oauth2Error(

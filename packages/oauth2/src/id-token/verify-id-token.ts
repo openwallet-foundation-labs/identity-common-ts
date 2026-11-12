@@ -15,7 +15,7 @@ export interface VerifyIdTokenJwtOptions {
   /**
    * Callbacks used for verifying the id token
    */
-  callbacks: Pick<CallbackContext, 'verifyJws' | 'fetch' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'fetch' | 'fetchLimits' | 'getJwks'>
 
   /**
    * If not provided current time will be used

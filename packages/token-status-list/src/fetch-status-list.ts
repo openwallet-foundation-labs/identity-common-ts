@@ -1,4 +1,4 @@
-import { bytesToString, createAcceptHeader, isMediaType, readResponseBodyAtMost } from '@owf/identity-common'
+import { bytesToString, type FetchCallback, type FetchLimits, fetchWithLimits, isMediaType } from '@owf/identity-common'
 import { StatusListError } from './status-list-error'
 import { StatusListMediaTypes } from './types'
 
@@ -10,38 +10,39 @@ const DEFAULT_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 
 export const fetchStatusList = async ({
   uri,
-  customFetcher = fetch,
+  customFetcher,
+  fetchLimits,
   acceptedFormats = ['jwt', 'cwt'],
-  maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES,
 }: {
   uri: string
   /**
    * The formats to ask for, in order of preference. If none is supplied either can be returned.
    */
   acceptedFormats?: Array<'cwt' | 'jwt'>
-  customFetcher?: typeof fetch
+  /** Defaults to the global `fetch`. It gets `{ type: 'statusList' }` as its third argument. */
+  customFetcher?: FetchCallback<'statusList'>
   /**
-   * The maximum size in bytes of the response body, 16 MiB by default. A larger response is rejected, without
+   * The maximum size of the response, 16 MiB for a status list by default. A larger response is rejected, without
    * reading more of it than the maximum where the platform streams the body.
    */
-  maxResponseBytes?: number
+  fetchLimits?: FetchLimits<'statusList'>
 }): Promise<string | Uint8Array> => {
   try {
     if (acceptedFormats.length === 0) {
       throw new StatusListError(`At least one accepted format (cwt, jwt) needs to be provided`)
     }
 
-    const acceptHeader = createAcceptHeader(
-      acceptedFormats.map((format) =>
-        format === 'jwt' ? StatusListMediaTypes.StatusListJwt : StatusListMediaTypes.StatusListCwt
-      )
+    const response = await fetchWithLimits(
+      { fetch: customFetcher, fetchLimits },
+      {
+        type: 'statusList',
+        url: uri,
+        defaultMaxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
+        accept: acceptedFormats.map((format) =>
+          format === 'jwt' ? StatusListMediaTypes.StatusListJwt : StatusListMediaTypes.StatusListCwt
+        ),
+      }
     )
-
-    const response = await customFetcher(uri, {
-      headers: {
-        Accept: acceptHeader,
-      },
-    })
 
     if (response.status > 399 || response.status <= 199) {
       throw new Error(`Could not fetch status list, response status '${response.status}'`)
@@ -49,9 +50,9 @@ export const fetchStatusList = async ({
 
     const contentType = response.headers.get('Content-Type')
     if (isMediaType(contentType, StatusListMediaTypes.StatusListJwt)) {
-      return bytesToString(await readResponseBodyAtMost(response, maxResponseBytes))
+      return bytesToString(new Uint8Array(await response.arrayBuffer()))
     } else if (isMediaType(contentType, StatusListMediaTypes.StatusListCwt)) {
-      return await readResponseBodyAtMost(response, maxResponseBytes)
+      return new Uint8Array(await response.arrayBuffer())
     }
 
     throw new StatusListError('Content type was either not provided in the response or invalid.')

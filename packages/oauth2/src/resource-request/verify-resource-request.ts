@@ -31,7 +31,7 @@ export interface VerifyResourceRequestOptions {
   /**
    * Callbacks for verification of the access token.
    */
-  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash' | 'clientAuthentication' | 'fetch' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash' | 'clientAuthentication' | 'fetch' | 'fetchLimits' | 'getJwks'>
 
   /**
    * allowed auth schemes for the access token. If not provided

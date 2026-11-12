@@ -1,6 +1,6 @@
 import { Oauth2ErrorCodes, Oauth2MediaTypes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { createFetcher, type Fetch, objectToQueryParams } from '@openid4vc/utils'
-import { CommonMediaTypes, createAcceptHeader } from '@owf/identity-common'
+import { createFetcher, type Fetch, type Openid4vcFetchType, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, createAcceptHeader, type FetchLimits } from '@owf/identity-common'
 import type { ClientIdPrefix } from '../../client-identifier-prefix/z-client-id-prefix'
 import type { WalletMetadata } from '../../models/z-wallet-metadata'
 
@@ -24,8 +24,10 @@ export async function fetchJarRequestObject(options: {
     nonce?: string
   }
   fetch?: Fetch
+  /** The maximum size of the response, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`) */
+  fetchLimits?: FetchLimits<Openid4vcFetchType>
 }): Promise<string> {
-  const { requestUri, clientIdPrefix, method, wallet, fetch } = options
+  const { requestUri, clientIdPrefix, method, wallet } = options
 
   let requestBody = wallet.metadata ? { wallet_metadata: wallet.metadata, wallet_nonce: wallet.nonce } : undefined
   if (requestBody?.wallet_metadata?.request_object_signing_alg_values_supported && clientIdPrefix === 'redirect_uri') {
@@ -34,7 +36,7 @@ export async function fetchJarRequestObject(options: {
     requestBody = { ...requestBody, wallet_metadata: { ...rest } }
   }
 
-  const response = await createFetcher(fetch)(requestUri, {
+  const response = await createFetcher(options, 'requestObject')(requestUri, {
     method,
     body: method === 'post' ? objectToQueryParams(wallet.metadata ?? {}) : undefined,
     headers: {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { IdentityCommonError, readResponseBodyAtMost } from '../../src'
+import { IdentityCommonError } from '../../src'
+import { readResponseBodyAtMost } from '../response-body'
 
 /** A body that streams `chunkCount` chunks of `chunkSize` bytes, counting the chunks it was asked for. */
 const streamedBody = (chunkSize: number, chunkCount = Number.POSITIVE_INFINITY) => {

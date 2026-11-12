@@ -17,7 +17,7 @@ import type { CallbackContext } from '../callbacks'
  */
 export async function fetchJwks(
   jwksUrl: string,
-  fetchOrCallbacks?: Fetch | Pick<CallbackContext, 'fetch' | 'getJwks'>
+  fetchOrCallbacks?: Fetch | Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'getJwks'>
 ): Promise<JwkSet> {
   const callbacks = typeof fetchOrCallbacks === 'function' ? { fetch: fetchOrCallbacks } : fetchOrCallbacks
   const providedJwks = await callbacks?.getJwks?.(jwksUrl)
@@ -30,7 +30,7 @@ export async function fetchJwks(
     )
   }
 
-  const fetcher = createZodFetcher(callbacks?.fetch)
+  const fetcher = createZodFetcher(callbacks, 'jwks')
 
   const { result, response } = await fetcher(zJwkSet, [CommonMediaTypes.JwkSet, CommonMediaTypes.Json], jwksUrl)
   if (!response.ok) {
