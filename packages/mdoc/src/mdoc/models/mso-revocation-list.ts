@@ -240,6 +240,17 @@ async function verifyStatusListJwt(
   return { statusListJwt: { header, payload, statusList }, chain }
 }
 
+/**
+ * How the verification of an mdoc checks the status list and identifier list of its MSO
+ * (ISO/IEC 18013-5 second edition § 12.3.6).
+ */
+export type StatusVerificationOptions = {
+  /** Don't fetch and check the status list or identifier list of the MSO. */
+  disableValidation?: boolean
+  /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
+  maxDecompressedBytes?: number
+}
+
 export type VerifyStatusListTokenOptions = {
   statusListInfo: Pick<StatusListInfo, 'uri' | 'idx'>
   /**

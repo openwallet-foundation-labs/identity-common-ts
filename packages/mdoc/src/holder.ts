@@ -8,6 +8,7 @@ import {
   IssuerSigned,
   type IssuerSignedVerificationResult,
   SessionTranscript,
+  type StatusVerificationOptions,
   type VerificationCallback,
 } from './mdoc'
 import { verifyAgeOverRequestLimit } from './utils/ageOver'
@@ -29,11 +30,9 @@ export class Holder {
       verificationCallback?: VerificationCallback
       now?: Date
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       trustedCertificates?: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       skewSeconds?: number
-      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
-      maxStatusListDecompressedBytes?: number
+      status?: StatusVerificationOptions
     },
     ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch' | 'fetchLimits'>
   ): Promise<IssuerSignedVerificationResult> {

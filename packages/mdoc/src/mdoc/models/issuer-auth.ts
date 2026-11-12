@@ -21,7 +21,7 @@ import {
 import { IdentifierFoundInRevokedListError, StatusListEntryNotValidError } from '../errors.js'
 import type { IdentifierListCwt } from './identifier-list-cwt'
 import { MobileSecurityObject, type MobileSecurityObjectEncodedStructure } from './mobile-security-object.js'
-import { verifyIdentifierListToken, verifyStatusListToken } from './mso-revocation-list'
+import { type StatusVerificationOptions, verifyIdentifierListToken, verifyStatusListToken } from './mso-revocation-list'
 
 export type IssuerAuthEncodedStructure = Sign1EncodedStructure
 export type IssuerAuthOptions = Omit<Sign1Options, 'payload'> & {
@@ -111,8 +111,8 @@ export class IssuerAuth extends Sign1 {
       checkFreshness,
       trustedStatusCertificates,
       disableCertificateChainValidation,
-      maxStatusListDecompressedBytes,
-    }: {
+      maxDecompressedBytes,
+    }: Omit<StatusVerificationOptions, 'disableValidation'> & {
       now?: Date
       /** Tolerance applied to the `exp` and `iat` of a revocation list. Defaults to 30 seconds. */
       skewSeconds?: number
@@ -123,8 +123,6 @@ export class IssuerAuth extends Sign1 {
        * certificate chain against `trustedStatusCertificates`. The revocation status is still checked.
        */
       disableCertificateChainValidation?: boolean
-      /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
-      maxStatusListDecompressedBytes?: number
     },
     ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose' | 'crypto'>
   ): Promise<{
@@ -145,7 +143,7 @@ export class IssuerAuth extends Sign1 {
             now,
             skewSeconds,
             checkFreshness,
-            maxDecompressedBytes: maxStatusListDecompressedBytes,
+            maxDecompressedBytes,
           },
           ctx
         )
@@ -197,17 +195,15 @@ export class IssuerAuth extends Sign1 {
       now?: Date
       trustedCertificates?: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       skewSeconds?: number
-      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
-      maxStatusListDecompressedBytes?: number
+      status?: StatusVerificationOptions
     },
     ctx: Pick<MdocContext, 'x509' | 'cose' | 'fetch' | 'fetchLimits' | 'crypto'>
   ): Promise<IssuerAuthVerificationResult> {
     const verificationCallback = options.verificationCallback ?? defaultVerificationCallback
     const now = options.now ?? new Date()
     const disableCertificateChainValidation = options.disableCertificateChainValidation ?? false
-    const disableStatusValidation = options.disableStatusValidation ?? false
+    const disableStatusValidation = options.status?.disableValidation ?? false
     const trustedCertificates = options.trustedCertificates ?? []
     const skewSeconds = options.skewSeconds ?? 30
 
@@ -294,7 +290,7 @@ export class IssuerAuth extends Sign1 {
             skewSeconds,
             checkFreshness: true,
             trustedStatusCertificates,
-            maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
+            maxDecompressedBytes: options.status?.maxDecompressedBytes,
           },
           ctx
         ))
