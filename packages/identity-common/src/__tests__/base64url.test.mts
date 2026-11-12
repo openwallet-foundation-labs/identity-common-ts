@@ -96,4 +96,9 @@ describe('bytesToString', () => {
   it('should keep a leading byte order mark', () => {
     expect(bytesToString(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]))).toBe('﻿a')
   })
+
+  it('should remove a leading byte order mark when stripByteOrderMark is set', () => {
+    expect(bytesToString(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]), { stripByteOrderMark: true })).toBe('a')
+    expect(bytesToString(new Uint8Array([0x61, 0xef, 0xbb, 0xbf]), { stripByteOrderMark: true })).toBe('a\uFEFF')
+  })
 })

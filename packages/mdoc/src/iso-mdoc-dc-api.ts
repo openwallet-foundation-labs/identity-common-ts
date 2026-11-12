@@ -468,6 +468,10 @@ export class IsoMdocDcApi {
       onCheck?: VerificationCallback
       now?: Date
       skewSeconds?: number
+      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
+      maxStatusListDecompressedBytes?: number
+      /** The maximum size in bytes of the response that serves the status list or identifier list of an mdoc, 16 MiB by default. */
+      maxRevocationListResponseBytes?: number
     },
     ctx: Pick<MdocContext, 'crypto' | 'cose' | 'x509' | 'fetch'>
   ): Promise<{
@@ -487,6 +491,8 @@ export class IsoMdocDcApi {
         onCheck: options.onCheck,
         now: options.now,
         skewSeconds: options.skewSeconds,
+        maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
+        maxRevocationListResponseBytes: options.maxRevocationListResponseBytes,
       },
       ctx
     )

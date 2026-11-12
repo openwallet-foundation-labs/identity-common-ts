@@ -9,7 +9,7 @@ import {
   type VerifyCwtClaimsOptions,
 } from '@owf/cose'
 import z from 'zod'
-import { type StatusList, verifyStatusValid } from '../status-list'
+import { type DecompressStatusListOptions, type StatusList, verifyStatusValid } from '../status-list'
 import { StatusListError } from '../status-list-error'
 import { StatusListCbor, type StatusListCborEncodedStructure } from './status-list-cbor'
 
@@ -102,9 +102,20 @@ export class StatusListCwtPayload extends CwtPayload<StatusListCwtPayloadDecoded
     return this.getClaim(StatusListCwtClaimKey.TimeToLive)
   }
 
-  /** `status_list` (65533) */
+  /**
+   * `status_list` (65533), inflated on first read with the default `maxDecompressedBytes` of 16 MiB. A getter takes no
+   * options, so {@link getStatusList} reads it with another limit.
+   */
   public get statusList(): StatusList {
-    return this.getClaim(StatusListCwtClaimKey.StatusList).statusList
+    return this.getStatusList()
+  }
+
+  /**
+   * `status_list` (65533), inflated on the first call, which `maxDecompressedBytes` limits. See
+   * `StatusListCbor.getStatusList`.
+   */
+  public getStatusList(options?: DecompressStatusListOptions): StatusList {
+    return this.getClaim(StatusListCwtClaimKey.StatusList).getStatusList(options)
   }
 
   /**
@@ -141,11 +152,12 @@ export class StatusListCwtPayload extends CwtPayload<StatusListCwtPayloadDecoded
   /**
    * Verifies that the status at `idx` in this token's status list is `Valid`.
    *
-   * @throws StatusListValidationError if the status list cannot be decompressed (`invalid_status_list`), or `idx`
-   *   is not in it (`index_out_of_range`) or its status is not `Valid` (`status_not_valid`).
+   * @throws StatusListValidationError if the status list cannot be decompressed or inflates to more than
+   *   `maxDecompressedBytes`, 16 MiB by default (`invalid_status_list`), or `idx` is not in it (`index_out_of_range`)
+   *   or its status is not `Valid` (`status_not_valid`).
    */
-  public verifyStatus(idx: number): void {
-    verifyStatusValid(this.statusList, idx)
+  public verifyStatus(idx: number, options?: DecompressStatusListOptions): void {
+    verifyStatusValid(this.getStatusList(options), idx)
   }
 
   public setStatusList(statusList: StatusList | StatusListCbor) {

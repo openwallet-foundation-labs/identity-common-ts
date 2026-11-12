@@ -12,7 +12,7 @@ export class StatusListError extends IdentityError {
 
 /** Codes for the checks of a status list and of the status of a Referenced Token in it */
 export const STATUS_LIST_VALIDATION_CODES = {
-  /** `lst` is not a status list compressed with zlib, or inflates to more statuses than the maximum */
+  /** `lst` is not a status list compressed with zlib, or inflates to more bytes than the maximum */
   INVALID_STATUS_LIST: 'invalid_status_list',
   /** The `idx` of a Referenced Token is not an index of the status list (Token Status List § 8.3) */
   INDEX_OUT_OF_RANGE: 'index_out_of_range',
