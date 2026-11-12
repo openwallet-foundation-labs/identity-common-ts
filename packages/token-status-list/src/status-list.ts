@@ -88,8 +88,7 @@ function inflateAtMost(compressed: Uint8Array, maxBytes: number): Uint8Array {
   let length = 0
   inflator.onData = (chunk) => {
     length += chunk.length
-    // Negated, so that a `maxBytes` of NaN rejects every list rather than none
-    if (!(length <= maxBytes)) {
+    if (length > maxBytes) {
       throw new StatusListError(`The status list is larger than the maximum of ${maxBytes} bytes`)
     }
     chunks.push(chunk)
@@ -211,6 +210,7 @@ export class StatusList {
    * Decompress a raw byte array and return a new StatusList instance, which reads its statuses from the
    * decompressed bytes.
    *
+   * @throws StatusListError if `maxDecompressedBytes` is not a number of 0 or more.
    * @throws StatusListValidationError with an `invalid_status_list` issue if the bytes are not one ZLIB stream of a
    *   status list, or inflate to more than `maxDecompressedBytes`, 16 MiB by default.
    */
@@ -220,6 +220,10 @@ export class StatusList {
     aggregationUri?: string,
     { maxDecompressedBytes = DEFAULT_MAX_DECOMPRESSED_BYTES }: DecompressStatusListOptions = {}
   ): StatusList {
+    if (Number.isNaN(maxDecompressedBytes) || maxDecompressedBytes < 0) {
+      throw new StatusListError(`maxDecompressedBytes must be a number of 0 or more, but is ${maxDecompressedBytes}`)
+    }
+
     try {
       const statusList = new StatusList([], bitsPerStatus, aggregationUri)
       const byteArray = inflateAtMost(compressed, maxDecompressedBytes)

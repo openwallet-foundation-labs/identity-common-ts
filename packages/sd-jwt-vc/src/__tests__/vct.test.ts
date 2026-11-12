@@ -435,6 +435,22 @@ describe('App', () => {
     expect(error.message).not.toContain('internal-secret')
   })
 
+  test('reads type metadata served with a byte order mark', async () => {
+    const typeMetadata = new TextEncoder().encode(JSON.stringify({ vct: 'http://example.com/bom' }))
+    server.use(
+      http.get(
+        'http://example.com/bom',
+        () =>
+          new HttpResponse(new Uint8Array([0xef, 0xbb, 0xbf, ...typeMetadata]), {
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+    )
+    const encodedSdjwt = await sdjwt.issue({ iat, iss, vct: 'http://example.com/bom', ...claims })
+
+    await expect(sdjwt.verify(encodedSdjwt)).resolves.toBeDefined()
+  })
+
   test('rejects type metadata larger than maxTypeMetadataResponseBytes', async () => {
     server.use(
       http.get('http://example.com/large', () =>

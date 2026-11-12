@@ -5,26 +5,29 @@ import { IdentityCommonError } from './identity-common-error'
  * response is not read into memory whole.
  *
  * A `Content-Length` above `maxBytes` is rejected before the body is read. A body stream is counted as it is read,
- * and cancelled once it is larger. Where fetch has no body stream, as in React Native, the body is read whole and
- * checked afterwards.
+ * and cancelled once it is larger. Where fetch has no body stream, the body is read whole and checked afterwards.
+ * The fetch of React Native without Expo has none, so use a fetch that streams the body there, such as the one of
+ * Expo (`expo/fetch`) or `react-native-nitro-fetch`.
  *
  * @returns The body, in a new array over a buffer of its own.
- * @throws IdentityCommonError if the response is larger than `maxBytes`.
+ * @throws IdentityCommonError if `maxBytes` is not a number of 0 or more, or the response is larger than `maxBytes`.
  */
 export async function readResponseBodyAtMost(response: Response, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
+  if (Number.isNaN(maxBytes) || maxBytes < 0) {
+    throw new IdentityCommonError(`The maximum size of a response must be a number of 0 or more, but is ${maxBytes}`)
+  }
   const tooLarge = () => new IdentityCommonError(`The response is larger than the maximum of ${maxBytes} bytes`)
 
-  // The header is optional, so the body is counted too. Negated, so that a `maxBytes` of NaN rejects every response
-  // rather than none.
+  // The header is optional, so the body is counted too
   const contentLength = response.headers.get('Content-Length')
-  if (contentLength !== null && !(Number(contentLength) <= maxBytes)) {
+  if (contentLength !== null && Number(contentLength) > maxBytes) {
     response.body?.cancel().catch(() => {})
     throw tooLarge()
   }
 
   if (!response.body) {
     const body = new Uint8Array(await response.arrayBuffer())
-    if (!(body.length <= maxBytes)) throw tooLarge()
+    if (body.length > maxBytes) throw tooLarge()
     return body
   }
 
@@ -35,7 +38,7 @@ export async function readResponseBodyAtMost(response: Response, maxBytes: numbe
     const { done, value } = await reader.read()
     if (done) break
     length += value.length
-    if (!(length <= maxBytes)) {
+    if (length > maxBytes) {
       reader.cancel().catch(() => {})
       throw tooLarge()
     }

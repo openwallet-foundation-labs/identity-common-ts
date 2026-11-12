@@ -102,7 +102,10 @@ export class StatusListCwtPayload extends CwtPayload<StatusListCwtPayloadDecoded
     return this.getClaim(StatusListCwtClaimKey.TimeToLive)
   }
 
-  /** `status_list` (65533), see {@link getStatusList}. */
+  /**
+   * `status_list` (65533), inflated on first read with the default `maxDecompressedBytes` of 16 MiB. A getter takes no
+   * options, so {@link getStatusList} reads it with another limit.
+   */
   public get statusList(): StatusList {
     return this.getStatusList()
   }

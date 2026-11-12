@@ -48,6 +48,8 @@ You can confirm this by checking if `global.TextDecoder` is available. It should
 
 If it is not available, make sure to add a polyfill like [this one](https://github.com/EvanBacon/text-decoder).
 
+The `fetch` of React Native without Expo does not stream the body of a response, so a response is read whole before its size can be checked. Use a `fetch` that streams the body, such as the one of Expo (`expo/fetch`) or [`react-native-nitro-fetch`](https://github.com/margelo/react-native-nitro-fetch), so that the packages that limit the size of a response, such as `@owf/token-status-list`, stop reading a response once it is larger.
+
 ## API Reference
 
 ### Validation

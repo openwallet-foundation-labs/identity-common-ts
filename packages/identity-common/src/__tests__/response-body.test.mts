@@ -47,10 +47,13 @@ describe('readResponseBodyAtMost', () => {
     expect(stream.cancelled).toBe(true)
   })
 
-  it('rejects every response for a maxBytes of NaN', async () => {
-    await expect(readResponseBodyAtMost(new Response(new Uint8Array(1)), Number.NaN)).rejects.toThrow(
-      IdentityCommonError
+  it.each([Number.NaN, -1])('rejects a maxBytes of %s before reading the body', async (maxBytes) => {
+    const { stream, body } = streamedBody(1024)
+
+    await expect(readResponseBodyAtMost(new Response(body), maxBytes)).rejects.toThrow(
+      new IdentityCommonError(`The maximum size of a response must be a number of 0 or more, but is ${maxBytes}`)
     )
+    expect(stream.pulled).toBe(0)
   })
 
   // The fetch of React Native has no body stream

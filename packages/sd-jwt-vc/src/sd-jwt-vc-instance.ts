@@ -1,4 +1,4 @@
-import { base64, isMediaType, readResponseBodyAtMost, secondsToDate } from '@owf/identity-common'
+import { base64, bytesToString, isMediaType, readResponseBodyAtMost, secondsToDate } from '@owf/identity-common'
 import {
   decodeStatusListJwt,
   fetchStatusList,
@@ -547,8 +547,7 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
       )
       await this.validateIntegrity(body, url, integrity)
       try {
-        // Not `bytesToString`: TextDecoder strips a byte order mark, as `response.text()` does
-        return JSON.parse(new TextDecoder().decode(body))
+        return JSON.parse(bytesToString(body, { stripByteOrderMark: true }))
       } catch {
         throw new SdJwtError(`The type metadata fetched from ${url} is not valid JSON`)
       }

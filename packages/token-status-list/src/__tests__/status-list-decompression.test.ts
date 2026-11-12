@@ -2,6 +2,7 @@ import { base64url, concatBytes } from '@owf/identity-common'
 import { deflate, deflateRaw, gzip, Inflate, inflate } from 'pako'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { StatusList } from '../status-list'
+import { StatusListError } from '../status-list-error'
 import { StatusType } from '../types'
 import { statusListIssue } from './context'
 import { statusListTestVectors } from './status-list-test-vectors'
@@ -63,12 +64,13 @@ describe('decompressStatusListFromBytes', () => {
     ).toThrow('The status list is larger than the maximum of 1000 bytes')
   })
 
-  it('rejects every list for a maxDecompressedBytes of NaN', () => {
+  it.each([Number.NaN, -1])('rejects a maxDecompressedBytes of %s before inflating', (maxDecompressedBytes) => {
+    const inflated = countInflatedBytes()
+
     expect(() =>
-      StatusList.decompressStatusListFromBytes(deflate(new Uint8Array(1)), 1, undefined, {
-        maxDecompressedBytes: Number.NaN,
-      })
-    ).toThrow(statusListIssue('invalid_status_list'))
+      StatusList.decompressStatusListFromBytes(deflate(new Uint8Array(1)), 1, undefined, { maxDecompressedBytes })
+    ).toThrow(new StatusListError(`maxDecompressedBytes must be a number of 0 or more, but is ${maxDecompressedBytes}`))
+    expect(inflated.bytes).toBe(0)
   })
 
   // Token Status List § 4.1: the byte array is compressed with DEFLATE in the ZLIB format

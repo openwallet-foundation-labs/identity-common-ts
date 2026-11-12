@@ -51,7 +51,10 @@ export class StatusListCbor extends CborStructure<StatusListCborEncodedStructure
     return this.structure.get('lst')
   }
 
-  /** The status list, see {@link getStatusList}. */
+  /**
+   * The status list, inflated on first read with the default `maxDecompressedBytes` of 16 MiB. A getter takes no
+   * options, so {@link getStatusList} reads it with another limit.
+   */
   public get statusList(): StatusList {
     return this.getStatusList()
   }
