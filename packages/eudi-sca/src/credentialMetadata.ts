@@ -1,5 +1,5 @@
 import { type CredentialIssuerMetadata, zCredentialIssuerMetadataSchema } from '@openid4vc/openid4vci'
-import { base64url, decodeJwt } from '@owf/identity-common'
+import { base64url, decodeJwt, type FetchCallback, type FetchLimits, fetchWithLimits } from '@owf/identity-common'
 import z from 'zod'
 import type { JwtSignatureVerifier } from './crypto'
 import type { IssuerMetadataWithCredentialMetadataUri } from './issuerMetadata'
@@ -71,11 +71,18 @@ export const parseCredentialMetadata = (credentialMetadata: Record<string, unkno
   return cm
 }
 
+/**
+ * Fetches the credential metadata of `credentialMetadataSource` and verifies it.
+ *
+ * @param customFetcher Defaults to the global `fetch`. It gets `{ type: 'credentialMetadata' }` as its third argument.
+ * @param fetchLimits The maximum size of the response, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`).
+ */
 export async function fetchCredentialMetadata(
   verifier: JwtSignatureVerifier,
   credentialMetadataSource: string | IssuerMetadataWithCredentialMetadataUri,
-  customFetcher = fetch,
-  langCode?: string
+  customFetcher?: FetchCallback<'credentialMetadata'>,
+  langCode?: string,
+  fetchLimits?: FetchLimits
 ): Promise<CredentialMetadata & CredentialIssuerMetadata> {
   const uri =
     typeof credentialMetadataSource === 'string'
@@ -85,12 +92,15 @@ export async function fetchCredentialMetadata(
     throw Error('credential_metadata_uri is not defined on the issuer metadata')
   }
 
-  const response = await customFetcher(uri, {
-    headers: {
-      Accept: 'application/jwt',
-      ...(langCode ? { 'Accept-Language': langCode } : {}),
-    },
-  })
+  const response = await fetchWithLimits(
+    { fetch: customFetcher, fetchLimits },
+    {
+      type: 'credentialMetadata',
+      url: uri,
+      accept: 'application/jwt',
+      init: { headers: langCode ? { 'Accept-Language': langCode } : {} },
+    }
+  )
 
   const payload = await validateJwt(await response.text(), uri, verifier)
 
