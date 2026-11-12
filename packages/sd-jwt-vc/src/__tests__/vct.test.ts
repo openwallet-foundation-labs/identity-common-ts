@@ -451,13 +451,13 @@ describe('App', () => {
     await expect(sdjwt.verify(encodedSdjwt)).resolves.toBeDefined()
   })
 
-  test('rejects type metadata larger than maxTypeMetadataResponseBytes', async () => {
+  test('rejects type metadata larger than its limit', async () => {
     server.use(
       http.get('http://example.com/large', () =>
         HttpResponse.json({ vct: 'http://example.com/large', description: 'a'.repeat(1024) })
       )
     )
-    const sdjwtWithLimit = (maxTypeMetadataResponseBytes: number) =>
+    const sdjwtWithLimit = (typeMetadata: number) =>
       new SdJwtVcInstance({
         signer,
         signAlg: 'EdDSA',
@@ -466,7 +466,7 @@ describe('App', () => {
         hashAlg: 'sha-256',
         saltGenerator: generateSalt,
         loadTypeMetadataFormat: true,
-        maxTypeMetadataResponseBytes,
+        fetchLimits: { maxResponseBytesByType: { typeMetadata } },
       })
     const encodedSdjwt = await sdjwtWithLimit(1024).issue({ iat, iss, vct: 'http://example.com/large', ...claims })
 
@@ -476,7 +476,7 @@ describe('App', () => {
     await expect(sdjwtWithLimit(2048).verify(encodedSdjwt)).resolves.toBeDefined()
   })
 
-  test('rejects a status list response larger than maxStatusListResponseBytes', async () => {
+  test('rejects a status list response larger than its limit', async () => {
     server.use(
       http.get(
         'http://example.com/status-list',
@@ -491,7 +491,7 @@ describe('App', () => {
       hasher: digest,
       hashAlg: 'sha-256',
       saltGenerator: generateSalt,
-      maxStatusListResponseBytes: 1024,
+      fetchLimits: { maxResponseBytesByType: { statusList: 1024 } },
     })
     const encodedSdjwt = await sdjwtWithLimit.issue({
       iat,
@@ -504,6 +504,41 @@ describe('App', () => {
     await expect(sdjwtWithLimit.verify(encodedSdjwt)).rejects.toThrow(
       'The response is larger than the maximum of 1024 bytes'
     )
+  })
+
+  test('fetches with the fetch of the configuration, which is told what it fetches', async () => {
+    const fetched: Array<{ url: string; type: string; signal: unknown }> = []
+    const sdjwtWithFetch = new SdJwtVcInstance({
+      signer,
+      signAlg: 'EdDSA',
+      verifier,
+      hasher: digest,
+      hashAlg: 'sha-256',
+      saltGenerator: generateSalt,
+      loadTypeMetadataFormat: true,
+      fetch: async (url, init, { type }) => {
+        fetched.push({ url, type, signal: init.signal })
+        return type === 'typeMetadata'
+          ? Response.json({ vct: 'http://example.com/configured-fetch' })
+          : new Response('not a status list', { headers: { 'Content-Type': 'application/statuslist+jwt' } })
+      },
+    })
+    const encodedSdjwt = await sdjwtWithFetch.issue({
+      iat,
+      iss,
+      vct: 'http://example.com/configured-fetch',
+      status: { status_list: { uri: 'http://example.com/configured-fetch/status-list', idx: 0 } },
+      ...claims,
+    })
+
+    const result = await sdjwtWithFetch.safeVerify(encodedSdjwt)
+
+    // The type metadata is valid, and only the status list is not
+    expect(result.errors?.map((error) => error.code)).toEqual(['STATUS_VERIFICATION_FAILED'])
+    expect(fetched).toEqual([
+      { url: 'http://example.com/configured-fetch/status-list', type: 'statusList', signal: expect.any(AbortSignal) },
+      { url: 'http://example.com/configured-fetch', type: 'typeMetadata', signal: expect.any(AbortSignal) },
+    ])
   })
 
   test('VCT Metadata retrieval fails when fetched type metadata is invalid', async () => {

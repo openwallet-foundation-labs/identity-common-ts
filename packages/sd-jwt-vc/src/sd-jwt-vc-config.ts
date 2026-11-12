@@ -1,3 +1,4 @@
+import type { FetchCallback, FetchLimits } from '@owf/identity-common'
 import type { SdJwtConfig, Verifier } from '@sd-jwt/core'
 import type { VctFetcher } from './sd-jwt-vc-vct'
 
@@ -32,13 +33,9 @@ export type StatusListVerificationErrorDetails = {
 export type SdJwtVcConfig<T = unknown> = SdJwtConfig<T> & {
   // A function that fetches the status list from the uri. If not provided, the library will assume that the response is a compact JWT.
   statusListFetcher?: StatusListFetcher
-  // maximum size in bytes of the status list response, for the default statusListFetcher. If not provided, it will default to 16 MiB.
-  maxStatusListResponseBytes?: number
   // validte the status and decide if the status is valid or not. If not provided, the code will continue if it is 0, otherwise it will throw an error.
   // To have safeVerify report an invalid status as STATUS_INVALID, throw an SdJwtError with the code 'STATUS_INVALID'.
   statusValidator?: StatusValidator
-  // maximum size in bytes of a type metadata response, for the default vctFetcher. If not provided, it will default to 1 MiB.
-  maxTypeMetadataResponseBytes?: number
   // a function that fetches the type metadata format from the uri. If not provided, the library will assume that the response is a TypeMetadataFormat. Caching has to be implemented in this function. If the integrity value is passed, it to be validated according to https://www.w3.org/TR/SRI/
   vctFetcher?: VctFetcher
   // a function that verifies the signature of the status list JWT. It gets the verification options. If not provided, the verifier is used.
@@ -49,6 +46,10 @@ export type SdJwtVcConfig<T = unknown> = SdJwtConfig<T> & {
   loadTypeMetadataFormat?: boolean
   // timeout value in milliseconds when to abort the fetch request. If not provided, it will default to 10000.
   timeout?: number
+  // the fetch of the default statusListFetcher and vctFetcher, which gets { type: 'statusList' } or { type: 'typeMetadata' } as its third argument. If not provided, the global fetch is used.
+  fetch?: FetchCallback<'statusList' | 'typeMetadata'>
+  // maximum sizes of the responses of the default statusListFetcher and vctFetcher (see FetchLimits of @owf/identity-common). If not provided, 16 MiB for a status list and 1 MiB for type metadata.
+  fetchLimits?: FetchLimits
   // maximum depth of extends chain to resolve. If not provided, it will default to 5. Set to -1 to not limit the vct extends depth.
   maxVctExtendsDepth?: number
 }
