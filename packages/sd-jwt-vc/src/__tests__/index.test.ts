@@ -1,7 +1,7 @@
 import Crypto from 'node:crypto'
 import { hasher as digest, generateSalt } from '@owf/crypto'
 import { base64url } from '@owf/identity-common'
-import { JoseValidationError, StatusList, StatusListError } from '@owf/token-status-list'
+import { decodeStatusListJwt, JoseValidationError, StatusList, StatusListError } from '@owf/token-status-list'
 import {
   type DisclosureFrame,
   JwtTimeClaimError,
@@ -433,7 +433,15 @@ describe('Revocation', () => {
       status: { status_list: { uri: 'https://example.com/status-list', idx: 6 } },
     }
     await sdjwtWithValidator.verify(await sdjwtWithValidator.issue(expectedPayload))
-    expect(statusValidator).toHaveBeenCalledWith(1, { uri: 'https://example.com/status-list', idx: 6 })
+    expect(statusValidator).toHaveBeenCalledWith(1, {
+      uri: 'https://example.com/status-list',
+      idx: 6,
+      statusListJwt: {
+        compact: statusListJWT,
+        header: decodeStatusListJwt(statusListJWT).header,
+        payload: decodeStatusListJwt(statusListJWT).payload,
+      },
+    })
   })
 
   test('safeVerify reports a revoked credential as STATUS_INVALID', async () => {

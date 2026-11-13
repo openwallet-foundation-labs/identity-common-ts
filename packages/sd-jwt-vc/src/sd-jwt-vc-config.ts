@@ -1,4 +1,5 @@
 import type { FetchCallback, FetchLimits } from '@owf/identity-common'
+import type { StatusListJwtHeaderParameters, StatusListJwtPayload } from '@owf/token-status-list'
 import type { SdJwtConfig, Verifier } from '@sd-jwt/core'
 import type { VctFetcher } from './sd-jwt-vc-vct'
 
@@ -12,12 +13,18 @@ export type StatusValidatorContext = {
   uri: string
   /** Index of the credential in the status list. */
   idx: number
+  /** The status list token the status was read from. Its signature and claims are verified. */
+  statusListJwt: {
+    compact: string
+    header: StatusListJwtHeaderParameters
+    payload: StatusListJwtPayload
+  }
 }
 
 export type StatusValidator = (status: number, context: StatusValidatorContext) => Promise<void>
 
 /** `details` of the error with code `STATUS_INVALID` that the default status validator throws. */
-export type StatusInvalidErrorDetails = StatusValidatorContext & {
+export type StatusInvalidErrorDetails = Pick<StatusValidatorContext, 'uri' | 'idx'> & {
   /** The status of the credential, e.g. `1` for invalid (revoked) or `2` for suspended. */
   status: number
 }

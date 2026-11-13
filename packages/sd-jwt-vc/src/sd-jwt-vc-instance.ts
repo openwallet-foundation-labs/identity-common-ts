@@ -851,7 +851,15 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
 
         // validate the status
         const statusValidator: StatusValidator = this.userConfig.statusValidator ?? this.statusValidator.bind(this)
-        await statusValidator(status, { uri, idx })
+        await statusValidator(status, {
+          uri,
+          idx,
+          statusListJwt: {
+            compact: statusListJwt,
+            header: decodedStatusListJwt.header,
+            payload: decodedStatusListJwt.payload,
+          },
+        })
       }
     }
   }
