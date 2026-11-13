@@ -197,6 +197,14 @@ export function clientAuthenticationClientSecretPost(
   }
 }
 
+// `application/x-www-form-urlencoded` encoding of RFC 6749 Appendix B: UTF-8, a space is `+`. Written out because
+// `URLSearchParams` in React Native encodes a space as `%20` and leaves `!'()~` as they are.
+function formUrlEncode(value: string) {
+  return encodeURIComponent(value)
+    .replace(/%20/g, '+')
+    .replace(/[!'()~]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)
+}
+
 export interface ClientAuthenticationClientSecretBasicOptions {
   clientId: string
   clientSecret: string
@@ -209,9 +217,9 @@ export function clientAuthenticationClientSecretBasic(
   options: ClientAuthenticationClientSecretBasicOptions
 ): ClientAuthenticationCallback {
   return ({ headers }) => {
-    // The client id and secret are form-urlencoded (RFC 6749 section 2.3.1), so a `:` in the client id can't
-    // split the pair, and then base64 encoded with padding, not base64url (RFC 7617 section 2)
-    const credentials = `${encodeURIComponent(options.clientId)}:${encodeURIComponent(options.clientSecret)}`
+    // The client id and secret are form-urlencoded (RFC 6749 Section 2.3.1), so a `:` in the client id can't
+    // split the pair, and then base64 encoded with padding, not base64url (RFC 7617 Section 2)
+    const credentials = `${formUrlEncode(options.clientId)}:${formUrlEncode(options.clientSecret)}`
     const authorization = base64.encode(stringToBytes(credentials))
     headers.set('Authorization', `Basic ${authorization}`)
   }
