@@ -1,5 +1,95 @@
 # @openid4vc/oauth2
 
+## 0.10.0
+
+### Minor Changes
+
+- c3e5919: `verifyClientAttestationJwt` and `verifyKeyAttestationJwt` reject an attestation signed with a `jwk` signer. This also applies to `Oauth2AuthorizationServer.verifyClientAttestation`, the verification of authorization, pushed authorization and access token requests, `Openid4vciIssuer.verifyWalletAttestation`, and the issuer's verification of `jwt` and `attestation` proofs. The signer was taken from the attestation's own header, and `verifyJws` has to accept such keys for DPoP, PoP and proof JWTs, so a client could attest itself and a wallet could attest its own keys, for example to meet `key_attestations_required` (OpenID4VCI 1.0 Appendix D).
+  
+  An attestation signed with a `did` signer is still passed to `verifyJws`, which must check that the DID belongs to an attester it trusts. Resolving the DID is not enough: anyone can create a did:jwk or did:key, or host a did:web.
+  
+  **Breaking:** the attester must be identified by `x5c`, a federation `trust_chain`, a DID, or another `kid` that `verifyJws` resolves, and `verifyJws` decides whether it trusts it, for example by validating the `x5c` chain or by checking the DID against a list of trusted attesters. Sign attestations with one of these signers instead of a `jwk` header.
+- 0060df2: **Breaking:** `Oauth2Error`, `Openid4vciError` and `Openid4vcBaseError` extend `IdentityError` of `@owf/identity-common`. Their `name` is their class name. `Oauth2Error` and `Openid4vciError` no longer append the message of their `cause`.
+- 0060df2: **Breaking:** `Oauth2JwtParseError` and `Oauth2JwtVerificationError` are removed. Catch the `@owf/jose` errors that `@openid4vc/oauth2` exports: `JoseParseError`, `JoseVerificationError` and its subclasses, and `JoseValidationError` for a header or claim that does not validate, with issue codes such as `invalid_typ`, `expired` or `claim_value_mismatch`. They don't extend `Oauth2Error`, so catch `IdentityError` to handle both.
+- 0060df2: Every JWT verification takes `now` and `allowedSkewInSeconds` (30 seconds by default), and `Oauth2ResourceServer`, `Openid4vciIssuer`, `Openid4vciClient`, `Openid4vpClient` and `Openid4vpVerifier` take a default `allowedSkewInSeconds`. Key attestations and JAR request objects are verified at the `now` passed in.
+  
+  DPoP proofs: `maxProofAgeSeconds` allows the skew, an `iat` in the future is always rejected, `assertJtiUniqueness` runs after the signature check, and the `JoseValidationError` of a failed claim is the `cause` of the error response.
+  
+  A `JoseInvalidArgumentError`, e.g. for a negative skew, is thrown as is instead of as an error response. An expired OpenID4VP request object gives `invalid_request_object`.
+  
+  A `typ` is accepted in any casing and with the `application/` prefix (RFC 7515 Section 4.1.9). Compare it with `isJwtTyp` of `@owf/identity-common`.
+- 0060df2: Schema issues have the codes of `@owf/identity-common`, such as `missing_value` or `invalid_format`, instead of `invalid_value`.
+  
+  **Breaking:** values the specifications don't allow to be empty are rejected when empty, e.g. `client_id`, `nonce`, `c_nonce`, `pre-authorized_code`, `vct`, `access_token` and `jti`. `dpop_signing_alg_values_supported` rejects `none` (RFC 9449 Section 4.2).
+- 0f663bf: Every request reads its response within the new `fetchLimits` of `CallbackContext` (see `FetchLimits` of `@owf/identity-common`), 10 MiB per response by default. Before, a response of any size was read, also to put its body in an `InvalidFetchResponseError`. The `fetch` callback gets what is requested as its third argument, an `Openid4vcFetchType` such as `{ type: 'accessTokenRequest' }`, `{ type: 'credentialRequest' }` or `{ type: 'jwks' }`, so it can apply its own policy per type. The functions that take a `fetch` option, such as `resolveCredentialOffer`, `requestNonce`, `fetchClientMetadata` and `fetchJarRequestObject`, take `fetchLimits` next to it, and `resourceRequest` takes the `type` of what it requests.
+  
+  **Breaking:** `createFetcher(callbacks, type)` and `createZodFetcher(callbacks, type)` of `@openid4vc/utils` take the `fetch` and `fetchLimits` of the callbacks and the type of the request, instead of a `fetch`, and the fetch they return takes a `string` URL. `fetchWellKnownMetadata` of `@openid4vc/oauth2` requires the `type` option, `'authorizationServerMetadata'` or `'credentialIssuerMetadata'`. `Fetch` is the `FetchCallback` of `@owf/identity-common`, which the global `fetch` still satisfies. A successful response of an unexpected content type throws the `IdentityCommonError` of `@owf/identity-common` instead of an `InvalidFetchResponseError`.
+- 0060df2: **Breaking:** JWT handling is built on `@owf/jose`. `@openid4vc/oauth2` no longer exports its JWK, JWA, JWS and JWT helpers:
+  
+  | Removed from `@openid4vc/oauth2` | Import from `@owf/jose` |
+  | --- | --- |
+  | `decodeJwt`, `decodeJwtHeader`, `verifyJwt`, `DecodeJwtOptions`, `DecodeJwtResult`, `Jwk`, `JwkSet`, `zJwk`, `zJwkSet`, `JwtHeader`, `JwtPayload`, `zJwtHeader`, `zJwtPayload`, `zCompactJwt`, `zCompactJwe`, `JweEncryptor`, `calculateJwkThumbprint`, `CalculateJwkThumbprintOptions` | the same names |
+  | `DecodeJwtHeaderResult` | `ReturnType<typeof decodeJwtHeader>` |
+  | `jwtHeaderFromJwtSigner` | `jwsHeaderFromSigner` |
+  | `jwtSignerFromJwt({ header, payload })` | `jwsSignerFromHeader({ header, issuer: payload.iss })` |
+  | `JwtSigner`, `JwtSignerCustom`, `JwtSignerDid`, `JwtSignerJwk`, `JwtSignerWithJwk`, `JwtSignerX5c` | `JwsSigner`, `JwsSignerCustom`, `JwsSignerDid`, `JwsSignerJwk`, `JwsSignerWithJwk`, `JwsSignerX5c` |
+  | `zAlgValueNotNone` | `zJwsAlg` |
+  | `jwaSignatureAlgorithmToFullySpecifiedCoseAlgorithm`, `fullySpecifiedCoseAlgorithmToJwaSignatureAlgorithm` | `jwaSignatureAlgorithmToCoseAlgorithm`, `coseAlgorithmToJwaSignatureAlgorithm` |
+  | `jwaSignatureAlgorithmArrayToFullySpecifiedCoseAlgorithmArray`, `fullySpecifiedCoseAlgorithmArrayToJwaSignatureAlgorithmArray` | `jwaSignatureAlgorithmsToCoseAlgorithms`, `coseAlgorithmsToJwaSignatureAlgorithms` |
+  
+  **Breaking:** the `CallbackContext` callbacks `signJwt` and `verifyJwt` are replaced by `signJws` and `verifyJws` (`SignJwsCallback`, `VerifyJwsCallback`). They sign or verify the signing input and return the public key they used. `hash` is a `Hasher` of `@owf/identity-common` that gets the algorithm as `'sha-256'`. The `HashAlgorithm` enum and `HashCallback` type are removed.
+  
+  **Breaking:** `verifyJwt` takes `jwt` (compact or decoded), `verifyJwsCallback` and `skewSeconds`. `checkExpirationTime`, `checkNotBefore` and `checkIssuedAt` replace `skipTimeBasedValidation`.
+  
+  **Breaking:** JWTs are verified more strictly. The default skew is 30 seconds instead of 0, also for client attestations. A token issued in the future, a token at its `exp`, a missing `aud` when one is expected, `none`, `HS256`/`HS384`/`HS512` and miscased algorithms are rejected. A header must identify its signer in one way only, and a DID in `kid` must be the `iss`. The JWKS no longer falls back to its only key for an unknown `kid`. Parts that are not base64url, private keys in `jwk` or `cnf.jwk`, and a `crit` that is not understood are rejected.
+- 0060df2: **Breaking:** `@openid4vc/utils` drops its copies of the `@owf/identity-common` helpers, `ValidationError`, `zNumericDate` and its `buffer` dependency:
+  
+  | Removed from `@openid4vc/utils` | Use from `@owf/identity-common` |
+  | --- | --- |
+  | `decodeUtf8String`, `encodeToUtf8String` | `stringToBytes`, `bytesToString` |
+  | `encodeToBase64Url`, `encodeToBase64` | `base64url.encode`, `base64.encode` |
+  | `decodeBase64` | `base64.decode` or `base64url.decode` |
+  | `dateToSeconds` | `dateToSeconds` |
+  | `OrPromise`, `isJwtTyp`, `zTyp`, `parseWithErrorHandling`, `BaseSchema`, `ValidationError`, `zNumericDate` | the same names |
+  
+  **Breaking:** the `@openid4vc` packages throw the `ValidationError` of `@owf/identity-common`, with `issues` instead of `zodError`. `formatZodError` is removed. The `result` of a `ZodFetcher` and the `*Result` fields of the `@openid4vc/openid4vci` responses are a `SchemaParseResult` with `issues`.
+  
+  The packages no longer call `z.config` on import.
+- 5fff735: Media types are compared with `isMediaType` and JOSE `typ` values with `isJwtTyp`, both from `@owf/identity-common`. New: `CommonMediaTypes` of `@owf/identity-common`, the media types that are not specific to one specification, and `Oauth2MediaTypes` of `@openid4vc/oauth2`, with the JAR request object media type. JARM accepts its `Content-Type` in any casing. A Key Binding JWT and a registration certificate accept their `typ` in any casing and with the `application/` prefix (RFC 7515 Section 4.1.9).
+  
+  **Breaking:** `isContentType` and `isResponseContentType` are removed from `@openid4vc/utils`. Replace `isContentType(contentType, value)` with `isMediaType(value, contentType)` and `isResponseContentType(contentType, response)` with `isMediaType(response.headers.get('Content-Type'), contentType)`. `MediaTypes` is renamed to `StatusListMediaTypes` in `@owf/token-status-list` and to `MdocMediaTypes` in `@owf/mdoc`. `ContentType` is removed from `@openid4vc/utils`: use `CommonMediaTypes`, and `Oauth2MediaTypes.AuthorizationRequestJwt` for `ContentType.OauthAuthorizationRequestJwt`. The `expectedContentType` of a `ZodFetcher` is a `string`.
+
+### Patch Changes
+
+- 0060df2: `clientAuthenticationClientSecretBasic` form-urlencodes the client id and secret (RFC 6749 Section 2.3.1 and Appendix B) and encodes them with base64 with padding instead of base64url (RFC 7617 Section 2). Authorization servers such as Keycloak rejected the header unless the length of `clientId:clientSecret` was a multiple of three.
+  
+  An authorization server that compares the secret without decoding it rejects a secret with characters other than letters, digits and `*-._`. Use `clientAuthenticationClientSecretPost` or a custom `clientAuthentication` callback for those.
+- 25c7506: Proofs of possession are only accepted for a limited time, so a captured one can no longer be replayed indefinitely:
+  
+  - `verifyDpopJwt`, and the DPoP checks of `verifyAuthorizationRequest`, `verifyPushedAuthorizationRequest`, the access token request verification and `verifyResourceRequest`, reject a DPoP proof whose `iat` is more than 300 seconds ago unless `maxProofAgeSeconds` allows more (RFC 9449 Section 11.1). Before, a proof without `maxProofAgeSeconds` was valid forever. `expectedNonce` is now accepted by all of them, so a server can require its nonce for authorization and resource requests too (RFC 9449 Section 8).
+  - `verifyClientAttestationPopJwt` requires the `iat` of a client attestation PoP (draft-ietf-oauth-attestation-based-client-auth-09 Section 5.2) and rejects one older than 300 seconds. `verifyClientAttestation` and the client attestation options of the authorization and access token request verification accept `expectedChallenge`, so a server can enforce the challenge it issued (Section 6).
+  - `verifyCredentialRequestJwtProof` rejects a `jwt` proof whose `iat` is more than 300 seconds ago (OpenID4VCI 1.0 Appendix F.4).
+- Updated dependencies [90614a9]
+- Updated dependencies [0060df2]
+- Updated dependencies [0f663bf]
+- Updated dependencies [ebd0b4b]
+- Updated dependencies [21cd668]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [f6d2c57]
+- Updated dependencies [5d665bb]
+- Updated dependencies [946d9af]
+- Updated dependencies [0060df2]
+- Updated dependencies [0f663bf]
+- Updated dependencies [755e2eb]
+- Updated dependencies [0060df2]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [cb487f1]
+- Updated dependencies [5fff735]
+- Updated dependencies [04cfd04]
+  - @openid4vc/utils@0.10.0
+  - @owf/identity-common@0.8.0
+  - @owf/jose@0.8.0
+
 ## 0.9.2
 
 ### Patch Changes
