@@ -6,6 +6,7 @@ import { defaultVerificationCallback, onCategoryCheck, type VerificationCallback
 import { IssuerAuth, type IssuerAuthEncodedStructure, type IssuerAuthVerificationResult } from './issuer-auth'
 import { IssuerNamespaces, type IssuerNamespacesEncodedStructure } from './issuer-namespaces'
 import type { IssuerSignedItem } from './issuer-signed-item'
+import type { StatusVerificationOptions } from './mso-revocation-list'
 import type { Namespace } from './namespace'
 
 // 18013-5 8.3.2.1.2.2: `nameSpaces` is optional, and left out when no issuer-signed element is
@@ -89,10 +90,8 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
       now?: Date
       trustedCertificates?: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       skewSeconds?: number
-      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
-      maxStatusListDecompressedBytes?: number
+      status?: StatusVerificationOptions
     },
     ctx: Pick<MdocContext, 'x509' | 'crypto' | 'cose' | 'fetch' | 'fetchLimits'>
   ): Promise<IssuerSignedVerificationResult> {

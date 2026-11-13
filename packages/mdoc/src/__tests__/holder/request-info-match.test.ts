@@ -366,7 +366,7 @@ describe('alternative data elements', () => {
         deviceResponse,
         sessionTranscript,
         trustedCertificates: [{ issuance: [issuerCertificate] }],
-        disableStatusValidation: true,
+        status: { disableValidation: true },
         onCheck: (check) => checks.push(check),
       },
       mdocContext
@@ -486,7 +486,7 @@ describe('alternative data elements', () => {
         deviceResponse,
         sessionTranscript,
         trustedCertificates: [{ issuance: [issuerCertificate] }],
-        disableStatusValidation: true,
+        status: { disableValidation: true },
         onCheck: (check) => checks.push(check),
       },
       mdocContext
@@ -574,7 +574,7 @@ describe('issuer identifiers', () => {
         deviceResponse,
         sessionTranscript,
         trustedCertificates: [{ issuance: [issuerCertificate] }],
-        disableStatusValidation: true,
+        status: { disableValidation: true },
         onCheck: (check) => checks.push(check),
       },
       mdocContext
@@ -774,7 +774,7 @@ describe('use cases', () => {
         deviceResponse,
         sessionTranscript,
         trustedCertificates: [{ issuance: [issuerCertificate] }],
-        disableStatusValidation: true,
+        status: { disableValidation: true },
         onCheck: (check) => checks.push(check),
       },
       mdocContext
@@ -1028,7 +1028,7 @@ describe('issuer identifiers against a certificate chain', () => {
         deviceResponse,
         sessionTranscript,
         trustedCertificates: [{ issuance: [trusted] }],
-        disableStatusValidation: true,
+        status: { disableValidation: true },
         onCheck: (check) => checks.push(check),
       },
       mdocContext
@@ -1446,7 +1446,7 @@ describe('attribution', () => {
         deviceResponse,
         sessionTranscript,
         trustedCertificates: [{ issuance: [issuerCertificate] }],
-        disableStatusValidation: true,
+        status: { disableValidation: true },
         onCheck: (check) => checks.push(check),
       },
       mdocContext

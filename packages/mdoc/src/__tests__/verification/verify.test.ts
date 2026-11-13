@@ -26,6 +26,7 @@ import {
   SessionTranscript,
   SignatureAlgorithm,
   Status,
+  type StatusVerificationOptions,
   UnprotectedHeaders,
   //StatusListInfo,
   type VerificationAssessment,
@@ -423,7 +424,7 @@ suite('Verification', () => {
       ...options
     }: {
       skewSeconds?: number
-      maxStatusListDecompressedBytes?: number
+      status?: StatusVerificationOptions
       fetchLimits?: FetchLimits
     } = {}
   ) =>
@@ -644,13 +645,13 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 2 })).rejects.toThrow(
+    await expect(verifyIssuerSigned(credential, { status: { maxDecompressedBytes: 2 } })).rejects.toThrow(
       decompressedError
     )
     await expect(verifyIssuerSigned(credential, { fetchLimits: { maxResponseBytes: 100 } })).rejects.toThrow(
       responseError
     )
-    await expect(verifyIssuerSigned(credential, { maxStatusListDecompressedBytes: 3 })).resolves.toBeDefined()
+    await expect(verifyIssuerSigned(credential, { status: { maxDecompressedBytes: 3 } })).resolves.toBeDefined()
 
     const sessionTranscript = await SessionTranscript.forOid4Vp(
       { clientId: 'my-client-id', responseUri: 'my-response-uri.com', nonce: 'my-random-nonce' },
@@ -682,17 +683,17 @@ suite('Verification', () => {
     )
 
     const verifyDeviceResponse = ({
+      status,
       fetchLimits,
-      ...options
     }: {
-      maxStatusListDecompressedBytes?: number
+      status?: StatusVerificationOptions
       fetchLimits?: FetchLimits
     }) =>
       Verifier.verifyDeviceResponse(
-        { deviceResponse, sessionTranscript, trustedCertificates: validTrustedCertificates, ...options },
+        { deviceResponse, sessionTranscript, trustedCertificates: validTrustedCertificates, status },
         { ...mdocContext, fetchLimits }
       )
-    await expect(verifyDeviceResponse({ maxStatusListDecompressedBytes: 2 })).rejects.toThrow(decompressedError)
+    await expect(verifyDeviceResponse({ status: { maxDecompressedBytes: 2 } })).rejects.toThrow(decompressedError)
     await expect(verifyDeviceResponse({ fetchLimits: { maxResponseBytes: 100 } })).rejects.toThrow(responseError)
   })
 
@@ -1766,7 +1767,7 @@ suite('Verification', () => {
         {
           issuerSigned: IssuerSigned.fromEncodedForOid4Vci(issuerSigned.encodedForOid4Vci),
           trustedCertificates: validTrustedCertificates,
-          disableStatusValidation: true,
+          status: { disableValidation: true },
         },
         mdocContext
       )
