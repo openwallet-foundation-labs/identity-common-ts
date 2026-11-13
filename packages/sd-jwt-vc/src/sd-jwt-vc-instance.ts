@@ -816,7 +816,16 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
         // fetch the status list from the uri
         const statusListJwt = await fetcher(uri)
 
-        const slJWT = Jwt.fromEncode<StatusListJwtHeaderParameters, StatusListJwtPayload>(statusListJwt)
+        // The only place the token is decoded, a status list can be large
+        const decodedStatusListJwt = decodeStatusListJwt(statusListJwt, {
+          maxDecompressedBytes: this.userConfig.maxStatusListDecompressedBytes,
+        })
+        const slJWT = new Jwt<StatusListJwtHeaderParameters, StatusListJwtPayload>({
+          header: decodedStatusListJwt.header,
+          payload: decodedStatusListJwt.payload,
+          signature: decodedStatusListJwt.signature,
+          encoded: statusListJwt,
+        })
         // check if the status list has a valid signature. Falls back to the verifier of the SD-JWT-VC.
         const statusListVerifier = this.userConfig.statusVerifier ?? this.userConfig.verifier
         if (!statusListVerifier) {
@@ -837,9 +846,6 @@ export class SdJwtVcInstance<T = unknown> extends SdJwtInstance<SdJwtVcPayload, 
           })
 
         // check the claims required for a Status List Token, e.g. that `sub` matches the referenced uri
-        const decodedStatusListJwt = decodeStatusListJwt(statusListJwt, {
-          maxDecompressedBytes: this.userConfig.maxStatusListDecompressedBytes,
-        })
         verifyStatusListJwtClaims(decodedStatusListJwt.payload, {
           uri,
           now: options?.currentDate !== undefined ? secondsToDate(options.currentDate) : undefined,
