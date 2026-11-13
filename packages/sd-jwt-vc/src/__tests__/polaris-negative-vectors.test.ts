@@ -46,7 +46,7 @@ const reasons: Record<string, string> = {
   'kb-aud-missing': 'Invalid Key Binding Jwt',
   'kb-nonce-missing': 'Invalid Key Binding Jwt',
   'status-list-unreachable': 'Could not fetch either a JWT or CWT as status list. Failed to fetch',
-  'status-list-not-a-token': 'Invalid JWT as input',
+  'status-list-not-a-token': 'Unable to parse the JWS, a compact JWS must consist of exactly three parts',
   'status-list-lst-truncated': 'The status list cannot be decompressed',
   'status-list-wrong-key': 'Status List JWT verification failed: Verify Error: Invalid JWT Signature',
   'status-list-no-authority': 'Status List JWT verification failed: Verify Error: Invalid JWT Signature',
