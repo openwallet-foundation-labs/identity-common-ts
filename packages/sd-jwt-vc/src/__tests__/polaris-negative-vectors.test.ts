@@ -45,7 +45,7 @@ const reasons: Record<string, string> = {
   'issuer-sig-der': 'Verify Error: Invalid JWT Signature',
   'kb-aud-missing': 'Invalid Key Binding Jwt',
   'kb-nonce-missing': 'Invalid Key Binding Jwt',
-  'status-list-unreachable': 'Failed to fetch',
+  'status-list-unreachable': 'Could not fetch either a JWT or CWT as status list. Failed to fetch',
   'status-list-not-a-token': 'Invalid JWT as input',
   'status-list-lst-truncated': 'The status list cannot be decompressed',
   'status-list-wrong-key': 'Status List JWT verification failed: Verify Error: Invalid JWT Signature',
