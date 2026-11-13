@@ -1,5 +1,31 @@
 # @owf/eudi-access-certificate
 
+## 0.7.0
+
+### Minor Changes
+
+- cb487f1: Validation issues have typed codes with their context, and a failed validation throws an error with the same `issues`.
+  
+  - `@owf/identity-common`: issue codes are a closed union, so `issue.code === 'expired'` narrows the context. Schema issues get a code of `SCHEMA_VALIDATION_CODES` (`missing_value`, `invalid_type`, `invalid_value`, `too_small`, …) instead of the zod code. New: `ValidationIssues`, `parseWithSchema`, `addValidationIssue` and `zTyp`. `@owf/identity-common` now depends on zod.
+  - Each package throws its own validation error with `issues`: `TrustedListValidationError`, `LoteValidationError`, `RegistrationCertificateValidationError` and `AccessCertificateValidationError`. Each extends the `ValidationError` of `@owf/identity-common`, not the error of its package.
+  - `createAccessCertificate` reports all invalid options at once, with a path into the options.
+  - `checkOverAsking` parses the DCQL query with the `dcql` library. A query it rejects gets the issues of `dcql`, with their location in the query and a code of `DCQL_VALIDATION_CODES` or a schema code. A credential query needs an `id`, and the `namespace`/`claim_name` form of earlier drafts gives an `invalid_query` issue (OpenID4VP 1.0 section 6).
+  
+  **Breaking:** `*Exception` is renamed to `*Error` in these packages, e.g. `WRPRCException` to `WRPRCError`. Zod schemas are named `zFoo` instead of `FooSchema`, e.g. `zTrustedList`. `@owf/identity-common` no longer exports `ValidationIssueParams` and `SchemaIssue`: add an issue with a code in a zod refinement with `addValidationIssue`. `schemaIssueToValidationIssue` takes a zod issue.
+
+### Patch Changes
+
+- Updated dependencies [0f663bf]
+- Updated dependencies [ebd0b4b]
+- Updated dependencies [21cd668]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [cb487f1]
+- Updated dependencies [5fff735]
+- Updated dependencies [04cfd04]
+  - @owf/identity-common@0.8.0
+  - @owf/x509@0.8.0
+
 ## 0.6.0
 
 ### Minor Changes
