@@ -49,7 +49,7 @@ describe('verifying credential request proofs against the credential configurati
     })
   })
 
-  const verifyJwtProof = (jwt: string, credentialConfiguration?: object) =>
+  const verifyJwtProof = (jwt: string, credentialConfiguration: object = {}) =>
     verifyCredentialRequestJwtProof({
       callbacks: { ...callbacks, verifyJws: verifyJwsTrustingDids([didJwk(proofKey.publicJwk)]) },
       credentialIssuer,
@@ -130,7 +130,7 @@ describe('verifying credential request proofs against the credential configurati
       })
     })
 
-    const verifyAttestationProof = (credentialConfiguration?: object) =>
+    const verifyAttestationProof = (credentialConfiguration: object = {}) =>
       verifyCredentialRequestAttestationProof({
         callbacks: { ...callbacks, verifyJws: verifyJwsTrustingDids([didJwk(attester.publicJwk)]) },
         keyAttestationJwt: attestationProof,

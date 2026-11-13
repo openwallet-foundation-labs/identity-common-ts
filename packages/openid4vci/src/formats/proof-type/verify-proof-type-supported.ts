@@ -8,10 +8,10 @@ export type CredentialRequestProofConfiguration = Pick<
 >
 
 export function getSupportedProofType(
-  credentialConfiguration: CredentialRequestProofConfiguration | undefined,
+  credentialConfiguration: CredentialRequestProofConfiguration,
   proofType: 'jwt' | 'attestation'
 ) {
-  const proofTypesSupported = credentialConfiguration?.proof_types_supported
+  const proofTypesSupported = credentialConfiguration.proof_types_supported
   if (!proofTypesSupported) return undefined
 
   const supportedProofType = proofTypesSupported[proofType]
@@ -35,10 +35,10 @@ export function verifyProofSigningAlgSupported(
 }
 
 export function verifyBindingMethodSupported(
-  credentialConfiguration: CredentialRequestProofConfiguration | undefined,
+  credentialConfiguration: CredentialRequestProofConfiguration,
   signer: Pick<JwsSigner, 'method'> & { didUrl?: string }
 ) {
-  const bindingMethods = credentialConfiguration?.cryptographic_binding_methods_supported
+  const bindingMethods = credentialConfiguration.cryptographic_binding_methods_supported
   if (!bindingMethods) return
 
   const bindingMethod = signer.method === 'did' && signer.didUrl ? `did:${signer.didUrl.split(':')[1]}` : signer.method

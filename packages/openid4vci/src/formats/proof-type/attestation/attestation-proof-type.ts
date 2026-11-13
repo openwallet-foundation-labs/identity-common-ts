@@ -36,11 +36,11 @@ export async function createCredentialRequestAttestationProof(
 
 export interface VerifyCredentialRequestAttestationProofOptions extends Omit<VerifyKeyAttestationJwtOptions, 'use'> {
   /**
-   * The credential configuration the proof is for. If provided, the proof type, the key attestation `alg`,
+   * The credential configuration the proof is for. The proof type, the key attestation `alg`,
    * `key_attestations_required` and `cryptographic_binding_methods_supported` (the attested keys are jwks) are
    * verified against it. A check is skipped when its field is absent.
    */
-  credentialConfiguration?: CredentialRequestProofConfiguration
+  credentialConfiguration: CredentialRequestProofConfiguration
 }
 export async function verifyCredentialRequestAttestationProof(options: VerifyCredentialRequestAttestationProofOptions) {
   const { credentialConfiguration, ...keyAttestationOptions } = options

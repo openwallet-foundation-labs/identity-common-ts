@@ -237,6 +237,7 @@ describe('Openid4vciIssuer', () => {
     })
 
     const verifyResult = await issuer.verifyCredentialRequestJwtProof({
+      credentialConfiguration: {},
       expectedNonce: 'some-nonce',
       issuerMetadata,
       jwt: parsedCredentialRequest.proofs?.jwt?.[0] as string,
@@ -279,6 +280,7 @@ describe('Openid4vciIssuer', () => {
     // Key attestation meets the requirements from the issuer metadata
     await expect(
       issuer.verifyCredentialRequestJwtProof({
+        credentialConfiguration: {},
         expectedNonce: 'some-nonce',
         issuerMetadata,
         jwt: credentialRequestJwt,
@@ -289,6 +291,7 @@ describe('Openid4vciIssuer', () => {
     // Key attestation does not meet the requirements from the issuer metadata
     await expect(
       issuer.verifyCredentialRequestJwtProof({
+        credentialConfiguration: {},
         expectedNonce: 'some-nonce',
         issuerMetadata,
         jwt: credentialRequestJwt,
@@ -333,6 +336,7 @@ describe('Openid4vciIssuer', () => {
 
     await expect(
       issuer.verifyCredentialRequestJwtProof({
+        credentialConfiguration: {},
         expectedNonce: 'some-nonce',
         issuerMetadata,
         jwt: credentialRequestJwtWithoutKeyAttestation,
@@ -360,6 +364,7 @@ describe('Openid4vciIssuer', () => {
     })
     await expect(
       issuer.verifyCredentialRequestAttestationProof({
+        credentialConfiguration: {},
         expectedNonce: 'some-nonce',
         issuerMetadata,
         keyAttestationJwt: attestationProof,
@@ -368,6 +373,7 @@ describe('Openid4vciIssuer', () => {
     ).resolves.toBeDefined()
     await expect(
       issuer.verifyCredentialRequestAttestationProof({
+        credentialConfiguration: {},
         expectedNonce: 'some-nonce',
         issuerMetadata,
         keyAttestationJwt: attestationProof,
@@ -422,6 +428,7 @@ describe('Openid4vciIssuer', () => {
       'verifies a jwt proof whose typ is %s',
       async (typ) => {
         const { header } = await issuer.verifyCredentialRequestJwtProof({
+          credentialConfiguration: {},
           expectedNonce: 'some-nonce',
           issuerMetadata,
           jwt: await signJwtProof({ header: { typ, jwk: credentialRequestProofJwkPublic } }),
@@ -438,6 +445,7 @@ describe('Openid4vciIssuer', () => {
         const didUrl = `did:jwk:${encodedJwk}#0`
 
         const { signer } = await issuer.verifyCredentialRequestJwtProof({
+          credentialConfiguration: {},
           expectedNonce: 'some-nonce',
           issuerMetadata,
           clientId: 'some_client_id',
@@ -455,6 +463,7 @@ describe('Openid4vciIssuer', () => {
     test('rejects a jwt whose typ is not openid4vci-proof+jwt as invalid_proof, caused by the typ', async () => {
       const error = await issuer
         .verifyCredentialRequestJwtProof({
+          credentialConfiguration: {},
           expectedNonce: 'some-nonce',
           issuerMetadata,
           jwt: await signJwtProof({ header: { typ: 'key-attestation+jwt', jwk: credentialRequestProofJwkPublic } }),
@@ -470,6 +479,7 @@ describe('Openid4vciIssuer', () => {
     test('rejects a jwt proof with another nonce as invalid_proof, saying which claim failed', async () => {
       const error = await issuer
         .verifyCredentialRequestJwtProof({
+          credentialConfiguration: {},
           expectedNonce: 'other-nonce',
           issuerMetadata,
           jwt: await signJwtProof({ header: { typ: 'openid4vci-proof+jwt', jwk: credentialRequestProofJwkPublic } }),
@@ -503,6 +513,7 @@ describe('Openid4vciIssuer', () => {
     test('uses the allowedSkewInSeconds of the issuer', async () => {
       const error = await issuerWithoutSkew
         .verifyCredentialRequestJwtProof({
+          credentialConfiguration: {},
           expectedNonce: 'some-nonce',
           issuerMetadata,
           jwt: await jwtIssuedIn10Seconds(),
@@ -517,6 +528,7 @@ describe('Openid4vciIssuer', () => {
     test('a per-call allowedSkewInSeconds takes precedence over the one of the issuer', async () => {
       await expect(
         issuerWithoutSkew.verifyCredentialRequestJwtProof({
+          credentialConfiguration: {},
           expectedNonce: 'some-nonce',
           issuerMetadata,
           jwt: await jwtIssuedIn10Seconds(),
@@ -529,6 +541,7 @@ describe('Openid4vciIssuer', () => {
     test('throws a negative allowedSkewInSeconds as the mistake of the issuer, not as an invalid proof', async () => {
       await expect(
         issuerWithoutSkew.verifyCredentialRequestJwtProof({
+          credentialConfiguration: {},
           expectedNonce: 'some-nonce',
           issuerMetadata,
           jwt: await jwtIssuedIn10Seconds(),

@@ -150,12 +150,12 @@ export interface VerifyCredentialRequestJwtProofOptions {
   keyAttestationsRequired?: KeyAttestationsRequired
 
   /**
-   * The credential configuration the proof is for. If provided, the proof type, the proof `alg`, the binding method of
-   * the proof key and `key_attestations_required` are verified against it. A check is skipped when its field is absent.
+   * The credential configuration the proof is for. The proof type, the proof `alg`, the binding method of the proof
+   * key and `key_attestations_required` are verified against it. A check is skipped when its field is absent.
    * A proof key that is not a `jwk` or a DID, such as an `x5c` certificate chain, is rejected when
    * `cryptographic_binding_methods_supported` is present, as there is no binding method for it.
    */
-  credentialConfiguration?: CredentialRequestProofConfiguration
+  credentialConfiguration: CredentialRequestProofConfiguration
 
   /**
    * Callbacks required for the jwt verification.
