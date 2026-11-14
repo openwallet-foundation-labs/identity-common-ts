@@ -316,6 +316,7 @@ describe('Full E2E test', () => {
         }
 
         const verifiedProof = await issuer.verifyCredentialRequestJwtProof({
+          credentialConfiguration: parsedCredentialRequest.credentialConfiguration ?? {},
           expectedNonce: 'cd59b02c-c199-4a31-903a-920a2830d2a4',
           issuerMetadata,
           jwt: parsedCredentialRequest.proofs.jwt[0],
@@ -751,6 +752,7 @@ describe('Full E2E test', () => {
         }
 
         const verifiedProof = await issuer.verifyCredentialRequestJwtProof({
+          credentialConfiguration: parsedCredentialRequest.credentialConfiguration ?? {},
           expectedNonce: 'cd59b02c-c199-4a31-903a-920a2830d2a4',
           issuerMetadata,
           jwt: parsedCredentialRequest.proofs.jwt[0],
