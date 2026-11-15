@@ -120,25 +120,22 @@ function writeStatus(byteArray: Uint8Array, bitsPerStatus: BitsPerStatus, index:
  * StatusList is a class that manages a list of statuses with variable bit size.
  */
 export class StatusList {
-  private _statusList: Array<StatusType | number>
-  /**
-   * The statuses of a decompressed list, encoded as in `lst`. They are read and set in place until `statusList`
-   * decodes them into `_statusList`, so that reading a list takes no more memory than its decompressed size.
-   */
-  #byteArray?: Uint8Array
+  // The statuses, encoded as in `lst` (Token Status List § 4.1), so a list takes no more memory than its byte array
+  #byteArray: Uint8Array
   private bitsPerStatus: BitsPerStatus
   #totalStatuses: number
   public aggregationUri?: string
   #isModified = false
 
-  constructor(statusList: number[], bitsPerStatus: BitsPerStatus, aggregationUri?: string) {
+  constructor(statusList: readonly number[], bitsPerStatus: BitsPerStatus, aggregationUri?: string) {
     if (![1, 2, 4, 8].includes(bitsPerStatus)) {
       throw new StatusListError('bitsPerStatus must be 1, 2, 4, or 8')
     }
+    this.#byteArray = new Uint8Array(Math.ceil((statusList.length * bitsPerStatus) / 8))
     for (let i = 0; i < statusList.length; i++) {
       assertStatusValue(statusList[i], bitsPerStatus, i)
+      writeStatus(this.#byteArray, bitsPerStatus, i, statusList[i])
     }
-    this._statusList = statusList
     this.bitsPerStatus = bitsPerStatus
     this.#totalStatuses = statusList.length
     this.aggregationUri = aggregationUri
@@ -150,15 +147,13 @@ export class StatusList {
   }
 
   /**
-   * Get the status list. A decompressed list is decoded into this array on first use, which takes about 8 bytes per
-   * status: to read the status of a Referenced Token, use `getStatus`.
+   * A copy of the status list, which takes about 8 bytes per status: to read the status of a Referenced Token, use
+   * `getStatus`. Changing the copy does not change the list, which `setStatus` does.
    */
-  get statusList(): number[] {
-    if (this.#byteArray) {
-      this._statusList = StatusList.decodeStatusListFromByteArray(this.#byteArray, this.bitsPerStatus)
-      this.#byteArray = undefined
-    }
-    return this._statusList
+  get statusList(): readonly number[] {
+    return Array.from({ length: this.#totalStatuses }, (_, index) =>
+      readStatus(this.#byteArray, this.bitsPerStatus, index)
+    )
   }
 
   /** Get the number of bits per status. */
@@ -178,18 +173,14 @@ export class StatusList {
   /** Get the status at a specific index. */
   getStatus(index: number): StatusType {
     this.assertIndex(index)
-    return this.#byteArray ? readStatus(this.#byteArray, this.bitsPerStatus, index) : this._statusList[index]
+    return readStatus(this.#byteArray, this.bitsPerStatus, index)
   }
 
   /** Set the status at a specific index. */
   setStatus(index: number, value: StatusType | number): void {
     this.assertIndex(index)
     assertStatusValue(value, this.bitsPerStatus, index)
-    if (this.#byteArray) {
-      writeStatus(this.#byteArray, this.bitsPerStatus, index, value)
-    } else {
-      this._statusList[index] = value
-    }
+    writeStatus(this.#byteArray, this.bitsPerStatus, index, value)
     this.#isModified = true
   }
 
@@ -203,7 +194,7 @@ export class StatusList {
 
   /** Compress the status list and return as raw bytes. */
   compressStatusListToBytes(): Uint8Array {
-    return deflate(this.#byteArray ?? this.encodeStatusListIntoByteArray(), { level: 9 })
+    return deflate(this.#byteArray, { level: 9 })
   }
 
   /**
@@ -242,39 +233,6 @@ export class StatusList {
 
   /** Encode the status list into a byte array. */
   public encodeStatusListIntoByteArray(): Uint8Array {
-    if (this.#byteArray) return this.#byteArray.slice()
-
-    const numBits = this.bitsPerStatus
-    const numBytes = Math.ceil((this.totalStatuses * numBits) / 8)
-    const byteArray = new Uint8Array(numBytes)
-    let byteIndex = 0
-    let bitIndex = 0
-    let currentByte = ''
-    for (let i = 0; i < this.totalStatuses; i++) {
-      const status = this._statusList[i]
-      // The list is exposed through `statusList`, so values may have changed since construction
-      assertStatusValue(status, numBits, i)
-      currentByte = status.toString(2).padStart(numBits, '0') + currentByte
-      bitIndex += numBits
-
-      if (bitIndex >= 8 || i === this.totalStatuses - 1) {
-        if (i === this.totalStatuses - 1 && bitIndex % 8 !== 0) {
-          currentByte = currentByte.padStart(8, '0')
-        }
-        byteArray[byteIndex] = Number.parseInt(currentByte, 2)
-        currentByte = ''
-        bitIndex = 0
-        byteIndex++
-      }
-    }
-
-    return byteArray
-  }
-
-  /** Decode the byte array into a status list. */
-  private static decodeStatusListFromByteArray(byteArray: Uint8Array, bitsPerStatus: BitsPerStatus): StatusType[] {
-    return Array.from({ length: (byteArray.length * 8) / bitsPerStatus }, (_, index) =>
-      readStatus(byteArray, bitsPerStatus, index)
-    )
+    return this.#byteArray.slice()
   }
 }
