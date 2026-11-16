@@ -19,6 +19,8 @@ A client attestation must be signed by an attester that is identified by `x5c`, 
 
 The package does not keep client registrations. An authorization server must check the `redirect_uri` of an authorization request against the redirect URIs registered for the client before it redirects to it, by passing them as `allowedRedirectUris` to the authorization request verification (RFC 9700 Section 4.1.3). It must also store the `redirect_uri` with the authorization code and pass it as `expectedRedirectUri` to `verifyAuthorizationCodeAccessTokenRequest` (RFC 6749 Section 4.1.3).
 
+The package does not keep client registrations. An authorization server must check the `redirect_uri` of an authorization request against the redirect URIs registered for the client before it redirects to it, by passing them as `allowedRedirectUris` to the authorization request verification (RFC 9700 Section 4.1.3). It must also store the `redirect_uri` with the authorization code and pass it as `expectedRedirectUri` to `verifyAuthorizationCodeAccessTokenRequest` (RFC 6749 Section 4.1.3).
+
 This package was previously developed in the [oid4vc-ts](https://github.com/openwallet-foundation-labs/oid4vc-ts) repository. The `@openid4vc/*` packages are versioned together, separately from the other packages in this repository.
 
 ## Installation
