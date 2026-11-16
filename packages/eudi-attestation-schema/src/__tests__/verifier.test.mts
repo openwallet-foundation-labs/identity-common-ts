@@ -124,4 +124,17 @@ describe('verifySchemaMeta', () => {
     const result = await verifySchemaMeta({ jws: signed.jws, verifier })
     expect(result.header.x5c).toEqual([parseCertificate(TEST_CERT)])
   })
+
+  // Explicit typing: a JWT signed with the same key for another purpose, with a payload that happens to look like a
+  // SchemaMeta, is not taken for one
+  it.each([['JWT'], [undefined]])('should reject a JWT with the typ %s', async (typ) => {
+    const signer = await ES256.getSigner(TEST_PRIVATE_KEY)
+    const verifier = await ES256.getVerifier(TEST_PUBLIC_KEY)
+    const signingInput = `${base64urlEncode(JSON.stringify({ alg: 'ES256', typ }))}.${base64urlEncode(
+      JSON.stringify({ ...buildTestMeta(), iat: Math.floor(Date.now() / 1000) })
+    )}`
+    const jws = `${signingInput}.${await signer(signingInput)}`
+
+    await expect(verifySchemaMeta({ jws, verifier })).rejects.toThrow("it must be 'attestation-schema+jwt'")
+  })
 })

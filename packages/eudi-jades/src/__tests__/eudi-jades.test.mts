@@ -201,6 +201,26 @@ describe('signing and verification', () => {
     )
   })
 
+  // Clause 5.2.8.3: the signature covers the hashV digests, so no payload may come back as verified
+  it('does not verify a payload with ObjectIdByURIHash', async () => {
+    const sigD = {
+      mId: DETACHED_MECHANISM_IDS.objectByUriHash,
+      pars: ['https://example.test/object'],
+      hashM: 'S256',
+      hashV: ['YWJj'],
+    }
+    const { jws } = await sign({ serialization: 'general', sigD, payload: undefined })
+    const unsignedPayload = JSON.stringify({ amount: 1_000_000 })
+
+    await expect(
+      verifyJades({ jws: { ...jws, payload: base64urlEncode(unsignedPayload) }, verifyJwsCallback })
+    ).rejects.toThrow()
+    await expect(verifyJades({ jws, verifyJwsCallback, detachedPayload: unsignedPayload })).rejects.toThrow(
+      expect.objectContaining({ issues: [expect.objectContaining({ code: 'not_allowed', path: ['payload'] })] })
+    )
+    expect((await verifyJades({ jws, verifyJwsCallback })).payload).toHaveLength(0)
+  })
+
   it('verifies a direct detached payload only when the caller supplies it', async () => {
     const payload = 'detached content'
     const sigD = { mId: DETACHED_MECHANISM_IDS.objectByUri, pars: ['https://example.test/object'] }

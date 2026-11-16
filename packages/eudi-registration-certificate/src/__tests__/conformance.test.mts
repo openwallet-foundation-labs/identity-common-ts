@@ -226,6 +226,26 @@ describe('GEN-5.2.1-04 JAdES B-B signature', () => {
       /B-B/
     )
   })
+
+  // ETSI TS 119 182-1 clause 5.1.2: not, for example, an HMAC keyed with what a verifier takes as the public key
+  it('rejects a registration certificate whose alg is not in the JAdES B-B set', async () => {
+    const signed = await signRegistrationCertificateJwt({
+      payload: base().build(),
+      accessCertificateSub: 'LEINL-529900T8BM49AURSDO55',
+      certificates: [TEST_CERT],
+      signJwsCallback,
+    })
+    const [, payload, signature] = signed.jws.split('.')
+    const header = base64urlEncode(JSON.stringify({ ...signed.header, alg: 'HS256' }))
+
+    expect(() =>
+      decodeRegistrationCertificateJwt(`${header}.${payload}.${signature}`, 'LEINL-529900T8BM49AURSDO55')
+    ).toThrow(
+      expect.objectContaining({
+        issues: expect.arrayContaining([expect.objectContaining({ code: 'invalid_value', path: ['header', 'alg'] })]),
+      })
+    )
+  })
 })
 
 describe('Annex C example', () => {
