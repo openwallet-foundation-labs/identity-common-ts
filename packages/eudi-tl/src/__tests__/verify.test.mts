@@ -69,6 +69,111 @@ describe('verifyTrustedListSignature', () => {
     await expect(verifyTrustedListSignature(wrapped, { trustAnchors })).rejects.toThrow(TrustedListSignatureError)
   })
 
+  // XML Signature Best Practices section 2.1: xmldsigjs applies the transforms before it checks the signature value,
+  // so the XPath transform, evaluated once per node, would run on whatever whoever serves the list put there
+  it('rejects a transform other than the enveloped signature and canonicalization', async () => {
+    const xpathTransform = SIGNED_TSL_XML.replace(
+      '<ds:Transforms>',
+      '<ds:Transforms><ds:Transform Algorithm="http://www.w3.org/TR/1999/REC-xpath-19991116"><ds:XPath>count(//. | //@*) &gt; 0</ds:XPath></ds:Transform>'
+    )
+
+    await expect(verifyTrustedListSignature(xpathTransform, { trustAnchors })).rejects.toThrow(
+      'Trusted list signature uses the transform "http://www.w3.org/TR/1999/REC-xpath-19991116", which is not allowed'
+    )
+  })
+
+  // Each transform runs on the whole referenced element, so repeating an allowed one costs as much
+  it('rejects a transform repeated in a reference', async () => {
+    const repeated = SIGNED_TSL_XML.replace(
+      '<ds:Transforms>',
+      '<ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>'
+    )
+
+    await expect(verifyTrustedListSignature(repeated, { trustAnchors })).rejects.toThrow(
+      'Trusted list signature applies the enveloped-signature transform or a canonicalization twice to a reference'
+    )
+  })
+
+  // xmldsigjs searches the whole document for the target of each reference
+  it('rejects more references than one to the list and one to its signed properties', async () => {
+    const signedPropertiesReference = SIGNED_TSL_XML.match(/<ds:Reference URI="#xades-[\s\S]*?<\/ds:Reference>/)?.[0]
+    const threeReferences = SIGNED_TSL_XML.replace('</ds:SignedInfo>', `${signedPropertiesReference}</ds:SignedInfo>`)
+    const listTwice = SIGNED_TSL_XML.replace(/URI="#xades-[^"]+"/, 'URI=""')
+
+    await expect(verifyTrustedListSignature(threeReferences, { trustAnchors })).rejects.toThrow(
+      'Trusted list signature has more than two references'
+    )
+    await expect(verifyTrustedListSignature(listTwice, { trustAnchors })).rejects.toThrow(
+      'Trusted list signature references the list twice'
+    )
+  })
+
+  it('rejects a canonicalization method that is not a canonicalization', async () => {
+    const xslt = SIGNED_TSL_XML.replace(
+      /<ds:CanonicalizationMethod Algorithm="[^"]*"\/>/,
+      '<ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/1999/REC-xslt-19991116"/>'
+    )
+
+    await expect(verifyTrustedListSignature(xslt, { trustAnchors })).rejects.toThrow(
+      'Trusted list signature uses the canonicalization "http://www.w3.org/TR/1999/REC-xslt-19991116", which is not allowed'
+    )
+  })
+
+  // ETSI TS 119 612 V2.4.1 Annex B.1.0: a reference to the TrustServiceStatusList that envelops the signature. Content
+  // outside the referenced element is not signed, so a list signed once could be wrapped into another root.
+  it('rejects a signature that references another element than the list', async () => {
+    const otherElement = SIGNED_TSL_XML.replace(
+      '<tsl:SchemeInformation>',
+      '<tsl:SchemeInformation Id="scheme">'
+    ).replace('<ds:Reference URI="">', '<ds:Reference URI="#scheme">')
+
+    await expect(verifyTrustedListSignature(otherElement, { trustAnchors })).rejects.toThrow(
+      'Trusted list signature references "#scheme", which is neither the list nor its signed properties'
+    )
+  })
+
+  it('rejects a reference typed as signed properties that names another element', async () => {
+    const signatureId = SIGNED_TSL_XML.match(/<ds:Signature Id="([^"]+)"/)?.[1]
+    const notSignedProperties = SIGNED_TSL_XML.replace(/URI="#xades-[^"]+"/, `URI="#${signatureId}"`)
+
+    await expect(verifyTrustedListSignature(notSignedProperties, { trustAnchors })).rejects.toThrow(
+      `Trusted list signature references "#${signatureId}", which is neither the list nor its signed properties`
+    )
+  })
+
+  it('rejects a signature without a reference to the list', async () => {
+    const onlySignedProperties = SIGNED_TSL_XML.replace(/<ds:Reference URI="">[\s\S]*?<\/ds:Reference>/, '')
+
+    await expect(verifyTrustedListSignature(onlySignedProperties, { trustAnchors })).rejects.toThrow(
+      'Trusted list signature does not reference the list'
+    )
+  })
+
+  // A reference by Id resolves to any element with that Id
+  it('rejects a reference to the Id of the root that another element has too', async () => {
+    const duplicatedId = SIGNED_TSL_XML.replace(
+      '<tsl:SchemeInformation>',
+      '<tsl:SchemeInformation Id="TrustServiceStatusList">'
+    ).replace('<ds:Reference URI="">', '<ds:Reference URI="#TrustServiceStatusList">')
+
+    await expect(verifyTrustedListSignature(duplicatedId, { trustAnchors })).rejects.toThrow(
+      'Trusted list signature references "#TrustServiceStatusList", which is neither the list nor its signed properties'
+    )
+  })
+
+  // A wrapped list keeps the list that was signed somewhere in the document. The ds:Object is not signed, apart from
+  // the signed properties, so the signature still verifies.
+  it('rejects a document with a second TrustServiceStatusList', async () => {
+    const nested = SIGNED_TSL_XML.replace(
+      '<ds:Object>',
+      '<ds:Object><tsl:TrustServiceStatusList xmlns:tsl="http://uri.etsi.org/02231/v2#"/>'
+    )
+
+    await expect(verifyTrustedListSignature(nested, { trustAnchors })).rejects.toThrow(
+      'The trusted list must be the root and the only TrustServiceStatusList'
+    )
+  })
+
   it('rejects a tampered document', async () => {
     const tampered = SIGNED_TSL_XML.replace('Test Qualified CA S.A.', 'Evil Qualified CA S.A.')
     expect(tampered).not.toBe(SIGNED_TSL_XML)

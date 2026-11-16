@@ -162,7 +162,11 @@ const { signerCertificateBase64 } = await verifyTrustedListSignature(xml, {
 
 The signature must verify with the key of a pinned certificate in its
 `KeyInfo`, and the list must have exactly one `ds:Signature`, as a child of its
-root. Without `trustAnchors`, only the cryptographic validity of the enveloped
+root. Before any transform runs, the signature is checked against the profile of
+ETSI TS 119 612 Annex B: it may only use the enveloped-signature transform and
+canonicalization, each once per reference, and it must reference the
+`TrustServiceStatusList` itself (`URI=""` or the `Id` of the root) and otherwise
+only its XAdES `SignedProperties`. Without `trustAnchors`, only the cryptographic validity of the enveloped
 signature is checked — that proves integrity, not trust. Production callers
 should always pin the scheme operator certificate(s); `loadTrustedList` requires
 them.
