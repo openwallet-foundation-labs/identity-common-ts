@@ -60,6 +60,7 @@ import { IssuerNamespaces } from './issuer-namespaces'
 import { IssuerSigned } from './issuer-signed'
 import type { IssuerSignedItem } from './issuer-signed-item'
 import type { KeyAuthorizations } from './key-authorizations'
+import type { StatusVerificationOptions } from './mso-revocation-list'
 import type { Namespace } from './namespace'
 import type { SessionTranscript } from './session-transcript'
 
@@ -239,13 +240,11 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       sessionTranscript: SessionTranscript | Uint8Array
       ephemeralReaderKey?: CoseKey
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       trustedCertificates: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       now?: Date
       onCheck?: VerificationCallback
       skewSeconds?: number
-      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
-      maxStatusListDecompressedBytes?: number
+      status?: StatusVerificationOptions
     },
     ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch' | 'fetchLimits'>
   ): Promise<DeviceResponseVerificationResult> {
@@ -297,8 +296,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
             now: options.now,
             trustedCertificates: options.trustedCertificates,
             skewSeconds: options.skewSeconds,
-            disableStatusValidation: options.disableStatusValidation,
-            maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
+            status: options.status,
           },
           ctx
         )
