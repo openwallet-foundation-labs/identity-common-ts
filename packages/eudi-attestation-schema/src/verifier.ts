@@ -34,6 +34,11 @@ export async function verifySchemaMeta(options: VerifyOptions): Promise<Verified
     throw new SchemaMetaError('Invalid signature')
   }
 
+  // The typ signSchemaMeta sets, so that another JWT signed with the same key is not taken for a SchemaMeta
+  if (header.typ !== 'attestation-schema+jwt') {
+    throw new SchemaMetaError(`Invalid typ header '${String(header.typ)}': it must be 'attestation-schema+jwt'`)
+  }
+
   const parsed = zSchemaMeta.safeParse(payload)
   if (!parsed.success) {
     const messages = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
