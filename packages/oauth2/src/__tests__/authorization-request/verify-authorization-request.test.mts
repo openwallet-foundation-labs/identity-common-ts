@@ -68,3 +68,45 @@ describe('Verify client instance key of Authorization Request', () => {
     ).rejects.toMatchObject({ errorResponse: { error: Oauth2ErrorCodes.InvalidClient } })
   })
 })
+
+// RFC 9700 §4.1.3: exact matching against the redirect URIs registered for the client
+describe('Verify redirect_uri of Authorization Request', () => {
+  const verifyRedirectUri = (redirectUri: string | undefined, allowedRedirectUris: string[]) =>
+    verifyAuthorizationRequest({
+      authorizationServerMetadata,
+      authorizationRequest: { client_id: 'wallet', redirect_uri: redirectUri },
+      allowedRedirectUris,
+      request: { headers: new Headers(), method: 'POST', url: 'https://server.com/par' },
+      callbacks,
+    })
+
+  test('accepts a registered redirect_uri', async () => {
+    await expect(
+      verifyRedirectUri('https://wallet.example/cb', ['https://other.example/cb', 'https://wallet.example/cb'])
+    ).resolves.toBeDefined()
+  })
+
+  test('rejects a redirect_uri that is not registered', async () => {
+    await expect(verifyRedirectUri('https://attacker.example/cb', ['https://wallet.example/cb'])).rejects.toMatchObject(
+      { errorResponse: { error: Oauth2ErrorCodes.InvalidRequest } }
+    )
+    // No prefix matching or normalization
+    await expect(verifyRedirectUri('https://wallet.example/cb/x', ['https://wallet.example/cb'])).rejects.toThrow(
+      `The 'redirect_uri' is not registered for the client`
+    )
+    await expect(verifyRedirectUri('https://WALLET.example/cb', ['https://wallet.example/cb'])).rejects.toThrow(
+      `The 'redirect_uri' is not registered for the client`
+    )
+    await expect(verifyRedirectUri('https://wallet.example/cb', [])).rejects.toThrow(
+      `The 'redirect_uri' is not registered for the client`
+    )
+  })
+
+  // RFC 6749 §3.1.2.3: the redirect_uri can only be left out if a single one is registered
+  test('requires a redirect_uri unless a single one is registered', async () => {
+    await expect(verifyRedirectUri(undefined, ['https://wallet.example/cb'])).resolves.toBeDefined()
+    await expect(
+      verifyRedirectUri(undefined, ['https://wallet.example/cb', 'https://other.example/cb'])
+    ).rejects.toThrow(`Missing required 'redirect_uri' in authorization request`)
+  })
+})
