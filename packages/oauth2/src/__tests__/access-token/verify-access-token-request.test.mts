@@ -396,6 +396,28 @@ describe('Verify Authorization Code Access Token Request', () => {
     ).rejects.toThrow(`Invalid 'code' provided`)
   })
 
+  // RFC 6749 §4.1.3: the redirect_uri must be identical to the one of the authorization request
+  test('verifies the redirect_uri against the one of the authorization request', async () => {
+    const verify = (redirectUri?: string) =>
+      verifyAuthorizationCodeAccessTokenRequest({
+        authorizationServerMetadata,
+        accessTokenRequest: { grant_type: authorizationCodeGrantIdentifier, code: 'hello', redirect_uri: redirectUri },
+        grant: { grantType: authorizationCodeGrantIdentifier, code: 'hello' },
+        callbacks,
+        expectedCode: 'hello',
+        expectedRedirectUri: 'https://wallet.example/cb',
+        request,
+      })
+
+    await expect(verify('https://attacker.example/cb')).rejects.toMatchObject({
+      errorResponse: { error: Oauth2ErrorCodes.InvalidGrant },
+      message: expect.stringContaining(`Invalid 'redirect_uri' provided`),
+    })
+    await expect(verify('https://wallet.example/cb/')).rejects.toThrow(`Invalid 'redirect_uri' provided`)
+    await expect(verify()).rejects.toThrow(`Missing required 'redirect_uri' in access token request`)
+    await expect(verify('https://wallet.example/cb')).resolves.toBeDefined()
+  })
+
   test('handles authorization code expired', async () => {
     const now = new Date()
     await expect(

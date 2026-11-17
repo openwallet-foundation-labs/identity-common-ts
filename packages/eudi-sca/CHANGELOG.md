@@ -1,5 +1,52 @@
 # @owf/eudi-sca
 
+## 0.7.0
+
+### Minor Changes
+
+- 0f663bf: `fetchCredentialMetadata` reads the response within 10 MiB, or the `credentialMetadata` limit of its new `fetchLimits` parameter (see `FetchLimits` of `@owf/identity-common`). Before, it read a response of any size. Its `customFetcher` gets `{ type: 'credentialMetadata' }` as its third argument.
+- 04cfd04: Error classes are named `FooError` and zod schemas `zFoo` in all packages.
+  
+  **Breaking:** `*Exception` is renamed to `*Error`, e.g. `IdentityException` to `IdentityError`, `SDJWTException` to `SdJwtError`, `JwtTimeClaimException` to `JwtTimeClaimError`, `X509Exception` to `X509Error` and `SLException` to `StatusListError`. The `name` of the errors changes with it. Zod schemas are renamed from `FooSchema` (or `fooSchema`) to `zFoo`, e.g. `TypeMetadataFormatSchema` to `zTypeMetadataFormat`, `SchemaMetaSchema` to `zSchemaMeta`, `issuerSignedItemSchema` to `zIssuerSignedItem` and `Iso4217CurrencyCode` to `zIso4217CurrencyCode`.
+
+### Patch Changes
+
+- 25c7506: `fetchCredentialMetadata` rejects expired credential metadata. The `exp` check compared seconds as milliseconds, so it never failed, and whoever serves the metadata could replay an old version of it, including the transaction data types and labels shown for SCA confirmation.
+- Updated dependencies [90614a9]
+- Updated dependencies [c3e5919]
+- Updated dependencies [8db5da6]
+- Updated dependencies [0060df2]
+- Updated dependencies [0f663bf]
+- Updated dependencies [ebd0b4b]
+- Updated dependencies [21cd668]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [0f663bf]
+- Updated dependencies [3127af9]
+- Updated dependencies [f6d2c57]
+- Updated dependencies [3127af9]
+- Updated dependencies [946d9af]
+- Updated dependencies [21cd668]
+- Updated dependencies [5441d63]
+- Updated dependencies [25c7506]
+- Updated dependencies [0060df2]
+- Updated dependencies [0060df2]
+- Updated dependencies [0f663bf]
+- Updated dependencies [0060df2]
+- Updated dependencies [755e2eb]
+- Updated dependencies [0060df2]
+- Updated dependencies [0060df2]
+- Updated dependencies [c3e5919]
+- Updated dependencies [ec2ed51]
+- Updated dependencies [cb487f1]
+- Updated dependencies [5fff735]
+- Updated dependencies [04cfd04]
+  - @sd-jwt/core@0.25.0
+  - @openid4vc/openid4vci@0.10.0
+  - @owf/crypto@0.8.0
+  - @owf/identity-common@0.8.0
+  - @owf/mdoc@0.10.0
+
 ## 0.6.0
 
 ### Patch Changes
