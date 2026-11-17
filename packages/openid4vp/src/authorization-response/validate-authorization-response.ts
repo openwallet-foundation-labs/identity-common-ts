@@ -22,8 +22,9 @@ export interface ValidateOpenid4vpAuthorizationResponseOptions {
  * - checking the revocation status of the presentations
  * - checking the nonce of the presentations matches the nonce of the request (for mdoc's)
  *
- * @throws Oauth2ServerErrorResponseError with error `invalid_request` when the response does not match the request or
- *   its `vp_token` cannot be parsed, with the `ValidationError` of `@owf/identity-common` as `cause` if there is one.
+ * @throws Oauth2ServerErrorResponseError with error `invalid_request` when the response is not valid for the request,
+ *   for example its `state` differs or its `vp_token` cannot be parsed, with the `ValidationError` of
+ *   `@owf/identity-common` as `cause` if there is one.
  */
 export function validateOpenid4vpAuthorizationResponsePayload(
   options: ValidateOpenid4vpAuthorizationResponseOptions

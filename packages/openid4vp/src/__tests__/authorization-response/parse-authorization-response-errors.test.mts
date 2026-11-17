@@ -105,7 +105,7 @@ describe('parseOpenid4vpAuthorizationResponse with a response that is not valid'
     expect(error.cause).toBeInstanceOf(ValidationError)
   })
 
-  test('throws invalid_request for a signed response with a vp_token that does not match the dcql query', async () => {
+  test('throws invalid_request for a signed response whose vp_token is not an object when the request has a dcql_query', async () => {
     const error = await invalidRequest(parse({ response: await createSignedResponse({ vp_token: 'presentation' }) }))
     expect(error.errorResponse.error_description).toBe(
       'Could not parse dcql vp_token. Expected an object where the values are encoded presentations'
@@ -121,7 +121,7 @@ describe('parseOpenid4vpAuthorizationResponse with a response that is not valid'
     expect(error.cause).toBeInstanceOf(ValidationError)
   })
 
-  test('throws invalid_request for a vp_token that does not match the dcql query', async () => {
+  test('throws invalid_request for a vp_token that is not an object when the request has a dcql_query', async () => {
     const error = await invalidRequest(parse({ vp_token: 'presentation' }))
     expect(error.errorResponse.error_description).toBe(
       'Could not parse dcql vp_token. Expected an object where the values are encoded presentations'
@@ -141,7 +141,7 @@ describe('parseOpenid4vpAuthorizationResponse with a response that is not valid'
 })
 
 describe('validateOpenid4vpAuthorizationResponsePayload with a response that is not valid', () => {
-  test('throws invalid_request for a vp_token that does not match the dcql query', async () => {
+  test('throws invalid_request for a vp_token that is not an object when the request has a dcql_query', async () => {
     const error = await invalidRequest(
       Promise.resolve().then(() =>
         validateOpenid4vpAuthorizationResponsePayload({
