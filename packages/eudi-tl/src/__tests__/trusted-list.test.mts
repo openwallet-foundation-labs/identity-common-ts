@@ -203,11 +203,12 @@ describe('pointer MimeType', () => {
     ])
   })
 
-  it('selects the pointers to XML lists, case-insensitively', () => {
+  it('selects the pointers to XML lists, ignoring casing and parameters', () => {
     const tl = parseTrustedList(LIST_XML)
     const xml = [base64.decode(NATIONAL_POINTER_CERT_BASE64)]
     expect(getPointerSigningCertificates(tl, { mimeType: XML_MIME_TYPE })).toEqual(xml)
     expect(getPointerSigningCertificates(tl, { mimeType: 'Application/VND.ETSI.TSL+XML' })).toEqual(xml)
+    expect(getPointerSigningCertificates(tl, { mimeType: `${XML_MIME_TYPE}; charset=utf-8` })).toEqual(xml)
     expect(getPointerSigningCertificates(tl, { schemeTerritory: 'DE', mimeType: XML_MIME_TYPE })).toEqual(xml)
     expect(getPointerSigningCertificates(tl, { mimeType: 'application/pdf' })).toEqual([
       base64.decode(LOTL_POINTER_CERT_BASE64),

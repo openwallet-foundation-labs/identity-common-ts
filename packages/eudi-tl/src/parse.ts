@@ -1,4 +1,4 @@
-import { base64, hexEncode } from '@owf/identity-common'
+import { base64, hexEncode, isMediaType } from '@owf/identity-common'
 import { AsnConvert, type IAsnParseOptions } from '@peculiar/asn1-schema'
 import { Certificate, id_ce_subjectKeyIdentifier, SubjectKeyIdentifier } from '@peculiar/asn1-x509'
 import { DOMParser, type Element } from '@xmldom/xmldom'
@@ -228,7 +228,7 @@ export interface TrustedListPointerFilter {
   tslType?: string
   /** Exact `TSLLocation` URL of the pointed-to list. */
   location?: string
-  /** `MimeType` of the pointed-to list (e.g. `application/vnd.etsi.tsl+xml`), case-insensitive. */
+  /** `MimeType` of the pointed-to list (e.g. `application/vnd.etsi.tsl+xml`), ignoring casing and parameters. */
   mimeType?: string
 }
 
@@ -264,8 +264,7 @@ export function getPointerSigningCertificates(
       continue
     }
     if (filter.tslType && stripScheme(pointer.tslType) !== stripScheme(filter.tslType)) continue
-    // A media type is case-insensitive (RFC 2045 clause 5.1)
-    if (filter.mimeType && pointer.mimeType?.toLowerCase() !== filter.mimeType.toLowerCase()) continue
+    if (filter.mimeType && !isMediaType(pointer.mimeType, filter.mimeType)) continue
     for (const identity of pointer.digitalIdentities) {
       if (!identity.certificate || seen.has(identity.certificate)) continue
       seen.add(identity.certificate)
