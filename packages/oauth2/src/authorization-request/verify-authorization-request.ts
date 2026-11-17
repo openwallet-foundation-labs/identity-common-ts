@@ -104,8 +104,20 @@ export interface VerifyAuthorizationRequestOptions {
 
   authorizationRequest: {
     client_id?: string
+    redirect_uri?: string
   }
   request: RequestLike
+
+  /**
+   * The redirect URIs registered for the client. If provided, the `redirect_uri` of the authorization request MUST
+   * exactly match one of them (RFC 9700 §2.1 and §4.1.3), and it can only be left out if a single redirect URI is
+   * registered (RFC 6749 §3.1.2.3).
+   *
+   * The authorization server MUST validate the `redirect_uri` against the registered redirect URIs of the client
+   * before it redirects to it, either with this option or itself. On an error the authorization server MUST NOT
+   * redirect to the `redirect_uri` (RFC 6749 §4.1.2.1).
+   */
+  allowedRedirectUris?: string[]
 
   dpop?: VerifyAuthorizationRequestDpop
   clientAttestation?: VerifyAuthorizationRequestClientAttestation
@@ -122,6 +134,10 @@ export interface VerifyAuthorizationRequestOptions {
 export async function verifyAuthorizationRequest(
   options: VerifyAuthorizationRequestOptions
 ): Promise<VerifyAuthorizationRequestReturn> {
+  if (options.allowedRedirectUris) {
+    verifyAuthorizationRequestRedirectUri(options.authorizationRequest.redirect_uri, options.allowedRedirectUris)
+  }
+
   const dpopResult = options.dpop
     ? await verifyAuthorizationRequestDpop(options.dpop, options.request, options.callbacks, options.now)
     : undefined
@@ -145,6 +161,25 @@ export async function verifyAuthorizationRequest(
         }
       : undefined,
     clientAttestation: clientAttestationResult,
+  }
+}
+
+function verifyAuthorizationRequestRedirectUri(redirectUri: string | undefined, allowedRedirectUris: string[]) {
+  if (redirectUri === undefined) {
+    if (allowedRedirectUris.length === 1) return
+
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequest,
+      error_description: `Missing required 'redirect_uri' in authorization request`,
+    })
+  }
+
+  // RFC 9700 §4.1.3: simple string comparison (RFC 3986 §6.2.1), no pattern or prefix matching
+  if (!allowedRedirectUris.includes(redirectUri)) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequest,
+      error_description: `The 'redirect_uri' is not registered for the client`,
+    })
   }
 }
 

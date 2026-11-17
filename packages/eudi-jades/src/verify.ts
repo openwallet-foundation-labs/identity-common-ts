@@ -25,7 +25,10 @@ export interface DecodeJadesOptions {
   /** The signature: a compact serialization, or a flattened or general JSON serialization */
   jws: string | FlattenedJws | GeneralJws
 
-  /** The detached JWS Payload (clause 5.2.8). Not needed for `ObjectIdByURIHash`, which signs an empty payload. */
+  /**
+   * The detached JWS Payload (clause 5.2.8). Rejected for `ObjectIdByURIHash`, which signs an empty payload and covers
+   * only the `hashV` digests.
+   */
   detachedPayload?: string | Uint8Array
 
   /**
@@ -82,6 +85,20 @@ export interface VerifyJadesJwtOptions
 export function decodeJades(options: DecodeJadesOptions): DecodedJades {
   const signatureIndex = options.signatureIndex ?? 0
   const objectByUriHash = isObjectByUriHash(options.jws, signatureIndex)
+
+  // The signature covers the hashV digests, not the objects (clause 5.2.8.3), so a payload passed in would resolve as
+  // verified although nothing verified it
+  if (objectByUriHash && options.detachedPayload !== undefined) {
+    const issues = new ValidationIssues<JadesValidationCode | SchemaValidationCode>()
+    issues.add({
+      code: 'not_allowed',
+      path: ['payload'],
+      message:
+        'A detached payload is not verified with ObjectIdByURIHash: compare the digest of each object of sigD.pars with sigD.hashV (clause 5.2.8.3)',
+    })
+    throw new JadesValidationError('Invalid JAdES signature', issues.issues)
+  }
+
   const decoded = parseJws({
     jws: options.jws,
     detachedPayload: objectByUriHash ? '' : options.detachedPayload,
