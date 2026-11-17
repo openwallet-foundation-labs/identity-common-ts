@@ -128,6 +128,25 @@ export async function fetchAuthorizationServerMetadata(
   return authorizationServerResult
 }
 
+/**
+ * Returns the metadata of an authorization server given as its metadata or its issuer identifier. An issuer
+ * identifier is resolved with {@link fetchAuthorizationServerMetadata}.
+ *
+ * @throws {Oauth2Error} if no metadata exists for the issuer
+ */
+export async function resolveAuthorizationServerMetadata(
+  authorizationServer: AuthorizationServerMetadata | string,
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'getAuthorizationServerMetadata'>
+) {
+  if (typeof authorizationServer !== 'string') return authorizationServer
+
+  const metadata = await fetchAuthorizationServerMetadata(authorizationServer, callbacks)
+  if (!metadata) {
+    throw new Oauth2Error(`Authorization server metadata for issuer '${authorizationServer}' not found.`)
+  }
+  return metadata
+}
+
 export function getAuthorizationServerMetadataFromList(
   authorizationServersMetadata: AuthorizationServerMetadata[],
   issuer: string

@@ -5,7 +5,16 @@ export interface Oauth2ResourceServerOptions {
   /**
    * Callbacks required for the oauth2 resource server
    */
-  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash' | 'clientAuthentication' | 'fetch' | 'fetchLimits' | 'getJwks'>
+  callbacks: Pick<
+    CallbackContext,
+    | 'verifyJws'
+    | 'hash'
+    | 'clientAuthentication'
+    | 'fetch'
+    | 'fetchLimits'
+    | 'getJwks'
+    | 'getAuthorizationServerMetadata'
+  >
 
   /**
    * Default allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of access tokens and

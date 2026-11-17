@@ -67,8 +67,13 @@ export type GetAuthorizationServerMetadataCallback = (
  * hosted by this same application) or keys from a cache that you populated from a previous fetch
  * of the same `jwksUri`. Returning keys for a `jwksUri` you do not control allows arbitrary
  * signatures to be accepted.
+ *
+ * `kid` is the key id named by the JWT being verified, if any. A cache can fetch the JWK Set again
+ * when its cached copy lacks that key, to pick up a rotated key. The `kid` comes from an unverified
+ * JWT, so bound those refetches (e.g. a few per 30 seconds, like `createRemoteJWKSet` of jose), or a
+ * made-up `kid` causes a request per JWT.
  */
-export type GetJwksCallback = (jwksUri: string) => OrPromise<JwkSet | undefined>
+export type GetJwksCallback = (jwksUri: string, options?: { kid?: string }) => OrPromise<JwkSet | undefined>
 
 /**
  * Callback context provides the callbacks that are required for the openid4vc library

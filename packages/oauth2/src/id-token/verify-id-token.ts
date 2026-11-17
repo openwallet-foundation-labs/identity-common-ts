@@ -73,7 +73,7 @@ export async function verifyIdTokenJwt(options: VerifyIdTokenJwtOptions) {
     throw new Oauth2Error(`Invalid 'azp' claim in id token jwt. Expected '${options.clientId}', got '${payload.azp}'.`)
   }
 
-  const jwks = await fetchJwks(jwksUrl, options.callbacks)
+  const jwks = await fetchJwks(jwksUrl, options.callbacks, { kid: header.kid })
   const publicJwk = extractJwkFromJwksForJwt({
     kid: header.kid,
     jwks,

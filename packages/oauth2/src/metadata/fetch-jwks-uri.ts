@@ -7,7 +7,8 @@ import type { CallbackContext } from '../callbacks'
  * Fetch JWKs from a provided JWKs URI.
  *
  * If a `getJwks` callback is provided and returns a JWK Set for the `jwksUrl`, that JWK Set is
- * returned and no request is performed.
+ * returned and no request is performed. `options.kid`, the key id of the JWT the keys are for, is
+ * passed on to the callback.
  *
  * Returns validated metadata if successful response
  * Throws error otherwise
@@ -17,10 +18,11 @@ import type { CallbackContext } from '../callbacks'
  */
 export async function fetchJwks(
   jwksUrl: string,
-  fetchOrCallbacks?: Fetch | Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'getJwks'>
+  fetchOrCallbacks?: Fetch | Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'getJwks'>,
+  options?: { kid?: string }
 ): Promise<JwkSet> {
   const callbacks = typeof fetchOrCallbacks === 'function' ? { fetch: fetchOrCallbacks } : fetchOrCallbacks
-  const providedJwks = await callbacks?.getJwks?.(jwksUrl)
+  const providedJwks = await callbacks?.getJwks?.(jwksUrl, { kid: options?.kid })
   if (providedJwks) {
     // Validated the same way as JWKs retrieved from the jwks_uri
     return parseWithErrorHandling(
