@@ -57,8 +57,9 @@ describe('ProtectedHeaders byte preservation', () => {
 
   test('a decoded Mac0 authenticates against those bytes too', async () => {
     const authenticationTag = await mac0Context.authenticate({
-      toBeAuthenticated: cborEncode(['MAC0', nonCanonicalMacHeaders, payload]),
+      toBeAuthenticated: cborEncode(['MAC0', nonCanonicalMacHeaders, new Uint8Array(), payload]),
       key: macKey,
+      algorithm: MacAlgorithm.HS256,
     })
     const mac0 = Mac0.decode(token(Mac0.tag, nonCanonicalMacHeaders, authenticationTag))
 

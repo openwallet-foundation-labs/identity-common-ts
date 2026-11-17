@@ -82,7 +82,7 @@ export class DeviceAuth extends CborStructure<DeviceAuthEncodedStructure, Device
     options: {
       document: Document
       verificationCallback?: VerificationCallback
-      ephemeralMacPrivateKey?: CoseKey
+      ephemeralReaderKey?: CoseKey
       sessionTranscript: SessionTranscript | Uint8Array
     },
     ctx: Pick<MdocContext, 'crypto' | 'cose'>
@@ -144,21 +144,20 @@ export class DeviceAuth extends CborStructure<DeviceAuthEncodedStructure, Device
       }
 
       onCheck({
-        status: options.ephemeralMacPrivateKey ? 'PASSED' : 'FAILED',
-        check: 'Ephemeral private key must be present when using MAC authentication',
+        status: options.ephemeralReaderKey ? 'PASSED' : 'FAILED',
+        check: 'Ephemeral reader key must be present when using MAC authentication',
       })
 
-      if (!options.ephemeralMacPrivateKey) {
+      if (!options.ephemeralReaderKey) {
         return
       }
 
       try {
         const isValid = await deviceMac.verify(
           {
-            publicKey: deviceKey,
-            privateKey: options.ephemeralMacPrivateKey,
+            key: options.ephemeralReaderKey,
+            peerPublicKey: deviceKey,
             sessionTranscript: options.sessionTranscript,
-            info: 'EMacKey',
             detachedPayload: deviceAuthenticationBytes,
           },
           ctx

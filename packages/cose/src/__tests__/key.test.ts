@@ -16,7 +16,6 @@ describe('cose key', () => {
     expect(key.y).toBeUndefined()
     expect(key.d).toBeUndefined()
     expect(() => key.publicKey).toThrow()
-    expect(() => key.privateKey).toThrow()
   })
 
   test('throws validation error if invalid values provided', () => {
@@ -63,7 +62,7 @@ describe('cose key', () => {
     expect(key.x).toBeUndefined()
     expect(key.y).toBeUndefined()
     expect(key.d).toBeDefined()
-    expect(base64url.encode(key.privateKey)).toStrictEqual('wOSo__ixR1AmrohLvcXpy-q5cK28TFwb4cDasS-qEZo')
+    expect(base64url.encode(key.d as Uint8Array)).toStrictEqual('wOSo__ixR1AmrohLvcXpy-q5cK28TFwb4cDasS-qEZo')
   })
 
   test('create cose key from jwk', () => {

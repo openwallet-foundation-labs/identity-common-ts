@@ -7,7 +7,7 @@ import { StatusList, StatusListCwt } from '@owf/token-status-list'
 import { registrationCertificate, type VerifyRegistrationCertificateCallbacks, WRP_ENTITLEMENTS } from '../index'
 
 export const sign1Context: Sign1Context = {
-  sign: async ({ key, toBeSigned }) => p256.sign(toBeSigned, key.privateKey, { format: 'compact' }),
+  sign: async ({ key, toBeSigned }) => p256.sign(toBeSigned, key.d as Uint8Array, { format: 'compact' }),
   verify: async ({ key, signature, toBeVerified }) =>
     p256.verify(signature, toBeVerified, key.publicKey, { lowS: false }),
 }

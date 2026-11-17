@@ -51,8 +51,8 @@ const createKey = (curve: Curve) => {
 const multiCurveContext: Sign1Context = {
   sign: async ({ key, toBeSigned }) => {
     const curve = key.curve as Curve
-    if (eddsa[curve]) return eddsa[curve].sign(toBeSigned, key.privateKey)
-    return ecdsa[curve].sign(toBeSigned, key.privateKey, { format: 'compact' })
+    if (eddsa[curve]) return eddsa[curve].sign(toBeSigned, key.d as Uint8Array)
+    return ecdsa[curve].sign(toBeSigned, key.d as Uint8Array, { format: 'compact' })
   },
   verify: async ({ key, toBeVerified, signature }) => {
     const curve = key.curve as Curve

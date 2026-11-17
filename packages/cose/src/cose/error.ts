@@ -32,8 +32,6 @@ export class CoseInvalidValueForKtyError extends CoseError {}
 export class CoseInvalidKtyForRawError extends CoseError {}
 export class CoseXNotDefinedError extends CoseError {}
 export class CoseYNotDefinedError extends CoseError {}
-export class CoseDNotDefinedError extends CoseError {}
-export class CoseKNotDefinedError extends CoseError {}
 export class CoseEphemeralMacKeyIsRequiredError extends CoseError {}
 export class CoseCertificateNotFoundError extends CoseError {}
 
@@ -42,7 +40,6 @@ export class CoseCertificateNotFoundError extends CoseError {}
  * unprotected header is therefore only accepted when a protected `x5t` matches its leaf.
  */
 export class CoseX5ChainNotBoundError extends CoseError {}
-export class CoseKeyTypeNotSupportedForPrivateKeyExtractionError extends CoseError {}
 
 /** The CWT carries a detached payload (`null`), which cannot be decoded into a claims set. */
 export class CwtDetachedPayloadError extends CoseError {}

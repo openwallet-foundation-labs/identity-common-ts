@@ -91,8 +91,8 @@ export class DeviceSignedBuilder {
   }
 
   public async tag(options: {
-    publicKey: CoseKey
-    privateKey: CoseKey
+    deviceKey: CoseKey
+    ephemeralReaderKey: CoseKey
     sessionTranscript: SessionTranscript
     algorithm: MacAlgorithm
   }): Promise<DeviceSigned> {
@@ -109,10 +109,10 @@ export class DeviceSignedBuilder {
 
     const unprotectedHeaders = UnprotectedHeaders.create({})
 
-    if (options.privateKey.keyId) {
+    if (options.deviceKey.keyId) {
       // COSE label 4 (kid) is a bstr per RFC 8152; UTF-8 encode the
       // text form at the header boundary.
-      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(options.privateKey.keyId))
+      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(options.deviceKey.keyId))
     }
 
     const deviceAuthentication = DeviceAuthentication.create({
@@ -127,23 +127,14 @@ export class DeviceSignedBuilder {
       payload: null,
     })
 
-    const derivedKey = await deviceMac.createDeviceMacKey(
+    const deviceMacWithTag = await deviceMac.authenticateWithKeyAgreement(
       {
-        privateKey: options.privateKey,
-        publicKey: options.publicKey,
+        key: options.deviceKey,
+        peerPublicKey: options.ephemeralReaderKey,
         sessionTranscript: options.sessionTranscript,
-        info: 'EMacKey',
-      },
-      this.ctx
-    )
-
-    const deviceMacWithTag = await deviceMac.authenticate(
-      {
-        key: derivedKey,
-        algorithm: options.algorithm,
         detachedPayload: deviceAuthentication.encode({ asDataItem: true }),
       },
-      this.ctx.cose.mac0
+      this.ctx
     )
 
     return DeviceSigned.create({

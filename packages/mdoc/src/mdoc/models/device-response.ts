@@ -161,8 +161,8 @@ export type DeviceResponseDocumentOptions = {
     signingKey: CoseKey
   }
   mac?: {
-    ephemeralKey: CoseKey
-    signingKey: CoseKey
+    deviceKey: CoseKey
+    ephemeralReaderKey: CoseKey
   }
 }
 
@@ -282,7 +282,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       await document.deviceSigned.deviceAuth.verify(
         {
           document,
-          ephemeralMacPrivateKey: options.ephemeralReaderKey,
+          ephemeralReaderKey: options.ephemeralReaderKey,
           sessionTranscript: options.sessionTranscript,
           verificationCallback: onCheck,
         },
@@ -365,8 +365,8 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
         signingKey: CoseKey
       }
       mac?: {
-        ephemeralKey: CoseKey
-        signingKey: CoseKey
+        deviceKey: CoseKey
+        ephemeralReaderKey: CoseKey
       }
     },
     ctx: Pick<MdocContext, 'crypto' | 'cose'>
@@ -375,8 +375,8 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     const useSignature = !!options.signature
     if (useMac === useSignature) throw new EitherSignatureOrMacMustBeProvidedError()
 
-    const signingKey = useSignature ? options.signature?.signingKey : options.mac?.signingKey
-    if (!signingKey) throw new Error('Signing key is missing')
+    const deviceKey = useSignature ? options.signature?.signingKey : options.mac?.deviceKey
+    if (!deviceKey) throw new Error('Device key is missing')
 
     // Every access to the mobile security object decodes it, so decode it once.
     const mobileSecurityObject = options.issuerSigned.issuerAuth.mobileSecurityObject
@@ -420,10 +420,10 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     }).encode({ asDataItem: true })
 
     const unprotectedHeaders = UnprotectedHeaders.create({})
-    if (signingKey.keyId) {
+    if (deviceKey.keyId) {
       // COSE label 4 (kid) is a bstr per RFC 8152; UTF-8 encode
       // the text form at the header boundary.
-      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(signingKey.keyId))
+      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(deviceKey.keyId))
     }
 
     const deviceAuthOptions: DeviceAuthOptions = {}
@@ -431,15 +431,15 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       const deviceSignature = await DeviceSignature.create({
         unprotectedHeaders,
         protectedHeaders: ProtectedHeaders.create({
-          protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, signingKey.algorithm]]),
+          protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, deviceKey.algorithm]]),
         }),
         payload: null,
-      }).sign({ signingKey, detachedPayload: deviceAuthenticationBytes }, { sign: ctx.cose.sign1.sign })
+      }).sign({ signingKey: deviceKey, detachedPayload: deviceAuthenticationBytes }, { sign: ctx.cose.sign1.sign })
 
       deviceAuthOptions.deviceSignature = deviceSignature
     } else {
-      const ephemeralKey = options.mac?.ephemeralKey
-      if (!ephemeralKey) throw new Error('Ephemeral key is missing')
+      const ephemeralReaderKey = options.mac?.ephemeralReaderKey
+      if (!ephemeralReaderKey) throw new Error('Ephemeral reader key is missing')
 
       // 18013-5 9.1.3.5: the device MAC is always HMAC 256/256, keyed with the EMacKey derived from
       // the device key, and not with the algorithm of the device key.
@@ -451,18 +451,14 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
         payload: null,
       })
 
-      const macKey = await deviceMac.createDeviceMacKey(
+      await deviceMac.authenticateWithKeyAgreement(
         {
-          publicKey: ephemeralKey,
-          privateKey: signingKey,
+          key: deviceKey,
+          peerPublicKey: ephemeralReaderKey,
           sessionTranscript: options.sessionTranscript,
+          detachedPayload: deviceAuthenticationBytes,
         },
         ctx
-      )
-
-      await deviceMac.authenticate(
-        { key: macKey, algorithm: MacAlgorithm.HS256, detachedPayload: deviceAuthenticationBytes },
-        ctx.cose.mac0
       )
 
       deviceAuthOptions.deviceMac = deviceMac

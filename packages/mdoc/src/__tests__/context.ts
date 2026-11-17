@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import crypto, { timingSafeEqual } from 'node:crypto'
+import crypto from 'node:crypto'
 import { p256 } from '@noble/curves/nist.js'
 import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
@@ -26,11 +26,9 @@ export const mdocContext: MdocContext = {
     random: (length: number) => {
       return crypto.getRandomValues(new Uint8Array(length))
     },
-    hdkf: async (input) => {
-      const { digestAlgorithm: da, salt, info, publicKey, privateKey } = input
-      const ikm = p256.getSharedSecret(privateKey, publicKey, true).slice(1)
-      const digestAlgorithm = da === 'SHA-384' ? 'sha384' : da === 'SHA-512' ? 'sha512' : 'sha256'
-      return await hkdf(digestAlgorithm, ikm, salt, info, 32)
+    deviceMac: async ({ key, peerPublicKey, salt, info, toBeAuthenticated }) => {
+      const sharedSecret = p256.getSharedSecret(key.d as Uint8Array, peerPublicKey.publicKey, true).slice(1)
+      return hmac(sha256, await hkdf('sha256', sharedSecret, salt, info, 32), toBeAuthenticated)
     },
     hpke: {
       suites: [HpkeSuiteId.DhkemP256HkdfSha256HkdfSha256Aes128Gcm],
@@ -46,7 +44,7 @@ export const mdocContext: MdocContext = {
         // for a non-extractable key. Passing a key pair works on every runtime and keeps the private
         // key non-extractable.
         const [privateKey, publicKey] = await Promise.all([
-          p256HpkeSuite.DeserializePrivateKey(recipientKey.privateKey),
+          p256HpkeSuite.DeserializePrivateKey(recipientKey.d as Uint8Array),
           p256HpkeSuite.DeserializePublicKey(recipientKey.publicKey),
         ])
 
@@ -56,21 +54,10 @@ export const mdocContext: MdocContext = {
   },
 
   cose: {
-    mac0: {
-      authenticate: async (input) => {
-        const { key, toBeAuthenticated } = input
-        const keyBytes = key instanceof CoseKey ? key.privateKey : key
-        return hmac(sha256, keyBytes, toBeAuthenticated)
-      },
-      verify: async (input) => {
-        const { tag, toBeAuthenticated, key } = input
-        return timingSafeEqual(tag, hmac(sha256, key instanceof CoseKey ? key.privateKey : key, toBeAuthenticated))
-      },
-    },
     sign1: {
       sign: async (input) => {
         const { key, toBeSigned } = input
-        return p256.sign(toBeSigned, key.privateKey, { format: 'compact' })
+        return p256.sign(toBeSigned, key.d as Uint8Array, { format: 'compact' })
       },
       verify: async (input) => {
         const { signature, key, toBeVerified } = input

@@ -1,4 +1,4 @@
-import type { CoseKey, DigestAlgorithm, Mac0Context, MacAlgorithm, Sign1Context, SignatureAlgorithm } from '@owf/cose'
+import type { CoseKey, DigestAlgorithm, MacAlgorithm, Sign1Context, SignatureAlgorithm } from '@owf/cose'
 import type { FetchCallback, FetchContext, FetchLimits } from '@owf/identity-common'
 
 type MaybePromise<T> = Promise<T> | T
@@ -86,12 +86,22 @@ export interface MdocContext {
   crypto: {
     random: (length: number) => Uint8Array
     digest: (input: { digestAlgorithm: DigestAlgorithm; bytes: Uint8Array }) => MaybePromise<Uint8Array>
-    hdkf: (input: {
-      digestAlgorithm?: DigestAlgorithm
-      privateKey: Uint8Array
-      publicKey: Uint8Array
+    /**
+     * The tag of a device MAC (ISO/IEC 18013-5 9.1.3.5): HMAC-SHA256 of `toBeAuthenticated`, keyed
+     * with the 32 byte HKDF-SHA256 output of `salt`, `info` and the ECKA-DH shared secret of `key`
+     * and `peerPublicKey`.
+     *
+     * Required for device MAC authentication only. `key` is the key passed to the library, the
+     * device key of the mdoc or the ephemeral key of the mdoc reader, so an implementation that
+     * keeps its private key in a key management system can resolve it by its `keyId`, the same way
+     * {@link Sign1Context.sign} does.
+     */
+    deviceMac?: (input: {
+      key: CoseKey
+      peerPublicKey: CoseKey
       salt: Uint8Array
       info: Uint8Array
+      toBeAuthenticated: Uint8Array
     }) => MaybePromise<Uint8Array>
 
     /**
@@ -105,8 +115,6 @@ export interface MdocContext {
       sign: Sign1Context['sign']
       verify: Sign1Context['verify']
     }
-
-    mac0: Mac0Context
   }
 
   x509: {
