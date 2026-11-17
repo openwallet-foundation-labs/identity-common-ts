@@ -17,6 +17,7 @@ import {
   ItemsRequest,
   KeyAuthorizations,
   SessionTranscript,
+  SignatureAlgorithm,
   type VerificationAssessment,
   VerificationError,
   Verifier,
@@ -33,6 +34,7 @@ class NullHandover extends Handover<null> {
 }
 
 const deviceKey = CoseKey.fromJwk(DEVICE_JWK_PRIVATE)
+const signature = { signingKey: deviceKey, algorithm: SignatureAlgorithm.ES256 }
 const sessionTranscript = SessionTranscript.create({ handover: NullHandover.fromEncodedStructure(null) })
 
 const createDeviceRequest = (
@@ -61,7 +63,7 @@ const createDeviceResponse = async (options: {
         issuerSigned,
         docRequestIndex,
         deviceNamespaces: options.deviceNamespaces,
-        signature: { signingKey: deviceKey },
+        signature,
       })),
     },
     mdocContext

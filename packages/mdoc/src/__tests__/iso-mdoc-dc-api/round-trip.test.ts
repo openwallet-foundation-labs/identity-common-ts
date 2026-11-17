@@ -20,6 +20,8 @@ import {
   MissingOriginError,
   MissingRequestedElementError,
   RegisteredCwtHeaderClaimKey,
+  SignatureAlgorithm,
+  SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError,
   type VerificationAssessment,
 } from '../..'
 import { DEVICE_JWK_PRIVATE } from '../config'
@@ -36,6 +38,7 @@ import { createReaderCertificate } from './reader-certificate'
 
 const origin = 'https://verifier.example.com'
 const deviceKey = CoseKey.fromJwk(DEVICE_JWK_PRIVATE)
+const algorithm = SignatureAlgorithm.ES256
 const recipientPublicKey = CoseKey.fromJwk(RECIPIENT_JWK_PUBLIC)
 const recipientPrivateKey = CoseKey.fromJwk(RECIPIENT_JWK_PRIVATE)
 const trustedCertificates = [{ issuance: [issuerCertificate] }]
@@ -67,7 +70,7 @@ describe('IsoMdocDcApi round trip', () => {
     expect(parsedRequest.encryptionInfo.nonce).toHaveLength(16)
 
     const response = await IsoMdocDcApi.createResponse(
-      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0 }] },
+      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0, algorithm }] },
       mdocContext
     )
 
@@ -98,7 +101,7 @@ describe('IsoMdocDcApi round trip', () => {
 
     const parsedRequest = await IsoMdocDcApi.parseRequest({ request, origin }, mdocContext)
     const { response } = await IsoMdocDcApi.createResponse(
-      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0 }] },
+      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0, algorithm }] },
       mdocContext
     )
 
@@ -113,7 +116,7 @@ describe('IsoMdocDcApi round trip', () => {
 
     const parsedRequest = await IsoMdocDcApi.parseRequest({ request, origin }, mdocContext)
     const response = await IsoMdocDcApi.createResponse(
-      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0 }] },
+      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0, algorithm }] },
       mdocContext
     )
 
@@ -251,7 +254,7 @@ describe('IsoMdocDcApi round trip', () => {
 
     const parsedRequest = await IsoMdocDcApi.parseRequest({ request, origin }, mdocContext)
     const { response } = await IsoMdocDcApi.createResponse(
-      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0 }] },
+      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0, algorithm }] },
       mdocContext
     )
 
@@ -297,8 +300,8 @@ describe('IsoMdocDcApi round trip', () => {
       {
         parsedRequest,
         documents: [
-          { issuerSigned: mdl, deviceKey, docRequestIndex: 0 },
-          { issuerSigned: photoId, deviceKey, docRequestIndex: 1 },
+          { issuerSigned: mdl, deviceKey, docRequestIndex: 0, algorithm },
+          { issuerSigned: photoId, deviceKey, docRequestIndex: 1, algorithm },
         ],
       },
       mdocContext
@@ -329,7 +332,7 @@ describe('IsoMdocDcApi round trip', () => {
 
     const parsedRequest = await IsoMdocDcApi.parseRequest({ request, origin }, mdocContext)
     const response = await IsoMdocDcApi.createResponse(
-      { parsedRequest, documents: [{ issuerSigned: mdl, deviceKey, docRequestIndex: 0 }] },
+      { parsedRequest, documents: [{ issuerSigned: mdl, deviceKey, docRequestIndex: 0, algorithm }] },
       mdocContext
     )
 
@@ -366,7 +369,7 @@ describe('IsoMdocDcApi round trip', () => {
         ],
         deviceRequestInfo: { useCases: [{ mandatory: true, documentSets: [[0], [1]] }] },
         recipientPublicKey,
-        readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin },
+        readerAuth: { signingKey: readerKey, algorithm, certificateChain: [readerCertificate], origin },
       },
       mdocContext
     )
@@ -393,7 +396,7 @@ describe('IsoMdocDcApi round trip', () => {
 
     const createResponse = (alternatives?: Record<string, Record<string, number>>) =>
       IsoMdocDcApi.createResponse(
-        { parsedRequest, documents: [{ issuerSigned: mdl, deviceKey, docRequestIndex: 0, alternatives }] },
+        { parsedRequest, documents: [{ issuerSigned: mdl, deviceKey, docRequestIndex: 0, algorithm, alternatives }] },
         mdocContext
       )
 
@@ -435,7 +438,7 @@ describe('IsoMdocDcApi round trip', () => {
 
     await expect(
       IsoMdocDcApi.createResponse(
-        { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0 }] },
+        { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0, algorithm }] },
         contextWithoutHpke
       )
     ).rejects.toThrow('does not provide HPKE support')
@@ -450,7 +453,7 @@ describe('IsoMdocDcApi reader auth', () => {
       {
         docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
         recipientPublicKey,
-        readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin },
+        readerAuth: { signingKey: readerKey, algorithm, certificateChain: [readerCertificate], origin },
       },
       mdocContext
     )
@@ -478,7 +481,7 @@ describe('IsoMdocDcApi reader auth', () => {
       {
         docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
         recipientPublicKey,
-        readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin },
+        readerAuth: { signingKey: readerKey, algorithm, certificateChain: [readerCertificate], origin },
       },
       mdocContext
     )
@@ -504,7 +507,7 @@ describe('IsoMdocDcApi reader auth', () => {
       {
         docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
         recipientPublicKey,
-        readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin },
+        readerAuth: { signingKey: readerKey, algorithm, certificateChain: [readerCertificate], origin },
       },
       mdocContext
     )
@@ -518,6 +521,58 @@ describe('IsoMdocDcApi reader auth', () => {
       mdocContext
     )
     expect(parsedRequest.docRequests[0].hasReaderAuth).toBe(true)
+  })
+
+  test('a reader key without alg signs with the supplied algorithm', async () => {
+    const { readerKey, readerCertificate } = await createReaderCertificate()
+    const { keyType, curve, x, y, d } = readerKey
+
+    const { request, deviceRequest } = await IsoMdocDcApi.createRequest(
+      {
+        docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
+        recipientPublicKey,
+        readerAuth: {
+          signingKey: CoseKey.create({ keyType, curve, x, y, d }),
+          algorithm: SignatureAlgorithm.ESP256,
+          certificateChain: [readerCertificate],
+          origin,
+        },
+      },
+      mdocContext
+    )
+    expect(deviceRequest.docRequests[0].readerAuth?.algorithm).toBe(SignatureAlgorithm.ESP256)
+
+    const checks: Array<VerificationAssessment> = []
+    await IsoMdocDcApi.parseRequest(
+      {
+        request,
+        origin,
+        trustedReaderCertificates: [readerCertificate],
+        verificationCallback: (assessment) => checks.push(assessment),
+      },
+      mdocContext
+    )
+    expect(checks.filter((check) => check.status === 'FAILED')).toStrictEqual([])
+  })
+
+  test('a reader key alg other than the supplied algorithm throws', async () => {
+    const { readerKey, readerCertificate } = await createReaderCertificate()
+
+    await expect(
+      IsoMdocDcApi.createRequest(
+        {
+          docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
+          recipientPublicKey,
+          readerAuth: {
+            signingKey: readerKey,
+            algorithm: SignatureAlgorithm.ESP256,
+            certificateChain: [readerCertificate],
+            origin,
+          },
+        },
+        mdocContext
+      )
+    ).rejects.toThrow(SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError)
   })
 })
 
@@ -555,7 +610,7 @@ describe('IsoMdocDcApi payload validation', () => {
     const { request } = await createRequest()
     const parsedRequest = await IsoMdocDcApi.parseRequest({ request, origin }, mdocContext)
     const { response } = await IsoMdocDcApi.createResponse(
-      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0 }] },
+      { parsedRequest, documents: [{ issuerSigned, deviceKey, docRequestIndex: 0, algorithm }] },
       mdocContext
     )
 
@@ -593,7 +648,7 @@ describe('IsoMdocDcApi input handling', () => {
         {
           docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
           recipientPublicKey,
-          readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin: `${origin}/` },
+          readerAuth: { signingKey: readerKey, algorithm, certificateChain: [readerCertificate], origin: `${origin}/` },
         },
         mdocContext
       )
@@ -650,7 +705,13 @@ describe('IsoMdocDcApi input handling', () => {
         {
           docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
           recipientPublicKey,
-          readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin, includeX5t: true },
+          readerAuth: {
+            signingKey: readerKey,
+            algorithm,
+            certificateChain: [readerCertificate],
+            origin,
+            includeX5t: true,
+          },
         },
         mdocContext
       )
@@ -683,7 +744,7 @@ describe('IsoMdocDcApi input handling', () => {
         {
           docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
           recipientPublicKey,
-          readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin },
+          readerAuth: { signingKey: readerKey, algorithm, certificateChain: [readerCertificate], origin },
         },
         mdocContext
       )
@@ -699,7 +760,13 @@ describe('IsoMdocDcApi input handling', () => {
         {
           docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
           recipientPublicKey,
-          readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin, includeX5t: true },
+          readerAuth: {
+            signingKey: readerKey,
+            algorithm,
+            certificateChain: [readerCertificate],
+            origin,
+            includeX5t: true,
+          },
         },
         mdocContext
       )
@@ -735,7 +802,7 @@ describe('IsoMdocDcApi input handling', () => {
       {
         docRequests: [{ docType: mdlDocType, namespaces: requestedNamespaces }],
         recipientPublicKey,
-        readerAuth: { signingKey: readerKey, certificateChain: [readerCertificate], origin },
+        readerAuth: { signingKey: readerKey, algorithm, certificateChain: [readerCertificate], origin },
       },
       mdocContext
     )

@@ -4,6 +4,7 @@ import {
   KeyType,
   ProtectedHeaders,
   RegisteredCwtHeaderClaimKey,
+  type SignatureAlgorithm,
   UnprotectedHeaders,
 } from '@owf/cose'
 import { base64url } from '@owf/identity-common'
@@ -34,6 +35,7 @@ import {
   ReaderAuth,
   ReaderAuthentication,
   SessionTranscript,
+  SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError,
   type VerificationCallback,
 } from './mdoc'
 import { verifyAgeOverRequestLimit } from './utils/ageOver'
@@ -155,6 +157,7 @@ export class IsoMdocDcApi {
       version?: string
       readerAuth?: {
         signingKey: CoseKey
+        algorithm: SignatureAlgorithm
         certificateChain: Array<Uint8Array>
         origin: string
         /**
@@ -171,7 +174,16 @@ export class IsoMdocDcApi {
       throw new InvalidEncryptionInfoError(`Nonce must be at least ${minimumNonceLength} bytes`)
     }
     assertP256PublicKey(options.recipientPublicKey)
-    if (options.readerAuth) assertSerializedOrigin(options.readerAuth.origin)
+    if (options.readerAuth) {
+      assertSerializedOrigin(options.readerAuth.origin)
+
+      const { signingKey, algorithm } = options.readerAuth
+      if (signingKey.algorithm && signingKey.algorithm !== algorithm) {
+        throw new SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError(
+          `Signing key algorithm '${signingKey.algorithm}' does not match the supplied algorithm '${algorithm}'`
+        )
+      }
+    }
 
     const encryptionInfo = EncryptionInfo.create({
       encryptionParameters: EncryptionParameters.create({ nonce, recipientPublicKey: options.recipientPublicKey }),
@@ -192,14 +204,14 @@ export class IsoMdocDcApi {
           return DocRequest.create({ itemsRequest })
         }
 
-        const { signingKey, certificateChain, includeX5t } = options.readerAuth
+        const { signingKey, algorithm, certificateChain, includeX5t } = options.readerAuth
         const unprotectedHeaders = UnprotectedHeaders.create({})
         unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.X5Chain, x5chainHeaderValue(certificateChain))
 
         const readerAuth = (await ReaderAuth.create({
           protectedHeaders: ProtectedHeaders.create({
             protectedHeaders: new Map<number, unknown>([
-              [RegisteredCwtHeaderClaimKey.Algorithm, signingKey.algorithm],
+              [RegisteredCwtHeaderClaimKey.Algorithm, algorithm],
               ...(includeX5t
                 ? [[RegisteredCwtHeaderClaimKey.X5T, await x5tHeaderValue(certificateChain, ctx)] as [number, unknown]]
                 : []),
@@ -210,6 +222,7 @@ export class IsoMdocDcApi {
         }).sign(
           {
             signingKey,
+            algorithm,
             detachedPayload: ReaderAuthentication.create({ sessionTranscript, itemsRequest }).encode({
               asDataItem: true,
             }),
@@ -348,6 +361,8 @@ export class IsoMdocDcApi {
           'issuerSigned' | 'docRequestIndex' | 'elements' | 'alternatives' | 'deviceNamespaces'
         > & {
           deviceKey: CoseKey
+          /** The algorithm of the device signature. */
+          algorithm: SignatureAlgorithm
         }
       >
     },
@@ -366,7 +381,7 @@ export class IsoMdocDcApi {
           elements: document.elements,
           alternatives: document.alternatives,
           deviceNamespaces: document.deviceNamespaces,
-          signature: { signingKey: document.deviceKey },
+          signature: { signingKey: document.deviceKey, algorithm: document.algorithm },
         })),
       },
       ctx

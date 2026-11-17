@@ -46,6 +46,7 @@ class NullHandover extends Handover<null> {
 }
 
 const deviceKey = CoseKey.fromJwk(DEVICE_JWK_PRIVATE)
+const signature = { signingKey: deviceKey, algorithm: SignatureAlgorithm.ES256 }
 const sessionTranscript = SessionTranscript.create({ handover: NullHandover.fromEncodedStructure(null) })
 const photoIdDocType = 'org.iso.23220.photoid.1'
 
@@ -187,7 +188,7 @@ describe('alternative data elements', () => {
             issuerSigned,
             docRequestIndex: 0,
             alternatives: { [mdlNamespace]: { age_in_years: 1 } },
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -209,7 +210,7 @@ describe('alternative data elements', () => {
         {
           deviceRequest,
           sessionTranscript,
-          documents: [{ issuerSigned, docRequestIndex: 0, alternatives, signature: { signingKey: deviceKey } }],
+          documents: [{ issuerSigned, docRequestIndex: 0, alternatives, signature }],
         },
         mdocContext
       )
@@ -243,7 +244,7 @@ describe('alternative data elements', () => {
               docRequestIndex: 0,
               elements,
               alternatives,
-              signature: { signingKey: deviceKey },
+              signature,
             },
           ],
         },
@@ -291,7 +292,7 @@ describe('alternative data elements', () => {
             {
               issuerSigned: await createIssuerSigned({ claims: { age_over_18: true } }),
               docRequestIndex: 0,
-              signature: { signingKey: deviceKey },
+              signature,
             },
           ],
         },
@@ -319,7 +320,7 @@ describe('alternative data elements', () => {
               issuerSigned: await createIssuerSigned({ claims: { age_over_18: true } }),
               docRequestIndex: 0,
               alternatives: { [mdlNamespace]: { age_in_years: 1 } },
-              signature: { signingKey: deviceKey },
+              signature,
             },
           ],
         },
@@ -352,7 +353,7 @@ describe('alternative data elements', () => {
             issuerSigned: await createIssuerSigned({ claims: { age_birth_year: 1990, age_over_18: true } }),
             docRequestIndex: 0,
             alternatives: { [mdlNamespace]: { age_in_years: 1 } },
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -469,7 +470,7 @@ describe('alternative data elements', () => {
             issuerSigned,
             docRequestIndex: 0,
             alternatives: { [mdlNamespace]: { age_in_years: 1 } },
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -542,9 +543,7 @@ describe('issuer identifiers', () => {
         {
           deviceRequest: namingAnotherIssuer(),
           sessionTranscript,
-          documents: [
-            { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-          ],
+          documents: [{ issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature }],
         },
         mdocContext
       )
@@ -560,9 +559,7 @@ describe('issuer identifiers', () => {
           docRequests: [{ namespaces: { [mdlNamespace]: { family_name: false } } }],
         }),
         sessionTranscript,
-        documents: [
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-        ],
+        documents: [{ issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature }],
       },
       mdocContext
     )
@@ -593,8 +590,8 @@ describe('unique document set', () => {
       docRequests: [{ ...docRequest, requestInfo: DocRequestInfo.create({ uniqueDocSetRequired: true }) }],
     })
   const twoDocuments = async () => [
-    { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-    { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+    { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature },
+    { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature },
   ]
 
   test('a holder refuses to answer a doc request that requires a unique document set with two documents', async () => {
@@ -643,12 +640,12 @@ describe('unique document set', () => {
         deviceRequest,
         sessionTranscript,
         documents: [
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature },
           {
             issuerSigned: await createIssuerSigned(),
             docRequestIndex: 1,
             elements: { [mdlNamespace]: ['family_name'] },
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -676,8 +673,8 @@ describe('unique document set', () => {
         deviceRequest,
         sessionTranscript,
         documents: [
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 1, signature: { signingKey: deviceKey } },
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature },
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 1, signature },
         ],
       },
       mdocContext
@@ -760,9 +757,7 @@ describe('use cases', () => {
       {
         deviceRequest,
         sessionTranscript,
-        documents: [
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-        ],
+        documents: [{ issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature }],
       },
       mdocContext
     )
@@ -814,9 +809,7 @@ describe('use cases', () => {
         {
           deviceRequest,
           sessionTranscript,
-          documents: [
-            { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-          ],
+          documents: [{ issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature }],
         },
         mdocContext
       )
@@ -835,9 +828,7 @@ describe('use cases', () => {
         {
           deviceRequest,
           sessionTranscript,
-          documents: [
-            { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-          ],
+          documents: [{ issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature }],
         },
         mdocContext
       )
@@ -862,7 +853,7 @@ describe('use cases', () => {
             issuerSigned: await createIssuerSigned({ docType: photoIdDocType }),
             docRequestIndex: 1,
             elements: {},
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -917,9 +908,7 @@ describe('use cases', () => {
       {
         deviceRequest,
         sessionTranscript,
-        documents: [
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-        ],
+        documents: [{ issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature }],
       },
       mdocContext
     )
@@ -1017,7 +1006,7 @@ describe('issuer identifiers against a certificate chain', () => {
           docRequests: [{ namespaces: { [mdlNamespace]: { family_name: false } } }],
         }),
         sessionTranscript,
-        documents: [{ issuerSigned, docRequestIndex: 0, signature: { signingKey: deviceKey } }],
+        documents: [{ issuerSigned, docRequestIndex: 0, signature }],
       },
       mdocContext
     )
@@ -1054,7 +1043,7 @@ describe('issuer identifiers against a certificate chain', () => {
         {
           deviceRequest,
           sessionTranscript,
-          documents: [{ issuerSigned, docRequestIndex: 0, signature: { signingKey: deviceKey } }],
+          documents: [{ issuerSigned, docRequestIndex: 0, signature }],
         },
         mdocContext
       )
@@ -1145,8 +1134,8 @@ describe('issuer identifiers against a certificate chain', () => {
         }),
         sessionTranscript,
         documents: [
-          { issuerSigned: await sign(fr), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-          { issuerSigned: await sign(de), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          { issuerSigned: await sign(fr), docRequestIndex: 0, signature },
+          { issuerSigned: await sign(de), docRequestIndex: 0, signature },
         ],
       },
       mdocContext
@@ -1204,7 +1193,7 @@ describe('issuer identifiers against a certificate chain', () => {
           documents: documents.map(([issuerSigned]) => ({
             issuerSigned,
             docRequestIndex: 0,
-            signature: { signingKey: deviceKey },
+            signature,
           })),
         },
         mdocContext
@@ -1278,9 +1267,9 @@ describe('issuer identifiers against a certificate chain', () => {
             issuerSigned: await sign(de),
             docRequestIndex: 0,
             elements: { [mdlNamespace]: ['family_name'] },
-            signature: { signingKey: deviceKey },
+            signature,
           },
-          { issuerSigned: full, docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          { issuerSigned: full, docRequestIndex: 0, signature },
         ],
       },
       mdocContext
@@ -1321,7 +1310,7 @@ describe('response checks', () => {
           {
             issuerSigned: await createIssuerSigned({ docType }),
             docRequestIndex,
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -1432,7 +1421,7 @@ describe('attribution', () => {
           documents.map(async ({ docRequestIndex, docType }) => ({
             issuerSigned: await createIssuerSigned({ docType }),
             docRequestIndex,
-            signature: { signingKey: deviceKey },
+            signature,
           }))
         ),
       },
@@ -1532,7 +1521,7 @@ describe('attribution, order and satisfaction', () => {
     issuerSigned: await createIssuerSigned(),
     docRequestIndex,
     elements: { [mdlNamespace]: claims },
-    signature: { signingKey: deviceKey },
+    signature,
   })
 
   test('a doc request that takes one document takes one that satisfies it when there is one', async () => {
@@ -1605,12 +1594,12 @@ describe('doc requests answered together', () => {
         deviceRequest,
         sessionTranscript,
         documents: [
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature },
           {
             issuerSigned: await createIssuerSigned(),
             docRequestIndex: 1,
             elements: {},
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -1708,12 +1697,12 @@ describe('doc requests answered together', () => {
             deviceRequest,
             sessionTranscript,
             documents: [
-              { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+              { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature },
               {
                 issuerSigned: await createIssuerSigned(),
                 docRequestIndex: optional,
                 elements: {},
-                signature: { signingKey: deviceKey },
+                signature,
               },
             ],
           },
@@ -1747,12 +1736,12 @@ describe('doc requests answered together', () => {
         deviceRequest,
         sessionTranscript,
         documents: [
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature },
           {
             issuerSigned: await createIssuerSigned(),
             docRequestIndex: 1,
             elements: { [mdlNamespace]: ['given_name'] },
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -1779,7 +1768,7 @@ describe('a document for several doc requests', () => {
       {
         deviceRequest,
         sessionTranscript,
-        documents: [{ issuerSigned: await createIssuerSigned(), signature: { signingKey: deviceKey }, ...document }],
+        documents: [{ issuerSigned: await createIssuerSigned(), signature, ...document }],
       },
       mdocContext
     )
@@ -1817,8 +1806,8 @@ describe('a document for several doc requests', () => {
           deviceRequest,
           sessionTranscript,
           documents: [
-            { issuerSigned: await createIssuerSigned(), docRequestIndex: [0, 1], signature: { signingKey: deviceKey } },
-            { issuerSigned: await createIssuerSigned(), docRequestIndex: 1, signature: { signingKey: deviceKey } },
+            { issuerSigned: await createIssuerSigned(), docRequestIndex: [0, 1], signature },
+            { issuerSigned: await createIssuerSigned(), docRequestIndex: 1, signature },
           ],
         },
         mdocContext
@@ -1892,8 +1881,8 @@ describe('a document for several doc requests', () => {
         deviceRequest,
         sessionTranscript,
         documents: [
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-          { issuerSigned: await createIssuerSigned(), docRequestIndex: 1, signature: { signingKey: deviceKey } },
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature },
+          { issuerSigned: await createIssuerSigned(), docRequestIndex: 1, signature },
         ],
       },
       mdocContext

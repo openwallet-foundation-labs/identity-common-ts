@@ -15,6 +15,7 @@ import {
   KeyAuthorizations,
   MissingRequestedElementError,
   SessionTranscript,
+  SignatureAlgorithm,
   type VerificationAssessment,
   Verifier,
 } from '../..'
@@ -30,6 +31,7 @@ class NullHandover extends Handover<null> {
 }
 
 const deviceKey = CoseKey.fromJwk(DEVICE_JWK_PRIVATE)
+const signature = { signingKey: deviceKey, algorithm: SignatureAlgorithm.ES256 }
 const sessionTranscript = SessionTranscript.create({ handover: NullHandover.fromEncodedStructure(null) })
 
 const photoIdDocType = 'org.iso.23220.photoid.1'
@@ -243,7 +245,7 @@ describe('Holder.matchDeviceRequest', () => {
         {
           deviceRequest,
           sessionTranscript,
-          documents: [{ issuerSigned, docRequestIndex: 0, signature: { signingKey: deviceKey } }],
+          documents: [{ issuerSigned, docRequestIndex: 0, signature }],
         },
         mdocContext
       )
@@ -413,7 +415,7 @@ describe('creating a response from a holder match', () => {
       {
         deviceRequest,
         sessionTranscript,
-        documents: [{ ...credential, docRequestIndex: 0, signature: { signingKey: deviceKey } }],
+        documents: [{ ...credential, docRequestIndex: 0, signature }],
       },
       mdocContext
     )
@@ -449,7 +451,7 @@ describe('creating a response from a holder match', () => {
         {
           deviceRequest,
           sessionTranscript,
-          documents: [{ issuerSigned, docRequestIndex: 0, signature: { signingKey: deviceKey } }],
+          documents: [{ issuerSigned, docRequestIndex: 0, signature }],
         },
         mdocContext
       )
@@ -470,9 +472,7 @@ describe('creating a response from a holder match', () => {
         {
           deviceRequest,
           sessionTranscript,
-          documents: [
-            { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
-          ],
+          documents: [{ issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature }],
         },
         mdocContext
       )
@@ -493,7 +493,7 @@ describe('creating a response from a holder match', () => {
             issuerSigned: await createIssuerSigned(),
             docRequestIndex: 0,
             elements: { [mdlNamespace]: ['family_name'] },
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -541,7 +541,7 @@ describe('creating a response from a holder match', () => {
             deviceNamespaces: deviceNamespaces({
               [deviceNamespace]: { session_id: 'abc', nonce: 'def', transaction_id: 'ghi' },
             }),
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -582,7 +582,7 @@ describe('creating a response from a holder match', () => {
               issuerSigned: await createIssuerSigned(),
               docRequestIndex: 0,
               elements: { [mdlNamespace]: ['family_name', 'birth_date'] },
-              signature: { signingKey: deviceKey },
+              signature,
             },
           ],
         },
@@ -618,7 +618,7 @@ describe('creating a response from a holder match', () => {
             ...credential,
             docRequestIndex: 0,
             elements: { [mdlNamespace]: ['family_name'] },
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -630,7 +630,7 @@ describe('creating a response from a holder match', () => {
       {
         deviceRequest,
         sessionTranscript,
-        documents: [{ ...credential, docRequestIndex: 0, signature: { signingKey: deviceKey } }],
+        documents: [{ ...credential, docRequestIndex: 0, signature }],
       },
       mdocContext
     )
@@ -658,7 +658,7 @@ describe('creating a response from a holder match', () => {
         {
           deviceRequest,
           sessionTranscript,
-          documents: [{ issuerSigned, docRequestIndex: 0, elements, signature: { signingKey: deviceKey } }],
+          documents: [{ issuerSigned, docRequestIndex: 0, elements, signature }],
         },
         mdocContext
       )
@@ -698,7 +698,7 @@ describe('creating a response from a holder match', () => {
               issuerSigned: await createIssuerSigned({ claims }),
               docRequestIndex: 0,
               elements,
-              signature: { signingKey: deviceKey },
+              signature,
             },
           ],
         },
@@ -746,7 +746,7 @@ describe('creating a response from a holder match', () => {
             docRequestIndex: 0,
             elements: { [deviceNamespace]: ['session_id'] },
             deviceNamespaces: deviceNamespaces({ [deviceNamespace]: { session_id: 'abc' } }),
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
@@ -789,7 +789,7 @@ describe('creating a response from a holder match', () => {
             {
               issuerSigned: await createIssuerSigned({ docType: photoIdDocType }),
               docRequestIndex: 0,
-              signature: { signingKey: deviceKey },
+              signature,
             },
           ],
         },
