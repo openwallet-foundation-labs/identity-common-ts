@@ -1,6 +1,6 @@
 import { addSecondsToDate } from '@openid4vc/utils'
 import { base64url, dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
-import { calculateJwkThumbprint, type Jwk, type JwsSigner, jwsHeaderFromSigner, signJwt } from '@owf/jose'
+import { calculateJwkThumbprint, type Jwk, type JwsSignerCustom, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import {
   type AccessTokenProfileJwtHeader,
@@ -37,9 +37,10 @@ export interface CreateAccessTokenOptions {
   authorizationServer: string
 
   /**
-   * Signer of the access token
+   * Signer of the access token: a key in the `jwks_uri` of the authorization server. The header gets its
+   * `kid`, which a resource server needs to select the key when that set has more than one.
    */
-  signer: JwsSigner
+  signer: JwsSignerCustom
 
   /**
    * Number of seconds after which the token will expire

@@ -18,6 +18,7 @@ const dpopSignerJwk = {
 const { d: _, ...dpopSignerJwkPublic } = dpopSignerJwk
 
 const accessTokenSignerJwk = {
+  kid: 'access-token-key',
   kty: 'EC',
   d: 'V_ksBfnmJBl9vU-GLs3LiNxgA3PV8he5u7NOYqcDWfo',
   crv: 'P-256',
@@ -123,9 +124,9 @@ describe('Oauth2AuthorizationServer', () => {
       // We bind the access token to the pre-auth_code
       subject: grant.preAuthorizedCode,
       signer: {
-        method: 'jwk',
+        method: 'custom',
         alg: 'ES256',
-        publicJwk: accessTokenSignerJwkPublic,
+        kid: accessTokenSignerJwkPublic.kid,
       },
       cNonce: '0f1c8dec-26d5-4014-a570-19225a3e00ae',
       cNonceExpiresIn: 300,
@@ -147,12 +148,7 @@ describe('Oauth2AuthorizationServer', () => {
     ).toMatchObject({
       header: {
         alg: 'ES256',
-        jwk: {
-          crv: 'P-256',
-          kty: 'EC',
-          x: 'rQbiDHRutR4YcJaWRV54Dx-sx81VlK7xuohm4-RXRT0',
-          y: 'YM4MRy90G9PW59wKcawyrHDCPp7QsE6l5QT-H2Koz_M',
-        },
+        kid: 'access-token-key',
         typ: 'at+jwt',
       },
       payload: {
@@ -267,9 +263,9 @@ describe('Oauth2AuthorizationServer', () => {
       expiresInSeconds: 300,
       subject: 'a9ad80ef-18b6-4087-9b88-55f5b14a33da',
       signer: {
-        method: 'jwk',
+        method: 'custom',
         alg: 'ES256',
-        publicJwk: accessTokenSignerJwkPublic,
+        kid: accessTokenSignerJwkPublic.kid,
       },
       cNonce: '0f1c8dec-26d5-4014-a570-19225a3e00ae',
       cNonceExpiresIn: 300,
@@ -291,12 +287,7 @@ describe('Oauth2AuthorizationServer', () => {
     ).toMatchObject({
       header: {
         alg: 'ES256',
-        jwk: {
-          crv: 'P-256',
-          kty: 'EC',
-          x: 'rQbiDHRutR4YcJaWRV54Dx-sx81VlK7xuohm4-RXRT0',
-          y: 'YM4MRy90G9PW59wKcawyrHDCPp7QsE6l5QT-H2Koz_M',
-        },
+        kid: 'access-token-key',
         typ: 'at+jwt',
       },
       payload: {
