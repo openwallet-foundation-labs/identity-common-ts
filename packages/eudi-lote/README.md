@@ -211,6 +211,11 @@ const signed = await signLote({
 
 ### Validating a LoTE Document
 
+`validateLote`, `validateLoteProfile` and `getNotifiedTrustedEntities` check the content of a LoTE, not its
+signature, and this package does not verify one. Verify the JWS of a list you received, for example with
+`verifyCompact` of [`@owf/eudi-jades`](../eudi-jades) and a certificate of the scheme operator that you trust, before
+you use its trusted entities. Otherwise whoever delivers the list chooses them.
+
 ```typescript
 import {
   validateLote,

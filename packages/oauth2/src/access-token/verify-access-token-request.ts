@@ -228,6 +228,13 @@ export interface VerifyAuthorizationCodeAccessTokenRequestOptions {
 
   expectedCode: string
 
+  /**
+   * The `redirect_uri` of the authorization request the code was issued for. If provided, the access token request
+   * MUST contain an identical `redirect_uri` (RFC 6749 §4.1.3). Provide it whenever the authorization request
+   * contained a `redirect_uri`.
+   */
+  expectedRedirectUri?: string
+
   clientAttestation?: VerifyAccessTokenRequestClientAttestation
   dpop?: VerifyAccessTokenRequestDpop
   pkce?: VerifyAccessTokenRequestPkce
@@ -261,6 +268,19 @@ export async function verifyAuthorizationCodeAccessTokenRequest(
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidGrant,
       error_description: `Invalid 'code' provided`,
+    })
+  }
+
+  // RFC 6749 §4.1.3: the redirect_uri must be present and identical if the authorization request included one
+  if (
+    options.expectedRedirectUri !== undefined &&
+    options.accessTokenRequest.redirect_uri !== options.expectedRedirectUri
+  ) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidGrant,
+      error_description: options.accessTokenRequest.redirect_uri
+        ? `Invalid 'redirect_uri' provided, it does not match the 'redirect_uri' of the authorization request`
+        : `Missing required 'redirect_uri' in access token request`,
     })
   }
 
