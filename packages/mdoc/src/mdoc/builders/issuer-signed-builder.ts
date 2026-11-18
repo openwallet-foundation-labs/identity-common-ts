@@ -6,7 +6,6 @@ import {
   type SignatureAlgorithm,
   UnprotectedHeaders,
 } from '@owf/cose'
-import { stringToBytes } from '@owf/identity-common'
 import type { MdocContext } from '../../context'
 import { randomUnsignedInteger } from '../../utils/randomUnsignedInteger'
 import { x5chainHeaderValue, x5tHeaderValue } from '../../utils/x5chain'
@@ -182,12 +181,6 @@ export class IssuerSignedBuilder {
     const unprotectedHeaders = UnprotectedHeaders.create({
       unprotectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.X5Chain, x5chainHeaderValue(options.certificates)]]),
     })
-
-    if (options.signingKey.keyId) {
-      // COSE label 4 (kid) is a bstr per RFC 8152; CoseKey.keyId is the
-      // text form, so we UTF-8 encode here at the header boundary.
-      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(options.signingKey.keyId))
-    }
 
     const issuerAuth = await IssuerAuth.create({
       payload: mso,

@@ -9,7 +9,7 @@ import {
   typedMap,
   UnprotectedHeaders,
 } from '@owf/cose'
-import { base64url, stringToBytes } from '@owf/identity-common'
+import { base64url } from '@owf/identity-common'
 import { z } from 'zod'
 import type { MdocContext } from '../../context'
 import { describeAgeOverLimitViolations, findAgeOverLimitViolations } from '../../utils/ageOver'
@@ -291,6 +291,20 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
         ctx
       )
 
+      // 18013-5 9.3.1 step 4: the docType of the document is not signed, so it must be the docType of
+      // the MSO, whether or not a device request is matched. Checked before `issuerSigned.verify`, which
+      // ends with the status check of the MSO (Token Status List § 8.3).
+      const mobileSecurityObjectDocType = document.issuerSigned.issuerAuth.mobileSecurityObject.docType
+      onCheck({
+        status: document.docType === mobileSecurityObjectDocType ? 'PASSED' : 'FAILED',
+        check: 'The docType of the document must match the docType of the mobile security object.',
+        category: 'ISSUER_AUTH',
+        reason:
+          document.docType !== mobileSecurityObjectDocType
+            ? `Document has docType '${document.docType}', but the mobile security object has docType '${mobileSecurityObjectDocType}'`
+            : undefined,
+      })
+
       const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
         await document.issuerSigned.verify(
           {
@@ -303,19 +317,6 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
           },
           ctx
         )
-
-      // 18013-5 9.3.1 step 4: the docType of the document is not signed, so it must be the docType of
-      // the MSO, whether or not a device request is matched.
-      const mobileSecurityObjectDocType = document.issuerSigned.issuerAuth.mobileSecurityObject.docType
-      onCheck({
-        status: document.docType === mobileSecurityObjectDocType ? 'PASSED' : 'FAILED',
-        check: 'The docType of the document must match the docType of the mobile security object.',
-        category: 'ISSUER_AUTH',
-        reason:
-          document.docType !== mobileSecurityObjectDocType
-            ? `Document has docType '${document.docType}', but the mobile security object has docType '${mobileSecurityObjectDocType}'`
-            : undefined,
-      })
 
       documentResults.push({
         trustedIssuanceChain,
@@ -422,11 +423,6 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     }).encode({ asDataItem: true })
 
     const unprotectedHeaders = UnprotectedHeaders.create({})
-    if (signingKey.keyId) {
-      // COSE label 4 (kid) is a bstr per RFC 8152; UTF-8 encode
-      // the text form at the header boundary.
-      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(signingKey.keyId))
-    }
 
     const deviceAuthOptions: DeviceAuthOptions = {}
     if (options.signature) {

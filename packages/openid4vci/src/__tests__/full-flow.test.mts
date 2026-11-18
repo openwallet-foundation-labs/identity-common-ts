@@ -50,6 +50,7 @@ const credentialRequestProofJwk = {
 const { d: __2, ...credentialRequestProofJwkPublic } = credentialRequestProofJwk
 
 const accessTokenJwk = {
+  kid: 'access-token-key',
   kty: 'EC',
   d: 'Y2KgM6WsS5lAiZMj96VaqPm0YpP67mclJ5yXbhM7oQE',
   crv: 'P-256',
@@ -242,9 +243,9 @@ describe('Full E2E test', () => {
         const accessTokenResponse = await authorizationServer.createAccessTokenResponse({
           audience: credentialIssuerMetadata.credential_issuer,
           signer: {
-            method: 'jwk',
+            method: 'custom',
             alg: 'ES256',
-            publicJwk: accessTokenJwkPublic,
+            kid: accessTokenJwkPublic.kid,
           },
           subject: parsedAccessTokenRequest.grant.preAuthorizedCode,
           expiresInSeconds: 300,
@@ -677,9 +678,9 @@ describe('Full E2E test', () => {
         const accessTokenResponse = await authorizationServer.createAccessTokenResponse({
           audience: credentialIssuerMetadata.credential_issuer,
           signer: {
-            method: 'jwk',
+            method: 'custom',
             alg: 'ES256',
-            publicJwk: accessTokenJwkPublic,
+            kid: accessTokenJwkPublic.kid,
           },
           subject: 'some-authorization-code',
           expiresInSeconds: 300,

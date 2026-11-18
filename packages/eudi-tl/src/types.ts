@@ -1,3 +1,4 @@
+import { zNonEmptyString } from '@owf/identity-common'
 import { z } from 'zod'
 
 /**
@@ -63,6 +64,11 @@ export const zTrustedListPointer = z.object({
   tslType: z.string().optional(),
   /** `SchemeTerritory` (country code), when advertised. */
   schemeTerritory: z.string().optional(),
+  /**
+   * `MimeType` of the pointed-to list, when advertised: `application/vnd.etsi.tsl+xml` for the XML list,
+   * `application/pdf` for its human-readable form (ETSI TS 119 612 clause 5.3.13).
+   */
+  mimeType: zNonEmptyString.optional(),
   /**
    * The pointer's `ServiceDigitalIdentities`: the certificates with which the
    * pointed-to list is signed. This is how a list distributes the trust anchors
