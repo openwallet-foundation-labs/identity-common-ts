@@ -338,6 +338,7 @@ export class Openid4vciClient {
         pkceCodeVerifier: options.pkceCodeVerifier,
         redirectUri: options.redirectUri,
         scope: options.scope,
+        state: options.state,
         additionalRequestPayload: {
           ...options.additionalRequestPayload,
           issuer_state: options.credentialOffer?.grants?.authorization_code?.issuer_state,
@@ -418,6 +419,7 @@ export class Openid4vciClient {
       resource: options.issuerMetadata.credentialIssuer.credential_issuer,
       redirectUri: options.redirectUri,
       scope: options.scope,
+      state: options.state,
       pkceCodeVerifier: options.pkceCodeVerifier,
       dpop: options.dpop,
     })

@@ -6,7 +6,6 @@ import {
   type SignatureAlgorithm,
   UnprotectedHeaders,
 } from '@owf/cose'
-import { stringToBytes } from '@owf/identity-common'
 import type { MdocContext } from '../../context'
 import { UnsupportedDeviceMacAlgorithmError } from '../errors'
 import {
@@ -56,12 +55,6 @@ export class DeviceSignedBuilder {
 
     const unprotectedHeaders = UnprotectedHeaders.create({})
 
-    if (options.signingKey.keyId) {
-      // COSE label 4 (kid) is a bstr per RFC 8152; UTF-8 encode the
-      // text form at the header boundary.
-      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(options.signingKey.keyId))
-    }
-
     const deviceAuthentication = DeviceAuthentication.create({
       sessionTranscript: options.sessionTranscript,
       deviceNamespaces: this.namespaces,
@@ -108,12 +101,6 @@ export class DeviceSignedBuilder {
     })
 
     const unprotectedHeaders = UnprotectedHeaders.create({})
-
-    if (options.privateKey.keyId) {
-      // COSE label 4 (kid) is a bstr per RFC 8152; UTF-8 encode the
-      // text form at the header boundary.
-      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(options.privateKey.keyId))
-    }
 
     const deviceAuthentication = DeviceAuthentication.create({
       sessionTranscript: options.sessionTranscript,

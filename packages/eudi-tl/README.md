@@ -84,6 +84,16 @@ const anchors = getPointerSigningCertificates(lotl, { schemeTerritory: 'ES' });
 const esList = await loadTrustedList(esXml, { trustAnchors: anchors });
 ```
 
+Each pointer has the `mimeType` of the list it points to, which
+`getPointerSigningCertificates` filters by as well, so a verifier can skip the
+PDF form of a list that the LOTL points to next to the XML:
+
+```typescript
+const xmlPointers = (lotl.pointersToOtherLists ?? []).filter(
+  (pointer) => pointer.mimeType?.toLowerCase() === 'application/vnd.etsi.tsl+xml',
+);
+```
+
 `loadEuLotl` verifies the signature against `getEuLotlTrustAnchors()` and checks
 the `TrustedListProfiles.euLotl` profile. Pass your own `trustAnchors` to
 override the shipped set.

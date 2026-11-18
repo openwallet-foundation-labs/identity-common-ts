@@ -835,6 +835,116 @@ describe('Openid4vciClient', () => {
     expect(authorization.dpop).toEqual({ ...dpop, nonce: dpopNonce })
   })
 
+  // RFC 6749 Section 4.1.1: the client includes `state` in the authorization request so it can
+  // check the authorization response against it (Section 10.12)
+  test('forward state to the authorization challenge and pushed authorization request in initiateAuthorization', async () => {
+    const state = 'some-random-state'
+    const requestStates: Array<string | undefined> = []
+
+    server.resetHandlers(
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`,
+        () => HttpResponse.json(presentationDuringIssuance.credentialIssuerMetadata)
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-configuration`,
+        () => HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/oauth-authorization-server`,
+        () => HttpResponse.json(presentationDuringIssuance.authorizationServerMetadata)
+      ),
+      http.post(
+        presentationDuringIssuance.authorizationServerMetadata.authorization_challenge_endpoint,
+        async ({ request }) => {
+          requestStates.push(parseXwwwFormUrlEncoded(await request.text()).state)
+          return HttpResponse.json({ error: 'redirect_to_web' }, { status: 400 })
+        }
+      ),
+      http.post(
+        presentationDuringIssuance.authorizationServerMetadata.pushed_authorization_request_endpoint,
+        async ({ request }) => {
+          requestStates.push(parseXwwwFormUrlEncoded(await request.text()).state)
+          return HttpResponse.json({
+            request_uri: 'urn:ietf:params:oauth:request_uri:request',
+            expires_in: 60,
+          })
+        }
+      )
+    )
+
+    const client = new Openid4vciClient({
+      callbacks: {
+        ...callbacks,
+        fetch,
+        signJws: getSignJwsCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
+      },
+    })
+    const credentialOffer = await client.resolveCredentialOffer(presentationDuringIssuance.credentialOffer)
+    const issuerMetadata = await client.resolveIssuerMetadata(credentialOffer.credential_issuer)
+
+    const authorization = await client.initiateAuthorization({
+      clientId: 'some-random-client-id',
+      issuerMetadata,
+      redirectUri: 'https://example.com/redirect',
+      credentialOffer,
+      state,
+    })
+    expect(authorization.authorizationFlow).toBe(AuthorizationFlow.Oauth2Redirect)
+    // Authorization challenge, then PAR after the redirect_to_web response
+    expect(requestStates).toEqual([state, state])
+  })
+
+  test('forward state to the pushed authorization request in createAuthorizationRequestUrlFromOffer', async () => {
+    const state = 'some-random-state'
+    let requestState: string | undefined
+
+    server.resetHandlers(
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`,
+        () => HttpResponse.json(presentationDuringIssuance.credentialIssuerMetadata)
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-configuration`,
+        () => HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/oauth-authorization-server`,
+        () => HttpResponse.json(presentationDuringIssuance.authorizationServerMetadata)
+      ),
+      http.post(
+        presentationDuringIssuance.authorizationServerMetadata.pushed_authorization_request_endpoint,
+        async ({ request }) => {
+          requestState = parseXwwwFormUrlEncoded(await request.text()).state
+          return HttpResponse.json({
+            request_uri: 'urn:ietf:params:oauth:request_uri:request',
+            expires_in: 60,
+          })
+        }
+      )
+    )
+
+    const client = new Openid4vciClient({
+      callbacks: {
+        ...callbacks,
+        fetch,
+        signJws: getSignJwsCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
+      },
+    })
+    const credentialOffer = await client.resolveCredentialOffer(presentationDuringIssuance.credentialOffer)
+    const issuerMetadata = await client.resolveIssuerMetadata(credentialOffer.credential_issuer)
+
+    await client.createAuthorizationRequestUrlFromOffer({
+      clientId: 'some-random-client-id',
+      issuerMetadata,
+      redirectUri: 'https://example.com/redirect',
+      credentialOffer,
+      state,
+    })
+
+    expect(requestState).toEqual(state)
+  })
+
   test.each([
     ['missing jwks', { enc_values_supported: ['A128GCM'], encryption_required: false }],
     ['empty keys', { jwks: { keys: [] }, enc_values_supported: ['A128GCM'], encryption_required: false }],

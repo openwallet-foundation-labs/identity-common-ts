@@ -104,9 +104,6 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
       check: 'Issuer Auth must include a supported digestAlgorithm element',
     })
 
-    // Verify the issuer auth
-    const verificationResult = await this.issuerAuth.verify(options, ctx)
-
     const namespaces = this.issuerNamespaces?.issuerNamespaces ?? new Map<string, IssuerSignedItem[]>()
 
     await Promise.all(
@@ -194,7 +191,9 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
       })
     )
 
-    return verificationResult
+    // The issuer auth comes last, as it ends with the status check of the MSO, which must not run for an
+    // mdoc that fails a check that needs no network access (Token Status List § 8.3).
+    return this.issuerAuth.verify(options, ctx)
   }
 
   public static create(options: IssuerSignedOptions): IssuerSigned {

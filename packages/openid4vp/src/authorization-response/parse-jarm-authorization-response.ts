@@ -7,6 +7,7 @@ import type { Openid4vpAuthorizationRequestDcApi } from '../authorization-reques
 import { verifyJarmAuthorizationResponse } from '../jarm/jarm-authorization-response/verify-jarm-authorization-response'
 import { zJarmHeader } from '../jarm/jarm-authorization-response/z-jarm-authorization-response'
 import { isJarmResponseMode } from '../jarm/jarm-response-mode'
+import { throwAsInvalidAuthorizationResponse } from './invalid-authorization-response'
 import type { ParsedOpenid4vpAuthorizationResponse } from './parse-authorization-response'
 import { parseOpenid4vpAuthorizationResponsePayload } from './parse-authorization-response-payload'
 import { validateOpenid4vpAuthorizationResponsePayload } from './validate-authorization-response'
@@ -32,56 +33,67 @@ export interface ParseJarmAuthorizationResponseOptions {
   allowedSkewInSeconds?: number
 }
 
+/**
+ * Parses, verifies and validates a JARM authorization response.
+ *
+ * @throws Oauth2ServerErrorResponseError with error `invalid_request` when the response is not valid, with the error
+ *   of `@owf/jose`, `@owf/identity-common` or `@openid4vc/utils` as `cause` if there is one.
+ * @throws Openid4vpAuthorizationResponseError when the wallet returned an authorization error response.
+ */
 export async function parseJarmAuthorizationResponse(
   options: ParseJarmAuthorizationResponseOptions
 ): Promise<ParsedOpenid4vpAuthorizationResponse> {
-  const { jarmResponseJwt, callbacks, authorizationRequestPayload, expectedClientId } = options
+  try {
+    const { jarmResponseJwt, callbacks, authorizationRequestPayload, expectedClientId } = options
 
-  const jarmAuthorizationResponseJwt = parseWithErrorHandling(
-    z.union([zCompactJwt, zCompactJwe]),
-    jarmResponseJwt,
-    'Invalid jarm authorization response jwt.'
-  )
-
-  const verifiedJarmResponse = await verifyJarmAuthorizationResponse({
-    jarmAuthorizationResponseJwt,
-    callbacks,
-    expectedClientId,
-    authorizationRequestPayload,
-    now: options.now,
-    allowedSkewInSeconds: options.allowedSkewInSeconds,
-  })
-
-  const { header: jarmHeader } = decodeJwtHeader({
-    jwt: jarmAuthorizationResponseJwt,
-    headerSchema: zJarmHeader,
-  })
-
-  const authorizationResponsePayload = parseOpenid4vpAuthorizationResponsePayload(
-    verifiedJarmResponse.jarmAuthorizationResponse
-  )
-  const validateOpenid4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
-    authorizationRequestPayload: authorizationRequestPayload,
-    authorizationResponsePayload: authorizationResponsePayload,
-  })
-
-  if (!authorizationRequestPayload.response_mode || !isJarmResponseMode(authorizationRequestPayload.response_mode)) {
-    throw new Oauth2ServerErrorResponseError(
-      {
-        error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: `The 'response_mode' parameter is not a valid JARM response mode.`,
-      },
-      {
-        internalMessage: `The 'response_mode' parameter is not a valid JARM response mode. Current: ${authorizationRequestPayload.response_mode ?? 'fragment'}`,
-      }
+    const jarmAuthorizationResponseJwt = parseWithErrorHandling(
+      z.union([zCompactJwt, zCompactJwe]),
+      jarmResponseJwt,
+      'Invalid jarm authorization response jwt.'
     )
-  }
 
-  return {
-    ...validateOpenid4vpResponse,
-    jarm: { ...verifiedJarmResponse, jarmHeader },
+    const verifiedJarmResponse = await verifyJarmAuthorizationResponse({
+      jarmAuthorizationResponseJwt,
+      callbacks,
+      expectedClientId,
+      authorizationRequestPayload,
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
+    })
 
-    expectedNonce: authorizationRequestPayload.nonce,
-    authorizationResponsePayload,
+    const { header: jarmHeader } = decodeJwtHeader({
+      jwt: jarmAuthorizationResponseJwt,
+      headerSchema: zJarmHeader,
+    })
+
+    const authorizationResponsePayload = parseOpenid4vpAuthorizationResponsePayload(
+      verifiedJarmResponse.jarmAuthorizationResponse
+    )
+    const validateOpenid4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
+      authorizationRequestPayload: authorizationRequestPayload,
+      authorizationResponsePayload: authorizationResponsePayload,
+    })
+
+    if (!authorizationRequestPayload.response_mode || !isJarmResponseMode(authorizationRequestPayload.response_mode)) {
+      throw new Oauth2ServerErrorResponseError(
+        {
+          error: Oauth2ErrorCodes.InvalidRequest,
+          error_description: `The 'response_mode' parameter is not a valid JARM response mode.`,
+        },
+        {
+          internalMessage: `The 'response_mode' parameter is not a valid JARM response mode. Current: ${authorizationRequestPayload.response_mode ?? 'fragment'}`,
+        }
+      )
+    }
+
+    return {
+      ...validateOpenid4vpResponse,
+      jarm: { ...verifiedJarmResponse, jarmHeader },
+
+      expectedNonce: authorizationRequestPayload.nonce,
+      authorizationResponsePayload,
+    }
+  } catch (error) {
+    throwAsInvalidAuthorizationResponse(error, 'Invalid JARM authorization response.')
   }
 }

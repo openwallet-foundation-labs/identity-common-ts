@@ -17,7 +17,9 @@ import {
   IdentifierListCwt,
   MdocMediaTypes as IdentifierListMediaTypes,
   Issuer,
+  IssuerNamespaces,
   IssuerSigned,
+  IssuerSignedItem,
   ItemsRequest,
   type MdocContext,
   type MdocFetchContext,
@@ -386,10 +388,13 @@ suite('Verification', () => {
     ).resolves.toBeDefined()
   })
 
-  const issueMdocWithStatus = async (status: {
-    statusList?: { idx: number; uri: string }
-    identifierList?: { id: Uint8Array; uri: string }
-  }) => {
+  const issueMdocWithStatus = async (
+    status: {
+      statusList?: { idx: number; uri: string }
+      identifierList?: { id: Uint8Array; uri: string }
+    },
+    validityInfo = { signed, validFrom, validUntil }
+  ) => {
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
     issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', { first_name: 'First', last_name: 'Last' })
 
@@ -399,7 +404,7 @@ suite('Verification', () => {
       algorithm: SignatureAlgorithm.ES256,
       digestAlgorithm: 'SHA-256',
       deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
-      validityInfo: { signed, validFrom, validUntil },
+      validityInfo,
       status,
     })
 
@@ -825,6 +830,83 @@ suite('Verification', () => {
     expect(verificationCallback).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'FAILED', check: 'Issuer auth signature is invalid' })
     )
+  })
+
+  // Token Status List § 8.3: the Referenced Token is validated before its status is evaluated, and an
+  // invalid one is rejected without it, also by a verification callback that does not throw.
+  test.each([
+    ['expired', { signed, validFrom, validUntil: new Date('2024-10-24T14:55:18Z') }],
+    ['not yet valid', { signed, validFrom: new Date(Date.now() + 86_400_000), validUntil }],
+  ])('Verify mdoc with a status list that is %s does not fetch the list', async (_, validityInfo) => {
+    const credential = await issueMdocWithStatus(
+      { statusList: { idx: 3, uri: 'https://example.org/status-list/outside-validity-period' } },
+      validityInfo
+    )
+    const { ctx, requestedUris } = recordingContext()
+    const checks: VerificationAssessment[] = []
+
+    await expect(
+      Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates: validTrustedCertificates }, ctx)
+    ).rejects.toThrow('The MSO must be valid at the time of verification')
+    await Holder.verifyIssuerSigned(
+      {
+        issuerSigned: credential,
+        trustedCertificates: validTrustedCertificates,
+        verificationCallback: (check) => checks.push(check),
+      },
+      ctx
+    )
+
+    expect(requestedUris).toEqual([])
+    expect(checks.filter((check) => check.status !== 'PASSED')).toEqual([
+      expect.objectContaining({ status: 'FAILED', check: 'The MSO must be valid at the time of verification' }),
+    ])
+  })
+
+  test('Verify mdoc with a status list within its validity period fetches the list', async () => {
+    const uri = 'https://example.org/status-list/within-validity-period'
+    const credential = await issueMdocWithStatus({ statusList: { idx: 3, uri } })
+    const { ctx, requestedUris } = recordingContext()
+
+    await expect(
+      Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates: validTrustedCertificates }, ctx)
+    ).rejects.toThrow(`Verifying the status list ${uri} failed`)
+    expect(requestedUris).toEqual([uri])
+  })
+
+  test('Verify mdoc with a status list and an element that does not match its digest does not fetch the list', async () => {
+    const credential = await issueMdocWithStatus({
+      statusList: { idx: 3, uri: 'https://example.org/status-list/tampered-element' },
+    })
+    const namespace = 'org.iso.18013.5.1.mDL'
+    const [item, ...items] = credential.issuerNamespaces?.issuerNamespaces.get(namespace) ?? []
+    const tampered = IssuerSigned.create({
+      issuerAuth: credential.issuerAuth,
+      issuerNamespaces: IssuerNamespaces.create({
+        issuerNamespaces: new Map([
+          [
+            namespace,
+            [
+              IssuerSignedItem.fromOptions({
+                digestId: item.digestId,
+                random: item.random,
+                elementIdentifier: item.elementIdentifier,
+                elementValue: 'Tampered',
+              }),
+              ...items,
+            ],
+          ],
+        ]),
+      }),
+    })
+    const { ctx, requestedUris } = recordingContext()
+
+    await expect(
+      Holder.verifyIssuerSigned({ issuerSigned: tampered, trustedCertificates: validTrustedCertificates }, ctx)
+    ).rejects.toThrow(
+      `The calculated digest for ${namespace}/${item.elementIdentifier} attribute must match the digest in the issuerAuth element`
+    )
+    expect(requestedUris).toEqual([])
   })
 
   // Disabling certificate chain validation also applies to the signer of a revocation list, but the
