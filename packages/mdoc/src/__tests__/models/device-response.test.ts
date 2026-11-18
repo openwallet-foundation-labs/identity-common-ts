@@ -92,11 +92,15 @@ describe('device response createWithDeviceRequest', () => {
         deviceRequest: deviceRequestFor(mdlDocType, photoIdDocType),
         sessionTranscript,
         documents: [
-          { issuerSigned: mdl, docRequestIndex: 0, signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) } },
+          {
+            issuerSigned: mdl,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
+          },
           {
             issuerSigned: photoId,
             docRequestIndex: 1,
-            signature: { signingKey: CoseKey.fromJwk(SECOND_DEVICE_JWK_PRIVATE) },
+            signature: { signingKey: CoseKey.fromJwk(SECOND_DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
           },
         ],
       },
@@ -121,7 +125,11 @@ describe('device response createWithDeviceRequest', () => {
           mdocContext
         ),
         documents: [
-          { issuerSigned: mdl, docRequestIndex: 0, signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) } },
+          {
+            issuerSigned: mdl,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
+          },
         ],
       },
       mdocContext
@@ -141,7 +149,11 @@ describe('device response createWithDeviceRequest', () => {
           mdocContext
         ),
         documents: [
-          { issuerSigned: mdl, docRequestIndex: 1, signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) } },
+          {
+            issuerSigned: mdl,
+            docRequestIndex: 1,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
+          },
         ],
       },
       mdocContext
@@ -162,7 +174,11 @@ describe('device response createWithDeviceRequest', () => {
             mdocContext
           ),
           documents: [
-            { issuerSigned: mdl, docRequestIndex: 3, signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) } },
+            {
+              issuerSigned: mdl,
+              docRequestIndex: 3,
+              signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
+            },
           ],
         },
         mdocContext
