@@ -4,7 +4,7 @@ import path from 'node:path'
 import { hasher as digest, generateSalt } from '@owf/crypto'
 import type { DisclosureFrame, PresentationFrame, Signer, Verifier } from '@sd-jwt/core'
 import { describe, expect, test } from 'vitest'
-import { SDJwtVcInstance } from '../../index'
+import { SdJwtVcInstance } from '../../index'
 
 const createSignerVerifier = () => {
   const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
@@ -25,7 +25,7 @@ const iat = Math.floor(Date.now() / 1000) // current time in seconds
 describe('App', () => {
   test('Example', async () => {
     const { signer, verifier } = createSignerVerifier()
-    const sdjwt = new SDJwtVcInstance({
+    const sdjwt = new SdJwtVcInstance({
       signer,
       signAlg: 'EdDSA',
       verifier,
@@ -115,10 +115,10 @@ describe('App', () => {
       firstname: true,
       id: true,
     }
-    const presentedSDJwt = await sdjwt.present<typeof claims>(encodedSdjwt, presentationFrame)
-    expect(presentedSDJwt).toBeDefined()
+    const presentedSdJwt = await sdjwt.present<typeof claims>(encodedSdjwt, presentationFrame)
+    expect(presentedSdJwt).toBeDefined()
 
-    const presentationClaims = await sdjwt.getClaims(presentedSDJwt)
+    const presentationClaims = await sdjwt.getClaims(presentedSdJwt)
     expect(presentationClaims).toBeDefined()
     expect(presentationClaims).toEqual({
       lastname: 'Doe',
@@ -206,7 +206,7 @@ describe('App', () => {
 async function JSONtest(filename: string) {
   const test = loadTestJsonFile(filename)
   const { signer, verifier } = createSignerVerifier()
-  const sdjwt = new SDJwtVcInstance({
+  const sdjwt = new SdJwtVcInstance({
     signer,
     signAlg: 'EdDSA',
     verifier,
@@ -228,11 +228,11 @@ async function JSONtest(filename: string) {
     payload,
   })
 
-  const presentedSDJwt = await sdjwt.present(encodedSdjwt, test.presentationFrames)
+  const presentedSdJwt = await sdjwt.present(encodedSdjwt, test.presentationFrames)
 
-  expect(presentedSDJwt).toBeDefined()
+  expect(presentedSdJwt).toBeDefined()
 
-  const presentationClaims = await sdjwt.getClaims(presentedSDJwt)
+  const presentationClaims = await sdjwt.getClaims(presentedSdJwt)
 
   expect(presentationClaims).toEqual({
     ...test.presentedClaims,

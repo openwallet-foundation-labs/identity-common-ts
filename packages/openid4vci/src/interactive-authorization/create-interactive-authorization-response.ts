@@ -1,5 +1,6 @@
 import { type Oauth2ErrorCodes, type Oauth2ErrorResponse, zOauth2ErrorResponse } from '@openid4vc/oauth2'
-import { parseWithErrorHandling, type StringWithAutoCompletion } from '@openid4vc/utils'
+import type { StringWithAutoCompletion } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import {
   type InteractiveAuthorizationCodeResponse,
   type InteractiveAuthorizationInteractionRequiredResponse,
@@ -71,20 +72,7 @@ export interface CreateInteractiveAuthorizationOpenid4vpInteractionOptions {
  * @param options - Response options
  * @returns The interaction required response
  *
- * @example With unsigned request
- * ```ts
- * const response = createInteractiveAuthorizationOpenid4vpInteraction({
- *   authSession: 'session-123',
- *   openid4vpRequest: {
- *     response_type: 'vp_token',
- *     response_mode: 'iae_post',
- *     nonce: 'n-0S6_WzA2Mj',
- *     dcql_query: { ... }
- *   }
- * })
- * ```
- *
- * @example With signed request
+ * @example
  * ```ts
  * const response = createInteractiveAuthorizationOpenid4vpInteraction({
  *   authSession: 'session-123',

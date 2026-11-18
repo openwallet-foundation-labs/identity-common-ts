@@ -1,6 +1,5 @@
 import {
   type CallbackContext,
-  decodeJwt,
   hasRequestUri,
   isJarAuthorizationRequest,
   Oauth2ErrorCodes,
@@ -11,7 +10,8 @@ import {
   type RequestLike,
   zJarAuthorizationRequest,
 } from '@openid4vc/oauth2'
-import { formatZodError, parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling, parseWithSchema, validationErrorMessage } from '@owf/identity-common'
+import { decodeJwt } from '@owf/jose'
 import z from 'zod'
 import type {
   InteractiveAuthorizationFollowUpRequest,
@@ -42,7 +42,7 @@ export interface ParseInteractiveAuthorizationRequestOptions {
   /**
    * Callbacks. JAR request objects passed by reference (`request_uri`) are not supported.
    */
-  callbacks: Pick<CallbackContext, 'fetch'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits'>
 }
 
 export interface ParseInteractiveAuthorizationInitialRequestResult extends ParseAuthorizationRequestResult {
@@ -159,11 +159,14 @@ export async function parseInteractiveAuthorizationRequest(
     })
     const jwt = decodeJwt({ jwt: parsedJar.authorizationRequestJwt })
 
-    const parsedInteractiveAuthorizationRequest = zInteractiveAuthorizationInitialRequest.safeParse(jwt.payload)
+    const parsedInteractiveAuthorizationRequest = parseWithSchema(zInteractiveAuthorizationInitialRequest, jwt.payload)
     if (!parsedInteractiveAuthorizationRequest.success) {
       throw new Oauth2ServerErrorResponseError({
         error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: `Invalid interactive authorization request. Could not parse JAR request payload.\n${formatZodError(parsedInteractiveAuthorizationRequest.error)}`,
+        error_description: validationErrorMessage(
+          'Invalid interactive authorization request. Could not parse JAR request payload.',
+          parsedInteractiveAuthorizationRequest.issues
+        ),
       })
     }
 

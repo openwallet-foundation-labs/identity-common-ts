@@ -5,11 +5,11 @@ import { Handover } from './handover'
 import type { Oid4vpDcApiDraft24HandoverInfo } from './oid4vp-dc-api-draft24-handover-info'
 import type { Oid4vpDcApiHandoverInfo } from './oid4vp-dc-api-handover-info'
 
-const oid4vpDcApiHandoverEncodedSchema = z.tuple([z.literal('OpenID4VPDCAPIHandover'), zUint8Array])
-const oid4vpDcApiHandoverDecodedSchema = zUint8Array
+const zOid4vpDcApiHandoverEncoded = z.tuple([z.literal('OpenID4VPDCAPIHandover'), zUint8Array])
+const zOid4vpDcApiHandoverDecoded = zUint8Array
 
-export type Oid4vpDcApiHandoverEncodedStructure = z.infer<typeof oid4vpDcApiHandoverEncodedSchema>
-export type Oid4vpDcApiHandoverDecodedStructure = z.infer<typeof oid4vpDcApiHandoverDecodedSchema>
+export type Oid4vpDcApiHandoverEncodedStructure = z.infer<typeof zOid4vpDcApiHandoverEncoded>
+export type Oid4vpDcApiHandoverDecodedStructure = z.infer<typeof zOid4vpDcApiHandoverDecoded>
 
 export type Oid4vpDcApiHandoverOptions = {
   oid4vpDcApiHandoverInfo: Oid4vpDcApiHandoverInfo | Oid4vpDcApiDraft24HandoverInfo
@@ -20,7 +20,7 @@ export class Oid4vpDcApiHandover extends Handover<
   Oid4vpDcApiHandoverDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(oid4vpDcApiHandoverEncodedSchema, oid4vpDcApiHandoverDecodedSchema, {
+    return z.codec(zOid4vpDcApiHandoverEncoded, zOid4vpDcApiHandoverDecoded, {
       encode: (handoverInfoHash) =>
         ['OpenID4VPDCAPIHandover', handoverInfoHash] satisfies Oid4vpDcApiHandoverEncodedStructure,
       decode: ([, handoverInfoHash]) => handoverInfoHash,

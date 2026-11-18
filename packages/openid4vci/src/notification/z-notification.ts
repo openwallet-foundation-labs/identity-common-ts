@@ -1,3 +1,4 @@
+import { zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 
 const zNotificationEvent = z.enum(['credential_accepted', 'credential_failure', 'credential_deleted'])
@@ -5,7 +6,7 @@ export type NotificationEvent = z.infer<typeof zNotificationEvent>
 
 export const zNotificationRequest = z
   .object({
-    notification_id: z.string(),
+    notification_id: zNonEmptyString,
     event: zNotificationEvent,
     event_description: z.optional(z.string()),
   })

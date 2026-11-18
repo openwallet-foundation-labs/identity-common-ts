@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { OpenIdFederationError } from '../error/OpenIdFederationError'
+import { OpenidFederationError } from '../error/OpenidFederationError'
 
 type ValidateOptions<Schema extends z.ZodType> = {
   data: z.input<Schema> | unknown
@@ -15,7 +15,7 @@ export const validate = <Schema extends z.ZodType>({
   try {
     return schema.parse(data)
   } catch (e) {
-    const error = OpenIdFederationError.fromZodError(e as z.ZodError)
+    const error = OpenidFederationError.fromZodError(e as z.ZodError)
     error.message = errorMessage ?? error.message
     throw error
   }

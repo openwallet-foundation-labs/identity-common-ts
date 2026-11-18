@@ -4,17 +4,17 @@ import {
   oauthAuthorizationServerEntityMetadata,
   oauthClientEntityMetadata,
   oauthResourceEntityMetadata,
-  openIdProviderEntityMetadata,
+  openidProviderEntityMetadata,
   openidRelyingPartyEntityMetadata,
 } from './entity'
 
-export const metadataPolicySchema = z.object({
+export const zMetadataPolicy = z.object({
   [federationEntityMetadata.identifier]: federationEntityMetadata.policySchema.optional(),
   [openidRelyingPartyEntityMetadata.identifier]: openidRelyingPartyEntityMetadata.policySchema.optional(),
-  [openIdProviderEntityMetadata.identifier]: openIdProviderEntityMetadata.policySchema.optional(),
+  [openidProviderEntityMetadata.identifier]: openidProviderEntityMetadata.policySchema.optional(),
   [oauthAuthorizationServerEntityMetadata.identifier]: oauthAuthorizationServerEntityMetadata.policySchema.optional(),
   [oauthClientEntityMetadata.identifier]: oauthClientEntityMetadata.policySchema.optional(),
   [oauthResourceEntityMetadata.identifier]: oauthResourceEntityMetadata.policySchema.optional(),
 })
 
-export type MetadataPolicy = z.infer<typeof metadataPolicySchema>
+export type MetadataPolicy = z.infer<typeof zMetadataPolicy>

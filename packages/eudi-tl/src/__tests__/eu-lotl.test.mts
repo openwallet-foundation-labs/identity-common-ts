@@ -10,8 +10,8 @@ import {
   EU_LOTL_SIGNING_CERTIFICATES,
   getEuLotlTrustAnchors,
   loadEuLotl,
-  TrustedListParseException,
-  TrustedListSignatureException,
+  TrustedListSignatureError,
+  TrustedListValidationError,
   verifyEuLotlSignature,
 } from '../index'
 import { SIGNED_TSL_XML, SIGNER_CERT_BASE64 } from './fixtures.mjs'
@@ -65,7 +65,7 @@ describe('verifyEuLotlSignature', () => {
   it('fails closed for a list not signed by a pinned LOTL signer', async () => {
     // The fixture is a valid signed list, but its signer is not one of the
     // Commission's LOTL signing certificates.
-    await expect(verifyEuLotlSignature(SIGNED_TSL_XML)).rejects.toThrow(TrustedListSignatureException)
+    await expect(verifyEuLotlSignature(SIGNED_TSL_XML)).rejects.toThrow(TrustedListSignatureError)
   })
 
   it('honours caller-supplied anchors instead of the shipped default', async () => {
@@ -81,7 +81,7 @@ describe('loadEuLotl', () => {
     // Pinning the fixture's own signer isolates the profile check from the
     // signature check: the signature is fine, the TSLType is EUgeneric.
     await expect(loadEuLotl(SIGNED_TSL_XML, { trustAnchors: [base64.decode(SIGNER_CERT_BASE64)] })).rejects.toThrow(
-      TrustedListParseException
+      TrustedListValidationError
     )
   })
 })

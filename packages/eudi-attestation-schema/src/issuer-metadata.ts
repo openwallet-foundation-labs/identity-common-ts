@@ -9,14 +9,14 @@
  */
 
 import { getClaimsFromSchema } from './dcql'
-import { SchemaMetaException } from './schema-meta-exception'
+import { SchemaMetaError } from './schema-meta-error'
 import type {
   AttestationFormat,
   BuildCredentialConfigurationTemplateOptions,
   CredentialConfigurationTemplate,
   ResolvedSchemaReference,
   SchemaMeta,
-  SchemaURI,
+  SchemaUri,
   ValidateIssuerMetadataOptions,
 } from './types'
 import type { ValidationError, ValidationResult } from './validator'
@@ -33,18 +33,18 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function getSchemaURI(schemaMeta: SchemaMeta, format: AttestationFormat): SchemaURI {
+function getSchemaUri(schemaMeta: SchemaMeta, format: AttestationFormat): SchemaUri {
   const entry = schemaMeta.schemaURIs.find((value) => value.formatIdentifier === format)
 
   if (!entry) {
-    throw new SchemaMetaException(`SchemaMeta has no schemaURI for format '${format}'`)
+    throw new SchemaMetaError(`SchemaMeta has no schemaUri for format '${format}'`)
   }
 
   return entry
 }
 
-function getCredentialTypeIdentifier(schemaURI: SchemaURI): string {
-  return schemaURI.formatIdentifier === 'dc+sd-jwt' ? schemaURI.meta.vct : schemaURI.meta.doctype_value
+function getCredentialTypeIdentifier(schemaUri: SchemaUri): string {
+  return schemaUri.formatIdentifier === 'dc+sd-jwt' ? schemaUri.meta.vct : schemaUri.meta.doctype_value
 }
 
 function findResolvedReference(
@@ -65,9 +65,9 @@ export function buildCredentialConfigurationTemplate(
   options: BuildCredentialConfigurationTemplateOptions
 ): CredentialConfigurationTemplate {
   const { schemaMeta, format, resolvedReferences, credentialConfigurationId } = options
-  const schemaURI = getSchemaURI(schemaMeta, format)
+  const schemaUri = getSchemaUri(schemaMeta, format)
   const credentialConfiguration: Record<string, unknown> = { format }
-  const metadata = schemaURI.meta.credential_metadata
+  const metadata = schemaUri.meta.credential_metadata
   if (metadata?.display) {
     credentialConfiguration.display = metadata.display.map((entry) => ({
       ...entry,
@@ -77,10 +77,10 @@ export function buildCredentialConfigurationTemplate(
     credentialConfiguration.claims = metadata.claims
   }
 
-  if (schemaURI.formatIdentifier === 'dc+sd-jwt') {
-    credentialConfiguration.vct = schemaURI.meta.vct
+  if (schemaUri.formatIdentifier === 'dc+sd-jwt') {
+    credentialConfiguration.vct = schemaUri.meta.vct
   } else {
-    credentialConfiguration.doctype = schemaURI.meta.doctype_value
+    credentialConfiguration.doctype = schemaUri.meta.doctype_value
   }
 
   const claims = getClaimsFromSchema(findResolvedReference(format, resolvedReferences))
@@ -113,7 +113,7 @@ export function buildCredentialConfigurationTemplate(
   }
 
   return {
-    credentialConfigurationId: credentialConfigurationId ?? getCredentialTypeIdentifier(schemaURI),
+    credentialConfigurationId: credentialConfigurationId ?? getCredentialTypeIdentifier(schemaUri),
     credentialConfiguration,
     deploymentFields: {
       credentialConfiguration: [...CONFIGURATION_DEPLOYMENT_FIELDS],
@@ -319,8 +319,8 @@ export function validateIssuerMetadataAgainstProfile(options: ValidateIssuerMeta
     }
   }
 
-  const schemaURI = getSchemaURI(schemaMeta, format)
-  const expectedTypeIdentifier = getCredentialTypeIdentifier(schemaURI)
+  const schemaUri = getSchemaUri(schemaMeta, format)
+  const expectedTypeIdentifier = getCredentialTypeIdentifier(schemaUri)
   const typeMember = format === 'dc+sd-jwt' ? 'vct' : 'doctype'
 
   const matches = findMatchingConfigurations(configurations, {

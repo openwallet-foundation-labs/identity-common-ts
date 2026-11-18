@@ -1,9 +1,9 @@
 import { CborStructure, TypedMap, typedMap, zUint8Array } from '@owf/cose'
 import { z } from 'zod'
-import { StatusList } from '../status-list'
+import { type DecompressStatusListOptions, StatusList } from '../status-list'
 import type { BitsPerStatus, StatusType } from '../types'
 
-export const statusListCborSchema = typedMap([
+export const zStatusListCbor = typedMap([
   ['bits', z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(8)])],
   ['lst', zUint8Array],
   // NOTE: `exactOptional`, so that the key is omitted when there is no aggregation uri, rather than
@@ -11,8 +11,8 @@ export const statusListCborSchema = typedMap([
   ['aggregation_uri', z.string().exactOptional()],
 ])
 
-export type StatusListCborEncodedStructure = z.input<typeof statusListCborSchema>
-export type StatusListCborDecodedStructure = z.output<typeof statusListCborSchema>
+export type StatusListCborEncodedStructure = z.input<typeof zStatusListCbor>
+export type StatusListCborDecodedStructure = z.output<typeof zStatusListCbor>
 
 export type CreateStatusListCborOptions = {
   bits: BitsPerStatus
@@ -34,7 +34,7 @@ export class StatusListCbor extends CborStructure<StatusListCborEncodedStructure
   #statusList?: StatusList
 
   public static override get encodingSchema() {
-    return statusListCborSchema
+    return zStatusListCbor
   }
 
   public get bits(): BitsPerStatus {
@@ -51,12 +51,28 @@ export class StatusListCbor extends CborStructure<StatusListCborEncodedStructure
     return this.structure.get('lst')
   }
 
+  /**
+   * The status list, inflated on first read with the default `maxDecompressedBytes` of 16 MiB. A getter takes no
+   * options, so {@link getStatusList} reads it with another limit.
+   */
   public get statusList(): StatusList {
+    return this.getStatusList()
+  }
+
+  /**
+   * The status list, inflated from `lst` on the first call. `maxDecompressedBytes` limits that inflation, so pass it
+   * on the first call; later calls return the same list.
+   *
+   * @throws StatusListValidationError with an `invalid_status_list` issue if `lst` is not a compressed status list,
+   *   or inflates to more than `maxDecompressedBytes`, 16 MiB by default.
+   */
+  public getStatusList(options?: DecompressStatusListOptions): StatusList {
     if (!this.#statusList) {
       this.#statusList = StatusList.decompressStatusListFromBytes(
         this.structure.get('lst'),
         this.structure.get('bits'),
-        this.structure.get('aggregation_uri')
+        this.structure.get('aggregation_uri'),
+        options
       )
     }
 

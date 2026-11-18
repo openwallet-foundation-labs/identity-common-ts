@@ -2,26 +2,23 @@ import { base64url, base64urlDecodeJson } from '@owf/identity-common'
 import { z } from 'zod'
 import { validate } from '../utils/validate'
 
-const defaultSchema = z.record(z.string(), z.unknown())
+const zDefault = z.record(z.string(), z.unknown())
 
 /**
  *
  * @todo better jwt validation
  *
  */
-export const jsonWebTokenSchema = <
-  CS extends z.ZodType = typeof defaultSchema,
-  HS extends z.ZodType = typeof defaultSchema,
->(
+export const zJsonWebToken = <CS extends z.ZodType = typeof zDefault, HS extends z.ZodType = typeof zDefault>(
   {
-    claimsSchema = defaultSchema as unknown as CS,
-    headerSchema = defaultSchema as unknown as HS,
+    claimsSchema = zDefault as unknown as CS,
+    headerSchema = zDefault as unknown as HS,
   }: {
     claimsSchema?: CS
     headerSchema?: HS
   } = {
-    claimsSchema: defaultSchema as unknown as CS,
-    headerSchema: defaultSchema as unknown as HS,
+    claimsSchema: zDefault as unknown as CS,
+    headerSchema: zDefault as unknown as HS,
   }
 ) =>
   z.string().transform((s, ctx) => {

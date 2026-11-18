@@ -1,6 +1,6 @@
 import { decodeJwt } from '@owf/identity-common'
-import { SchemaMetaException } from './schema-meta-exception'
-import { SchemaMetaSchema } from './schemas'
+import { SchemaMetaError } from './schema-meta-error'
+import { zSchemaMeta } from './schemas'
 import type { VerifiedSchemaMeta, VerifyOptions } from './types'
 
 /**
@@ -31,13 +31,18 @@ export async function verifySchemaMeta(options: VerifyOptions): Promise<Verified
 
   const isValid = await verifier(signingInput, signature)
   if (!isValid) {
-    throw new SchemaMetaException('Invalid signature')
+    throw new SchemaMetaError('Invalid signature')
   }
 
-  const parsed = SchemaMetaSchema.safeParse(payload)
+  // The typ signSchemaMeta sets, so that another JWT signed with the same key is not taken for a SchemaMeta
+  if (header.typ !== 'attestation-schema+jwt') {
+    throw new SchemaMetaError(`Invalid typ header '${String(header.typ)}': it must be 'attestation-schema+jwt'`)
+  }
+
+  const parsed = zSchemaMeta.safeParse(payload)
   if (!parsed.success) {
     const messages = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n')
-    throw new SchemaMetaException(`Invalid SchemaMeta payload:\n${messages}`)
+    throw new SchemaMetaError(`Invalid SchemaMeta payload:\n${messages}`)
   }
 
   return {

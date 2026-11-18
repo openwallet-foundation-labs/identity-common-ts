@@ -3,13 +3,13 @@ import { z } from 'zod'
 import { DeviceAuth, type DeviceAuthEncodedStructure } from './device-auth'
 import { DeviceNamespaces } from './device-namespaces'
 
-const deviceSignedSchema = typedMap([
+const zDeviceSigned = typedMap([
   ['nameSpaces', z.instanceof(DeviceNamespaces)],
   ['deviceAuth', z.instanceof(DeviceAuth)],
 ] as const)
 
-export type DeviceSignedDecodedStructure = z.output<typeof deviceSignedSchema>
-export type DeviceSignedEncodedStructure = z.input<typeof deviceSignedSchema>
+export type DeviceSignedDecodedStructure = z.output<typeof zDeviceSigned>
+export type DeviceSignedEncodedStructure = z.input<typeof zDeviceSigned>
 
 export type DeviceSignedOptions = {
   deviceNamespaces: DeviceNamespaces
@@ -18,7 +18,7 @@ export type DeviceSignedOptions = {
 
 export class DeviceSigned extends CborStructure<DeviceSignedEncodedStructure, DeviceSignedDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(deviceSignedSchema.in, deviceSignedSchema.out, {
+    return z.codec(zDeviceSigned.in, zDeviceSigned.out, {
       decode: (input) => {
         const map: DeviceSignedDecodedStructure = TypedMap.fromMap(input)
 

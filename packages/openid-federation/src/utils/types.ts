@@ -1,3 +1,4 @@
+import type { FetchCallback as IdentityCommonFetchCallback } from '@owf/identity-common'
 import type { JsonWebKey } from '../jsonWeb'
 
 export type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>
@@ -13,4 +14,11 @@ export type VerifyCallback = (options: {
   jwk: JsonWebKey
 }) => Promise<boolean>
 
-export type FetchCallback = typeof fetch
+/** What this library fetches. */
+export type FederationFetchType = 'entityConfiguration' | 'entityStatement'
+
+/**
+ * Fetches an entity configuration or an entity statement. It gets `{ type: 'entityConfiguration' }` or
+ * `{ type: 'entityStatement' }` as its third argument, and the global `fetch` satisfies it.
+ */
+export type FetchCallback = IdentityCommonFetchCallback<FederationFetchType>

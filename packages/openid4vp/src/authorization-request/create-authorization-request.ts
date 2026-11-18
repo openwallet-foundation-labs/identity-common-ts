@@ -2,8 +2,12 @@ import {
   type CallbackContext,
   type CreateJarAuthorizationRequestOptions,
   createJarAuthorizationRequest,
+  Oauth2ErrorCodes,
+  Oauth2ServerErrorResponseError,
 } from '@openid4vc/oauth2'
-import { objectToQueryParams, parseWithErrorHandling, URL, URLSearchParams } from '@openid4vc/utils'
+import { objectToQueryParams, URL, URLSearchParams } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
+import { getOpenid4vpClientId } from '../client-identifier-prefix/parse-client-identifier-prefix'
 import {
   validateOpenid4vpAuthorizationRequestPayload,
   type WalletVerificationOptions,
@@ -34,10 +38,11 @@ export interface CreateOpenid4vpAuthorizationRequestOptions {
   >
 
   wallet?: WalletVerificationOptions
-  callbacks: Pick<CallbackContext, 'signJwt' | 'encryptJwe'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'encryptJwe'>
 
   /**
-   * Date that should be used as now. If not provided current date will be used.
+   * Date that should be used as now, for the `iat` and `exp` of the request object. If not provided current
+   * date will be used.
    */
   now?: Date
 }
@@ -60,7 +65,7 @@ export interface CreateOpenid4vpAuthorizationRequestOptions {
  * @returns Object containing the authorization request parameters, URI and optional JAR details
  */
 export async function createOpenid4vpAuthorizationRequest(options: CreateOpenid4vpAuthorizationRequestOptions) {
-  const { jar, scheme = 'openid4vp://', wallet, callbacks } = options
+  const { jar, scheme = 'openid4vp://', wallet, callbacks, now } = options
 
   let additionalJwtPayload: Record<string, unknown> | undefined
 
@@ -104,6 +109,25 @@ export async function createOpenid4vpAuthorizationRequest(options: CreateOpenid4
     })
   }
 
+  const isJsonRequest =
+    isOpenid4vpAuthorizationRequestDcApi(authorizationRequestPayload) ||
+    isOpenid4vpAuthorizationRequestIae(authorizationRequestPayload)
+
+  if (!jar && !isOpenid4vpAuthorizationRequestDcApi(authorizationRequestPayload)) {
+    const { clientIdPrefix } = getOpenid4vpClientId({
+      clientId: authorizationRequestPayload.client_id,
+      legacyClientIdScheme: authorizationRequestPayload.client_id_scheme,
+      responseMode: authorizationRequestPayload.response_mode,
+    })
+
+    if (clientIdPrefix !== 'pre-registered' && clientIdPrefix !== 'redirect_uri') {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: `Using client identifier prefix '${clientIdPrefix}' requires a signed JAR request.`,
+      })
+    }
+  }
+
   if (jar) {
     additionalJwtPayload = !jar.additionalJwtPayload?.aud
       ? { ...jar.additionalJwtPayload, aud: 'https://self-issued.me/v2' }
@@ -114,6 +138,7 @@ export async function createOpenid4vpAuthorizationRequest(options: CreateOpenid4
       authorizationRequestPayload,
       additionalJwtPayload,
       callbacks,
+      now,
     })
 
     const url = new URL(scheme)
@@ -129,7 +154,7 @@ export async function createOpenid4vpAuthorizationRequest(options: CreateOpenid4
     return {
       authorizationRequestPayload,
       authorizationRequestObject: jarResult.jarAuthorizationRequest,
-      authorizationRequest: url.toString(),
+      authorizationRequest: isJsonRequest ? jarResult.jarAuthorizationRequest : url.toString(),
       jar: { ...jar, ...jarResult },
     }
   }
@@ -143,7 +168,7 @@ export async function createOpenid4vpAuthorizationRequest(options: CreateOpenid4
   return {
     authorizationRequestPayload,
     authorizationRequestObject: authorizationRequestPayload,
-    authorizationRequest: url.toString(),
+    authorizationRequest: isJsonRequest ? authorizationRequestPayload : url.toString(),
     jar: undefined,
   }
 }

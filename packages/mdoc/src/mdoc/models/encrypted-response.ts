@@ -3,11 +3,11 @@ import { base64url } from '@owf/identity-common'
 import { z } from 'zod'
 import { EncryptedResponseData, type EncryptedResponseDataEncodedStructure } from './encrypted-response-data'
 
-const encryptedResponseEncodedSchema = z.tuple([z.literal('dcapi'), z.map(z.unknown(), z.unknown())])
-const encryptedResponseDecodedSchema = z.instanceof(EncryptedResponseData)
+const zEncryptedResponseEncoded = z.tuple([z.literal('dcapi'), z.map(z.unknown(), z.unknown())])
+const zEncryptedResponseDecoded = z.instanceof(EncryptedResponseData)
 
-export type EncryptedResponseEncodedStructure = z.infer<typeof encryptedResponseEncodedSchema>
-export type EncryptedResponseDecodedStructure = z.infer<typeof encryptedResponseDecodedSchema>
+export type EncryptedResponseEncodedStructure = z.infer<typeof zEncryptedResponseEncoded>
+export type EncryptedResponseDecodedStructure = z.infer<typeof zEncryptedResponseDecoded>
 
 export type EncryptedResponseOptions = {
   encryptedResponseData: EncryptedResponseData
@@ -23,7 +23,7 @@ export class EncryptedResponse extends CborStructure<
   EncryptedResponseDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(encryptedResponseEncodedSchema, encryptedResponseDecodedSchema, {
+    return z.codec(zEncryptedResponseEncoded, zEncryptedResponseDecoded, {
       decode: ([, encryptedResponseData]) =>
         EncryptedResponseData.fromEncodedStructure(encryptedResponseData as EncryptedResponseDataEncodedStructure),
       encode: (encryptedResponseData) =>

@@ -24,13 +24,13 @@ import {
  * so issuers can publish revocation status for issued credentials, and
  * verifiers can check it during presentation.
  */
-const statusSchema = typedMap([
+const zStatus = typedMap([
   ['status_list', z.instanceof(StatusListInfo).exactOptional()],
   ['identifier_list', z.instanceof(IdentifierListInfo).exactOptional()],
 ])
 
-export type StatusDecodedStructure = z.output<typeof statusSchema>
-export type StatusEncodedStructure = z.input<typeof statusSchema>
+export type StatusDecodedStructure = z.output<typeof zStatus>
+export type StatusEncodedStructure = z.input<typeof zStatus>
 
 export type StatusOptions = {
   statusList?: StatusListInfo | StatusListInfoOptions
@@ -39,7 +39,7 @@ export type StatusOptions = {
 
 export class Status extends CborStructure<StatusEncodedStructure, StatusDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(statusSchema.in, statusSchema.out, {
+    return z.codec(zStatus.in, zStatus.out, {
       decode: (input) => {
         const map: StatusDecodedStructure = TypedMap.fromMap(input)
 

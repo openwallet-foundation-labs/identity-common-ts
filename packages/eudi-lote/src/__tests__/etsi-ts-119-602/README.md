@@ -1,7 +1,7 @@
 # ETSI TS 119 602 v1.1.1 JSON schema
 
 The JSON schema of Lists of Trusted Entities as ETSI publishes it, vendored unchanged
-for `schema-drift.test.mts`, which checks that `validateLoTE` accepts what this schema
+for `schema-drift.test.mts`, which checks that `validateLote` accepts what this schema
 accepts.
 
 - Source: <https://forge.etsi.org/rep/esi/x19_60201_lists_of_trusted_entities>, tag `v1.1.1`

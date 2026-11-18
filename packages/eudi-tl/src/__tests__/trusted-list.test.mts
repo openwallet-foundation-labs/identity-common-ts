@@ -1,14 +1,16 @@
-import { base64 } from '@owf/identity-common'
+import { base64, ValidationError } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
 import {
   ACTIVE_SERVICE_STATUSES,
+  assertValidTrustedList,
   getPointerSigningCertificates,
   getTrustAnchors,
   parseTrustedList,
   ServiceStatus,
   ServiceType,
-  TrustedListParseException,
-  TSLType,
+  TrustedListParseError,
+  TrustedListValidationError,
+  TslType,
   validateTrustedList,
 } from '../index'
 import {
@@ -30,8 +32,10 @@ describe('parseTrustedList', () => {
     const tl = parseTrustedList(UNSIGNED_TSL_XML)
     expect(validateTrustedList(tl).valid).toBe(true)
 
-    expect(tl.tslType).toBe(TSLType.EUgeneric)
+    expect(tl.tslType).toBe(TslType.EUgeneric)
     expect(tl.schemeOperatorName).toBe('Test Scheme Operator') // 'en' entry preferred
+    // the list's own territory, not the one of a pointer
+    expect(tl.schemeTerritory).toBe('ES')
     expect(tl.sequenceNumber).toBe(42)
     expect(tl.listIssueDateTime).toBe('2025-01-15T00:00:00Z')
     expect(tl.nextUpdate).toBe('2025-07-15T00:00:00Z')
@@ -71,7 +75,7 @@ describe('parseTrustedList', () => {
     expect(tl.pointersToOtherLists).toHaveLength(2)
     expect(tl.pointersToOtherLists?.[0]).toEqual({
       location: 'https://ec.europa.eu/tools/lotl/eu-lotl.xml',
-      tslType: TSLType.EUlistofthelists,
+      tslType: TslType.EUlistofthelists,
       schemeTerritory: 'EU',
       digitalIdentities: [
         {
@@ -100,7 +104,19 @@ describe('parseTrustedList', () => {
   })
 
   it('rejects XML whose root is not a TrustServiceStatusList', () => {
-    expect(() => parseTrustedList('<root/>')).toThrow(TrustedListParseException)
+    expect(() => parseTrustedList('<root/>')).toThrow(TrustedListParseError)
+  })
+
+  it('throws the issues of a list that does not conform, as a validation error', () => {
+    let error: unknown
+    try {
+      assertValidTrustedList({})
+    } catch (thrown) {
+      error = thrown
+    }
+    expect(error).toBeInstanceOf(TrustedListValidationError)
+    expect(error).toBeInstanceOf(ValidationError)
+    expect((error as TrustedListValidationError).issues).toEqual(validateTrustedList({}).issues)
   })
 })
 
@@ -137,6 +153,85 @@ describe('getPointerSigningCertificates', () => {
     const tl = parseTrustedList(UNSIGNED_TSL_XML)
     expect(getPointerSigningCertificates(tl, { schemeTerritory: 'FR' })).toEqual([])
     expect(getPointerSigningCertificates(tl, { location: 'https://example.test/unknown.xml' })).toEqual([])
+  })
+})
+
+/**
+ * ETSI TS 119 612 clause 5.3.13: a pointer advertises the MIME type of the pointed-to list. The EU LOTL points to
+ * the XML list (`application/vnd.etsi.tsl+xml`) and, for some territories, to a PDF of it (`application/pdf`).
+ */
+describe('pointer MimeType', () => {
+  const XML_MIME_TYPE = 'application/vnd.etsi.tsl+xml'
+  const pointer = (territory: string, certificate: string, mimeType: string) => `
+      <tsl:OtherTSLPointer>
+        <tsl:ServiceDigitalIdentities>
+          <tsl:ServiceDigitalIdentity>
+            <tsl:DigitalId><tsl:X509Certificate>${certificate}</tsl:X509Certificate></tsl:DigitalId>
+          </tsl:ServiceDigitalIdentity>
+        </tsl:ServiceDigitalIdentities>
+        <tsl:TSLLocation>https://example.test/tsl-${territory.toLowerCase()}-${certificate.length}.xml</tsl:TSLLocation>
+        <tsl:AdditionalInformation>
+          <tsl:OtherInformation><tsl:TSLType>${TslType.EUgeneric}</tsl:TSLType></tsl:OtherInformation>
+          <tsl:OtherInformation><tsl:SchemeTerritory>${territory}</tsl:SchemeTerritory></tsl:OtherInformation>
+          ${mimeType}
+        </tsl:AdditionalInformation>
+      </tsl:OtherTSLPointer>`
+  // The prefix is free: the live EU LOTL binds the namespace to `ns3`
+  const LIST_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<tsl:TrustServiceStatusList xmlns:tsl="http://uri.etsi.org/02231/v2#" xmlns:tslx="http://uri.etsi.org/02231/v2/additionaltypes#">
+  <tsl:SchemeInformation>
+    <tsl:TSLType>${TslType.EUlistofthelists}</tsl:TSLType>
+    <tsl:SchemeTerritory>EU</tsl:SchemeTerritory>
+    <tsl:PointersToOtherTSL>
+      ${pointer('DE', NATIONAL_POINTER_CERT_BASE64, `<tsl:OtherInformation><tslx:MimeType>${XML_MIME_TYPE}</tslx:MimeType></tsl:OtherInformation>`)}
+      ${pointer('DE', LOTL_POINTER_CERT_BASE64, '<tsl:OtherInformation><ns3:MimeType xmlns:ns3="http://uri.etsi.org/02231/v2/additionaltypes#"> application/pdf </ns3:MimeType></tsl:OtherInformation>')}
+      ${pointer('FR', NATIONAL_POINTER_CERT_BASE64, '<tsl:OtherInformation><tslx:MimeType> </tslx:MimeType></tsl:OtherInformation>')}
+      ${pointer('IT', LOTL_POINTER_CERT_BASE64, '')}
+    </tsl:PointersToOtherTSL>
+  </tsl:SchemeInformation>
+  <tsl:TrustServiceProviderList/>
+</tsl:TrustServiceStatusList>`
+
+  it('reads the trimmed MimeType of each pointer, and none when it is empty or missing', () => {
+    const tl = parseTrustedList(LIST_XML)
+    expect(validateTrustedList(tl).valid).toBe(true)
+    expect(tl.pointersToOtherLists?.map((p) => [p.schemeTerritory, p.mimeType])).toEqual([
+      ['DE', XML_MIME_TYPE],
+      ['DE', 'application/pdf'],
+      ['FR', undefined],
+      ['IT', undefined],
+    ])
+  })
+
+  it('selects the pointers to XML lists, ignoring casing and parameters', () => {
+    const tl = parseTrustedList(LIST_XML)
+    const xml = [base64.decode(NATIONAL_POINTER_CERT_BASE64)]
+    expect(getPointerSigningCertificates(tl, { mimeType: XML_MIME_TYPE })).toEqual(xml)
+    expect(getPointerSigningCertificates(tl, { mimeType: 'Application/VND.ETSI.TSL+XML' })).toEqual(xml)
+    expect(getPointerSigningCertificates(tl, { mimeType: `${XML_MIME_TYPE}; charset=utf-8` })).toEqual(xml)
+    expect(getPointerSigningCertificates(tl, { schemeTerritory: 'DE', mimeType: XML_MIME_TYPE })).toEqual(xml)
+    expect(getPointerSigningCertificates(tl, { mimeType: 'application/pdf' })).toEqual([
+      base64.decode(LOTL_POINTER_CERT_BASE64),
+    ])
+  })
+
+  it('does not select a pointer without a MimeType when filtering by it', () => {
+    const tl = parseTrustedList(LIST_XML)
+    expect(getPointerSigningCertificates(tl, { schemeTerritory: 'FR', mimeType: XML_MIME_TYPE })).toEqual([])
+    expect(getPointerSigningCertificates(tl, { schemeTerritory: 'IT', mimeType: XML_MIME_TYPE })).toEqual([])
+    // Without the filter, they are selected as before
+    expect(getPointerSigningCertificates(tl, { schemeTerritory: 'IT' })).toEqual([
+      base64.decode(LOTL_POINTER_CERT_BASE64),
+    ])
+  })
+
+  it('rejects an empty MimeType in the schema', () => {
+    const result = validateTrustedList({
+      providers: [],
+      pointersToOtherLists: [{ location: 'https://example.test/tsl.xml', mimeType: '', digitalIdentities: [] }],
+    })
+    expect(result.valid).toBe(false)
+    expect(result.issues[0].path).toEqual(['pointersToOtherLists', 0, 'mimeType'])
   })
 })
 

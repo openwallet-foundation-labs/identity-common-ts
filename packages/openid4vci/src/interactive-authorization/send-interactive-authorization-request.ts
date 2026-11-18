@@ -8,15 +8,8 @@ import {
   type RequestDpopOptions,
   zOauth2ErrorResponse,
 } from '@openid4vc/oauth2'
-import {
-  ContentType,
-  createZodFetcher,
-  Headers,
-  InvalidFetchResponseError,
-  objectToQueryParams,
-  parseWithErrorHandling,
-  ValidationError,
-} from '@openid4vc/utils'
+import { createZodFetcher, Headers, InvalidFetchResponseError, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import { Openid4vciClientInteractiveAuthorizationError } from '../error/Openid4vciClientInteractiveAuthorizationError'
 import {
   type InteractiveAuthorizationFollowUpRequest,
@@ -30,7 +23,7 @@ export interface SendInteractiveAuthorizationRequestOptions {
   /**
    * Callback context
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'signJwt' | 'hash' | 'generateRandom'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'signJws' | 'hash' | 'generateRandom'>
 
   /**
    * Authorization server metadata containing the interactive_authorization_endpoint
@@ -101,7 +94,7 @@ export interface SendInteractiveAuthorizationRequestOptions {
  * ```
  */
 export async function sendInteractiveAuthorizationRequest(options: SendInteractiveAuthorizationRequestOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'interactiveAuthorizationRequest')
 
   const authorizationServerMetadata = options.authorizationServerMetadata
   const interactiveAuthorizationEndpoint = authorizationServerMetadata.interactive_authorization_endpoint
@@ -143,12 +136,12 @@ export async function sendInteractiveAuthorizationRequest(options: SendInteracti
       const headers = new Headers({
         ...dpopHeaders,
         ...options.additionalHeaders,
-        'Content-Type': ContentType.XWwwFormUrlencoded,
+        'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
       })
 
       const { response, result } = await fetchWithZod(
         zInteractiveAuthorizationResponse,
-        ContentType.Json,
+        CommonMediaTypes.Json,
         interactiveAuthorizationEndpoint,
         {
           method: 'POST',
@@ -180,7 +173,7 @@ export async function sendInteractiveAuthorizationRequest(options: SendInteracti
       }
 
       if (!result.success) {
-        throw new ValidationError('Error validating interactive authorization response', result.error)
+        throw new ValidationError('Error validating interactive authorization response', result.issues)
       }
 
       const dpopNonce = extractDpopNonceFromHeaders(response.headers) ?? undefined

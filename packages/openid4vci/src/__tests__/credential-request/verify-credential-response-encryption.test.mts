@@ -92,7 +92,7 @@ describe('credential request parsing', () => {
     expect(() =>
       parseCredentialRequestPayload({
         issuerMetadata,
-        credentialRequest: { credential_configuration_id: 'my_credential', proofs: { jwt: ['ey.ey.S'] } },
+        credentialRequest: { credential_configuration_id: 'my_credential', proofs: { jwt: ['ey.ey.Sg'] } },
       })
     ).toThrow("the request does not contain 'credential_response_encryption'")
   })

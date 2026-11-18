@@ -1,9 +1,9 @@
 import { CborStructure } from '@owf/cose'
 import { z } from 'zod'
 
-const documentErrorSchema = z.map(z.string(), z.number())
+const zDocumentError = z.map(z.string(), z.number())
 
-export type DocumentErrorStructure = z.infer<typeof documentErrorSchema>
+export type DocumentErrorStructure = z.infer<typeof zDocumentError>
 
 export type DocumentErrorOptions = {
   documentError: DocumentErrorStructure
@@ -11,7 +11,7 @@ export type DocumentErrorOptions = {
 
 export class DocumentError extends CborStructure<DocumentErrorStructure> {
   public static override get encodingSchema() {
-    return documentErrorSchema
+    return zDocumentError
   }
 
   /**

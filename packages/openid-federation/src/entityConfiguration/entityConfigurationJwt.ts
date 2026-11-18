@@ -1,8 +1,8 @@
-import { jsonWebTokenSchema } from '../jsonWeb'
-import { entityConfigurationClaimsSchema } from './entityConfigurationClaims'
-import { entityConfigurationHeaderSchema } from './entityConfigurationHeader'
+import { zJsonWebToken } from '../jsonWeb'
+import { zEntityConfigurationClaims } from './entityConfigurationClaims'
+import { zEntityConfigurationHeader } from './entityConfigurationHeader'
 
-export const entityConfigurationJwtSchema = jsonWebTokenSchema({
-  headerSchema: entityConfigurationHeaderSchema,
-  claimsSchema: entityConfigurationClaimsSchema,
+export const zEntityConfigurationJwt = zJsonWebToken({
+  headerSchema: zEntityConfigurationHeader,
+  claimsSchema: zEntityConfigurationClaims,
 })

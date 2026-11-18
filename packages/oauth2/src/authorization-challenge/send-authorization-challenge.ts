@@ -1,12 +1,5 @@
-import {
-  ContentType,
-  createZodFetcher,
-  Headers,
-  InvalidFetchResponseError,
-  objectToQueryParams,
-  parseWithErrorHandling,
-  ValidationError,
-} from '@openid4vc/utils'
+import { createZodFetcher, Headers, InvalidFetchResponseError, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
 import { authorizationServerRequestWithDpopRetry } from '../dpop/dpop-retry'
@@ -25,7 +18,10 @@ export interface SendAuthorizationChallengeRequestOptions {
   /**
    * Callback context
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'hash' | 'generateRandom' | 'signJwt' | 'clientAuthentication'>
+  callbacks: Pick<
+    CallbackContext,
+    'fetch' | 'fetchLimits' | 'hash' | 'generateRandom' | 'signJws' | 'clientAuthentication'
+  >
 
   /**
    * Metadata of the authorization server where to perform the authorization challenge
@@ -90,7 +86,7 @@ export interface SendAuthorizationChallengeRequestOptions {
  * @throws {ValidationError} if a successful response was received but an error occurred during verification of the {@link AuthorizationChallengeResponse}
  */
 export async function sendAuthorizationChallengeRequest(options: SendAuthorizationChallengeRequestOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'authorizationChallengeRequest')
 
   const authorizationServerMetadata = options.authorizationServerMetadata
   const authorizationChallengeEndpoint = authorizationServerMetadata.authorization_challenge_endpoint
@@ -140,7 +136,7 @@ export async function sendAuthorizationChallengeRequest(options: SendAuthorizati
 
       const headers = new Headers({
         ...dpopHeaders,
-        'Content-Type': ContentType.XWwwFormUrlencoded,
+        'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
       })
 
       // Apply client authentication
@@ -149,13 +145,13 @@ export async function sendAuthorizationChallengeRequest(options: SendAuthorizati
         method: 'POST',
         authorizationServerMetadata: options.authorizationServerMetadata,
         body: authorizationChallengeRequest,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         headers,
       })
 
       const { response, result } = await fetchWithZod(
         zAuthorizationChallengeResponse,
-        ContentType.Json,
+        CommonMediaTypes.Json,
         authorizationChallengeEndpoint,
         {
           method: 'POST',
@@ -187,7 +183,7 @@ export async function sendAuthorizationChallengeRequest(options: SendAuthorizati
       }
 
       if (!result.success) {
-        throw new ValidationError('Error validating authorization challenge response', result.error)
+        throw new ValidationError('Error validating authorization challenge response', result.issues)
       }
 
       const dpopNonce = extractDpopNonceFromHeaders(response.headers) ?? undefined

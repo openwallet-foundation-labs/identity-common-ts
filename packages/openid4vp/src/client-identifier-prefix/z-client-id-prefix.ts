@@ -1,4 +1,5 @@
 import { getGlobalConfig } from '@openid4vc/utils'
+import { addValidationIssue } from '@owf/identity-common'
 import { z } from 'zod'
 
 export const zClientIdPrefix = z.enum([
@@ -50,7 +51,10 @@ export const zClientIdToClientIdPrefixAndIdentifier = z.union(
       .pipe(z.tuple([zClientIdPrefix.exclude(['pre-registered']), z.string()])),
     z
       .string()
-      .refine((clientId) => clientId.includes(':') === false)
+      .superRefine((clientId, ctx) => {
+        if (!clientId.includes(':')) return
+        addValidationIssue(ctx, { code: 'invalid_value', message: `A pre-registered client_id must not contain ':'` })
+      })
       .transform((clientId) => ['pre-registered', clientId] as const),
   ],
   {

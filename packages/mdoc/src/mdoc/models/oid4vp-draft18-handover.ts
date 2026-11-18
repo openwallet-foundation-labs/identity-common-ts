@@ -3,15 +3,15 @@ import z from 'zod'
 import type { MdocContext } from '../../context'
 import { Handover } from './handover'
 
-const oid4vpDraft18HandoverEncodedSchema = z.tuple([zUint8Array, zUint8Array, z.string()])
-const oid4vpDraft18HandoverDecodedSchema = z.object({
+const zOid4vpDraft18HandoverEncoded = z.tuple([zUint8Array, zUint8Array, z.string()])
+const zOid4vpDraft18HandoverDecoded = z.object({
   clientIdHash: zUint8Array,
   responseUriHash: zUint8Array,
   nonce: z.string(),
 })
 
-export type Oid4vpDraft18HandoverEncodedStructure = z.infer<typeof oid4vpDraft18HandoverEncodedSchema>
-export type Oid4vpDraft18HandoverDecodedStructure = z.infer<typeof oid4vpDraft18HandoverDecodedSchema>
+export type Oid4vpDraft18HandoverEncodedStructure = z.infer<typeof zOid4vpDraft18HandoverEncoded>
+export type Oid4vpDraft18HandoverDecodedStructure = z.infer<typeof zOid4vpDraft18HandoverDecoded>
 
 export type Oid4vpDraft18HandoverOptions = {
   clientId: string
@@ -25,7 +25,7 @@ export class Oid4vpDraft18Handover extends Handover<
   Oid4vpDraft18HandoverDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(oid4vpDraft18HandoverEncodedSchema, oid4vpDraft18HandoverDecodedSchema, {
+    return z.codec(zOid4vpDraft18HandoverEncoded, zOid4vpDraft18HandoverDecoded, {
       encode: ({ clientIdHash, responseUriHash, nonce }) =>
         [clientIdHash, responseUriHash, nonce] satisfies Oid4vpDraft18HandoverEncodedStructure,
       decode: ([clientIdHash, responseUriHash, nonce]) => ({ clientIdHash, responseUriHash, nonce }),

@@ -1,5 +1,5 @@
 import { base64 } from '@owf/identity-common'
-import { X509Exception } from './x509-exception'
+import { X509Error } from './x509-error'
 
 /** DER bytes, a base64 encoded DER string, or a PEM string */
 export type DerInput = Uint8Array | ArrayBuffer | string
@@ -23,17 +23,17 @@ export function toDer(input: DerInput, label: string = PEM_LABELS.certificate): 
   if (input instanceof Uint8Array) return input
   if (input instanceof ArrayBuffer) return new Uint8Array(input)
   if (typeof input !== 'string') {
-    throw new X509Exception('Input must be DER bytes, a base64 DER string, or PEM')
+    throw new X509Error('Input must be DER bytes, a base64 DER string, or PEM')
   }
   let body = input
   if (input.includes('-----BEGIN')) {
     const pem = input.match(new RegExp(`-----BEGIN ${label}-----([\\s\\S]*?)-----END ${label}-----`))
-    if (!pem) throw new X509Exception(`No PEM block with label "${label}" found`)
+    if (!pem) throw new X509Error(`No PEM block with label "${label}" found`)
     body = pem[1]
   }
   body = body.replace(/\s/g, '')
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(body)) {
-    throw new X509Exception('Input is neither PEM nor base64 encoded DER')
+    throw new X509Error('Input is neither PEM nor base64 encoded DER')
   }
   return base64.decode(body)
 }

@@ -1,6 +1,6 @@
 import { parseCertificate } from '@owf/crypto'
 import { base64urlEncode } from '@owf/identity-common'
-import type { ListAndSchemeInformation, LoTE, LoTEDocument, SignedLoTE, SignOptions, TrustedEntity } from './types'
+import type { ListAndSchemeInformation, LoTE, LoteDocument, SignedLote, SignOptions, TrustedEntity } from './types'
 
 /**
  * Sign a LoTE document
@@ -11,12 +11,12 @@ import type { ListAndSchemeInformation, LoTE, LoTEDocument, SignedLoTE, SignOpti
  * @example Using a local key via @owf/crypto:
  * ```typescript
  * import { ES256 } from '@owf/crypto';
- * import { signLoTE } from '@owf/eudi-lote';
+ * import { signLote } from '@owf/eudi-lote';
  *
  * const { privateKey } = await ES256.generateKeyPair();
  * const signer = await ES256.getSigner(privateKey);
- * const signed = await signLoTE({
- *   lote: myLoTE,
+ * const signed = await signLote({
+ *   lote: myLote,
  *   keyId: 'lote-signer-2025',
  *   signer,
  * });
@@ -24,14 +24,14 @@ import type { ListAndSchemeInformation, LoTE, LoTEDocument, SignedLoTE, SignOpti
  *
  * @example Using an external KMS:
  * ```typescript
- * const signed = await signLoTE({
- *   lote: myLoTE,
+ * const signed = await signLote({
+ *   lote: myLote,
  *   keyId: 'lote-signer-2025',
  *   signer: async (data) => myKms.sign('ES256', data),
  * });
  * ```
  */
-export async function signLoTE(options: SignOptions): Promise<SignedLoTE> {
+export async function signLote(options: SignOptions): Promise<SignedLote> {
   const { lote, keyId, algorithm = 'ES256', certificates, signer } = options
 
   const header: Record<string, unknown> = {
@@ -68,10 +68,10 @@ export async function signLoTE(options: SignOptions): Promise<SignedLoTE> {
  * Per ETSI TS 119 602, only SchemeOperatorName, ListIssueDateTime and NextUpdate are required
  * Default NextUpdate is 6 months per ETSI TS 119 602 maximum validity
  */
-export function createLoTE(
+export function createLote(
   schemeInfo: Partial<ListAndSchemeInformation> & Pick<ListAndSchemeInformation, 'SchemeOperatorName'>,
   entities: TrustedEntity[] = []
-): LoTEDocument {
+): LoteDocument {
   const now = new Date()
   const sixMonthsLater = new Date(now)
   sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6)
@@ -111,7 +111,7 @@ export function createLoTE(
 /**
  * Options for updating a LoTE version
  */
-export interface UpdateLoTEVersionOptions {
+export interface UpdateLoteVersionOptions {
   /**
    * The issue date/time for the new version.
    * Useful when generating a LoTE in advance before publication.
@@ -135,18 +135,18 @@ export interface UpdateLoTEVersionOptions {
  *
  * @example Update with defaults (now + 6 months):
  * ```typescript
- * const updated = updateLoTEVersion(lote);
+ * const updated = updateLoteVersion(lote);
  * ```
  *
  * @example Schedule for future publication:
  * ```typescript
- * const updated = updateLoTEVersion(lote, {
+ * const updated = updateLoteVersion(lote, {
  *   listIssueDateTime: new Date('2025-01-01'),
  *   nextUpdate: new Date('2025-06-01'),
  * });
  * ```
  */
-export function updateLoTEVersion(lote: LoTEDocument, options: UpdateLoTEVersionOptions = {}): LoTEDocument {
+export function updateLoteVersion(lote: LoteDocument, options: UpdateLoteVersionOptions = {}): LoteDocument {
   const issueDate = options.listIssueDateTime
     ? typeof options.listIssueDateTime === 'string'
       ? new Date(options.listIssueDateTime)
@@ -178,7 +178,7 @@ export function updateLoTEVersion(lote: LoTEDocument, options: UpdateLoTEVersion
 /**
  * Add a trusted entity to a LoTE document
  */
-export function addTrustedEntity(lote: LoTEDocument, entity: TrustedEntity): LoTEDocument {
+export function addTrustedEntity(lote: LoteDocument, entity: TrustedEntity): LoteDocument {
   return {
     LoTE: {
       ...lote.LoTE,
@@ -190,13 +190,13 @@ export function addTrustedEntity(lote: LoTEDocument, entity: TrustedEntity): LoT
 /**
  * Remove a trusted entity from a LoTE document by name
  */
-export function removeTrustedEntity(lote: LoTEDocument, entityName: string): LoTEDocument {
+export function removeTrustedEntity(lote: LoteDocument, entityName: string): LoteDocument {
   const list = lote.LoTE.TrustedEntitiesList
   const remaining = list?.filter((e) => !e.TrustedEntityInformation.TEName.some((n) => n.value === entityName))
   // Nothing removed: the document as it was, key and order included
   if (!list || !remaining || remaining.length === list.length) return { LoTE: { ...lote.LoTE } }
   if (remaining.length > 0) return { LoTE: { ...lote.LoTE, TrustedEntitiesList: remaining } }
-  // No entity left: the key goes, as in createLoTE (the JSON schema has minItems 1)
+  // No entity left: the key goes, as in createLote (the JSON schema has minItems 1)
   const { TrustedEntitiesList: _removed, ...rest } = lote.LoTE
   return { LoTE: rest }
 }

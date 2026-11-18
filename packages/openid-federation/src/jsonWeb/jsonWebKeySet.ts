@@ -1,10 +1,10 @@
 import { z } from 'zod'
-import { jsonWebKeySchema } from './jsonWebKey'
+import { zJsonWebKey } from './jsonWebKey'
 
-export const jsonWebKeySetSchema = z.object({
-  keys: z.array(jsonWebKeySchema),
+export const zJsonWebKeySet = z.object({
+  keys: z.array(zJsonWebKey),
 })
 
-export type JsonWebKeySetOptions = z.input<typeof jsonWebKeySetSchema>
+export type JsonWebKeySetOptions = z.input<typeof zJsonWebKeySet>
 
-export type JsonWebKeySet = z.output<typeof jsonWebKeySetSchema>
+export type JsonWebKeySet = z.output<typeof zJsonWebKeySet>

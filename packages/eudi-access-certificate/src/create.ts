@@ -1,3 +1,4 @@
+import { ValidationIssues } from '@owf/identity-common'
 import {
   ATTRIBUTE_TYPES,
   assembleCertificate,
@@ -7,7 +8,7 @@ import {
   type SignatureEncoding,
   stringOtherName,
 } from '@owf/x509'
-import { AccessCertificateException } from './access-certificate-exception'
+import { AccessCertificateValidationError } from './access-certificate-error'
 import { ACCESS_CERTIFICATE_POLICIES, ACCESS_CERTIFICATE_POLICY_INFO } from './constants'
 import { toAccessCertificate } from './profile'
 import { parseSemanticIdentifier } from './semantic-identifier'
@@ -19,7 +20,11 @@ import type {
   PrepareAccessCertificateOptions,
   PreparedAccessCertificate,
 } from './types'
-import { validateAccessCertificate } from './validate'
+import {
+  type AccessCertificateValidationCode,
+  ACCESS_CERTIFICATE_VALIDATION_CODES as C,
+  validateAccessCertificate,
+} from './validate'
 
 function isLegalPerson(options: PrepareAccessCertificateOptions): options is LegalPersonAccessCertificateOptions {
   return ACCESS_CERTIFICATE_POLICY_INFO[options.policy]?.subjectType === 'legal'
@@ -53,33 +58,65 @@ function subjectAttributes(options: PrepareAccessCertificateOptions): NameAttrib
   ]
 }
 
+/**
+ * Check the options against the certificate profile, with a `path` into the options for each issue
+ *
+ * @throws AccessCertificateValidationError when an option does not satisfy the profile
+ */
 function assertInput(options: PrepareAccessCertificateOptions): void {
+  const issues = new ValidationIssues<AccessCertificateValidationCode>()
   if (!ACCESS_CERTIFICATE_POLICIES[options.policy]) {
-    throw new AccessCertificateException(`Unknown access certificate policy: ${options.policy}`)
+    issues.add({
+      code: C.MISSING_POLICY,
+      path: ['policy'],
+      message: `Unknown access certificate policy: ${options.policy}`,
+      requirement: 'GEN-6.6.1-03',
+    })
   }
   if (!options.cpsUri) {
-    throw new AccessCertificateException('cpsUri is required (GEN-6.6.1-06)')
+    issues.add({
+      code: C.MISSING_CPS_URI,
+      path: ['cpsUri'],
+      message: 'cpsUri is required (GEN-6.6.1-06)',
+      requirement: 'GEN-6.6.1-06',
+    })
   }
   const { uris = [], emails = [], phoneNumbers = [] } = options.contact
   if (uris.length + emails.length + phoneNumbers.length === 0) {
-    throw new AccessCertificateException(
-      'At least one contact website, email address or phone number is required (GEN-6.6.1-07)'
-    )
+    issues.add({
+      code: C.MISSING_CONTACT,
+      path: ['contact'],
+      message: 'At least one contact website, email address or phone number is required (GEN-6.6.1-07)',
+      requirement: 'GEN-6.6.1-07',
+    })
   }
   if (!/^[A-Z]{2}$/.test(options.subject.countryName)) {
-    throw new AccessCertificateException('countryName must be an ISO 3166-1 alpha-2 country code')
+    issues.add({
+      code: C.INVALID_COUNTRY_NAME,
+      path: ['subject', 'countryName'],
+      message: 'countryName must be an ISO 3166-1 alpha-2 country code',
+    })
   }
   if (isLegalPerson(options)) {
     const identifier = parseSemanticIdentifier(options.subject.organizationIdentifier)
     if (!identifier) {
-      throw new AccessCertificateException(
-        'organizationIdentifier must be encoded as specified in ETSI EN 319 412-1 clause 5.1.4 (GEN-6.6.1-05)'
-      )
-    }
-    if (identifier.countryCode === 'GR') {
-      throw new AccessCertificateException('organizationIdentifier must use the country code "EL" for Greece')
+      issues.add({
+        code: C.INVALID_ORGANIZATION_IDENTIFIER,
+        path: ['subject', 'organizationIdentifier'],
+        message: 'organizationIdentifier must be encoded as specified in ETSI EN 319 412-1 clause 5.1.4 (GEN-6.6.1-05)',
+        requirement: 'GEN-6.6.1-05',
+      })
+    } else if (identifier.countryCode === 'GR') {
+      issues.add({
+        code: C.INVALID_GREECE_COUNTRY_CODE,
+        path: ['subject', 'organizationIdentifier'],
+        message: 'organizationIdentifier must use the country code "EL" for Greece',
+        requirement: 'GEN-6.6.1-05',
+      })
     }
   }
+  const result = issues.result()
+  if (!result.valid) throw new AccessCertificateValidationError('Invalid access certificate options', result.issues)
 }
 
 /** Map access certificate options to a generic `@owf/x509` certificate template. */
@@ -152,7 +189,7 @@ export function assembleAccessCertificate(
  * Likewise only the public key of the wallet-relying party is needed; a JWK that contains
  * private key material is rejected.
  *
- * @throws AccessCertificateException when the input or the resulting certificate does not
+ * @throws AccessCertificateValidationError when the input or the resulting certificate does not
  * satisfy the certificate profile
  */
 export async function createAccessCertificate(options: CreateAccessCertificateOptions): Promise<AccessCertificate> {
@@ -162,10 +199,7 @@ export async function createAccessCertificate(options: CreateAccessCertificateOp
 
   const result = validateAccessCertificate(accessCertificate, { now: false })
   if (!result.valid) {
-    throw new AccessCertificateException(
-      `Created access certificate does not conform: ${result.errors.map((e) => e.message).join('; ')}`,
-      result.errors
-    )
+    throw new AccessCertificateValidationError('Created access certificate does not conform', result.issues)
   }
   return accessCertificate
 }

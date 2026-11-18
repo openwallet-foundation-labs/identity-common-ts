@@ -1,0 +1,17 @@
+import { IdentityError, ValidationError } from '@owf/identity-common'
+import type { LoteValidationIssue } from './validator'
+
+/**
+ * LoteError is the error of LoTE operations.
+ */
+export class LoteError extends IdentityError {
+  constructor(message: string, details?: unknown) {
+    super(message, details)
+    this.name = 'LoteError'
+  }
+}
+
+/**
+ * Thrown when a LoTE document or one of its parts does not pass validation, with the `issues` of the validation. The message lists the errors among them.
+ */
+export class LoteValidationError extends ValidationError<LoteValidationIssue> {}

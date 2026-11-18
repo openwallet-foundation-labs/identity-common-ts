@@ -6,7 +6,7 @@
  */
 
 import { ES256 } from '@owf/crypto'
-import { schemaMeta, schemaURI, signSchemaMeta, trustAuthority, verifySchemaMeta } from '@owf/eudi-attestation-schema'
+import { schemaMeta, schemaUri, signSchemaMeta, trustAuthority, verifySchemaMeta } from '@owf/eudi-attestation-schema'
 
 // ---------------------------------------------------------------------------
 // 1. Key material — in production, load from a vault / HSM
@@ -52,16 +52,16 @@ async function main() {
     .rulebookIntegrity('sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw=')
     .attestationLoS('iso_18045_basic')
     .bindingType('key')
-    .addSchemaURI(
-      schemaURI()
+    .addSchemaUri(
+      schemaUri()
         .format('dc+sd-jwt')
         .uri('https://catalog.example.com/schemas/pid/sd-jwt/1.0.0.json')
         .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')
         .meta({ vct: 'eu.example.pid.1' })
         .build()
     )
-    .addSchemaURI(
-      schemaURI()
+    .addSchemaUri(
+      schemaUri()
         .format('mso_mdoc')
         .uri('https://catalog.example.com/schemas/pid/mdoc/1.0.0.json')
         .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')

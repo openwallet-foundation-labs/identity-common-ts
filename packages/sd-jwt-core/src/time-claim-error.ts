@@ -1,5 +1,5 @@
 import type { JwtTimeClaimErrorCode, JwtTimeClaimErrorDetails } from './types'
-import { JwtTimeClaimException } from './utils'
+import { JwtTimeClaimError } from './utils'
 
 /** The JWT a payload check runs on. It names the JWT in error messages and selects the error codes. */
 export type JwtRole = 'jwt' | 'key-binding-jwt'
@@ -22,14 +22,14 @@ const PROBLEMS: Record<TimeClaimFailure, string> = {
   tooOld: 'is too old',
 }
 
-/** The exception for a failed `iat`, `nbf`, `exp` or maximum age check of the given JWT. */
-export const timeClaimException = (
+/** The error for a failed `iat`, `nbf`, `exp` or maximum age check of the given JWT. */
+export const timeClaimError = (
   role: JwtRole,
   failure: TimeClaimFailure,
   details: JwtTimeClaimErrorDetails
-): JwtTimeClaimException => {
+): JwtTimeClaimError => {
   const errors = TIME_CLAIM_ERRORS[role]
-  return new JwtTimeClaimException(`Verify Error: ${errors.name} ${PROBLEMS[failure]}`, {
+  return new JwtTimeClaimError(`Verify Error: ${errors.name} ${PROBLEMS[failure]}`, {
     details,
     code: errors[failure],
   })

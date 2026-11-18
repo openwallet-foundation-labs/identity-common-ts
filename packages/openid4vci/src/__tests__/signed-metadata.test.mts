@@ -1,17 +1,23 @@
 import {
-  decodeJwt,
   Oauth2AuthorizationServer,
   PkceCodeChallengeMethod,
   SupportedClientAuthenticationMethod,
 } from '@openid4vc/oauth2'
+import { decodeJwt, signJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import { getSignJwtCallback, callbacks as partialCallbacks } from '../../../oauth2/src/__tests__/util.mjs'
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
+import {
+  getSignJwsCallback,
+  getVerifyJwsCallback,
+  callbacks as partialCallbacks,
+  signerWithOwnKey,
+} from '../../../oauth2/src/__tests__/util.mjs'
 import { type CredentialConfigurationSupportedWithFormats, Openid4vciClient, Openid4vciIssuer } from '../index.js'
 import { fetchCredentialIssuerMetadata } from '../metadata/credential-issuer/credential-issuer-metadata.js'
 
 const credentialIssuerJwk = {
+  kid: 'credential-issuer',
   kty: 'EC',
   d: 'IfSdct8njqWDcMaLIO3ZGG-8a61t9acXxxFWFVDFx6Y',
   crv: 'P-256',
@@ -19,13 +25,16 @@ const credentialIssuerJwk = {
   y: 'Xfx_VfGzNfRVT5cNbi8jKZ3KMgKzqPGHWCT1yklA0UE',
 }
 const { d: __, ...credentialIssuerJwkPublic } = credentialIssuerJwk
+// The wallet trusts the key of the credential issuer out of band
+const credentialIssuerSigner = { method: 'custom', alg: 'ES256', kid: credentialIssuerJwk.kid } as const
 
 const server = setupServer()
 
 const callbacks = {
   ...partialCallbacks,
   fetch,
-  signJwt: getSignJwtCallback([credentialIssuerJwk]),
+  signJws: getSignJwsCallback([credentialIssuerJwk]),
+  verifyJws: getVerifyJwsCallback({ publicJwks: [credentialIssuerJwkPublic] }),
 }
 
 const issuer = new Openid4vciIssuer({
@@ -94,24 +103,15 @@ describe('Signed Credential Issuer Metadata', () => {
   test('Create, resolve and verify signed credential issuer metadata', async () => {
     const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
       credentialIssuerMetadata,
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: credentialIssuerJwkPublic,
-      },
+      signer: credentialIssuerSigner,
     })
 
-    expect(decodeJwt({ jwt: credentialIssuerMetadataJwt })).toStrictEqual({
+    expect(decodeJwt({ jwt: credentialIssuerMetadataJwt })).toMatchObject({
       compact: credentialIssuerMetadataJwt,
       signature: expect.any(String),
       header: {
         alg: 'ES256',
-        jwk: {
-          crv: 'P-256',
-          kty: 'EC',
-          x: 'ghHo8AZRPhIdmR9zO_aab0R7CsDah-XI5zht8GXo71w',
-          y: 'Xfx_VfGzNfRVT5cNbi8jKZ3KMgKzqPGHWCT1yklA0UE',
-        },
+        kid: credentialIssuerJwk.kid,
         typ: 'openidvci-issuer-metadata+jwt',
       },
       payload: {
@@ -150,18 +150,13 @@ describe('Signed Credential Issuer Metadata', () => {
       credentialIssuerMetadata.credential_request_encryption
     )
 
-    expect(resolvedIssuerMetadata.signedCredentialIssuer).toStrictEqual({
+    expect(resolvedIssuerMetadata.signedCredentialIssuer).toMatchObject({
       jwt: {
         compact: credentialIssuerMetadataJwt,
         signature: expect.any(String),
         header: {
           alg: 'ES256',
-          jwk: {
-            crv: 'P-256',
-            kty: 'EC',
-            x: 'ghHo8AZRPhIdmR9zO_aab0R7CsDah-XI5zht8GXo71w',
-            y: 'Xfx_VfGzNfRVT5cNbi8jKZ3KMgKzqPGHWCT1yklA0UE',
-          },
+          kid: credentialIssuerJwk.kid,
           typ: 'openidvci-issuer-metadata+jwt',
         },
         payload: {
@@ -170,27 +165,14 @@ describe('Signed Credential Issuer Metadata', () => {
           sub: credentialIssuerMetadata.credential_issuer,
         },
       },
-      signer: {
-        alg: 'ES256',
-        method: 'jwk',
-        publicJwk: {
-          crv: 'P-256',
-          kty: 'EC',
-          x: 'ghHo8AZRPhIdmR9zO_aab0R7CsDah-XI5zht8GXo71w',
-          y: 'Xfx_VfGzNfRVT5cNbi8jKZ3KMgKzqPGHWCT1yklA0UE',
-        },
-      },
+      signer: { ...credentialIssuerSigner, publicJwk: credentialIssuerJwkPublic },
     })
   })
 
-  test('Request only unsigned credential issuer metadata by default without a verifyJwt callback', async () => {
+  test('Request only unsigned credential issuer metadata by default without a verifyJws callback', async () => {
     const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
       credentialIssuerMetadata,
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: credentialIssuerJwkPublic,
-      },
+      signer: credentialIssuerSigner,
     })
 
     const acceptHeaders: Array<string | null> = []
@@ -215,11 +197,7 @@ describe('Signed Credential Issuer Metadata', () => {
   test('Request only unsigned credential issuer metadata if signed metadata is disallowed', async () => {
     const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
       credentialIssuerMetadata,
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: credentialIssuerJwkPublic,
-      },
+      signer: credentialIssuerSigner,
     })
 
     const acceptHeaders: Array<string | null> = []
@@ -233,7 +211,7 @@ describe('Signed Credential Issuer Metadata', () => {
     )
 
     const result = await fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
-      callbacks: { fetch, verifyJwt: callbacks.verifyJwt },
+      callbacks: { fetch, verifyJws: callbacks.verifyJws },
       signedMetadata: 'disallowed',
     })
 
@@ -245,11 +223,7 @@ describe('Signed Credential Issuer Metadata', () => {
   test('Request only signed credential issuer metadata if signed metadata is required', async () => {
     const credentialIssuerMetadataJwt = await issuer.createSignedCredentialIssuerMetadataJwt({
       credentialIssuerMetadata,
-      signer: {
-        method: 'jwk',
-        alg: 'ES256',
-        publicJwk: credentialIssuerJwkPublic,
-      },
+      signer: credentialIssuerSigner,
     })
 
     const acceptHeaders: Array<string | null> = []
@@ -261,7 +235,7 @@ describe('Signed Credential Issuer Metadata', () => {
     )
 
     const result = await fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
-      callbacks: { fetch, verifyJwt: callbacks.verifyJwt },
+      callbacks: { fetch, verifyJws: callbacks.verifyJws },
       signedMetadata: 'required',
     })
 
@@ -284,13 +258,13 @@ describe('Signed Credential Issuer Metadata', () => {
     ).rejects.toThrow("Expected response to match content type application/jwt, but received 'application/json'")
   })
 
-  test('Throw an error if signed metadata is preferred without a verifyJwt callback', async () => {
+  test('Throw an error if signed metadata is preferred without a verifyJws callback', async () => {
     await expect(
       fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
         callbacks: { fetch },
         signedMetadata: 'preferred',
       })
-    ).rejects.toThrow("Signed credential issuer metadata is preferred, but no 'verifyJwt' callback provided")
+    ).rejects.toThrow("Signed credential issuer metadata is preferred, but no 'verifyJws' callback provided")
   })
 
   test.each(['signed', 'application/jwt', 'constructor'])(
@@ -298,10 +272,167 @@ describe('Signed Credential Issuer Metadata', () => {
     async (signedMetadata) => {
       await expect(
         fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
-          callbacks: { fetch, verifyJwt: callbacks.verifyJwt },
+          callbacks: { fetch, verifyJws: callbacks.verifyJws },
           signedMetadata: signedMetadata as 'required',
         })
       ).rejects.toThrow("The 'signedMetadata' option must be one of 'required', 'preferred' or 'disallowed'")
     }
   )
+
+  // Signed metadata as `createSignedCredentialIssuerMetadataJwt` creates it, but with the given typ
+  const signCredentialIssuerMetadataJwt = async (
+    typ: string,
+    sub = credentialIssuerMetadata.credential_issuer,
+    iat = Math.floor(Date.now() / 1000)
+  ) => {
+    const { jwt } = await signJwt({
+      header: { typ, alg: 'ES256', kid: credentialIssuerJwk.kid },
+      payload: {
+        ...credentialIssuerMetadata,
+        sub,
+        iat,
+      },
+      signer: credentialIssuerSigner,
+      signJwsCallback: callbacks.signJws,
+    })
+
+    return jwt
+  }
+
+  const serveSignedCredentialIssuerMetadata = (credentialIssuerMetadataJwt: string) =>
+    server.resetHandlers(
+      http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-credential-issuer`, () =>
+        HttpResponse.text(credentialIssuerMetadataJwt, { headers: { 'Content-Type': 'application/jwt' } })
+      ),
+      http.get(`${authorizationServerMetadata.issuer}/.well-known/openid-configuration`, () =>
+        HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.get(`${authorizationServerMetadata.issuer}/.well-known/oauth-authorization-server`, () =>
+        HttpResponse.json(authorizationServerMetadata)
+      )
+    )
+
+  describe('typ', () => {
+    test.each(['application/openidvci-issuer-metadata+jwt', 'OpenIDVCI-Issuer-Metadata+JWT'])(
+      'resolves signed credential issuer metadata whose typ is %s',
+      async (typ) => {
+        serveSignedCredentialIssuerMetadata(await signCredentialIssuerMetadataJwt(typ))
+
+        const resolvedIssuerMetadata = await client.resolveIssuerMetadata(credentialIssuerMetadata.credential_issuer)
+
+        expect(resolvedIssuerMetadata.signedCredentialIssuer?.jwt.header.typ).toEqual(typ)
+      }
+    )
+
+    test('rejects signed credential issuer metadata whose typ is not openidvci-issuer-metadata+jwt', async () => {
+      serveSignedCredentialIssuerMetadata(await signCredentialIssuerMetadataJwt('JWT'))
+
+      await expect(client.resolveIssuerMetadata(credentialIssuerMetadata.credential_issuer)).rejects.toThrow(
+        `typ: typ must be openidvci-issuer-metadata+jwt (invalid_typ)`
+      )
+    })
+
+    test('rejects signed credential issuer metadata whose sub is another credential issuer', async () => {
+      serveSignedCredentialIssuerMetadata(
+        await signCredentialIssuerMetadataJwt('openidvci-issuer-metadata+jwt', 'https://other-issuer.example')
+      )
+
+      await expect(client.resolveIssuerMetadata(credentialIssuerMetadata.credential_issuer)).rejects.toThrow(
+        /sub: .* \(claim_value_mismatch\)/
+      )
+    })
+  })
+
+  // OpenID4VCI 1.0 Section 12.2.3: the wallet must trust the signer of the metadata, but `verifyJws` accepts a key
+  // from a `jwk` header or a did:jwk, with which anyone could sign metadata for any credential issuer
+  test.each(['jwk', 'did'] as const)(
+    'rejects signed credential issuer metadata signed with a %s signer',
+    async (method) => {
+      serveSignedCredentialIssuerMetadata(
+        await issuer.createSignedCredentialIssuerMetadataJwt({
+          credentialIssuerMetadata,
+          signer: signerWithOwnKey(method, credentialIssuerJwkPublic),
+        })
+      )
+
+      await expect(
+        fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+          callbacks: { fetch, verifyJws: callbacks.verifyJws },
+          signedMetadata: 'required',
+        })
+      ).rejects.toThrow(`method ${method}`)
+    }
+  )
+
+  describe('allowedSkewInSeconds', () => {
+    const now = new Date('2026-01-01T00:00:00Z')
+
+    // Only Date is faked, so msw keeps working. The client has no `now` option.
+    beforeAll(() => vi.useFakeTimers({ toFake: ['Date'], now }))
+    afterAll(() => vi.useRealTimers())
+
+    const serveMetadataIssuedIn10Seconds = async () =>
+      serveSignedCredentialIssuerMetadata(
+        await signCredentialIssuerMetadataJwt(
+          'openidvci-issuer-metadata+jwt',
+          credentialIssuerMetadata.credential_issuer,
+          Math.floor(now.getTime() / 1000) + 10
+        )
+      )
+
+    test('accepts signed metadata whose iat is 10 seconds in the future with the default skew', async () => {
+      await serveMetadataIssuedIn10Seconds()
+
+      const result = await fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+        callbacks: { fetch, verifyJws: callbacks.verifyJws },
+        signedMetadata: 'required',
+        now,
+      })
+
+      expect(result?.signed).toBeDefined()
+    })
+
+    test('rejects signed metadata whose iat is 10 seconds in the future with an allowed skew of 0', async () => {
+      await serveMetadataIssuedIn10Seconds()
+
+      await expect(
+        fetchCredentialIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+          callbacks: { fetch, verifyJws: callbacks.verifyJws },
+          signedMetadata: 'required',
+          now,
+          allowedSkewInSeconds: 0,
+        })
+      ).rejects.toThrow(/iat: .* \(not_yet_valid\)/)
+    })
+
+    test('uses the allowedSkewInSeconds of the client, unless resolveIssuerMetadata overrides it', async () => {
+      await serveMetadataIssuedIn10Seconds()
+      const clientWithoutSkew = new Openid4vciClient({ callbacks, allowedSkewInSeconds: 0 })
+
+      await expect(clientWithoutSkew.resolveIssuerMetadata(credentialIssuerMetadata.credential_issuer)).rejects.toThrow(
+        /iat: .* \(not_yet_valid\)/
+      )
+      await expect(
+        clientWithoutSkew.resolveIssuerMetadata(credentialIssuerMetadata.credential_issuer, {
+          allowedSkewInSeconds: 30,
+        })
+      ).resolves.toMatchObject({ signedCredentialIssuer: expect.any(Object) })
+    })
+  })
+
+  test('names the legacy url in the error when the metadata was served there', async () => {
+    const credentialIssuer = 'https://oid4vc-ts-issuer.com/tenant'
+    server.use(
+      http.get('https://oid4vc-ts-issuer.com/.well-known/openid-credential-issuer/tenant', () =>
+        HttpResponse.json({}, { status: 404 })
+      ),
+      http.get('https://oid4vc-ts-issuer.com/tenant/.well-known/openid-credential-issuer', () =>
+        HttpResponse.json(credentialIssuerMetadata)
+      )
+    )
+
+    await expect(fetchCredentialIssuerMetadata(credentialIssuer, { callbacks: { fetch } })).rejects.toThrow(
+      "in the well known credential issuer metadata at 'https://oid4vc-ts-issuer.com/tenant/.well-known/openid-credential-issuer' does not match"
+    )
+  })
 })

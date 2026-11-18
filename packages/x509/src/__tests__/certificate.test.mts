@@ -14,7 +14,7 @@ import {
   telephoneNumbers,
   toDer,
   verifyCertificateSignature,
-  X509Exception,
+  X509Error,
 } from '../index'
 import { generateSubjectKey, webCryptoSigner, webCryptoVerifier } from './crypto.mjs'
 import { CA_CERTIFICATE_PEM, CA_PRIVATE_JWK, OPENSSL_LEAF_CERTIFICATE_PEM } from './fixtures.mjs'
@@ -91,8 +91,8 @@ describe('parseCertificate', () => {
   })
 
   it('rejects malformed input', () => {
-    expect(() => parseCertificate('not a certificate!')).toThrow(X509Exception)
-    expect(() => parseCertificate(new Uint8Array([0x30, 0x03, 0x02, 0x01, 0x01]))).toThrow(X509Exception)
+    expect(() => parseCertificate('not a certificate!')).toThrow(X509Error)
+    expect(() => parseCertificate(new Uint8Array([0x30, 0x03, 0x02, 0x01, 0x01]))).toThrow(X509Error)
     expect(() => parseCertificate('-----BEGIN X509 CRL-----\nAAAA\n-----END X509 CRL-----')).toThrow(
       /No PEM block with label "CERTIFICATE"/
     )

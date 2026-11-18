@@ -3,6 +3,7 @@ import { deflate } from 'pako'
 import { expect, suite, test } from 'vitest'
 import { StatusListCbor } from '../../cbor/status-list-cbor'
 import { StatusList } from '../../status-list'
+import { statusListIssue } from '../context'
 
 /**
  * A status list as some other issuer would send it: `lst` compressed at the zlib default level
@@ -90,7 +91,9 @@ suite('StatusListCbor round trip', () => {
   })
 
   test('rejects bytes passed to create that are not a compressed status list', () => {
-    expect(() => StatusListCbor.create({ bits: 1, list: new Uint8Array([0, 1, 2, 3]) })).toThrow('Decompression failed')
+    expect(() => StatusListCbor.create({ bits: 1, list: new Uint8Array([0, 1, 2, 3]) })).toThrow(
+      statusListIssue('invalid_status_list')
+    )
   })
 
   suite('after modification', () => {

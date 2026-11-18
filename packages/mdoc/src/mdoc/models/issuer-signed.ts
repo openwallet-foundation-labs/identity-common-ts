@@ -6,17 +6,18 @@ import { defaultVerificationCallback, onCategoryCheck, type VerificationCallback
 import { IssuerAuth, type IssuerAuthEncodedStructure, type IssuerAuthVerificationResult } from './issuer-auth'
 import { IssuerNamespaces, type IssuerNamespacesEncodedStructure } from './issuer-namespaces'
 import type { IssuerSignedItem } from './issuer-signed-item'
+import type { StatusVerificationOptions } from './mso-revocation-list'
 import type { Namespace } from './namespace'
 
 // 18013-5 8.3.2.1.2.2: `nameSpaces` is optional, and left out when no issuer-signed element is
 // disclosed, as `IssuerNameSpaces` must have at least one namespace.
-const issuerSignedSchema = typedMap([
+const zIssuerSigned = typedMap([
   ['nameSpaces', z.instanceof(IssuerNamespaces).exactOptional()],
   ['issuerAuth', z.instanceof(IssuerAuth)],
 ])
 
-export type IssuerSignedDecodedStructure = z.output<typeof issuerSignedSchema>
-export type IssuerSignedEncodedStructure = z.input<typeof issuerSignedSchema>
+export type IssuerSignedDecodedStructure = z.output<typeof zIssuerSigned>
+export type IssuerSignedEncodedStructure = z.input<typeof zIssuerSigned>
 
 export type IssuerSignedOptions = {
   issuerNamespaces?: IssuerNamespaces
@@ -27,7 +28,7 @@ export type IssuerSignedVerificationResult = IssuerAuthVerificationResult
 
 export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, IssuerSignedDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(issuerSignedSchema.in, issuerSignedSchema.out, {
+    return z.codec(zIssuerSigned.in, zIssuerSigned.out, {
       decode: (input) => {
         const map: IssuerSignedDecodedStructure = TypedMap.fromMap(input)
 
@@ -89,10 +90,10 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
       now?: Date
       trustedCertificates?: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       skewSeconds?: number
+      status?: StatusVerificationOptions
     },
-    ctx: Pick<MdocContext, 'x509' | 'crypto' | 'cose' | 'fetch'>
+    ctx: Pick<MdocContext, 'x509' | 'crypto' | 'cose' | 'fetch' | 'fetchLimits'>
   ): Promise<IssuerSignedVerificationResult> {
     const { valueDigests, digestAlgorithm } = this.issuerAuth.mobileSecurityObject
 
@@ -102,10 +103,6 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
       status: digestAlgorithm ? 'PASSED' : 'FAILED',
       check: 'Issuer Auth must include a supported digestAlgorithm element',
     })
-
-    // Verify the issuer auth
-    const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
-      await this.issuerAuth.verify(options, ctx)
 
     const namespaces = this.issuerNamespaces?.issuerNamespaces ?? new Map<string, IssuerSignedItem[]>()
 
@@ -193,6 +190,11 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
         }
       })
     )
+
+    // The issuer auth comes last, as it ends with the status check of the MSO, which must not run for an
+    // mdoc that fails a check that needs no network access (Token Status List § 8.3).
+    const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
+      await this.issuerAuth.verify(options, ctx)
 
     return { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain }
   }

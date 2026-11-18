@@ -15,6 +15,12 @@ An implementation of the [OAuth 2.0 Authorization Framework](https://datatracker
 - [OAuth 2.0 Attestation-Based Client Authentication](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-09.html)
 - [RFC 9207 - OAuth 2.0 Authorization Server Issuer Identification](https://www.rfc-editor.org/rfc/rfc9207.html)
 
+A client attestation must be signed by an attester that is identified by `x5c`, a federation `trust_chain`, a DID, or another `kid`. The `verifyJws` callback decides whether the attester is trusted, for example by validating the `x5c` chain. For a DID, it must check that the DID belongs to a trusted attester: resolving the DID is not enough, as anyone can create a did:jwk or did:key, or host a did:web. An attestation signed with a key from a `jwk` header is rejected, as the client could choose that key itself.
+
+The package does not keep client registrations. An authorization server must check the `redirect_uri` of an authorization request against the redirect URIs registered for the client before it redirects to it, by passing them as `allowedRedirectUris` to the authorization request verification (RFC 9700 Section 4.1.3). It must also store the `redirect_uri` with the authorization code and pass it as `expectedRedirectUri` to `verifyAuthorizationCodeAccessTokenRequest` (RFC 6749 Section 4.1.3).
+
+The package does not keep client registrations. An authorization server must check the `redirect_uri` of an authorization request against the redirect URIs registered for the client before it redirects to it, by passing them as `allowedRedirectUris` to the authorization request verification (RFC 9700 Section 4.1.3). It must also store the `redirect_uri` with the authorization code and pass it as `expectedRedirectUri` to `verifyAuthorizationCodeAccessTokenRequest` (RFC 6749 Section 4.1.3).
+
 This package was previously developed in the [oid4vc-ts](https://github.com/openwallet-foundation-labs/oid4vc-ts) repository. The `@openid4vc/*` packages are versioned together, separately from the other packages in this repository.
 
 ## Installation
@@ -39,6 +45,8 @@ import { Oauth2AuthorizationServer, Oauth2Client, Oauth2ResourceServer } from '@
 ## Dependencies
 
 - [@openid4vc/utils](https://www.npmjs.com/package/@openid4vc/utils)
+- [@owf/identity-common](https://www.npmjs.com/package/@owf/identity-common)
+- [@owf/jose](https://www.npmjs.com/package/@owf/jose)
 - [zod](https://www.npmjs.com/package/zod)
 
 ## Platform Support
@@ -49,7 +57,7 @@ This library is **platform agnostic** and works in:
 - ✅ Browsers (modern browsers with ES2020 support)
 - ✅ React Native
 
-The environment must provide an implementation of `URL` and `URLSearchParams`. Platform-specific functionality such as hashing, generating random bytes and signing is provided through callbacks. If no global `fetch` is available in your environment, it also needs to be provided through the callbacks.
+The environment must provide an implementation of `URL` and `URLSearchParams`. Platform-specific functionality such as hashing, generating random bytes and signing is provided through callbacks. If no global `fetch` is available in your environment, it also needs to be provided through the callbacks. The `fetch` callback gets what is requested as its third argument, an `Openid4vcFetchType` such as `{ type: 'accessTokenRequest' }`, and every response is read within the `fetchLimits` of the callbacks, 10 MiB per response by default (see `FetchLimits` of `@owf/identity-common`).
 
 ## Contributing
 

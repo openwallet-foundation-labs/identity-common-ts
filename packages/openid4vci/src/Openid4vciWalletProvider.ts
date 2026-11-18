@@ -9,7 +9,7 @@ export interface Openid4vciWalletProviderOptions {
   /**
    * Callbacks required for the openid4vc issuer
    */
-  callbacks: Pick<CallbackContext, 'signJwt'>
+  callbacks: Pick<CallbackContext, 'signJws'>
 }
 
 export class Openid4vciWalletProvider {

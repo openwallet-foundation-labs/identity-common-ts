@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { callbacks, getSignJwtCallback } from '../../../oauth2/src/__tests__/util.mjs'
+import { callbacks, getSignJwsCallback } from '../../../oauth2/src/__tests__/util.mjs'
 import { Openid4vciIssuer } from '../Openid4vciIssuer.js'
 
 const fullV1Metadata = {
@@ -1011,7 +1011,7 @@ describe('OpenID4VCI | Draft 11', () => {
     const issuer = new Openid4vciIssuer({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([]),
+        signJws: getSignJwsCallback([]),
       },
     })
     expect(issuer.getCredentialIssuerMetadataDraft11(fullV1Metadata)).toEqual(transformedDraft11Metadata)

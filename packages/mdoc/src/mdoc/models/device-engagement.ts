@@ -14,7 +14,7 @@ enum DeviceEngagementKeys {
   ProtocolInfo = 4,
 }
 
-const deviceEngagementSchema = typedMap([
+const zDeviceEngagement = typedMap([
   [DeviceEngagementKeys.Version, z.string()],
   [DeviceEngagementKeys.Security, z.instanceof(Security)],
   [DeviceEngagementKeys.DeviceRetrievalMethods, z.array(z.instanceof(DeviceRetrievalMethod)).exactOptional()],
@@ -23,8 +23,8 @@ const deviceEngagementSchema = typedMap([
   [DeviceEngagementKeys.ProtocolInfo, z.instanceof(ProtocolInfo).exactOptional()],
 ] as const)
 
-export type DeviceEngagementEncodedStructure = z.input<typeof deviceEngagementSchema>
-export type DeviceEngagementDecodedStructure = z.output<typeof deviceEngagementSchema>
+export type DeviceEngagementEncodedStructure = z.input<typeof zDeviceEngagement>
+export type DeviceEngagementDecodedStructure = z.output<typeof zDeviceEngagement>
 
 export type DeviceEngagementOptions = {
   version: string
@@ -39,7 +39,7 @@ export class DeviceEngagement extends OriginalBytesCborStructure<
   DeviceEngagementDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(deviceEngagementSchema.in, deviceEngagementSchema.out, {
+    return z.codec(zDeviceEngagement.in, zDeviceEngagement.out, {
       decode: (input) => {
         const map: DeviceEngagementDecodedStructure = TypedMap.fromMap(input)
 

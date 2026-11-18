@@ -1,5 +1,5 @@
 import type { DisclosureFrame, Verifier } from '@sd-jwt/core'
-import { SDJwtInstance } from '@sd-jwt/core'
+import { SdJwtInstance } from '@sd-jwt/core'
 import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
 
 // 1. Define your extended options type
@@ -23,7 +23,7 @@ type TrustListOptions = {
     return verifier(data, signature)
   }
 
-  const sdjwt = new SDJwtInstance<typeof claims, TrustListOptions>({
+  const sdjwt = new SdJwtInstance<typeof claims, TrustListOptions>({
     signer,
     verifier: extendedVerifier, // use the extended verifier
     signAlg: ES256.alg,

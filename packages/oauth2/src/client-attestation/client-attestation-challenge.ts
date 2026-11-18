@@ -1,10 +1,5 @@
-import {
-  ContentType,
-  createZodFetcher,
-  type FetchHeaders,
-  InvalidFetchResponseError,
-  ValidationError,
-} from '@openid4vc/utils'
+import { createZodFetcher, type FetchHeaders, InvalidFetchResponseError } from '@openid4vc/utils'
+import { CommonMediaTypes, ValidationError } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import { Oauth2ErrorCodes, type Oauth2ErrorResponse } from '../common/z-oauth2-error'
 import { Oauth2ClientErrorResponseError } from '../error/Oauth2ClientErrorResponseError'
@@ -21,7 +16,7 @@ export interface RequestClientAttestationChallengeOptions {
   /**
    * Callback context
    */
-  callbacks: Pick<CallbackContext, 'fetch'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits'>
 }
 
 /**
@@ -34,7 +29,7 @@ export interface RequestClientAttestationChallengeOptions {
  * @throws {ValidationError} if the response could not be validated
  */
 export async function requestClientAttestationChallenge(options: RequestClientAttestationChallengeOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'clientAttestationChallengeRequest')
 
   const { authorizationServerMetadata } = options
   const challengeEndpoint = authorizationServerMetadata.challenge_endpoint
@@ -46,7 +41,7 @@ export async function requestClientAttestationChallenge(options: RequestClientAt
 
   const { response, result } = await fetchWithZod(
     zClientAttestationChallengeResponse,
-    ContentType.Json,
+    CommonMediaTypes.Json,
     challengeEndpoint,
     {
       method: 'POST',
@@ -62,7 +57,7 @@ export async function requestClientAttestationChallenge(options: RequestClientAt
   }
 
   if (!result.success) {
-    throw new ValidationError('Error validating client attestation challenge response', result.error)
+    throw new ValidationError('Error validating client attestation challenge response', result.issues)
   }
 
   return {

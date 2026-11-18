@@ -1,4 +1,4 @@
-import type { Jwk } from '@openid4vc/oauth2'
+import type { Jwk } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
 import { verifyCredentialRequestDiVpProof } from '../../../../formats/proof-type/di-vp/di-vp-proof-type'
 

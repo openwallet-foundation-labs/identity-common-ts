@@ -1,13 +1,7 @@
-import {
-  type CallbackContext,
-  decodeJwt,
-  type Jwk,
-  type JwtSigner,
-  jwtHeaderFromJwtSigner,
-  jwtSignerFromJwt,
-  verifyJwt,
-} from '@openid4vc/oauth2'
-import { dateToSeconds, parseWithErrorHandling, type StringWithAutoCompletion } from '@openid4vc/utils'
+import type { CallbackContext } from '@openid4vc/oauth2'
+import type { StringWithAutoCompletion } from '@openid4vc/utils'
+import { dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
+import { decodeJwt, type Jwk, type JwsSigner, jwsHeaderFromSigner, signJwt, verifyJwt } from '@owf/jose'
 import { Openid4vciError } from '../error/Openid4vciError'
 import {
   type Iso18045,
@@ -71,12 +65,12 @@ export interface CreateKeyAttestationJwtOptions {
   /**
    * Signer of the key attestation jwt
    */
-  signer: JwtSigner
+  signer: JwsSigner
 
   /**
    * Callbacks used for creating the key attestation jwt
    */
-  callbacks: Pick<CallbackContext, 'signJwt'>
+  callbacks: Pick<CallbackContext, 'signJws'>
 
   /**
    * Additional payload to include in the key attestation jwt payload. Will be applied after
@@ -87,12 +81,12 @@ export interface CreateKeyAttestationJwtOptions {
 
 export async function createKeyAttestationJwt(options: CreateKeyAttestationJwtOptions): Promise<string> {
   const header = parseWithErrorHandling(zKeyAttestationJwtHeader, {
-    ...jwtHeaderFromJwtSigner(options.signer),
+    ...jwsHeaderFromSigner(options.signer),
     typ: 'key-attestation+jwt',
   } satisfies KeyAttestationJwtHeader)
 
   const payload = parseWithErrorHandling(zKeyAttestationJwtPayloadForUse(options.use), {
-    iat: dateToSeconds(options.issuedAt),
+    iat: dateToSeconds(options.issuedAt ?? new Date()),
     exp: options.expiresAt ? dateToSeconds(options.expiresAt) : undefined,
     nonce: options.nonce,
     attested_keys: options.attestedKeys,
@@ -102,7 +96,7 @@ export async function createKeyAttestationJwt(options: CreateKeyAttestationJwtOp
     ...options.additionalPayload,
   } satisfies KeyAttestationJwtPayload)
 
-  const { jwt } = await options.callbacks.signJwt(options.signer, { header, payload })
+  const { jwt } = await signJwt({ header, payload, signer: options.signer, signJwsCallback: options.callbacks.signJws })
   return jwt
 }
 
@@ -161,20 +155,34 @@ export interface VerifyKeyAttestationJwtOptions {
   now?: Date
 
   /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
+
+  /**
    * The `key_attestations_required` value of the proof type from the credential configuration in the
    * credential issuer metadata. If provided, the key attestation is verified against these requirements.
    */
   keyAttestationsRequired?: KeyAttestationsRequired
 
   /**
-   * Callbacks required for the key attestation jwt verification
+   * Callbacks required for the key attestation jwt verification. `verifyJws` decides whether the attester is
+   * trusted, for example by validating the `x5c` chain. A key attestation signed with a `jwk` signer is rejected
+   * before, as its key comes from the key attestation itself.
+   *
+   * A key attestation signed with a `did` signer is passed to `verifyJws`, which must then check that
+   * `signer.didUrl` belongs to a key attester the credential issuer trusts. Resolving the DID is not enough: anyone
+   * can create a did:jwk or did:key, or host a did:web, so any wallet could attest its own keys.
    */
-  callbacks: Pick<CallbackContext, 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'verifyJws'>
 }
 
 export type VerifyKeyAttestationJwtReturn = Awaited<ReturnType<typeof verifyKeyAttestationJwt>>
 export async function verifyKeyAttestationJwt(options: VerifyKeyAttestationJwtOptions) {
-  const { header, payload } = parseKeyAttestationJwt({ keyAttestationJwt: options.keyAttestationJwt, use: options.use })
+  const decodedJwt = parseKeyAttestationJwt({ keyAttestationJwt: options.keyAttestationJwt, use: options.use })
+  const { header, payload } = decodedJwt
 
   // TODO: if you use stateless nonce, it doesn't make sense to verify the nonce here
   // We should just return the nonce after verification so it can be checked (or actually, it should be checked upfront)
@@ -184,14 +192,17 @@ export async function verifyKeyAttestationJwt(options: VerifyKeyAttestationJwtOp
   }
 
   const { signer } = await verifyJwt({
-    compact: options.keyAttestationJwt,
-    header,
-    payload,
-    signer: jwtSignerFromJwt({ header, payload }),
-    verifyJwtCallback: options.callbacks.verifyJwt,
+    jwt: decodedJwt,
+    verifyJwsCallback: options.callbacks.verifyJws,
+    // The attester must be one the issuer trusts (OpenID4VCI 1.0 Appendix D), so its key cannot come from the key
+    // attestation itself: `verifyJws` accepts a key from a `jwk` header for proofs, and with it any wallet could
+    // attest its own keys. A DID signer (a `kid`, as Appendix D.1 allows) is allowed, and `verifyJws` must check
+    // that the DID is a trusted attester.
+    allowedSignerMethods: ['x5c', 'federation', 'custom', 'did'],
     errorMessage: 'Error verifying key attestation jwt',
     expectedNonce: options.expectedNonce,
     now: options.now,
+    skewSeconds: options.allowedSkewInSeconds,
   })
 
   verifyKeyAttestationRequirements({

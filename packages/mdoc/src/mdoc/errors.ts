@@ -1,7 +1,8 @@
+import { IdentityError } from '@owf/identity-common'
 import type { VerificationAssessment, VerificationCallback } from './check-callback.js'
 
 // biome-ignore format: no explanation
-export class MdlError extends Error {
+export class MdlError extends IdentityError {
   constructor(message: string = new.target.name) {
     super(message)
   }

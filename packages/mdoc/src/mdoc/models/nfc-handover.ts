@@ -2,14 +2,14 @@ import { zUint8Array } from '@owf/cose'
 import z from 'zod'
 import { Handover } from './handover'
 
-const nfcHandoverEncodedSchema = z.tuple([zUint8Array, zUint8Array.nullable()])
-const nfcHandoverDecodedSchema = z.object({
+const zNfcHandoverEncoded = z.tuple([zUint8Array, zUint8Array.nullable()])
+const zNfcHandoverDecoded = z.object({
   selectMessage: zUint8Array,
   requestMessage: zUint8Array.nullable(),
 })
 
-export type NfcHandoverEncodedStructure = z.infer<typeof nfcHandoverEncodedSchema>
-export type NfcHandoverDecodedStructure = z.infer<typeof nfcHandoverDecodedSchema>
+export type NfcHandoverEncodedStructure = z.infer<typeof zNfcHandoverEncoded>
+export type NfcHandoverDecodedStructure = z.infer<typeof zNfcHandoverDecoded>
 
 export type NfcHandoverOptions = {
   selectMessage: Uint8Array
@@ -18,7 +18,7 @@ export type NfcHandoverOptions = {
 
 export class NfcHandover extends Handover<NfcHandoverEncodedStructure, NfcHandoverDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(nfcHandoverEncodedSchema, nfcHandoverDecodedSchema, {
+    return z.codec(zNfcHandoverEncoded, zNfcHandoverDecoded, {
       encode: ({ selectMessage, requestMessage }) =>
         [selectMessage, requestMessage] satisfies NfcHandoverEncodedStructure,
       decode: ([selectMessage, requestMessage]) => ({ selectMessage, requestMessage }),

@@ -1,7 +1,8 @@
+import { zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 
 const zVerifierAttestation = z.object({
-  format: z.string(),
+  format: zNonEmptyString,
   data: z.record(z.string(), z.unknown()).or(z.string()),
   credential_ids: z.array(z.string()).optional(),
 })

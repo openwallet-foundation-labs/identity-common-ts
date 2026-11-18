@@ -1,4 +1,5 @@
 import { zDataUrl, zHttpsUrl } from '@openid4vc/utils'
+import { zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 import { zKeyAttestationsRequired } from '../../key-attestation/z-key-attestation'
 
@@ -35,8 +36,8 @@ export const zCredentialConfigurationSupportedCommonCredentialMetadata = z
 
 export const zCredentialConfigurationSupportedCommon = z
   .object({
-    format: z.string(),
-    scope: z.string().optional(),
+    format: zNonEmptyString,
+    scope: zNonEmptyString.optional(),
     cryptographic_binding_methods_supported: z.array(z.string()).optional(),
     credential_signing_alg_values_supported: z.array(z.string()).or(z.array(z.number())).optional(),
     proof_types_supported: z
@@ -54,8 +55,8 @@ export const zCredentialConfigurationSupportedCommon = z
 
 export const zCredentialConfigurationSupportedCommonDraft15 = z
   .object({
-    format: z.string(),
-    scope: z.string().optional(),
+    format: zNonEmptyString,
+    scope: zNonEmptyString.optional(),
     cryptographic_binding_methods_supported: z.array(z.string()).optional(),
     // Up until draft 15 it was an array of strings
     credential_signing_alg_values_supported: z.array(z.string()).optional(),

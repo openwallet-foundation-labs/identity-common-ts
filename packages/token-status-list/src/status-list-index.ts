@@ -1,5 +1,5 @@
 import type { Hasher } from '@owf/identity-common'
-import { SLException } from './status-list-exception'
+import { StatusListError } from './status-list-error'
 
 const UINT32_RANGE = 0x100000000
 
@@ -70,7 +70,9 @@ class SeededRandom {
       // Guard against a hasher that returns too little to make progress on:
       // without this the do/while in nextInt would spin forever.
       if (digest.length < 4) {
-        throw new SLException(`hasher returned ${digest.length} bytes for ${SEED_HASH_ALGORITHM}, expected at least 4`)
+        throw new StatusListError(
+          `hasher returned ${digest.length} bytes for ${SEED_HASH_ALGORITHM}, expected at least 4`
+        )
       }
       this.buffer = digest
       this.bufferOffset = 0
@@ -119,7 +121,7 @@ export class StatusListIndexAllocator {
 
   next(): number {
     if (this.position >= this.indices.length) {
-      throw new SLException('No status list indices remain')
+      throw new StatusListError('No status list indices remain')
     }
 
     return this.indices[this.position++]
@@ -147,18 +149,18 @@ export async function createStatusListIndexAllocator(
 
 function validateLength(length: number): void {
   if (!Number.isSafeInteger(length) || length <= 0 || length > 0xffffffff) {
-    throw new SLException('length must be a positive safe integer no greater than 2^32 - 1')
+    throw new StatusListError('length must be a positive safe integer no greater than 2^32 - 1')
   }
 }
 
 function validatePosition(position: number, length: number): void {
   if (!Number.isSafeInteger(position) || position < 0 || position > length) {
-    throw new SLException('position must be between 0 and length')
+    throw new StatusListError('position must be between 0 and length')
   }
 }
 
 function validateSeed(seed: Uint8Array): void {
   if (seed.length === 0) {
-    throw new SLException('seed must not be empty')
+    throw new StatusListError('seed must not be empty')
   }
 }

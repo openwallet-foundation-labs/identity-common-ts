@@ -1,5 +1,5 @@
-import { SchemaMetaException } from './schema-meta-exception'
-import { SchemaMetaSchema } from './schemas'
+import { SchemaMetaError } from './schema-meta-error'
+import { zSchemaMeta } from './schemas'
 import type { SchemaMeta } from './types'
 
 export interface ValidationError {
@@ -16,7 +16,7 @@ export interface ValidationResult {
  * Validate a SchemaMeta object against the TS11 schema
  */
 export function validateSchemaMeta(schemaMetaDocument: unknown): ValidationResult {
-  const result = SchemaMetaSchema.safeParse(schemaMetaDocument)
+  const result = zSchemaMeta.safeParse(schemaMetaDocument)
 
   if (result.success) {
     return { valid: true, errors: [] }
@@ -37,6 +37,6 @@ export function assertValidSchemaMeta(schemaMetaDocument: unknown): asserts sche
   const result = validateSchemaMeta(schemaMetaDocument)
   if (!result.valid) {
     const errorMessages = result.errors.map((e) => `${e.path}: ${e.message}`).join('\n')
-    throw new SchemaMetaException(`Invalid SchemaMeta:\n${errorMessages}`)
+    throw new SchemaMetaError(`Invalid SchemaMeta:\n${errorMessages}`)
   }
 }

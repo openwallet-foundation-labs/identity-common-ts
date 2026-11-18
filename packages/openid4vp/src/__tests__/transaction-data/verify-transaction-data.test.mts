@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { HashAlgorithm, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
+import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { describe, expect, test } from 'vitest'
 import { callbacks } from '../../../../oauth2/src/__tests__/util.mjs'
 import { verifyTransactionData } from '../../transaction-data/verify-transaction-data.js'
@@ -22,14 +22,12 @@ describe('Verify transaction data', () => {
           {
             transaction_data_hashes: [
               'random',
-              Buffer.from(callbacks.hash(Buffer.from(transactionData), HashAlgorithm.Sha256)).toString('base64url'),
+              Buffer.from(callbacks.hash(transactionData, 'sha-256')).toString('base64url'),
             ],
             transaction_data_hashes_alg: 'sha-256',
           },
           {
-            transaction_data_hashes: [
-              Buffer.from(callbacks.hash(Buffer.from(transactionData), HashAlgorithm.Sha256)).toString('base64url'),
-            ],
+            transaction_data_hashes: [Buffer.from(callbacks.hash(transactionData, 'sha-256')).toString('base64url')],
             transaction_data_hashes_alg: 'sha-256',
           },
         ],
@@ -43,13 +41,13 @@ describe('Verify transaction data', () => {
           {
             presentationIndex: 0,
             credentialHashIndex: 1,
-            hash: Buffer.from(callbacks.hash(Buffer.from(transactionData), HashAlgorithm.Sha256)).toString('base64url'),
+            hash: Buffer.from(callbacks.hash(transactionData, 'sha-256')).toString('base64url'),
             hashAlg: 'sha-256',
           },
           {
             presentationIndex: 1,
             credentialHashIndex: 0,
-            hash: Buffer.from(callbacks.hash(Buffer.from(transactionData), HashAlgorithm.Sha256)).toString('base64url'),
+            hash: Buffer.from(callbacks.hash(transactionData, 'sha-256')).toString('base64url'),
             hashAlg: 'sha-256',
           },
         ],
@@ -88,16 +86,14 @@ describe('Verify transaction data', () => {
       credentials: {
         three: [
           {
-            transaction_data_hashes: [
-              Buffer.from(callbacks.hash(Buffer.from(transactionData2), HashAlgorithm.Sha256)).toString('base64url'),
-            ],
+            transaction_data_hashes: [Buffer.from(callbacks.hash(transactionData2, 'sha-256')).toString('base64url')],
           },
         ],
         two: [
           {
             transaction_data_hashes: [
               'random',
-              Buffer.from(callbacks.hash(Buffer.from(transactionData), HashAlgorithm.Sha256)).toString('base64url'),
+              Buffer.from(callbacks.hash(transactionData, 'sha-256')).toString('base64url'),
             ],
             transaction_data_hashes_alg: 'sha-256',
           },
@@ -112,7 +108,7 @@ describe('Verify transaction data', () => {
           {
             presentationIndex: 0,
             credentialHashIndex: 1,
-            hash: Buffer.from(callbacks.hash(Buffer.from(transactionData), HashAlgorithm.Sha256)).toString('base64url'),
+            hash: Buffer.from(callbacks.hash(transactionData, 'sha-256')).toString('base64url'),
             hashAlg: 'sha-256',
           },
         ],
@@ -132,9 +128,7 @@ describe('Verify transaction data', () => {
           {
             presentationIndex: 0,
             credentialHashIndex: 0,
-            hash: Buffer.from(callbacks.hash(Buffer.from(transactionData2), HashAlgorithm.Sha256)).toString(
-              'base64url'
-            ),
+            hash: Buffer.from(callbacks.hash(transactionData2, 'sha-256')).toString('base64url'),
             hashAlg: 'sha-256',
           },
         ],
@@ -175,7 +169,7 @@ describe('Verify transaction data', () => {
             {
               transaction_data_hashes: [
                 'random',
-                Buffer.from(callbacks.hash(Buffer.from(transactionData), HashAlgorithm.Sha256)).toString('base64url'),
+                Buffer.from(callbacks.hash(transactionData, 'sha-256')).toString('base64url'),
               ],
               transaction_data_hashes_alg: 'sha-256',
             },
@@ -216,7 +210,7 @@ describe('Verify transaction data', () => {
             {
               transaction_data_hashes: [
                 'random',
-                Buffer.from(callbacks.hash(Buffer.from(transactionData), HashAlgorithm.Sha256)).toString('base64url'),
+                Buffer.from(callbacks.hash(transactionData, 'sha-256')).toString('base64url'),
               ],
               transaction_data_hashes_alg: 'random',
             },
@@ -257,7 +251,7 @@ describe('Verify transaction data', () => {
             {
               transaction_data_hashes: [
                 'random',
-                Buffer.from(callbacks.hash(Buffer.from(transactionData), HashAlgorithm.Sha256)).toString('base64url'),
+                Buffer.from(callbacks.hash(transactionData, 'sha-256')).toString('base64url'),
               ],
               transaction_data_hashes_alg: 'random',
             },

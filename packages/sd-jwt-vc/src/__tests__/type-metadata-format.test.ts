@@ -1,19 +1,19 @@
 import { describe, expect, test } from 'vitest'
-import { RenderingSchema, type TypeMetadataFormat } from '../sd-jwt-vc-type-metadata-format'
+import { type TypeMetadataFormat, zRendering } from '../sd-jwt-vc-type-metadata-format'
 
 const svgTemplate = { uri: 'https://example.com/template.svg' }
 
-describe('RenderingSchema', () => {
+describe('zRendering', () => {
   test('keeps svg_templates', () => {
-    expect(RenderingSchema.parse({ svg_templates: [svgTemplate] })).toStrictEqual({ svg_templates: [svgTemplate] })
+    expect(zRendering.parse({ svg_templates: [svgTemplate] })).toStrictEqual({ svg_templates: [svgTemplate] })
   })
 
   test('maps the deprecated svg_template to svg_templates', () => {
-    expect(RenderingSchema.parse({ svg_template: [svgTemplate] })).toStrictEqual({ svg_templates: [svgTemplate] })
+    expect(zRendering.parse({ svg_template: [svgTemplate] })).toStrictEqual({ svg_templates: [svgTemplate] })
   })
 
   test('does not add svg_templates when not present', () => {
-    expect(RenderingSchema.parse({ simple: { background_color: '#ffffff' } })).toStrictEqual({
+    expect(zRendering.parse({ simple: { background_color: '#ffffff' } })).toStrictEqual({
       simple: { background_color: '#ffffff' },
     })
   })

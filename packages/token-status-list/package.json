@@ -1,6 +1,6 @@
 {
   "name": "@owf/token-status-list",
-  "version": "0.6.2",
+  "version": "0.8.0",
   "files": [
     "dist"
   ],
@@ -31,8 +31,9 @@
   "dependencies": {
     "@owf/cose": "workspace:*",
     "@owf/identity-common": "workspace:*",
+    "@owf/jose": "workspace:*",
     "cbor-x": "catalog:",
-    "pako": "^3.0.2",
+    "pako": "^3.0.3",
     "zod": "catalog:"
   }
 }

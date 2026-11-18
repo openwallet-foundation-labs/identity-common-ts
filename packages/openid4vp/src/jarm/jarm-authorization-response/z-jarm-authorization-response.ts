@@ -1,4 +1,4 @@
-import { zJwtHeader, zJwtPayload } from '@openid4vc/oauth2'
+import { zJwtHeader, zJwtPayload } from '@owf/jose'
 import { z } from 'zod'
 
 export const zJarmHeader = z.object({ ...zJwtHeader.shape, apu: z.string().optional(), apv: z.string().optional() })

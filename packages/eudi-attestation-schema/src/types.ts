@@ -12,52 +12,52 @@ import type { Verifier } from '@owf/identity-common'
 import type { TypeMetadataFormat } from '@sd-jwt/sd-jwt-vc'
 import type { z } from 'zod'
 import type {
-  AttestationFormatSchema,
-  AttestationLoSSchema,
-  BindingTypeSchema,
-  FrameworkTypeSchema,
-  IssuanceProfileSchema,
-  MsoMdocMetaSchema,
-  Oid4vciClaimDisplaySchema,
-  Oid4vciClaimSchema,
-  Oid4vciCredentialMetadataSchema,
-  Oid4vciDisplaySchema,
-  ProofTypeSchema,
-  SchemaMetaSchema,
-  SchemaURISchema,
-  SdJwtMetaSchema,
-  SdJwtVcTypeMetadataSchema,
-  StatusMechanismSchema,
-  TrustAuthoritySchema,
+  zAttestationFormat,
+  zAttestationLos,
+  zBindingType,
+  zFrameworkType,
+  zIssuanceProfile,
+  zMsoMdocMeta,
+  zOid4vciClaim,
+  zOid4vciClaimDisplay,
+  zOid4vciCredentialMetadata,
+  zOid4vciDisplay,
+  zProofType,
+  zSchemaMeta,
+  zSchemaUri,
+  zSdJwtMeta,
+  zSdJwtVcTypeMetadata,
+  zStatusMechanism,
+  zTrustAuthority,
 } from './schemas'
 
 // ============================================================================
 // Enum Types
 // ============================================================================
 
-export type AttestationFormat = z.infer<typeof AttestationFormatSchema>
-export type AttestationLoS = z.infer<typeof AttestationLoSSchema>
-export type BindingType = z.infer<typeof BindingTypeSchema>
-export type FrameworkType = z.infer<typeof FrameworkTypeSchema>
+export type AttestationFormat = z.infer<typeof zAttestationFormat>
+export type AttestationLos = z.infer<typeof zAttestationLos>
+export type BindingType = z.infer<typeof zBindingType>
+export type FrameworkType = z.infer<typeof zFrameworkType>
 
 // ============================================================================
 // Data Model Types
 // ============================================================================
 
-export type TrustAuthority = z.infer<typeof TrustAuthoritySchema>
-export type SdJwtMeta = z.infer<typeof SdJwtMetaSchema>
-export type MsoMdocMeta = z.infer<typeof MsoMdocMetaSchema>
-export type Oid4vciCredentialMetadata = z.infer<typeof Oid4vciCredentialMetadataSchema>
-export type Oid4vciDisplay = z.infer<typeof Oid4vciDisplaySchema>
-export type Oid4vciClaimDisplay = z.infer<typeof Oid4vciClaimDisplaySchema>
-export type Oid4vciClaim = z.infer<typeof Oid4vciClaimSchema>
-export type SdJwtVcTypeMetadata = z.infer<typeof SdJwtVcTypeMetadataSchema>
-export type SchemaURIMeta = SdJwtMeta | MsoMdocMeta
-export type SchemaURI = z.infer<typeof SchemaURISchema>
-export type ProofType = z.infer<typeof ProofTypeSchema>
-export type StatusMechanism = z.infer<typeof StatusMechanismSchema>
-export type IssuanceProfile = z.infer<typeof IssuanceProfileSchema>
-export type SchemaMeta = z.infer<typeof SchemaMetaSchema>
+export type TrustAuthority = z.infer<typeof zTrustAuthority>
+export type SdJwtMeta = z.infer<typeof zSdJwtMeta>
+export type MsoMdocMeta = z.infer<typeof zMsoMdocMeta>
+export type Oid4vciCredentialMetadata = z.infer<typeof zOid4vciCredentialMetadata>
+export type Oid4vciDisplay = z.infer<typeof zOid4vciDisplay>
+export type Oid4vciClaimDisplay = z.infer<typeof zOid4vciClaimDisplay>
+export type Oid4vciClaim = z.infer<typeof zOid4vciClaim>
+export type SdJwtVcTypeMetadata = z.infer<typeof zSdJwtVcTypeMetadata>
+export type SchemaUriMeta = SdJwtMeta | MsoMdocMeta
+export type SchemaUri = z.infer<typeof zSchemaUri>
+export type ProofType = z.infer<typeof zProofType>
+export type StatusMechanism = z.infer<typeof zStatusMechanism>
+export type IssuanceProfile = z.infer<typeof zIssuanceProfile>
+export type SchemaMeta = z.infer<typeof zSchemaMeta>
 
 // ============================================================================
 // Signed SchemaMeta Types
@@ -111,7 +111,7 @@ export interface ResolvedSchemaReference {
   format: AttestationFormat
   uri: string
   integrity: string
-  meta?: SchemaURIMeta
+  meta?: SchemaUriMeta
   rawSchema: unknown
   /** Present for `dc+sd-jwt` references that resolve to Type Metadata, merged over `extends`. */
   typeMetadata?: TypeMetadataFormat

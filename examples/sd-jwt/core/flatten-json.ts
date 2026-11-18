@@ -1,12 +1,12 @@
 import type { DisclosureFrame } from '@sd-jwt/core'
-import { FlattenJSON, SDJwtInstance } from '@sd-jwt/core'
+import { FlattenJson, SdJwtInstance } from '@sd-jwt/core'
 import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
 
 ;(async () => {
   const { signer, verifier } = await createSignerVerifier()
 
-  // Create SDJwt instance for use
-  const sdjwt = new SDJwtInstance({
+  // Create SdJwt instance for use
+  const sdjwt = new SdJwtInstance({
     signer,
     signAlg: ES256.alg,
     verifier,
@@ -26,7 +26,7 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
     _sd: ['firstname', 'id'],
   }
 
-  const kbPayload = {
+  const KbJwtPayload = {
     iat: Math.floor(Date.now() / 1000),
     aud: 'https://example.com',
     nonce: '1234',
@@ -36,21 +36,21 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
   const encodedSdjwt = await sdjwt.issue(claims, disclosureFrame)
   console.log('encodedSdjwt:', encodedSdjwt)
 
-  const flattenJSON = FlattenJSON.fromEncode(encodedSdjwt)
-  console.log('flattenJSON(credential): ', flattenJSON.toJson())
+  const flattenJson = FlattenJson.fromEncode(encodedSdjwt)
+  console.log('flattenJson(credential): ', flattenJson.toJson())
 
   const presentedSdJwt = await sdjwt.present<typeof claims>(
     encodedSdjwt,
     { id: true },
     {
       kb: {
-        payload: kbPayload,
+        payload: KbJwtPayload,
       },
     }
   )
 
-  const flattenPresentationJSON = FlattenJSON.fromEncode(presentedSdJwt)
-  console.log('flattenJSON(presentation): ', flattenPresentationJSON.toJson())
+  const flattenPresentationJson = FlattenJson.fromEncode(presentedSdJwt)
+  console.log('flattenJson(presentation): ', flattenPresentationJson.toJson())
 
   const verified = await sdjwt.verify(presentedSdJwt, {
     requiredClaimKeys: ['id'],

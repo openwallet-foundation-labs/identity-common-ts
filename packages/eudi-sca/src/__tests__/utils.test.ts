@@ -1,5 +1,5 @@
 import { expect, suite, test } from 'vitest'
-import { getJsonPathValueAndKey, Iso4217Amount, Iso4217CurrencyCode } from '../utils'
+import { getJsonPathValueAndKey, zIso4217Amount, zIso4217CurrencyCode } from '../utils'
 
 suite('getJsonPathValueAndKey', () => {
   suite('edge cases', () => {
@@ -81,124 +81,124 @@ suite('getJsonPathValueAndKey', () => {
   })
 })
 
-suite('Iso4217CurrencyCode', () => {
+suite('zIso4217CurrencyCode', () => {
   test('accepts valid ISO4217 currency codes', () => {
-    expect(Iso4217CurrencyCode.parse('USD')).toBe('USD')
-    expect(Iso4217CurrencyCode.parse('EUR')).toBe('EUR')
-    expect(Iso4217CurrencyCode.parse('GBP')).toBe('GBP')
-    expect(Iso4217CurrencyCode.parse('JPY')).toBe('JPY')
-    expect(Iso4217CurrencyCode.parse('AED')).toBe('AED')
-    expect(Iso4217CurrencyCode.parse('ZWL')).toBe('ZWL')
+    expect(zIso4217CurrencyCode.parse('USD')).toBe('USD')
+    expect(zIso4217CurrencyCode.parse('EUR')).toBe('EUR')
+    expect(zIso4217CurrencyCode.parse('GBP')).toBe('GBP')
+    expect(zIso4217CurrencyCode.parse('JPY')).toBe('JPY')
+    expect(zIso4217CurrencyCode.parse('AED')).toBe('AED')
+    expect(zIso4217CurrencyCode.parse('ZWL')).toBe('ZWL')
   })
 
   test('rejects invalid currency codes', () => {
-    expect(() => Iso4217CurrencyCode.parse('ABC')).toThrow()
-    expect(() => Iso4217CurrencyCode.parse('XXX')).toThrow()
-    expect(() => Iso4217CurrencyCode.parse('US')).toThrow()
-    expect(() => Iso4217CurrencyCode.parse('USDD')).toThrow()
+    expect(() => zIso4217CurrencyCode.parse('ABC')).toThrow()
+    expect(() => zIso4217CurrencyCode.parse('XXX')).toThrow()
+    expect(() => zIso4217CurrencyCode.parse('US')).toThrow()
+    expect(() => zIso4217CurrencyCode.parse('USDD')).toThrow()
   })
 
   test('rejects lowercase currency codes', () => {
-    expect(() => Iso4217CurrencyCode.parse('usd')).toThrow()
-    expect(() => Iso4217CurrencyCode.parse('eur')).toThrow()
-    expect(() => Iso4217CurrencyCode.parse('Usd')).toThrow()
+    expect(() => zIso4217CurrencyCode.parse('usd')).toThrow()
+    expect(() => zIso4217CurrencyCode.parse('eur')).toThrow()
+    expect(() => zIso4217CurrencyCode.parse('Usd')).toThrow()
   })
 
   test('rejects empty string', () => {
-    expect(() => Iso4217CurrencyCode.parse('')).toThrow()
+    expect(() => zIso4217CurrencyCode.parse('')).toThrow()
   })
 
   test('rejects non-string values', () => {
-    expect(() => Iso4217CurrencyCode.parse(123)).toThrow()
-    expect(() => Iso4217CurrencyCode.parse(null)).toThrow()
-    expect(() => Iso4217CurrencyCode.parse(undefined)).toThrow()
+    expect(() => zIso4217CurrencyCode.parse(123)).toThrow()
+    expect(() => zIso4217CurrencyCode.parse(null)).toThrow()
+    expect(() => zIso4217CurrencyCode.parse(undefined)).toThrow()
   })
 })
 
-suite('Iso4217Amount', () => {
+suite('zIso4217Amount', () => {
   suite('valid amounts', () => {
     test('accepts correct format with valid currency code', () => {
-      expect(Iso4217Amount.parse('49.99 EUR')).toBe('49.99 EUR')
-      expect(Iso4217Amount.parse('100.00 USD')).toBe('100.00 USD')
-      expect(Iso4217Amount.parse('0.00 EUR')).toBe('0.00 EUR')
-      expect(Iso4217Amount.parse('1234567.89 GBP')).toBe('1234567.89 GBP')
-      expect(Iso4217Amount.parse('9.9 JPY')).toBe('9.9 JPY')
+      expect(zIso4217Amount.parse('49.99 EUR')).toBe('49.99 EUR')
+      expect(zIso4217Amount.parse('100.00 USD')).toBe('100.00 USD')
+      expect(zIso4217Amount.parse('0.00 EUR')).toBe('0.00 EUR')
+      expect(zIso4217Amount.parse('1234567.89 GBP')).toBe('1234567.89 GBP')
+      expect(zIso4217Amount.parse('9.9 JPY')).toBe('9.9 JPY')
     })
 
     test('accepts amounts with multiple decimal places', () => {
-      expect(Iso4217Amount.parse('1.000 KWD')).toBe('1.000 KWD')
-      expect(Iso4217Amount.parse('10.5 USD')).toBe('10.5 USD')
+      expect(zIso4217Amount.parse('1.000 KWD')).toBe('1.000 KWD')
+      expect(zIso4217Amount.parse('10.5 USD')).toBe('10.5 USD')
     })
 
     test('accepts zero amount', () => {
-      expect(Iso4217Amount.parse('0.0 USD')).toBe('0.0 USD')
+      expect(zIso4217Amount.parse('0.0 USD')).toBe('0.0 USD')
     })
 
     test('accepts large amounts', () => {
-      expect(Iso4217Amount.parse('9999999999.99 USD')).toBe('9999999999.99 USD')
+      expect(zIso4217Amount.parse('9999999999.99 USD')).toBe('9999999999.99 USD')
     })
   })
 
   suite('invalid format', () => {
     test('rejects amount without decimal part', () => {
-      expect(() => Iso4217Amount.parse('100 USD')).toThrow()
+      expect(() => zIso4217Amount.parse('100 USD')).toThrow()
     })
 
     test('rejects amount without currency code', () => {
-      expect(() => Iso4217Amount.parse('100.00')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00')).toThrow()
     })
 
     test('rejects amount with wrong separator', () => {
-      expect(() => Iso4217Amount.parse('100.00-USD')).toThrow()
-      expect(() => Iso4217Amount.parse('100.00_USD')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00-USD')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00_USD')).toThrow()
     })
 
     test('rejects negative amounts', () => {
-      expect(() => Iso4217Amount.parse('-100.00 USD')).toThrow()
+      expect(() => zIso4217Amount.parse('-100.00 USD')).toThrow()
     })
 
     test('rejects amount with comma decimal separator', () => {
-      expect(() => Iso4217Amount.parse('100,00 USD')).toThrow()
+      expect(() => zIso4217Amount.parse('100,00 USD')).toThrow()
     })
 
     test('rejects extra whitespace', () => {
-      expect(() => Iso4217Amount.parse('100.00  USD')).toThrow()
-      expect(() => Iso4217Amount.parse(' 100.00 USD')).toThrow()
-      expect(() => Iso4217Amount.parse('100.00 USD ')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00  USD')).toThrow()
+      expect(() => zIso4217Amount.parse(' 100.00 USD')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00 USD ')).toThrow()
     })
 
     test('rejects empty string', () => {
-      expect(() => Iso4217Amount.parse('')).toThrow()
+      expect(() => zIso4217Amount.parse('')).toThrow()
     })
 
     test('rejects non-string values', () => {
-      expect(() => Iso4217Amount.parse(100)).toThrow()
-      expect(() => Iso4217Amount.parse(null)).toThrow()
-      expect(() => Iso4217Amount.parse(undefined)).toThrow()
+      expect(() => zIso4217Amount.parse(100)).toThrow()
+      expect(() => zIso4217Amount.parse(null)).toThrow()
+      expect(() => zIso4217Amount.parse(undefined)).toThrow()
     })
   })
 
   suite('invalid currency code in amount', () => {
     test('rejects unknown currency codes', () => {
-      expect(() => Iso4217Amount.parse('100.00 ABC')).toThrow()
-      expect(() => Iso4217Amount.parse('100.00 XXX')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00 ABC')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00 XXX')).toThrow()
     })
 
     test('rejects lowercase currency codes', () => {
-      expect(() => Iso4217Amount.parse('100.00 usd')).toThrow()
-      expect(() => Iso4217Amount.parse('100.00 eur')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00 usd')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00 eur')).toThrow()
     })
 
     test('rejects 2-letter currency codes', () => {
-      expect(() => Iso4217Amount.parse('100.00 US')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00 US')).toThrow()
     })
 
     test('rejects 4-letter currency codes', () => {
-      expect(() => Iso4217Amount.parse('100.00 USDD')).toThrow()
+      expect(() => zIso4217Amount.parse('100.00 USDD')).toThrow()
     })
 
     test('provides correct error message for invalid currency code', () => {
-      const result = Iso4217Amount.safeParse('100.00 ABC')
+      const result = zIso4217Amount.safeParse('100.00 ABC')
       expect(result.success).toBe(false)
       if (!result.success) {
         const messages = result.error.issues.map((i) => i.message)
@@ -209,11 +209,11 @@ suite('Iso4217Amount', () => {
 
   suite('boundary currency codes in amounts', () => {
     test('accepts first currency in list (AED)', () => {
-      expect(Iso4217Amount.parse('1.00 AED')).toBe('1.00 AED')
+      expect(zIso4217Amount.parse('1.00 AED')).toBe('1.00 AED')
     })
 
     test('accepts last currency in list (ZWL)', () => {
-      expect(Iso4217Amount.parse('1.00 ZWL')).toBe('1.00 ZWL')
+      expect(zIso4217Amount.parse('1.00 ZWL')).toBe('1.00 ZWL')
     })
   })
 })

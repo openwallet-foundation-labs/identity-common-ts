@@ -5,7 +5,7 @@
 
 Core library for [Selective Disclosure for JWTs (SD-JWT) — RFC 9901](https://www.rfc-editor.org/rfc/rfc9901.html).
 
-This package provides types, utilities, encoding/decoding, presentation, and the main `SDJwtInstance` class — everything needed to issue, present, and verify SD-JWTs. For [SD-JWT-based Verifiable Credentials](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/), use [`@sd-jwt/sd-jwt-vc`](../sd-jwt-vc), which is built on top of this package.
+This package provides types, utilities, encoding/decoding, presentation, and the main `SdJwtInstance` class — everything needed to issue, present, and verify SD-JWTs. For [SD-JWT-based Verifiable Credentials](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/), use [`@sd-jwt/sd-jwt-vc`](../sd-jwt-vc), which is built on top of this package.
 
 ## Installation
 
@@ -24,12 +24,12 @@ yarn add @sd-jwt/core
 
 ```typescript
 import Crypto from 'node:crypto'
-import { SDJwtInstance } from '@sd-jwt/core'
+import { SdJwtInstance } from '@sd-jwt/core'
 
 // Bring your own crypto – any Signer / Verifier / Hasher that fits the interface
 const { privateKey, publicKey } = Crypto.generateKeyPairSync('ed25519')
 
-const sdjwt = new SDJwtInstance({
+const sdjwt = new SdJwtInstance({
   signer: async (data) => {
     const sig = Crypto.sign(null, Buffer.from(data), privateKey)
     return Buffer.from(sig).toString('base64url')

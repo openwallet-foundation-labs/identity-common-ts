@@ -1,14 +1,14 @@
 import {
   type AuthorizationServerMetadata,
   clientAuthenticationAnonymous,
-  decodeJwt,
   preAuthorizedCodeGrantIdentifier,
 } from '@openid4vc/oauth2'
-import { parseWithErrorHandling, ValidationError } from '@openid4vc/utils'
+import { parseWithErrorHandling, ValidationError } from '@owf/identity-common'
+import { decodeJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import { callbacks, getSignJwtCallback, parseXwwwFormUrlEncoded } from '../../../oauth2/src/__tests__/util.mjs'
+import { callbacks, getSignJwsCallback, parseXwwwFormUrlEncoded } from '../../../oauth2/src/__tests__/util.mjs'
 import { zAuthorizationChallengeRequest } from '../../../oauth2/src/authorization-challenge/z-authorization-challenge.js'
 import { Openid4vciVersion } from '../index.js'
 import { extractScopesForCredentialConfigurationIds } from '../metadata/credential-issuer/credential-configurations.js'
@@ -84,7 +84,7 @@ describe('Openid4vciClient', () => {
         ...callbacks,
         clientAuthentication: clientAuthenticationAnonymous(),
         fetch,
-        signJwt: getSignJwtCallback([paradymDraft13.holderPrivateKeyJwk]),
+        signJws: getSignJwsCallback([paradymDraft13.holderPrivateKeyJwk]),
       },
     })
 
@@ -119,7 +119,7 @@ describe('Openid4vciClient', () => {
     expect(proofJwt).toMatch(
       'eyJhbGciOiJFUzI1NiIsInR5cCI6Im9wZW5pZDR2Y2ktcHJvb2Yrand0Iiwia2lkIjoiZGlkOmp3azpleUpyZEhraU9pSkZReUlzSW5naU9pSkJSVmh3U0hreE1FZG9kRmRvYkZaUVRtMXlSbk5pZVhSZmQwUnpVVjgzY1ROa2FrNXVjbWg2YWw4MElpd2llU0k2SWtSSFZFRkRUMEZCYmxGVVpYQmhSRFF3WjNsSE9WcHNMVzlFYUU5c2RqTlZRbXhVZEhoSlpYSTFaVzhpTENKamNuWWlPaUpRTFRJMU5pSjkjMCJ9.eyJhdWQiOiJodHRwczovL2FnZW50LnBhcmFkeW0uaWQvb2lkNHZjaS9kcmFmdC0xMy1pc3N1ZXIiLCJpYXQiOjE3Mjg1MTg0MDAsIm5vbmNlIjoiNDYzMjUzOTE3MDk0ODY5MTcyMDc4MzEwIn0.'
     )
-    expect(decodeJwt({ jwt: proofJwt })).toStrictEqual({
+    expect(decodeJwt({ jwt: proofJwt })).toMatchObject({
       header: {
         alg: 'ES256',
         kid: 'did:jwk:eyJrdHkiOiJFQyIsIngiOiJBRVhwSHkxMEdodFdobFZQTm1yRnNieXRfd0RzUV83cTNkak5ucmh6al80IiwieSI6IkRHVEFDT0FBblFUZXBhRDQwZ3lHOVpsLW9EaE9sdjNVQmxUdHhJZXI1ZW8iLCJjcnYiOiJQLTI1NiJ9#0',
@@ -198,7 +198,7 @@ describe('Openid4vciClient', () => {
         ...callbacks,
         clientAuthentication: clientAuthenticationAnonymous(),
         fetch,
-        signJwt: getSignJwtCallback([paradymDraft11.holderPrivateKeyJwk]),
+        signJws: getSignJwsCallback([paradymDraft11.holderPrivateKeyJwk]),
       },
     })
 
@@ -296,7 +296,7 @@ describe('Openid4vciClient', () => {
     expect(proofJwt).toMatch(
       'eyJhbGciOiJFUzI1NiIsInR5cCI6Im9wZW5pZDR2Y2ktcHJvb2Yrand0Iiwia2lkIjoiZGlkOmp3azpleUpyZEhraU9pSkZReUlzSW5naU9pSkJSVmh3U0hreE1FZG9kRmRvYkZaUVRtMXlSbk5pZVhSZmQwUnpVVjgzY1ROa2FrNXVjbWg2YWw4MElpd2llU0k2SWtSSFZFRkRUMEZCYmxGVVpYQmhSRFF3WjNsSE9WcHNMVzlFYUU5c2RqTlZRbXhVZEhoSlpYSTFaVzhpTENKamNuWWlPaUpRTFRJMU5pSjkjMCJ9.eyJhdWQiOiJodHRwczovL2FnZW50LnBhcmFkeW0uaWQvb2lkNHZjaS9kcmFmdC0xMS1pc3N1ZXIiLCJpYXQiOjE3Mjg1MTg0MDAsIm5vbmNlIjoiNDYzMjUzOTE3MDk0ODY5MTcyMDc4MzEwIn0.'
     )
-    expect(decodeJwt({ jwt: proofJwt })).toStrictEqual({
+    expect(decodeJwt({ jwt: proofJwt })).toMatchObject({
       header: {
         alg: 'ES256',
         kid: 'did:jwk:eyJrdHkiOiJFQyIsIngiOiJBRVhwSHkxMEdodFdobFZQTm1yRnNieXRfd0RzUV83cTNkak5ucmh6al80IiwieSI6IkRHVEFDT0FBblFUZXBhRDQwZ3lHOVpsLW9EaE9sdjNVQmxUdHhJZXI1ZW8iLCJjcnYiOiJQLTI1NiJ9#0',
@@ -359,7 +359,7 @@ describe('Openid4vciClient', () => {
           decodeJwt({
             jwt: request.headers.get('DPoP') as string,
           })
-        ).toStrictEqual({
+        ).toMatchObject({
           header: {
             alg: 'ES256',
             typ: 'dpop+jwt',
@@ -400,7 +400,7 @@ describe('Openid4vciClient', () => {
           decodeJwt({
             jwt: request.headers.get('DPoP') as string,
           })
-        ).toStrictEqual({
+        ).toMatchObject({
           header: {
             alg: 'ES256',
             typ: 'dpop+jwt',
@@ -438,7 +438,7 @@ describe('Openid4vciClient', () => {
       callbacks: {
         ...callbacks,
         fetch,
-        signJwt: getSignJwtCallback([bdrDraft13.holderPrivateKeyJwk, bdrDraft13.dpopPrivateKeyJwk]),
+        signJws: getSignJwsCallback([bdrDraft13.holderPrivateKeyJwk, bdrDraft13.dpopPrivateKeyJwk]),
       },
     })
 
@@ -511,7 +511,7 @@ describe('Openid4vciClient', () => {
     expect(proofJwt).toMatch(
       'eyJhbGciOiJFUzI1NiIsInR5cCI6Im9wZW5pZDR2Y2ktcHJvb2Yrand0IiwiandrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiQUVYcEh5MTBHaHRXaGxWUE5tckZzYnl0X3dEc1FfN3EzZGpObnJoempfNCIsInkiOiJER1RBQ09BQW5RVGVwYUQ0MGd5RzlabC1vRGhPbHYzVUJsVHR4SWVyNWVvIn19.eyJpc3MiOiJzb21lLXJhbmRvbS1jbGllbnQtaWQiLCJhdWQiOiJodHRwczovL2RlbW8ucGlkLWlzc3Vlci5idW5kZXNkcnVja2VyZWkuZGUvYyIsImlhdCI6MTcyODUxODQwMCwibm9uY2UiOiJzak5NaXF5Zm1CZUQxcWlvQ1Z5cXZTIn0.'
     )
-    expect(decodeJwt({ jwt: proofJwt })).toStrictEqual({
+    expect(decodeJwt({ jwt: proofJwt })).toMatchObject({
       header: {
         alg: 'ES256',
         jwk: publicKeyJwk,
@@ -616,7 +616,7 @@ describe('Openid4vciClient', () => {
       callbacks: {
         ...callbacks,
         fetch,
-        signJwt: getSignJwtCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
+        signJws: getSignJwsCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
       },
     })
 
@@ -688,7 +688,7 @@ describe('Openid4vciClient', () => {
       nonce: accessTokenResponse.c_nonce,
     })
 
-    expect(decodeJwt({ jwt: proofJwt })).toStrictEqual({
+    expect(decodeJwt({ jwt: proofJwt })).toMatchObject({
       header: {
         alg: 'ES256',
         jwk: publicKeyJwk,
@@ -756,7 +756,7 @@ describe('Openid4vciClient', () => {
       callbacks: {
         ...callbacks,
         fetch,
-        signJwt: getSignJwtCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
+        signJws: getSignJwsCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
       },
     })
     const credentialOffer = await client.resolveCredentialOffer(presentationDuringIssuance.credentialOffer)
@@ -817,7 +817,7 @@ describe('Openid4vciClient', () => {
       callbacks: {
         ...callbacks,
         fetch,
-        signJwt: getSignJwtCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
+        signJws: getSignJwsCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
       },
     })
     const credentialOffer = await client.resolveCredentialOffer(presentationDuringIssuance.credentialOffer)
@@ -833,6 +833,116 @@ describe('Openid4vciClient', () => {
 
     expect(authorization.authorizationFlow).toBe(AuthorizationFlow.Oauth2Redirect)
     expect(authorization.dpop).toEqual({ ...dpop, nonce: dpopNonce })
+  })
+
+  // RFC 6749 Section 4.1.1: the client includes `state` in the authorization request so it can
+  // check the authorization response against it (Section 10.12)
+  test('forward state to the authorization challenge and pushed authorization request in initiateAuthorization', async () => {
+    const state = 'some-random-state'
+    const requestStates: Array<string | undefined> = []
+
+    server.resetHandlers(
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`,
+        () => HttpResponse.json(presentationDuringIssuance.credentialIssuerMetadata)
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-configuration`,
+        () => HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/oauth-authorization-server`,
+        () => HttpResponse.json(presentationDuringIssuance.authorizationServerMetadata)
+      ),
+      http.post(
+        presentationDuringIssuance.authorizationServerMetadata.authorization_challenge_endpoint,
+        async ({ request }) => {
+          requestStates.push(parseXwwwFormUrlEncoded(await request.text()).state)
+          return HttpResponse.json({ error: 'redirect_to_web' }, { status: 400 })
+        }
+      ),
+      http.post(
+        presentationDuringIssuance.authorizationServerMetadata.pushed_authorization_request_endpoint,
+        async ({ request }) => {
+          requestStates.push(parseXwwwFormUrlEncoded(await request.text()).state)
+          return HttpResponse.json({
+            request_uri: 'urn:ietf:params:oauth:request_uri:request',
+            expires_in: 60,
+          })
+        }
+      )
+    )
+
+    const client = new Openid4vciClient({
+      callbacks: {
+        ...callbacks,
+        fetch,
+        signJws: getSignJwsCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
+      },
+    })
+    const credentialOffer = await client.resolveCredentialOffer(presentationDuringIssuance.credentialOffer)
+    const issuerMetadata = await client.resolveIssuerMetadata(credentialOffer.credential_issuer)
+
+    const authorization = await client.initiateAuthorization({
+      clientId: 'some-random-client-id',
+      issuerMetadata,
+      redirectUri: 'https://example.com/redirect',
+      credentialOffer,
+      state,
+    })
+    expect(authorization.authorizationFlow).toBe(AuthorizationFlow.Oauth2Redirect)
+    // Authorization challenge, then PAR after the redirect_to_web response
+    expect(requestStates).toEqual([state, state])
+  })
+
+  test('forward state to the pushed authorization request in createAuthorizationRequestUrlFromOffer', async () => {
+    const state = 'some-random-state'
+    let requestState: string | undefined
+
+    server.resetHandlers(
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`,
+        () => HttpResponse.json(presentationDuringIssuance.credentialIssuerMetadata)
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-configuration`,
+        () => HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/oauth-authorization-server`,
+        () => HttpResponse.json(presentationDuringIssuance.authorizationServerMetadata)
+      ),
+      http.post(
+        presentationDuringIssuance.authorizationServerMetadata.pushed_authorization_request_endpoint,
+        async ({ request }) => {
+          requestState = parseXwwwFormUrlEncoded(await request.text()).state
+          return HttpResponse.json({
+            request_uri: 'urn:ietf:params:oauth:request_uri:request',
+            expires_in: 60,
+          })
+        }
+      )
+    )
+
+    const client = new Openid4vciClient({
+      callbacks: {
+        ...callbacks,
+        fetch,
+        signJws: getSignJwsCallback([presentationDuringIssuance.holderPrivateKeyJwk]),
+      },
+    })
+    const credentialOffer = await client.resolveCredentialOffer(presentationDuringIssuance.credentialOffer)
+    const issuerMetadata = await client.resolveIssuerMetadata(credentialOffer.credential_issuer)
+
+    await client.createAuthorizationRequestUrlFromOffer({
+      clientId: 'some-random-client-id',
+      issuerMetadata,
+      redirectUri: 'https://example.com/redirect',
+      credentialOffer,
+      state,
+    })
+
+    expect(requestState).toEqual(state)
   })
 
   test.each([
@@ -866,7 +976,7 @@ describe('Openid4vciClient', () => {
       http.get('https://example.com/.well-known/openid-credential-issuer/issuer-id', () => HttpResponse.json(metadata)),
       http.get(`${credentialIssuer}/.well-known/openid-credential-issuer`, () => HttpResponse.json(metadata))
     )
-    const client = new Openid4vciClient({ callbacks: { ...callbacks, fetch, signJwt: getSignJwtCallback([]) } })
+    const client = new Openid4vciClient({ callbacks: { ...callbacks, fetch, signJws: getSignJwsCallback([]) } })
 
     await expect(client.resolveIssuerMetadata(credentialIssuer)).rejects.toMatchObject({
       constructor: ValidationError,
@@ -902,7 +1012,7 @@ describe('Openid4vciClient', () => {
       callbacks: {
         ...callbacks,
         fetch,
-        signJwt: () => {
+        signJws: () => {
           throw new Error('Not implemented')
         },
       },
@@ -1098,7 +1208,7 @@ describe('Openid4vciClient', () => {
       callbacks: {
         ...callbacks,
         fetch,
-        signJwt: () => {
+        signJws: () => {
           throw new Error('Not implemented')
         },
       },

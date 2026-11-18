@@ -1,5 +1,5 @@
 /**
- * EUDI WRPRC (Wallet-Relying Party Registration Certificate) Package
+ * EUDI Wallet-Relying Party Registration Certificates
  *
  * Implementation of ETSI TS 119 475 v1.2.1 - Wallet-Relying Party Registration Certificates.
  *
@@ -11,80 +11,122 @@
 // Builders
 export {
   CredentialBuilder,
-  createLegalPersonWRPRC,
-  createNaturalPersonWRPRC,
-  createServiceProviderWRPRC,
+  createLegalPersonRegistrationCertificate,
+  createNaturalPersonRegistrationCertificate,
+  createServiceProviderRegistrationCertificate,
   credential,
-  WRPRCBuilder,
-  wrprc,
+  RegistrationCertificateBuilder,
+  registrationCertificate,
 } from './builders'
+// CWT
+export {
+  decodeRegistrationCertificateCwt,
+  RegistrationCertificateCwt,
+  RegistrationCertificateCwtPayload,
+  signRegistrationCertificateCwt,
+} from './cwt'
 // Dialects
-export type { WRPRCDialect } from './dialect'
-export { normalizeWRPRCPayload, toWRPRCDialect, WRPRC_DIALECTS } from './dialect'
+export type { RegistrationCertificateDialect } from './dialect'
+export {
+  normalizeRegistrationCertificatePayload,
+  REGISTRATION_CERTIFICATE_DIALECTS,
+  toRegistrationCertificateDialect,
+} from './dialect'
 // Entitlements (ETSI TS 119 475 Annex A)
 export {
   getIdentifierPrefix,
   hasAttestationProviderEntitlement,
   IDENTIFIER_TYPES,
-  isPSPSubEntitlement,
+  isPspSubEntitlement,
   isValidEntitlement,
   LEGAL_PERSON_IDENTIFIER_PREFIXES,
   NATURAL_PERSON_IDENTIFIER_PREFIXES,
   PSP_SUB_ENTITLEMENTS,
   WRP_ENTITLEMENTS,
 } from './entitlements'
+// Over-asking
+export type { OverAskingCode, OverAskingIssue, OverAskingResult, RegisteredCredential } from './over-asking'
+export { checkOverAsking, OVER_ASKING_CODES } from './over-asking'
+// Presentation requests
+export type { Openid4vpRegistrationCertificateVerifierInfoOptions } from './presentation-request'
+export {
+  decodeMdocRegistrationCertificate,
+  decodeOpenid4vpRegistrationCertificate,
+  mdocRegistrationCertificateExtension,
+  openid4vpRegistrationCertificateVerifierInfo,
+} from './presentation-request'
+// Error
+export { RegistrationCertificateValidationError } from './registration-certificate-error'
 // Schemas
 export {
-  ClaimSchema,
-  CredentialSchema,
-  IntermediarySchema,
-  LegalPersonSubjectSchema,
-  MultiLangStringSchema,
-  NaturalPersonSubjectSchema,
-  ProvidedAttestationSchema,
-  StatusSchema,
-  SupervisoryAuthoritySchema,
-  WRPRC_JWS_ALGORITHMS,
-  WRPRCCWTHeaderSchema,
-  WRPRCJWTHeaderSchema,
-  WRPRCPayloadSchema,
+  REGISTRATION_CERTIFICATE_JWS_ALGORITHMS,
+  zClaim,
+  zCredential,
+  zIntermediary,
+  zLegalPersonSubject,
+  zMultiLangString,
+  zNaturalPersonSubject,
+  zProvidedAttestation,
+  zRegistrationCertificateCwtHeader,
+  zRegistrationCertificateJwtHeader,
+  zRegistrationCertificatePayload,
+  zStatus,
+  zSupervisoryAuthority,
 } from './schemas'
 // Signer
-export { createWRPRCPayload, decodeWRPRC, parseWRPRC, signWRPRC } from './signer'
+export {
+  createRegistrationCertificatePayload,
+  decodeRegistrationCertificateJwt,
+  parseRegistrationCertificateJwt,
+  signRegistrationCertificateJwt,
+} from './signer'
+// Status
+export type { VerifyRegistrationCertificateStatusOptions } from './status'
+export { verifyRegistrationCertificateStatus } from './status'
 // Types
 export type {
   Claim,
   Credential,
   Intermediary,
+  LegalPersonRegistrationCertificateInput,
   LegalPersonSubject,
-  LegalPersonWRPRCInput,
   MultiLangString,
+  NaturalPersonRegistrationCertificateInput,
   NaturalPersonSubject,
-  NaturalPersonWRPRCInput,
   ProvidedAttestation,
-  SignedWRPRC,
-  SignOptions,
+  RegistrationCertificateCwtHeader,
+  RegistrationCertificateJwtHeader,
+  RegistrationCertificatePayload,
+  SignCwtOptions,
+  SignedRegistrationCertificateCwt,
+  SignedRegistrationCertificateJwt,
+  SignJwtOptions,
   Status,
   SupervisoryAuthority,
-  WRPRCCWTHeader,
-  WRPRCJWTHeader,
-  WRPRCPayload,
+  VerifyCoseCallback,
+  VerifyRegistrationCertificateCallbacks,
 } from './types'
 // Validators
-export type { ValidationError, ValidationResult, WRPRCValidationCode } from './validator'
-export {
-  assertValidWRPRC,
-  assertValidWRPRCPayload,
-  isLegalPersonWRPRC,
-  isNaturalPersonWRPRC,
-  parseWRPRCPayload,
-  validateLegalPersonWRPRC,
-  validateNaturalPersonWRPRC,
-  validateWRPRC,
-  validateWRPRCJWTHeader,
-  validateWRPRCPayload,
-  WRPRC_VALIDATION_CODES,
+export type {
+  RegistrationCertificateValidationCode,
+  RegistrationCertificateValidationContexts,
+  RegistrationCertificateValidationIssue,
+  ValidationResult,
 } from './validator'
-
-// Exception
-export { WRPRCException } from './wrprc-exception'
+export {
+  assertValidRegistrationCertificate,
+  assertValidRegistrationCertificatePayload,
+  isLegalPersonRegistrationCertificate,
+  isNaturalPersonRegistrationCertificate,
+  parseRegistrationCertificatePayload,
+  REGISTRATION_CERTIFICATE_VALIDATION_CODES,
+  validateLegalPersonRegistrationCertificate,
+  validateNaturalPersonRegistrationCertificate,
+  validateRegistrationCertificate,
+  validateRegistrationCertificateCwtHeader,
+  validateRegistrationCertificateJwtHeader,
+  validateRegistrationCertificatePayload,
+} from './validator'
+// Verification
+export type { VerifyRegistrationCertificateOptions } from './verify'
+export { verifyRegistrationCertificate } from './verify'

@@ -1,5 +1,6 @@
-import { zJwk } from '@openid4vc/oauth2'
 import type { InferOutputUnion, Simplify } from '@openid4vc/utils'
+import { addValidationIssue, zNonEmptyString } from '@owf/identity-common'
+import { zJwk } from '@owf/jose'
 import z from 'zod'
 import {
   zAttestationProofTypeIdentifier,
@@ -12,7 +13,7 @@ import {
 
 const zCredentialRequestProofCommon = z
   .object({
-    proof_type: z.string(),
+    proof_type: zNonEmptyString,
   })
   .loose()
 
@@ -27,7 +28,8 @@ export const zCredentialRequestProof = z.union([
   z.discriminatedUnion('proof_type', allCredentialRequestProofs),
 ])
 
-const zCredentialRequestProofsCommon = z.record(z.string(), z.array(z.unknown()))
+// OpenID4VCI 1.0 Section 8.2: the value of the proof type is a non-empty array
+const zCredentialRequestProofsCommon = z.record(z.string(), z.array(z.unknown()).min(1))
 export const zCredentialRequestProofs = z.object({
   [zJwtProofTypeIdentifier.value]: z.optional(z.array(zCredentialRequestProofJwt.shape.jwt)),
   [zAttestationProofTypeIdentifier.value]: z.optional(z.array(zCredentialRequestProofAttestation.shape.attestation)),
@@ -53,7 +55,7 @@ export const zCredentialResponseEncryption = z
     // `jwk`. It is kept as an optional sibling for backwards compatibility with draft 14/15, where it
     // was a required top-level member.
     alg: z.optional(z.string()),
-    enc: z.string(),
+    enc: zNonEmptyString,
     zip: z.optional(z.string()),
   })
   .loose()
@@ -64,17 +66,34 @@ export const zCredentialRequestCommon = z
   .object({
     proof: zCredentialRequestProof.optional(),
     proofs: z.optional(
-      z
-        .intersection(zCredentialRequestProofsCommon, zCredentialRequestProofs)
-        .refine((proofs) => Object.values(proofs).length === 1, {
-          message: `The 'proofs' object in a credential request should contain exactly one attribute`,
-        })
+      z.intersection(zCredentialRequestProofsCommon, zCredentialRequestProofs).superRefine((proofs, ctx) => {
+        const count = Object.values(proofs).length
+        if (count === 1) return
+        const message = `The 'proofs' object in a credential request should contain exactly one attribute`
+        if (count === 0) {
+          addValidationIssue(ctx, {
+            code: 'too_small',
+            message,
+            context: { minimum: 1, inclusive: true, origin: 'object' },
+          })
+        } else {
+          addValidationIssue(ctx, {
+            code: 'too_big',
+            message,
+            context: { maximum: 1, inclusive: true, origin: 'object' },
+          })
+        }
+      })
     ),
 
     credential_response_encryption: zCredentialResponseEncryption.optional(),
   })
   .loose()
-  // It's not allowed to provide both proof and proofs
-  .refine(({ proof, proofs }) => !(proof !== undefined && proofs !== undefined), {
-    message: `Both 'proof' and 'proofs' are defined. Only one is allowed`,
+  .superRefine(({ proof, proofs }, ctx) => {
+    if (proof === undefined || proofs === undefined) return
+    addValidationIssue(ctx, {
+      code: 'not_allowed',
+      path: ['proofs'],
+      message: `Both 'proof' and 'proofs' are defined. Only one is allowed`,
+    })
   })

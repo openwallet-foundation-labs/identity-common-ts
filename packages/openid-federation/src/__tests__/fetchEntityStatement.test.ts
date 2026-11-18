@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createEntityConfiguration, fetchEntityConfiguration } from '../entityConfiguration'
-import { entityStatementClaimsSchema } from '../entityStatement'
+import { zEntityStatementClaims } from '../entityStatement'
 import { createEntityStatement } from '../entityStatement/createEntityStatement'
 import { fetchEntityStatement } from '../entityStatement/fetchEntityStatement'
 import type { SignCallback, VerifyCallback } from '../utils'
@@ -74,7 +74,7 @@ describe('fetch entity statement', () => {
       issEntityConfiguration: fetchedEntityConfiguration,
     })
 
-    expect(fetchedEntityStatement).toStrictEqual(entityStatementClaimsSchema.parse(entityStatementClaims))
+    expect(fetchedEntityStatement).toStrictEqual(zEntityStatementClaims.parse(entityStatementClaims))
 
     for (const mockedResponse of mockedResponses) mockedResponse.done()
   })
@@ -134,7 +134,7 @@ describe('fetch entity statement', () => {
       sub,
     })
 
-    expect(fetchedEntityStatement).toStrictEqual(entityStatementClaimsSchema.parse(entityStatementClaims))
+    expect(fetchedEntityStatement).toStrictEqual(zEntityStatementClaims.parse(entityStatementClaims))
 
     for (const mockedResponse of mockedResponses) mockedResponse.done()
   })
@@ -195,7 +195,7 @@ describe('fetch entity statement', () => {
       endpoint: `${iss}/fetch`,
     })
 
-    expect(fetchedEntityStatement).toStrictEqual(entityStatementClaimsSchema.parse(entityStatementClaims))
+    expect(fetchedEntityStatement).toStrictEqual(zEntityStatementClaims.parse(entityStatementClaims))
 
     for (const mockedResponse of mockedResponses) mockedResponse.done()
   })

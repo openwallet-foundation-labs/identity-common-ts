@@ -34,7 +34,7 @@ describe('Parse Credential Request', () => {
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
@@ -56,7 +56,7 @@ describe('Parse Credential Request', () => {
           credential_configuration_id: 'not-offered',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
@@ -87,13 +87,13 @@ describe('Parse Credential Request', () => {
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
 
       credentialConfigurationId: 'my_credential',
@@ -106,7 +106,7 @@ describe('Parse Credential Request', () => {
         extra_prop: 'should-stay',
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -133,13 +133,13 @@ describe('Parse Credential Request', () => {
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       format: {
         format: 'vc+sd-jwt',
@@ -151,7 +151,7 @@ describe('Parse Credential Request', () => {
         extra_prop: 'should-stay',
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -178,13 +178,13 @@ describe('Parse Credential Request', () => {
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       format: {
         format: 'mso_mdoc',
@@ -196,7 +196,7 @@ describe('Parse Credential Request', () => {
         extra_prop: 'should-stay',
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -231,7 +231,7 @@ describe('Parse Credential Request', () => {
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
@@ -249,7 +249,7 @@ describe('Parse Credential Request', () => {
         },
       },
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       credentialRequest: {
         format: 'ldp_vc',
@@ -265,7 +265,7 @@ describe('Parse Credential Request', () => {
         extra_prop: 'should-stay',
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -300,13 +300,13 @@ describe('Parse Credential Request', () => {
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       format: {
         format: 'jwt_vc_json-ld',
@@ -334,7 +334,7 @@ describe('Parse Credential Request', () => {
         extra_prop: 'should-stay',
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -368,13 +368,13 @@ describe('Parse Credential Request', () => {
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       format: {
         format: 'jwt_vc_json',
@@ -400,7 +400,7 @@ describe('Parse Credential Request', () => {
         extra_prop: 'should-stay',
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -426,13 +426,13 @@ describe('Parse Credential Request', () => {
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       credentialIdentifier: 'some-identifier',
       credentialRequest: {
@@ -440,7 +440,7 @@ describe('Parse Credential Request', () => {
         extra_prop: 'should-stay',
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -584,20 +584,20 @@ describe('Parse Credential Request', () => {
           credential_identifier: 'some-identifier',
           extra_prop: 'should-stay',
           proofs: {
-            jwt: ['ey.ey.S', 'ey.ey.S'],
+            jwt: ['ey.ey.Sg', 'ey.ey.Sg'],
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S', 'ey.ey.S'],
+        jwt: ['ey.ey.Sg', 'ey.ey.Sg'],
       },
       credentialIdentifier: 'some-identifier',
       credentialRequest: {
         credential_identifier: 'some-identifier',
         extra_prop: 'should-stay',
         proofs: {
-          jwt: ['ey.ey.S', 'ey.ey.S'],
+          jwt: ['ey.ey.Sg', 'ey.ey.Sg'],
         },
       },
       credentialResponseEncryption: undefined,
@@ -659,13 +659,13 @@ describe('Parse Credential Request', () => {
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       credentialIdentifier: 'some-identifier',
       credentialRequest: {
@@ -673,7 +673,7 @@ describe('Parse Credential Request', () => {
         extra_prop: 'should-stay',
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -698,19 +698,19 @@ describe('Parse Credential Request', () => {
           format: 'a-new-format',
           some_random_prop: 'should-be-allowed',
           proofs: {
-            jwt: ['ey.ey.S'],
+            jwt: ['ey.ey.Sg'],
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       credentialRequest: {
         format: 'a-new-format',
         some_random_prop: 'should-be-allowed',
         proofs: {
-          jwt: ['ey.ey.S'],
+          jwt: ['ey.ey.Sg'],
         },
       },
       credentialResponseEncryption: undefined,
@@ -742,13 +742,13 @@ describe('Parse Credential Request', () => {
           },
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       format: {
         format: 'jwt_vc_json',
@@ -774,7 +774,7 @@ describe('Parse Credential Request', () => {
         },
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -809,7 +809,7 @@ describe('Parse Credential Request', () => {
           some_other_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
@@ -827,7 +827,7 @@ describe('Parse Credential Request', () => {
         },
       },
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       credentialRequest: {
         format: 'jwt_vc_json-ld',
@@ -843,7 +843,7 @@ describe('Parse Credential Request', () => {
         },
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,
@@ -878,13 +878,13 @@ describe('Parse Credential Request', () => {
           some_other_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
-            jwt: 'ey.ey.S',
+            jwt: 'ey.ey.Sg',
           },
         },
       })
     ).toStrictEqual({
       proofs: {
-        jwt: ['ey.ey.S'],
+        jwt: ['ey.ey.Sg'],
       },
       format: {
         format: 'ldp_vc',
@@ -912,7 +912,7 @@ describe('Parse Credential Request', () => {
         },
         proof: {
           proof_type: 'jwt',
-          jwt: 'ey.ey.S',
+          jwt: 'ey.ey.Sg',
         },
       },
       credentialResponseEncryption: undefined,

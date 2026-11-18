@@ -15,15 +15,15 @@ enum WifiOptionsKeys {
 //   ? 2: uint,  // Channel Number
 //   ? 3: bstr   // Supported Bands
 // }
-const wifiOptionsSchema = typedMap([
+const zWifiOptions = typedMap([
   [WifiOptionsKeys.Passphrase, z.string().exactOptional()],
   [WifiOptionsKeys.OperatingClass, z.number().exactOptional()],
   [WifiOptionsKeys.ChannelNumber, z.number().exactOptional()],
   [WifiOptionsKeys.SupportedBands, zUint8Array.exactOptional()],
 ] as const)
 
-export type WifiOptionsEncodedStructure = z.input<typeof wifiOptionsSchema>
-export type WifiOptionsDecodedStructure = z.output<typeof wifiOptionsSchema>
+export type WifiOptionsEncodedStructure = z.input<typeof zWifiOptions>
+export type WifiOptionsDecodedStructure = z.output<typeof zWifiOptions>
 
 export type WifiOptionsOptions = {
   passphrase?: string
@@ -34,7 +34,7 @@ export type WifiOptionsOptions = {
 
 export class WifiOptions extends CborStructure<WifiOptionsEncodedStructure, WifiOptionsDecodedStructure> {
   public static override get encodingSchema() {
-    return wifiOptionsSchema
+    return zWifiOptions
   }
 
   public get encodedStructure() {

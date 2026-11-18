@@ -1,6 +1,6 @@
 import 'reflect-metadata'
-import { base64, base64url, stringToBytes } from '@owf/identity-common'
-import { MediaTypes, StatusList, StatusListCwt, StatusListInfo, StatusType } from '@owf/token-status-list'
+import { base64, base64url, type FetchLimits, stringToBytes } from '@owf/identity-common'
+import { StatusList, StatusListCwt, StatusListInfo, StatusListMediaTypes, StatusType } from '@owf/token-status-list'
 import { X509Certificate } from '@peculiar/x509'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -15,9 +15,11 @@ import {
   Holder,
   IdentifierList,
   IdentifierListCwt,
-  MediaTypes as IdentifierListMediaTypes,
+  MdocMediaTypes as IdentifierListMediaTypes,
   Issuer,
+  IssuerNamespaces,
   IssuerSigned,
+  IssuerSignedItem,
   ItemsRequest,
   type MdocContext,
   type MdocFetchContext,
@@ -26,8 +28,10 @@ import {
   SessionTranscript,
   SignatureAlgorithm,
   Status,
+  type StatusVerificationOptions,
   UnprotectedHeaders,
   //StatusListInfo,
+  type VerificationAssessment,
   VerificationError,
   Verifier,
 } from '../..'
@@ -395,10 +399,13 @@ suite('Verification', () => {
     ).resolves.toBeDefined()
   })
 
-  const issueMdocWithStatus = async (status: {
-    statusList?: { idx: number; uri: string }
-    identifierList?: { id: Uint8Array; uri: string }
-  }) => {
+  const issueMdocWithStatus = async (
+    status: {
+      statusList?: { idx: number; uri: string }
+      identifierList?: { id: Uint8Array; uri: string }
+    },
+    validityInfo = { signed, validFrom, validUntil }
+  ) => {
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
     issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', { first_name: 'First', last_name: 'Last' })
 
@@ -408,17 +415,27 @@ suite('Verification', () => {
       algorithm: SignatureAlgorithm.ES256,
       digestAlgorithm: 'SHA-256',
       deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
-      validityInfo: { signed, validFrom, validUntil },
+      validityInfo,
       status,
     })
 
     return IssuerSigned.fromEncodedForOid4Vci(issuerSigned.encodedForOid4Vci)
   }
 
-  const verifyIssuerSigned = (credential: IssuerSigned, options: { skewSeconds?: number } = {}) =>
+  const verifyIssuerSigned = (
+    credential: IssuerSigned,
+    {
+      fetchLimits,
+      ...options
+    }: {
+      skewSeconds?: number
+      status?: StatusVerificationOptions
+      fetchLimits?: FetchLimits
+    } = {}
+  ) =>
     Holder.verifyIssuerSigned(
       { issuerSigned: credential, trustedCertificates: validTrustedCertificates, ...options },
-      mdocContext
+      { ...mdocContext, fetchLimits }
     )
 
   const signStatusListCwt = async ({
@@ -477,7 +494,12 @@ suite('Verification', () => {
   const mockStatusList = async (path: string, options: Omit<Parameters<typeof signStatusListCwt>[0], 'uri'>) => {
     const uri = `https://example.org${path}`
 
-    mockGet(uri, await signStatusListCwt({ uri, ...options }), MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      uri,
+      await signStatusListCwt({ uri, ...options }),
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     return uri
   }
@@ -506,7 +528,7 @@ suite('Verification', () => {
       algorithm: SignatureAlgorithm.ES256,
     })
 
-    mockGet(uri, `${signingInput}.${base64url.encode(signature)}`, MediaTypes.StatusListJwt)
+    mockGet(uri, `${signingInput}.${base64url.encode(signature)}`, StatusListMediaTypes.StatusListJwt)
 
     return uri
   }
@@ -571,7 +593,9 @@ suite('Verification', () => {
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
     const verification = verifyIssuerSigned(credential)
-    await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
+    await expect(verification).rejects.toThrow(
+      `Verifying the status list ${uri} failed: Status for id '${idx}' is not Valid (0), but is instead '1'`
+    )
     await expect(verification).rejects.toMatchObject({
       assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Invalid } },
     })
@@ -614,6 +638,68 @@ suite('Verification', () => {
     await expect(verification).rejects.toMatchObject({
       assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Invalid } },
     })
+  })
+
+  // Ten statuses of 2 bits inflate to 3 bytes
+  test('Verify mdoc with a status list larger than its maximum sizes', async () => {
+    const idx = 3
+    const uri = await mockStatusList('/status-list/too-large', { idx, status: StatusType.Valid })
+    const decompressedError = `Verifying the status list ${uri} failed: The status list cannot be decompressed`
+    // The signed CWT, with its certificate, is far larger than 100 bytes
+    const responseError = 'The response is larger than the maximum of 100 bytes'
+
+    const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
+
+    await expect(verifyIssuerSigned(credential, { status: { maxDecompressedBytes: 2 } })).rejects.toThrow(
+      decompressedError
+    )
+    await expect(verifyIssuerSigned(credential, { fetchLimits: { maxResponseBytes: 100 } })).rejects.toThrow(
+      responseError
+    )
+    await expect(verifyIssuerSigned(credential, { status: { maxDecompressedBytes: 3 } })).resolves.toBeDefined()
+
+    const sessionTranscript = await SessionTranscript.forOid4Vp(
+      { clientId: 'my-client-id', responseUri: 'my-response-uri.com', nonce: 'my-random-nonce' },
+      mdocContext
+    )
+    const deviceRequest = DeviceRequest.create({
+      docRequests: [
+        DocRequest.create({
+          itemsRequest: ItemsRequest.create({
+            docType: 'org.iso.18013.5.1',
+            namespaces: { 'org.iso.18013.5.1.mDL': { first_name: true } },
+          }),
+        }),
+      ],
+    })
+    const deviceResponse = await Holder.createDeviceResponseForDeviceRequest(
+      {
+        deviceRequest,
+        sessionTranscript,
+        documents: [
+          {
+            issuerSigned: credential,
+            docRequestIndex: 0,
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+          },
+        ],
+      },
+      mdocContext
+    )
+
+    const verifyDeviceResponse = ({
+      status,
+      fetchLimits,
+    }: {
+      status?: StatusVerificationOptions
+      fetchLimits?: FetchLimits
+    }) =>
+      Verifier.verifyDeviceResponse(
+        { deviceResponse, sessionTranscript, trustedCertificates: validTrustedCertificates, status },
+        { ...mdocContext, fetchLimits }
+      )
+    await expect(verifyDeviceResponse({ status: { maxDecompressedBytes: 2 } })).rejects.toThrow(decompressedError)
+    await expect(verifyDeviceResponse({ fetchLimits: { maxResponseBytes: 100 } })).rejects.toThrow(responseError)
   })
 
   // An expired list says nothing about the status it carries (Token Status List § 8.3), so the
@@ -697,6 +783,21 @@ suite('Verification', () => {
     await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
   })
 
+  test('Verify mdoc with an identifier list larger than its limit', async () => {
+    const id = new Uint8Array([0xab, 0xcd])
+    const uri = await mockIdentifierList('/identifier-list/too-large', { identifiers: [new Uint8Array([0x01])] })
+
+    const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
+
+    // The signed CWT, with its certificate, is far larger than 100 bytes
+    await expect(
+      verifyIssuerSigned(credential, { fetchLimits: { maxResponseBytesByType: { identifierList: 100 } } })
+    ).rejects.toThrow(
+      `Verifying the identifier list ${uri} failed: Identifier list at ${uri}: The response is larger than the maximum of 100 bytes`
+    )
+    await expect(verifyIssuerSigned(credential)).resolves.toBeDefined()
+  })
+
   // A fetch that records the URIs it is asked for, so a test can assert no revocation list was requested.
   const recordingContext = () => {
     const requestedUris: string[] = []
@@ -740,47 +841,149 @@ suite('Verification', () => {
     )
   })
 
+  // Token Status List § 8.3: the Referenced Token is validated before its status is evaluated, and an
+  // invalid one is rejected without it, also by a verification callback that does not throw.
+  test.each([
+    ['expired', { signed, validFrom, validUntil: new Date('2024-10-24T14:55:18Z') }],
+    ['not yet valid', { signed, validFrom: new Date(Date.now() + 86_400_000), validUntil }],
+  ])('Verify mdoc with a status list that is %s does not fetch the list', async (_, validityInfo) => {
+    const credential = await issueMdocWithStatus(
+      { statusList: { idx: 3, uri: 'https://example.org/status-list/outside-validity-period' } },
+      validityInfo
+    )
+    const { ctx, requestedUris } = recordingContext()
+    const checks: VerificationAssessment[] = []
+
+    await expect(
+      Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates: validTrustedCertificates }, ctx)
+    ).rejects.toThrow('The MSO must be valid at the time of verification')
+    await Holder.verifyIssuerSigned(
+      {
+        issuerSigned: credential,
+        trustedCertificates: validTrustedCertificates,
+        verificationCallback: (check) => checks.push(check),
+      },
+      ctx
+    )
+
+    expect(requestedUris).toEqual([])
+    expect(checks.filter((check) => check.status !== 'PASSED')).toEqual([
+      expect.objectContaining({ status: 'FAILED', check: 'The MSO must be valid at the time of verification' }),
+    ])
+  })
+
+  test('Verify mdoc with a status list within its validity period fetches the list', async () => {
+    const uri = 'https://example.org/status-list/within-validity-period'
+    const credential = await issueMdocWithStatus({ statusList: { idx: 3, uri } })
+    const { ctx, requestedUris } = recordingContext()
+
+    await expect(
+      Holder.verifyIssuerSigned({ issuerSigned: credential, trustedCertificates: validTrustedCertificates }, ctx)
+    ).rejects.toThrow(`Verifying the status list ${uri} failed`)
+    expect(requestedUris).toEqual([uri])
+  })
+
+  test('Verify mdoc with a status list and an element that does not match its digest does not fetch the list', async () => {
+    const credential = await issueMdocWithStatus({
+      statusList: { idx: 3, uri: 'https://example.org/status-list/tampered-element' },
+    })
+    const namespace = 'org.iso.18013.5.1.mDL'
+    const [item, ...items] = credential.issuerNamespaces?.issuerNamespaces.get(namespace) ?? []
+    const tampered = IssuerSigned.create({
+      issuerAuth: credential.issuerAuth,
+      issuerNamespaces: IssuerNamespaces.create({
+        issuerNamespaces: new Map([
+          [
+            namespace,
+            [
+              IssuerSignedItem.fromOptions({
+                digestId: item.digestId,
+                random: item.random,
+                elementIdentifier: item.elementIdentifier,
+                elementValue: 'Tampered',
+              }),
+              ...items,
+            ],
+          ],
+        ]),
+      }),
+    })
+    const { ctx, requestedUris } = recordingContext()
+
+    await expect(
+      Holder.verifyIssuerSigned({ issuerSigned: tampered, trustedCertificates: validTrustedCertificates }, ctx)
+    ).rejects.toThrow(
+      `The calculated digest for ${namespace}/${item.elementIdentifier} attribute must match the digest in the issuerAuth element`
+    )
+    expect(requestedUris).toEqual([])
+  })
+
   // Disabling certificate chain validation also applies to the signer of a revocation list, but the
   // revocation status itself is still checked.
-  const verifyWithoutChainValidation = (credential: IssuerSigned) =>
+  const verifyWithoutChainValidation = (
+    credential: IssuerSigned,
+    verificationCallback?: (check: VerificationAssessment) => void
+  ) =>
     Holder.verifyIssuerSigned(
-      { issuerSigned: credential, trustedCertificates: [], disableCertificateChainValidation: true },
+      {
+        issuerSigned: credential,
+        trustedCertificates: [],
+        disableCertificateChainValidation: true,
+        verificationCallback,
+      },
       mdocContext
     )
 
-  test('Verify mdoc with a status list without certificate chain validation', async () => {
+  // Without chain validation, the MSO is only known to be signed with the key of its own certificate, so whoever
+  // presents a self-signed MSO could make the verifier request the revocation URIs of their choosing
+  test('Verify mdoc with a status list without certificate chain validation does not fetch the status list', async () => {
+    // Not mocked, so a request to it fails
+    const uri = 'https://example.org/status-list/not-fetched'
+    const credential = await issueMdocWithStatus({ statusList: { idx: 3, uri } })
+    const checks: VerificationAssessment[] = []
+
+    const { statusList } = await verifyWithoutChainValidation(credential, (check) => checks.push(check))
+    expect(statusList).toBeUndefined()
+    expect(checks.filter((check) => check.status !== 'PASSED')).toEqual([
+      expect.objectContaining({ status: 'WARNING', check: 'Status information must be valid' }),
+    ])
+  })
+
+  // How a verifier that establishes the trust in the issuer itself checks the status
+  test('Verify the status of an mdoc with IssuerAuth.verifyStatus without certificate chain validation', async () => {
     const idx = 3
     const uri = await mockStatusList('/status-list/no-chain-validation', { idx })
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    const { statusList, trustedStatusListChain } = await verifyWithoutChainValidation(credential)
+    const { statusList, trustedStatusListChain } = await credential.issuerAuth.verifyStatus(
+      { disableCertificateChainValidation: true },
+      mdocContext
+    )
     expect(statusList).toBeDefined()
     expect(trustedStatusListChain).toBeUndefined()
   })
 
-  test('Verify mdoc with a revoked entry in a status list without certificate chain validation', async () => {
+  test('Verify a revoked entry in a status list with IssuerAuth.verifyStatus without certificate chain validation', async () => {
     const idx = 3
     const uri = await mockStatusList('/status-list/no-chain-validation-revoked', { idx, status: StatusType.Invalid })
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    const verification = verifyWithoutChainValidation(credential)
-    await expect(verification).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
-    await expect(verification).rejects.toMatchObject({
-      assessment: { result: { type: 'statusListEntryNotValid', uri, idx, status: StatusType.Invalid } },
-    })
+    await expect(
+      credential.issuerAuth.verifyStatus({ disableCertificateChainValidation: true }, mdocContext)
+    ).rejects.toThrow(`Status for id '${idx}' is not Valid (0), but is instead '1'`)
   })
 
-  test('Verify mdoc with an identifier list that carries its identifier without certificate chain validation', async () => {
+  test('Verify an identifier list that carries its identifier with IssuerAuth.verifyStatus without certificate chain validation', async () => {
     const id = new Uint8Array([0xab, 0xcd])
     const uri = await mockIdentifierList('/identifier-list/no-chain-validation-revoked', { identifiers: [id] })
 
     const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
 
-    await expect(verifyWithoutChainValidation(credential)).rejects.toThrow(
-      `Identifier abcd found in the revoked identifier list at '${uri}'`
-    )
+    await expect(
+      credential.issuerAuth.verifyStatus({ disableCertificateChainValidation: true }, mdocContext)
+    ).rejects.toThrow(`Identifier abcd found in the revoked identifier list at '${uri}'`)
   })
 
   test('Verify mdoc with an identifier list that carries its identifier', async () => {
@@ -832,7 +1035,7 @@ suite('Verification', () => {
     const id = new Uint8Array([0xab, 0xcd])
     const uri = 'https://example.org/identifier-list/wrong-content-type'
 
-    mockGet(uri, await signIdentifierListCwt({ uri, identifiers: [] }), MediaTypes.StatusListCwt)
+    mockGet(uri, await signIdentifierListCwt({ uri, identifiers: [] }), StatusListMediaTypes.StatusListCwt)
 
     const credential = await issueMdocWithStatus({ identifierList: { id, uri } })
 
@@ -860,7 +1063,12 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    mockGet('https://example.org/status-list/10', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/10',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -990,7 +1198,12 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    mockGet('https://example.org/status-list/10', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/10',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1099,7 +1312,7 @@ suite('Verification', () => {
     mockGet(
       'https://example.org/status-list/30',
       'invalid-jwt',
-      MediaTypes.StatusListJwt,
+      StatusListMediaTypes.StatusListJwt,
       /application\/statuslist\+cwt/
     )
 
@@ -1134,7 +1347,7 @@ suite('Verification', () => {
         },
         mdocContext
       )
-    ).rejects.toThrow(`The status list at ${uri} is not a valid JWT`)
+    ).rejects.toThrow('Unable to parse the JWS')
   })
 
   test('Verify mdoc with status invalid no trusted certificates supplied', async () => {
@@ -1155,7 +1368,12 @@ suite('Verification', () => {
       { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
       { sign: mdocContext.cose.sign1.sign }
     )
-    mockGet('https://example.org/status-list/40', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/40',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1209,7 +1427,12 @@ suite('Verification', () => {
       { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
       { sign: mdocContext.cose.sign1.sign }
     )
-    mockGet('https://example.org/status-list/40', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/40',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1266,7 +1489,12 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    mockGet('https://example.org/status-list/10', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/10',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1321,7 +1549,12 @@ suite('Verification', () => {
       { sign: mdocContext.cose.sign1.sign }
     )
 
-    mockGet('https://example.org/status-list/20', encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+    mockGet(
+      'https://example.org/status-list/20',
+      encodedCwt,
+      StatusListMediaTypes.StatusListCwt,
+      /application\/statuslist\+cwt/
+    )
 
     const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
 
@@ -1616,7 +1849,7 @@ suite('Verification', () => {
         {
           issuerSigned: IssuerSigned.fromEncodedForOid4Vci(issuerSigned.encodedForOid4Vci),
           trustedCertificates: validTrustedCertificates,
-          disableStatusValidation: true,
+          status: { disableValidation: true },
         },
         mdocContext
       )
@@ -1660,7 +1893,12 @@ suite('Verification', () => {
         { sign: mdocContext.cose.sign1.sign }
       )
 
-      mockGet(`https://example.org${path}`, encodedCwt, MediaTypes.StatusListCwt, /application\/statuslist\+cwt/)
+      mockGet(
+        `https://example.org${path}`,
+        encodedCwt,
+        StatusListMediaTypes.StatusListCwt,
+        /application\/statuslist\+cwt/
+      )
     }
 
     const signCredentialWithStatus = async (uri: string) => {

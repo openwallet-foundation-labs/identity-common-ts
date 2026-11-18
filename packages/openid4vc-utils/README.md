@@ -24,9 +24,8 @@ yarn add @openid4vc/utils
 
 ## Dependencies
 
-- [buffer](https://www.npmjs.com/package/buffer)
+- [@owf/identity-common](https://www.npmjs.com/package/@owf/identity-common)
 - [zod](https://www.npmjs.com/package/zod)
-- [zod-validation-error](https://www.npmjs.com/package/zod-validation-error)
 
 ## Platform Support
 
@@ -36,7 +35,7 @@ This library is **platform agnostic** and works in:
 - ✅ Browsers (modern browsers with ES2020 support)
 - ✅ React Native
 
-The environment must provide an implementation of `URL` and `URLSearchParams`. Platform-specific functionality such as hashing, generating random bytes and signing is provided through callbacks. If no global `fetch` is available in your environment, it also needs to be provided through the callbacks.
+The environment must provide an implementation of `URL` and `URLSearchParams`. Platform-specific functionality such as hashing, generating random bytes and signing is provided through callbacks. If no global `fetch` is available in your environment, it also needs to be provided through the callbacks. The `fetch` callback gets what is requested as its third argument, an `Openid4vcFetchType` such as `{ type: 'accessTokenRequest' }`, and every response is read within the `fetchLimits` of the callbacks, 10 MiB per response by default (see `FetchLimits` of `@owf/identity-common`).
 
 ## Contributing
 

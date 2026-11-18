@@ -4,14 +4,14 @@ import { DeviceKey, type DeviceKeyEncodedStructure } from './device-key'
 import { KeyAuthorizations, type KeyAuthorizationsEncodedStructure } from './key-authorizations'
 import { KeyInfo, type KeyInfoEncodedStructure } from './key-info'
 
-const deviceKeyInfoSchema = typedMap([
+const zDeviceKeyInfo = typedMap([
   ['deviceKey', z.instanceof(DeviceKey)],
   ['keyAuthorizations', z.instanceof(KeyAuthorizations).exactOptional()],
   ['keyInfo', z.instanceof(KeyInfo).exactOptional()],
 ] as const)
 
-export type DeviceKeyInfoDecodedStructure = z.output<typeof deviceKeyInfoSchema>
-export type DeviceKeyInfoEncodedStructure = z.input<typeof deviceKeyInfoSchema>
+export type DeviceKeyInfoDecodedStructure = z.output<typeof zDeviceKeyInfo>
+export type DeviceKeyInfoEncodedStructure = z.input<typeof zDeviceKeyInfo>
 
 export type DeviceKeyInfoOptions = {
   deviceKey: DeviceKey
@@ -21,7 +21,7 @@ export type DeviceKeyInfoOptions = {
 
 export class DeviceKeyInfo extends CborStructure<DeviceKeyInfoEncodedStructure, DeviceKeyInfoDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(deviceKeyInfoSchema.in, deviceKeyInfoSchema.out, {
+    return z.codec(zDeviceKeyInfo.in, zDeviceKeyInfo.out, {
       decode: (input) => {
         const map: DeviceKeyInfoDecodedStructure = TypedMap.fromMap(input)
 

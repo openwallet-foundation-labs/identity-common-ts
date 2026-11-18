@@ -1,15 +1,25 @@
-// biome-ignore format: no explanation
-class CoseError extends Error {
+import { type CommonValidationCode, IdentityError, ValidationError, type ValidationIssueOf } from '@owf/identity-common'
+
+/**
+ * Base error class for the COSE structures in this package.
+ *
+ * Extends `IdentityError` so that a caller can catch every error raised by the identity-common
+ * packages in one place.
+ */
+export class CoseError extends IdentityError {
   // NOTE: declared explicitly rather than passing `{ cause }` to `super`, as the
   // project targets ES2020 and `Error.cause` was only added in ES2022.
   public readonly cause?: unknown
 
-  constructor(message: string = new.target.name, options?: { cause?: unknown }) {
-    super(message)
+  constructor(message: string = new.target.name, options?: { cause?: unknown; details?: unknown }) {
+    super(message, options?.details)
     this.name = new.target.name
     this.cause = options?.cause
   }
 }
+
+/** A COSE or CBOR structure does not match its schema, with the `issues` of the validation */
+export class CoseValidationError extends ValidationError {}
 
 export class CoseUnsupportedMacError extends CoseError {}
 export class CoseInvalidSignatureError extends CoseError {}
@@ -48,6 +58,8 @@ export class CwtMissingVerifyContextError extends CoseError {}
 
 /**
  * A claim required by the profile the token is verified against is missing, a claim does not match
- * the value it was expected to have, or the token is outside its validity window.
+ * the value it was expected to have, or the token is outside its validity window. Each with an issue
+ * of `VALIDATION_CODES`: `claim_missing`, `claim_value_mismatch`, `expired` or `not_yet_valid`, at
+ * the key of the claim.
  */
-export class CwtClaimVerificationError extends CoseError {}
+export class CwtClaimVerificationError extends ValidationError<ValidationIssueOf<CommonValidationCode>> {}

@@ -483,7 +483,7 @@ describe('Correctly parses the client identifier', () => {
         const resolved = await resolveOpenid4vpAuthorizationRequest({
           authorizationRequestPayload: { ...dcApiRequest, client_id: clientId },
           responseMode: { type: 'dc_api', expectedOrigin: origin },
-          callbacks: { ...callbacks, verifyJwt: () => Promise.reject(), decryptJwe: () => Promise.reject() },
+          callbacks: { ...callbacks, verifyJws: () => Promise.reject(), decryptJwe: () => Promise.reject() },
         })
 
         expect(resolved.authorizationRequestPayload).not.toHaveProperty('client_id')

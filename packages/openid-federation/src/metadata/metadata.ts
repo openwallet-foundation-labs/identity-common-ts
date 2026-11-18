@@ -5,19 +5,19 @@ import {
   oauthAuthorizationServerEntityMetadata,
   oauthClientEntityMetadata,
   oauthResourceEntityMetadata,
-  openIdCredentialIssuerEntityMetadata,
-  openIdProviderEntityMetadata,
+  openidCredentialIssuerEntityMetadata,
   openidCredentialVerifierEntityMetadata,
+  openidProviderEntityMetadata,
   openidRelyingPartyEntityMetadata,
 } from './entity'
 
-export const metadataSchema = z
+export const zMetadata = z
   .object({
     [federationEntityMetadata.identifier]: federationEntityMetadata.schema.optional(),
     [openidRelyingPartyEntityMetadata.identifier]: openidRelyingPartyEntityMetadata.schema.optional(),
     [openidCredentialVerifierEntityMetadata.identifier]: openidCredentialVerifierEntityMetadata.schema.optional(),
-    [openIdCredentialIssuerEntityMetadata.identifier]: openIdCredentialIssuerEntityMetadata.schema.optional(),
-    [openIdProviderEntityMetadata.identifier]: openIdProviderEntityMetadata.schema.optional(),
+    [openidCredentialIssuerEntityMetadata.identifier]: openidCredentialIssuerEntityMetadata.schema.optional(),
+    [openidProviderEntityMetadata.identifier]: openidProviderEntityMetadata.schema.optional(),
     [oauthAuthorizationServerEntityMetadata.identifier]: oauthAuthorizationServerEntityMetadata.schema.optional(),
     [oauthClientEntityMetadata.identifier]: oauthClientEntityMetadata.schema.optional(),
     [oauthResourceEntityMetadata.identifier]: oauthResourceEntityMetadata.schema.optional(),
@@ -25,4 +25,4 @@ export const metadataSchema = z
   // Entity types not defined here are kept unvalidated, as OpenID Federation allows further entity types.
   .loose()
 
-export type Metadata = z.input<typeof metadataSchema>
+export type Metadata = z.input<typeof zMetadata>

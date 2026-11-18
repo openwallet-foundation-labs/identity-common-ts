@@ -10,9 +10,9 @@ import {
   Sign1,
   type Sign1EncodedStructure,
   SignatureAlgorithm,
-  sign1DecodedSchema,
-  sign1EncodedSchema,
   UnprotectedHeaders,
+  zSign1Decoded,
+  zSign1Encoded,
   zUint8Array,
 } from '../../src'
 import { sign1Context } from './context'
@@ -89,13 +89,13 @@ describe('sign1', () => {
   })
 
   test('subclass decode respects subclass encodingSchema and returns subclass instance', () => {
-    const customSign1DecodedSchema = sign1DecodedSchema.extend({
+    const zCustomSign1Decoded = zSign1Decoded.extend({
       payload: zUint8Array.nullable().refine((p) => p !== null && p.length >= 5, { message: 'Payload too short' }),
     })
 
     class CustomSign1 extends Sign1 {
       public static override get encodingSchema() {
-        return z.codec(sign1EncodedSchema, customSign1DecodedSchema, {
+        return z.codec(zSign1Encoded, zCustomSign1Decoded, {
           encode: (decoded) =>
             [
               decoded.protectedHeaders.encodedStructure,

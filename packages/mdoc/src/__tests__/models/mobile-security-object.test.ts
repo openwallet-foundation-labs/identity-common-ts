@@ -36,7 +36,7 @@ describe('mobile security object', () => {
   })
 
   test.each([42, undefined])('reject a status of %s', (status) => {
-    expect(() => MobileSecurityObject.decode(withStatus(status))).toThrow('Expected map')
+    expect(() => MobileSecurityObject.decode(withStatus(status))).toThrow('expected map')
   })
 
   test('round-trip with status list', () => {

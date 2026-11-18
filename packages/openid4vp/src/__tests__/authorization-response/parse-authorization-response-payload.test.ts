@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import { Openid4vpAuthorizationResponseError } from '../../authorization-response/Openid4vpAuthorizationResponseError'
-import { parseOpenid4VpAuthorizationResponsePayload } from '../../authorization-response/parse-authorization-response-payload'
+import { parseOpenid4vpAuthorizationResponsePayload } from '../../authorization-response/parse-authorization-response-payload'
 
-describe('parseOpenid4VpAuthorizationResponsePayload', () => {
+describe('parseOpenid4vpAuthorizationResponsePayload', () => {
   test('should correctly handle stringified arguments due to response submitted as query', () => {
     const parsedPayload = Object.fromEntries(
       new URLSearchParams(
@@ -10,7 +10,7 @@ describe('parseOpenid4VpAuthorizationResponsePayload', () => {
       ).entries()
     )
 
-    expect(parseOpenid4VpAuthorizationResponsePayload(parsedPayload)).toEqual({
+    expect(parseOpenid4vpAuthorizationResponsePayload(parsedPayload)).toEqual({
       expires_in: 6000,
       state: '126781532216424167140483',
       vp_token: 'vptoken',
@@ -38,7 +38,7 @@ describe('parseOpenid4VpAuthorizationResponsePayload', () => {
 
     let error: unknown
     try {
-      parseOpenid4VpAuthorizationResponsePayload(parsedPayload)
+      parseOpenid4vpAuthorizationResponsePayload(parsedPayload)
     } catch (e) {
       error = e
     }
@@ -54,7 +54,7 @@ describe('parseOpenid4VpAuthorizationResponsePayload', () => {
   test('should throw an Openid4vpAuthorizationResponseError for an error response without additional parameters', () => {
     let error: unknown
     try {
-      parseOpenid4VpAuthorizationResponsePayload({ error: 'wallet_unavailable' })
+      parseOpenid4vpAuthorizationResponsePayload({ error: 'wallet_unavailable' })
     } catch (e) {
       error = e
     }

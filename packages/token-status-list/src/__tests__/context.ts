@@ -3,7 +3,52 @@ import { p256 } from '@noble/curves/nist.js'
 import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { CoseKey, type Mac0Context, type Sign1Context } from '@owf/cose'
-import type { Hasher } from '@owf/identity-common'
+import { base64url, type Hasher } from '@owf/identity-common'
+import {
+  JoseValidationError,
+  type JoseValidationIssue,
+  type JwsSigner,
+  type SignJwsCallback,
+  type VerifyJwsCallback,
+} from '@owf/jose'
+import { expect } from 'vitest'
+import { StatusListValidationError, type StatusListValidationIssue } from '../status-list-error'
+
+const jwsKeyPair = p256.keygen()
+// The uncompressed point is 0x04 || x || y
+const jwsPublicPoint = p256.Point.fromBytes(jwsKeyPair.publicKey).toBytes(false)
+export const jwsPublicJwk = {
+  kty: 'EC',
+  crv: 'P-256',
+  x: base64url.encode(jwsPublicPoint.slice(1, 33)),
+  y: base64url.encode(jwsPublicPoint.slice(33)),
+}
+
+export const jwsSigner: JwsSigner = { method: 'custom', alg: 'ES256' }
+
+export const signJws: SignJwsCallback = (_signer, { signingInputBytes }) => ({
+  signature: base64url.encode(p256.sign(signingInputBytes, jwsKeyPair.secretKey)),
+  signerJwk: jwsPublicJwk,
+})
+
+export const verifyJws: VerifyJwsCallback = (_signer, { signingInputBytes, signature }) =>
+  p256.verify(base64url.decode(signature), signingInputBytes, jwsKeyPair.publicKey)
+    ? { verified: true, signerJwk: jwsPublicJwk }
+    : { verified: false }
+
+/** Matches a `JoseValidationError` with an issue of `code` at `claim`. */
+export const claimIssue = (claim: string, code: JoseValidationIssue['code']) =>
+  expect.objectContaining({
+    name: JoseValidationError.name,
+    issues: expect.arrayContaining([expect.objectContaining({ code, path: [claim] })]),
+  })
+
+/** Matches a `StatusListValidationError` with an issue of `code`, with `context` when given. */
+export const statusListIssue = (code: StatusListValidationIssue['code'], context?: object) =>
+  expect.objectContaining({
+    name: StatusListValidationError.name,
+    issues: [expect.objectContaining({ code, ...(context && { context }) })],
+  })
 
 export const sign1Context: Sign1Context = {
   sign: async (input) => {
@@ -37,6 +82,15 @@ export const signKey = CoseKey.fromJwk({
   x: 'usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8',
   y: 'IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4',
   d: 'V8kgd2ZBRuh2dgyVINBUqpPDr7BOMGcF22CQMIUHtNM',
+})
+
+// A second key pair, to check that a token does not verify against a key that did not sign it.
+export const otherSignKey = CoseKey.fromJwk({
+  kty: 'EC',
+  crv: 'P-256',
+  alg: 'ES256',
+  x: 'R7D-W2d9MEVRN_5P23yN9SodkjMEHI2Np_YHD02eTCQ',
+  y: 'c5Ynunf6XyarMKXt0hWEezNzsZv01uQpCnpT-qJoll8',
 })
 
 export const macKey = CoseKey.fromJwk({

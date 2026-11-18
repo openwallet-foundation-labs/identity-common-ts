@@ -1,4 +1,4 @@
-import { IdentityCommonException } from './identity-common-exception'
+import { IdentityCommonError } from './identity-common-error'
 
 const HEX_CHARS = '0123456789abcdef'
 
@@ -15,7 +15,7 @@ const hexToBytes = (hex: string): Uint8Array => {
   // Validate input - only hex characters are allowed
   const validHexRegex = /^[0-9a-fA-F]*$/
   if (!validHexRegex.test(hex)) {
-    throw new IdentityCommonException('Invalid hex string: contains invalid characters')
+    throw new IdentityCommonError('Invalid hex string: contains invalid characters')
   }
 
   // Handle odd-length hex strings by padding with leading zero

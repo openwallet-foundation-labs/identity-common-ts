@@ -1,8 +1,8 @@
 import { hasher } from '@owf/crypto'
 import { base64, compareBytes } from '@owf/identity-common'
-import { SchemaMetaException } from './schema-meta-exception'
-import { mergeTypeMetadata, type TypeMetadata, TypeMetadataSchema } from './type-metadata'
-import type { ResolvedSchemaReference, ResolverContent, ResolveSchemaReferencesOptions, SchemaURI } from './types'
+import { SchemaMetaError } from './schema-meta-error'
+import { mergeTypeMetadata, type TypeMetadata, zTypeMetadata } from './type-metadata'
+import type { ResolvedSchemaReference, ResolverContent, ResolveSchemaReferencesOptions, SchemaUri } from './types'
 
 const DEFAULT_MAX_EXTENDS_DEPTH = 10
 
@@ -20,25 +20,25 @@ function parseSri(integrity: string): { algorithm: 'sha256'; digest: Uint8Array 
   const separatorIndex = token.indexOf('-')
 
   if (separatorIndex <= 0 || separatorIndex >= token.length - 1) {
-    throw new SchemaMetaException(`integrity invalid format '${integrity}'`)
+    throw new SchemaMetaError(`integrity invalid format '${integrity}'`)
   }
 
   const algorithm = token.slice(0, separatorIndex)
   const digestValue = token.slice(separatorIndex + 1)
 
   if (algorithm !== 'sha256') {
-    throw new SchemaMetaException(`integrity unsupported algorithm '${algorithm}'`)
+    throw new SchemaMetaError(`integrity unsupported algorithm '${algorithm}'`)
   }
 
   let digest: Uint8Array
   try {
     digest = base64.decode(digestValue)
   } catch {
-    throw new SchemaMetaException(`integrity invalid base64 digest`)
+    throw new SchemaMetaError(`integrity invalid base64 digest`)
   }
 
   if (digest.length === 0) {
-    throw new SchemaMetaException(`integrity invalid base64 digest`)
+    throw new SchemaMetaError(`integrity invalid base64 digest`)
   }
 
   return { algorithm, digest }
@@ -50,7 +50,7 @@ function parseSri(integrity: string): { algorithm: 'sha256'; digest: Uint8Array 
  */
 function verifySriIntegrity(content: ResolverContent, integrity: string): void {
   if (typeof content !== 'string' && !(content instanceof Uint8Array)) {
-    throw new SchemaMetaException(
+    throw new SchemaMetaError(
       'integrity cannot be verified over parsed content: return the response body as a string or Uint8Array'
     )
   }
@@ -59,7 +59,7 @@ function verifySriIntegrity(content: ResolverContent, integrity: string): void {
   const actual = hasher(content instanceof Uint8Array ? (content.buffer as ArrayBuffer) : content, algorithm)
 
   if (!compareBytes(actual, digest)) {
-    throw new SchemaMetaException('integrity mismatch')
+    throw new SchemaMetaError('integrity mismatch')
   }
 }
 
@@ -88,35 +88,35 @@ async function fetchDocument(
     content = result.content
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    throw new SchemaMetaException(`${context} resolve failed: ${message}`)
+    throw new SchemaMetaError(`${context} resolve failed: ${message}`)
   }
 
   if (options.verifyIntegrity && integrity) {
     try {
       verifySriIntegrity(content, integrity)
     } catch (error) {
-      if (error instanceof SchemaMetaException) {
-        throw new SchemaMetaException(`${context.replace(/\.uri$/, '')}.${error.message}`)
+      if (error instanceof SchemaMetaError) {
+        throw new SchemaMetaError(`${context.replace(/\.uri$/, '')}.${error.message}`)
       }
 
       const message = error instanceof Error ? error.message : String(error)
-      throw new SchemaMetaException(`${context}.integrity verification failed: ${message}`)
+      throw new SchemaMetaError(`${context}.integrity verification failed: ${message}`)
     }
   }
 
   try {
     return parseJsonContent(content)
   } catch {
-    throw new SchemaMetaException(`${context} is not valid JSON`)
+    throw new SchemaMetaError(`${context} is not valid JSON`)
   }
 }
 
 function parseTypeMetadata(document: unknown, context: string): TypeMetadata {
-  const result = TypeMetadataSchema.safeParse(document)
+  const result = zTypeMetadata.safeParse(document)
 
   if (!result.success) {
     const messages = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')
-    throw new SchemaMetaException(`${context} is not valid SD-JWT VC Type Metadata: ${messages}`)
+    throw new SchemaMetaError(`${context} is not valid SD-JWT VC Type Metadata: ${messages}`)
   }
 
   return result.data
@@ -137,11 +137,11 @@ async function resolveExtendsChain(
 
   while (current.extends !== undefined) {
     if (depth >= options.maxExtendsDepth) {
-      throw new SchemaMetaException(`${context}.extends exceeds the maximum depth of ${options.maxExtendsDepth}`)
+      throw new SchemaMetaError(`${context}.extends exceeds the maximum depth of ${options.maxExtendsDepth}`)
     }
 
     if (options.visited.has(current.extends)) {
-      throw new SchemaMetaException(`${context}.extends forms a cycle at '${current.extends}'`)
+      throw new SchemaMetaError(`${context}.extends forms a cycle at '${current.extends}'`)
     }
 
     options.visited.add(current.extends)
@@ -159,7 +159,7 @@ async function resolveExtendsChain(
 
 async function resolveSdJwtReference(
   document: unknown,
-  schemaURI: Extract<SchemaURI, { formatIdentifier: 'dc+sd-jwt' }>,
+  schemaUri: Extract<SchemaUri, { formatIdentifier: 'dc+sd-jwt' }>,
   context: string,
   options: FetchOptions & { maxExtendsDepth: number }
 ): Promise<{ typeMetadata?: TypeMetadata; parsedSchema?: Record<string, unknown> }> {
@@ -170,12 +170,12 @@ async function resolveSdJwtReference(
 
   const typeMetadata = await resolveExtendsChain(parseTypeMetadata(document, context), context, {
     ...options,
-    visited: new Set<string>([schemaURI.uri]),
+    visited: new Set<string>([schemaUri.uri]),
   })
 
-  if (typeMetadata.vct !== schemaURI.meta.vct) {
-    throw new SchemaMetaException(
-      `${context}.vct '${typeMetadata.vct}' does not match the catalogue entry vct '${schemaURI.meta.vct}'`
+  if (typeMetadata.vct !== schemaUri.meta.vct) {
+    throw new SchemaMetaError(
+      `${context}.vct '${typeMetadata.vct}' does not match the catalogue entry vct '${schemaUri.meta.vct}'`
     )
   }
 
@@ -196,24 +196,24 @@ export async function resolveSchemaReferences(
   const fetchOptions: FetchOptions = { resolve, verifyIntegrity }
   const resolved: ResolvedSchemaReference[] = []
 
-  for (const [index, schemaURI] of schemaMeta.schemaURIs.entries()) {
-    if (selectedSet && !selectedSet.has(schemaURI.formatIdentifier)) {
+  for (const [index, schemaUri] of schemaMeta.schemaURIs.entries()) {
+    if (selectedSet && !selectedSet.has(schemaUri.formatIdentifier)) {
       continue
     }
 
     const context = `schemaURIs[${index}]`
-    const rawSchema = await fetchDocument(schemaURI.uri, schemaURI.integrity, `${context}.uri`, fetchOptions)
+    const rawSchema = await fetchDocument(schemaUri.uri, schemaUri.integrity, `${context}.uri`, fetchOptions)
 
     const { typeMetadata, parsedSchema } =
-      schemaURI.formatIdentifier === 'dc+sd-jwt'
-        ? await resolveSdJwtReference(rawSchema, schemaURI, context, { ...fetchOptions, maxExtendsDepth })
+      schemaUri.formatIdentifier === 'dc+sd-jwt'
+        ? await resolveSdJwtReference(rawSchema, schemaUri, context, { ...fetchOptions, maxExtendsDepth })
         : { typeMetadata: undefined, parsedSchema: isPlainObject(rawSchema) ? rawSchema : undefined }
 
     resolved.push({
-      format: schemaURI.formatIdentifier,
-      uri: schemaURI.uri,
-      integrity: schemaURI.integrity,
-      meta: schemaURI.meta,
+      format: schemaUri.formatIdentifier,
+      uri: schemaUri.uri,
+      integrity: schemaUri.integrity,
+      meta: schemaUri.meta,
       rawSchema,
       typeMetadata,
       parsedSchema,

@@ -1,3 +1,13 @@
+// Signing, parsing and verifying a Status List Token in JWT format raises `@owf/jose`'s errors,
+// re-exported here so they can be caught without depending on `@owf/jose` directly.
+export {
+  JoseError,
+  JoseInvalidArgumentError,
+  JoseParseError,
+  JoseSignatureVerificationError,
+  JoseValidationError,
+  JoseVerificationError,
+} from '@owf/jose'
 export type { CreateStatusListCborOptions, StatusListCborWithStatusListOptions } from './cbor/status-list-cbor'
 export { StatusListCbor } from './cbor/status-list-cbor'
 export type { StatusListCwtOptions } from './cbor/status-list-cwt'
@@ -16,10 +26,30 @@ export type {
 export { StatusListInfo } from './cbor/status-list-info'
 export { fetchStatusList } from './fetch-status-list'
 export type { EncryptBlock } from './ff1'
-export type { JWTwithStatusListPayload, StatusListJWTHeaderParameters, StatusListJWTPayload } from './jwt-types'
-export { JWT_STATUS_LIST_TYPE, JWTClaimNames } from './jwt-types'
+export type {
+  ReferencedTokenJwtPayload,
+  StatusClaim,
+  StatusListJwtHeaderParameters,
+  StatusListJwtPayload,
+  StatusListReference,
+} from './jwt-types'
+export {
+  JWT_STATUS_LIST_TYPE,
+  JwtClaimNames,
+  zReferencedTokenJwtPayload,
+  zStatusClaim,
+  zStatusListJwtHeader,
+  zStatusListJwtPayload,
+  zStatusListReference,
+} from './jwt-types'
+export type { DecompressStatusListOptions } from './status-list'
 export { StatusList } from './status-list'
-export { SLException, StatusListEntryNotValidException } from './status-list-exception'
+export type {
+  StatusListValidationCode,
+  StatusListValidationContexts,
+  StatusListValidationIssue,
+} from './status-list-error'
+export { STATUS_LIST_VALIDATION_CODES, StatusListError, StatusListValidationError } from './status-list-error'
 export type {
   StatusListIndexAllocatorContext,
   StatusListIndexAllocatorOptions,
@@ -32,14 +62,20 @@ export type {
   FeistelStatusListIndexAllocatorState,
 } from './status-list-index-feistel'
 export { createFeistelStatusListIndexAllocator, FeistelStatusListIndexAllocator } from './status-list-index-feistel'
-export type { VerifyStatusListJwtClaimsOptions } from './status-list-jwt'
-export {
-  createHeaderAndPayload,
-  getListFromStatusListJWT,
-  getStatusListFromJWT,
-  verifyStatus,
-  verifyStatusListJwtClaims,
-  verifyStatusListJwtHeader,
+export type {
+  CreateStatusListJwtHeader,
+  CreateStatusListJwtPayload,
+  DecodeStatusListJwtResult,
+  SignStatusListJwtOptions,
+  VerifyStatusListJwtClaimsOptions,
+  VerifyStatusListJwtOptions,
+  VerifyStatusListJwtResult,
 } from './status-list-jwt'
-export type { BitsPerStatus, StatusListEntry } from './types'
-export { MediaTypes, StatusType } from './types'
+export {
+  decodeStatusListJwt,
+  signStatusListJwt,
+  verifyStatusListJwt,
+  verifyStatusListJwtClaims,
+} from './status-list-jwt'
+export type { BitsPerStatus } from './types'
+export { StatusListMediaTypes, StatusType } from './types'

@@ -25,7 +25,7 @@ export enum IdentifierListCwtClaimKey {
  * The registered CWT claims, with the ones an identifier list CWT requires narrowed to
  * non-optional, plus the identifier list claim itself.
  */
-const identifierListCwtPayloadSchema = extendCwtPayloadClaims(
+const zIdentifierListCwtPayload = extendCwtPayloadClaims(
   [
     // § 12.3.6.3 defers to the Token Status List specification, where `sub` and `iat` are
     // REQUIRED claims of a Status List Token. `sub` shall equal the `uri` of the
@@ -50,8 +50,8 @@ const identifierListCwtPayloadSchema = extendCwtPayloadClaims(
   { keyLabels: { ...IdentifierListCwtClaimKey, ...StatusListCwtClaimKey } }
 )
 
-export type IdentifierListCwtPayloadEncodedStructure = z.input<typeof identifierListCwtPayloadSchema>
-export type IdentifierListCwtPayloadDecodedStructure = z.infer<typeof identifierListCwtPayloadSchema>
+export type IdentifierListCwtPayloadEncodedStructure = z.input<typeof zIdentifierListCwtPayload>
+export type IdentifierListCwtPayloadDecodedStructure = z.infer<typeof zIdentifierListCwtPayload>
 
 export type CreateIdentifierListCwtPayloadOptions = Omit<CreateCwtPayloadOptions, 'subject' | 'expirationTime'> & {
   identifierList: IdentifierList
@@ -84,7 +84,7 @@ export type VerifyIdentifierListCwtClaimsOptions = Omit<VerifyCwtClaimsOptions, 
  */
 export class IdentifierListCwtPayload extends CwtPayload<IdentifierListCwtPayloadDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(identifierListCwtPayloadSchema.in, identifierListCwtPayloadSchema.out, {
+    return z.codec(zIdentifierListCwtPayload.in, zIdentifierListCwtPayload.out, {
       decode: (input) => {
         const map: IdentifierListCwtPayloadDecodedStructure = TypedMap.fromMap(input)
         map.set(

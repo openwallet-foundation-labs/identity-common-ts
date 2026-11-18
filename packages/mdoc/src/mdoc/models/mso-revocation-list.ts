@@ -5,18 +5,21 @@ import {
   RegisteredCwtClaimKey,
   SignatureAlgorithm,
 } from '@owf/cose'
-import { base64, base64url, decodeJwt, stringToBytes } from '@owf/identity-common'
+import { base64, base64url } from '@owf/identity-common'
 import {
   fetchStatusList,
-  getListFromStatusListJWT,
-  SLException,
+  JoseError,
+  JoseSignatureVerificationError,
+  JoseValidationError,
   type StatusList,
   StatusListCwt,
-  StatusListEntryNotValidException,
+  StatusListError,
   type StatusListInfo,
-  type StatusListJWTPayload,
-  verifyStatus,
-  verifyStatusListJwtHeader,
+  type StatusListJwtPayload,
+  StatusListValidationError,
+  StatusType,
+  type VerifyStatusListJwtOptions,
+  verifyStatusListJwt as verifyTokenStatusListJwt,
 } from '@owf/token-status-list'
 import type { MdocContext } from '../../context'
 import {
@@ -50,7 +53,16 @@ async function asMdlRevocationListError<T>(
   } catch (error) {
     if (error instanceof CoseInvalidSignatureError) throw new invalidSignatureError(error.message)
     if (error instanceof CoseX5ChainNotBoundError) throw new UnprotectedX5ChainNotBoundError(error.message)
-    if (error instanceof SLException) throw new InvalidRevocationListError(error.message)
+    // The cause is what the verification callback threw, already an mdoc error
+    if (error instanceof JoseSignatureVerificationError) throw error.cause ?? new invalidSignatureError(error.message)
+    if (
+      error instanceof StatusListError ||
+      error instanceof StatusListValidationError ||
+      error instanceof JoseError ||
+      error instanceof JoseValidationError
+    ) {
+      throw new InvalidRevocationListError(error.message)
+    }
     throw error
   }
 }
@@ -122,19 +134,31 @@ async function verifyRevocationListSigner(
  * and HMAC are refused, as an HMAC keyed with the public key of the certificate would be accepted
  * from anyone.
  */
-const jwsSignatureAlgorithms = new Map<string, { algorithm: SignatureAlgorithm; signatureLength: number }>([
+type JwsSignatureAlgorithm = { algorithm: SignatureAlgorithm; signatureLength: number }
+const jwsSignatureAlgorithms = new Map<string, JwsSignatureAlgorithm>([
   ['ES256', { algorithm: SignatureAlgorithm.ES256, signatureLength: 64 }],
   ['ES384', { algorithm: SignatureAlgorithm.ES384, signatureLength: 96 }],
   ['ES512', { algorithm: SignatureAlgorithm.ES512, signatureLength: 132 }],
 ])
 
-const isJsonObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
+/**
+ * Checks the status at `idx`, only once the list verified, so that a list that does not verify is never
+ * reported as a status (Token Status List § 8.3). § 12.3.6.1 accepts no status but Valid.
+ */
+async function assertStatusValid(statusList: StatusList, uri: string, idx: number) {
+  const status = await asMdlRevocationListError(() => statusList.getStatus(idx), InvalidSignatureError)
+  if (status !== StatusType.Valid) {
+    throw new StatusListEntryNotValidError(
+      `Status for id '${idx}' is not Valid (${StatusType.Valid}), but is instead '${status}'`,
+      { uri, idx, status }
+    )
+  }
+}
 
 /**
- * Verify a status list in JWT format the way {@link verifyStatusListToken} verifies a CWT: the
- * signer from the `x5c` header, the signature with the `MdocContext` callbacks, then the header and
- * claims, with the same mandatory `exp`.
+ * Verify a status list in JWT format to the same rules as a CWT, with `verifyStatusListJwt` of
+ * `@owf/token-status-list` and a callback that validates the `x5c` chain and checks the signature
+ * with the `MdocContext`.
  */
 async function verifyStatusListJwt(
   {
@@ -146,98 +170,85 @@ async function verifyStatusListJwt(
     now,
     skewSeconds,
     checkFreshness,
+    maxDecompressedBytes,
   }: { jwt: string; uri: string; idx: number; now: Date } & Omit<
     VerifyStatusListTokenOptions,
     'statusListInfo' | 'now'
   >,
   ctx: Pick<MdocContext, 'x509' | 'cose'>
 ) {
-  let header: Record<string, unknown>
-  let payload: StatusListJWTPayload
-  let signature: Uint8Array
-  try {
-    let encodedSignature: string
-    ;({ header, payload, signature: encodedSignature } = decodeJwt<Record<string, unknown>, StatusListJWTPayload>(jwt))
-    if (!isJsonObject(header) || !isJsonObject(payload)) throw new Error('The header and payload must be objects')
-    signature = base64url.decode(encodedSignature)
-  } catch {
-    throw new InvalidRevocationListError(`The status list at ${uri} is not a valid JWT`)
-  }
+  let chain: Array<Uint8Array> | undefined
+  const verifyJwsCallback: VerifyStatusListJwtOptions['verifyJwsCallback'] = async (
+    signer,
+    { signingInputBytes, signature }
+  ) => {
+    if (signer.method !== 'x5c') throw new UnableToExtractX5ChainFromJwtError()
+    // Set, as `allowedAlgorithms` only has the keys of the map
+    const { algorithm, signatureLength } = jwsSignatureAlgorithms.get(signer.alg) as JwsSignatureAlgorithm
 
-  // RFC 7515 § 4.1.11: a `crit` extension the recipient does not understand must be rejected, and
-  // none is understood here.
-  if (header.crit !== undefined) {
-    throw new InvalidRevocationListError(`The status list at ${uri} has a crit header, which is not supported`)
-  }
-
-  // `typ` and `alg` are checked before the signature too, as the signature check needs `alg`.
-  const { alg } = await asMdlRevocationListError(() => verifyStatusListJwtHeader(header), InvalidSignatureError)
-  const jwsAlgorithm = jwsSignatureAlgorithms.get(alg)
-  if (jwsAlgorithm === undefined) {
-    // The value is not echoed in full, as it comes from the list before its signature is verified.
-    throw new InvalidRevocationListError(
-      `The status list at ${uri} is signed with unsupported alg '${alg.slice(0, 32)}'`
+    const signerKey = await verifyRevocationListSigner(
+      {
+        // RFC 7515 § 4.1.6: standard base64 DER, not base64url.
+        x5chain: signer.x5c.map((cert) => base64.decode(cert)),
+        algorithm,
+        trustedCertificates,
+        disableCertificateChainValidation,
+        now,
+      },
+      ctx
     )
-  }
-  const { algorithm, signatureLength } = jwsAlgorithm
+    chain = signerKey.chain
 
-  const { x5c } = header
-  if (!Array.isArray(x5c) || x5c.length === 0 || !x5c.every((cert) => typeof cert === 'string')) {
-    throw new UnableToExtractX5ChainFromJwtError()
-  }
-  let x5chain: Array<Uint8Array>
-  try {
-    // RFC 7515 § 4.1.6: standard base64 DER, not base64url.
-    x5chain = x5c.map((cert: string) => base64.decode(cert))
-  } catch {
-    throw new UnableToExtractX5ChainFromJwtError()
-  }
+    // A DER-encoded signature, as some signers produce, is not a JWS signature and is rejected here
+    // rather than left to the `sign1.verify` callback, which may throw on an unexpected length.
+    const signatureBytes = base64url.decode(signature)
+    if (signatureBytes.length !== signatureLength) {
+      throw new InvalidSignatureError(
+        `The signature of the status list at ${uri} is ${signatureBytes.length} bytes, not the ${signatureLength} bytes of a raw ${signer.alg} signature`
+      )
+    }
 
-  const { chain, key } = await verifyRevocationListSigner(
-    {
-      x5chain,
+    const verified = await ctx.cose.sign1.verify({
+      toBeVerified: signingInputBytes,
+      signature: signatureBytes,
+      key: signerKey.key,
       algorithm,
-      trustedCertificates,
-      disableCertificateChainValidation,
-      now,
-    },
-    ctx
+    })
+    if (!verified) throw new InvalidSignatureError(`The signature of the status list at ${uri} is not valid`)
+    return { verified: true, signerJwk: signerKey.key.jwk as { kty: string } }
+  }
+
+  const { header, payload, statusList } = await asMdlRevocationListError(
+    () =>
+      verifyTokenStatusListJwt({
+        jwt,
+        uri,
+        now,
+        skewSeconds,
+        checkIssuedAt: checkFreshness,
+        // § 12.3.6.3: "The exp claim shall be present."
+        requiredClaims: ['exp'],
+        allowedAlgorithms: [...jwsSignatureAlgorithms.keys()],
+        verifyJwsCallback,
+        maxDecompressedBytes,
+      }),
+    InvalidSignatureError
   )
 
-  // A DER-encoded signature, as some signers produce, is not a JWS signature and is rejected here
-  // rather than left to the `sign1.verify` callback, which may throw on an unexpected length.
-  if (signature.length !== signatureLength) {
-    throw new InvalidSignatureError(
-      `The signature of the status list at ${uri} is ${signature.length} bytes, not the ${signatureLength} bytes of a raw ${header.alg} signature`
-    )
-  }
+  await assertStatusValid(statusList, uri, idx)
 
-  // NOTE: `sign1.verify` is used as a raw signature check over the JWS signing input, which it
-  // does not parse, so the context needs no JWT callback.
-  const isValid = await ctx.cose.sign1.verify({
-    toBeVerified: stringToBytes(jwt.slice(0, jwt.lastIndexOf('.'))),
-    signature,
-    key,
-    algorithm,
-  })
-  if (!isValid) {
-    throw new InvalidSignatureError(`The signature of the status list at ${uri} is not valid`)
-  }
+  return { statusListJwt: { header, payload, statusList }, chain }
+}
 
-  // The header, the claims and then the status at `idx`, only once the list verified, so that a list
-  // that does not verify is never reported as a status (Token Status List § 8.3).
-  await asMdlRevocationListError(() => {
-    try {
-      verifyStatus({ token: jwt, idx, uri, now, skewSeconds, checkFreshness, requireExpirationTime: true })
-    } catch (error) {
-      if (error instanceof StatusListEntryNotValidException) {
-        throw new StatusListEntryNotValidError(error.message, { uri, idx, status: error.status })
-      }
-      throw error
-    }
-  }, InvalidSignatureError)
-
-  return { statusListJwt: { header, payload, statusList: getListFromStatusListJWT(jwt) }, chain }
+/**
+ * How the verification of an mdoc checks the status list and identifier list of its MSO
+ * (ISO/IEC 18013-5 second edition § 12.3.6).
+ */
+export type StatusVerificationOptions = {
+  /** Don't fetch and check the status list or identifier list of the MSO. */
+  disableValidation?: boolean
+  /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
+  maxDecompressedBytes?: number
 }
 
 export type VerifyStatusListTokenOptions = {
@@ -254,12 +265,14 @@ export type VerifyStatusListTokenOptions = {
   now?: Date
   skewSeconds?: number
   checkFreshness?: boolean
+  /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
+  maxDecompressedBytes?: number
 }
 
 /** A status list served in JWT format, once verified. */
 export type VerifiedStatusListJwt = {
   header: Record<string, unknown>
-  payload: StatusListJWTPayload
+  payload: StatusListJwtPayload
   statusList: StatusList
 }
 
@@ -298,8 +311,9 @@ export async function verifyStatusListToken(
     now = new Date(),
     skewSeconds,
     checkFreshness,
+    maxDecompressedBytes,
   }: VerifyStatusListTokenOptions,
-  ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose' | 'crypto'>
+  ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose' | 'crypto'>
 ): Promise<VerifyStatusListTokenResult> {
   if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
 
@@ -308,7 +322,8 @@ export async function verifyStatusListToken(
   // JWT is asked for with a lower quality value, and still accepted if a server returns it anyway.
   const token = await fetchStatusList({
     uri,
-    customFetcher: (input, init) => ctx.fetch(input, init, { type: 'statusList' }),
+    customFetcher: ctx.fetch,
+    fetchLimits: ctx.fetchLimits,
     acceptedFormats: ['cwt', 'jwt'],
   })
 
@@ -325,6 +340,7 @@ export async function verifyStatusListToken(
         now,
         skewSeconds,
         checkFreshness,
+        maxDecompressedBytes,
       },
       ctx
     )
@@ -375,20 +391,11 @@ export async function verifyStatusListToken(
     InvalidSignatureError
   )
 
-  // The status at `idx` is checked only once the list verified, so that a list that does not verify
-  // is never reported as a status (Token Status List § 8.3).
-  try {
-    statusListCwt.verifyStatus(idx)
-  } catch (error) {
-    if (error instanceof SLException) {
-      throw new StatusListEntryNotValidError(error.message, {
-        uri,
-        idx,
-        status: statusListCwt.payload.statusList.getStatus(idx),
-      })
-    }
-    throw error
-  }
+  const statusList = await asMdlRevocationListError(
+    () => statusListCwt.payload.getStatusList({ maxDecompressedBytes }),
+    InvalidSignatureError
+  )
+  await assertStatusValid(statusList, uri, idx)
 
   return { statusListCwt, chain }
 }
@@ -434,7 +441,7 @@ export async function verifyIdentifierListToken(
     skewSeconds,
     checkFreshness,
   }: VerifyIdentifierListTokenOptions,
-  ctx: Pick<MdocContext, 'fetch' | 'x509' | 'cose'>
+  ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose'>
 ): Promise<VerifyIdentifierListTokenResult> {
   if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
 

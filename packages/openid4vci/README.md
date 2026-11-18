@@ -13,6 +13,8 @@ An implementation of the [OpenID for Verifiable Credential Issuance](https://ope
 - Create and verify wallet attestations based on attestation-based client authentication
 - Resolve and create signed credential issuer metadata
 
+Wallet attestations and key attestations must be signed by an attester that is identified by `x5c`, a federation `trust_chain`, a DID, or another `kid`. Signed credential issuer metadata must be signed by a signer that is identified by `x5c`, a federation `trust_chain`, or a `kid` that is not a DID. The `verifyJws` callback decides whether the signer is trusted, for example by validating the `x5c` chain. For a DID-signed attestation, it must check that the DID belongs to a trusted attester: resolving the DID is not enough, as anyone can create a did:jwk or did:key, or host a did:web. A JWT signed with a key from a `jwk` header is rejected, as whoever created it could choose that key itself.
+
 This package was previously developed in the [oid4vc-ts](https://github.com/openwallet-foundation-labs/oid4vc-ts) repository. The `@openid4vc/*` packages are versioned together, separately from the other packages in this repository.
 
 ## Installation
@@ -63,6 +65,8 @@ and issuers must not advertise compression support.
 
 - [@openid4vc/oauth2](https://www.npmjs.com/package/@openid4vc/oauth2)
 - [@openid4vc/utils](https://www.npmjs.com/package/@openid4vc/utils)
+- [@owf/identity-common](https://www.npmjs.com/package/@owf/identity-common)
+- [@owf/jose](https://www.npmjs.com/package/@owf/jose)
 - [zod](https://www.npmjs.com/package/zod)
 
 ## Platform Support
@@ -73,7 +77,7 @@ This library is **platform agnostic** and works in:
 - ✅ Browsers (modern browsers with ES2020 support)
 - ✅ React Native
 
-The environment must provide an implementation of `URL` and `URLSearchParams`. Platform-specific functionality such as hashing, generating random bytes and signing is provided through callbacks. If no global `fetch` is available in your environment, it also needs to be provided through the callbacks.
+The environment must provide an implementation of `URL` and `URLSearchParams`. Platform-specific functionality such as hashing, generating random bytes and signing is provided through callbacks. If no global `fetch` is available in your environment, it also needs to be provided through the callbacks. The `fetch` callback gets what is requested as its third argument, an `Openid4vcFetchType` such as `{ type: 'accessTokenRequest' }`, and every response is read within the `fetchLimits` of the callbacks, 10 MiB per response by default (see `FetchLimits` of `@owf/identity-common`).
 
 ## Contributing
 

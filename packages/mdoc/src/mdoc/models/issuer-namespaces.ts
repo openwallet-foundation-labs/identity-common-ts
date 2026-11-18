@@ -2,11 +2,11 @@ import { CborStructure, DataItem } from '@owf/cose'
 import z from 'zod'
 import { IssuerSignedItem } from './issuer-signed-item'
 
-export const issuerNamespacesEncodedSchema = z.map(z.string(), z.array(z.instanceof(DataItem)))
-export const issuerNamespacesDecodedSchema = z.map(z.string(), z.array(z.instanceof(IssuerSignedItem)))
+export const zIssuerNamespacesEncoded = z.map(z.string(), z.array(z.instanceof(DataItem)))
+export const zIssuerNamespacesDecoded = z.map(z.string(), z.array(z.instanceof(IssuerSignedItem)))
 
-export type IssuerNamespacesEncodedStructure = z.infer<typeof issuerNamespacesEncodedSchema>
-export type IssuerNamespacesDecodedStructure = z.infer<typeof issuerNamespacesDecodedSchema>
+export type IssuerNamespacesEncodedStructure = z.infer<typeof zIssuerNamespacesEncoded>
+export type IssuerNamespacesDecodedStructure = z.infer<typeof zIssuerNamespacesDecoded>
 
 export type IssuerNamespacesOptions = {
   issuerNamespaces: IssuerNamespacesDecodedStructure
@@ -17,7 +17,7 @@ export class IssuerNamespaces extends CborStructure<
   IssuerNamespacesDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(issuerNamespacesEncodedSchema, issuerNamespacesDecodedSchema, {
+    return z.codec(zIssuerNamespacesEncoded, zIssuerNamespacesDecoded, {
       decode: (encoded) => {
         const issuerNamespaces = new Map<string, IssuerSignedItem[]>()
         encoded.forEach((value, key) => {

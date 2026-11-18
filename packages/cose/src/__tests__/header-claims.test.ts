@@ -4,7 +4,7 @@ import { RegisteredCwtHeaderClaimKey } from '../cose/headers/defaults'
 import { ProtectedHeaders } from '../cose/headers/protected-headers'
 import { UnprotectedHeaders } from '../cose/headers/unprotected-headers'
 
-const { KeyId, X5Chain } = RegisteredCwtHeaderClaimKey
+const { Algorithm, Critical, KeyId, X5Chain } = RegisteredCwtHeaderClaimKey
 
 describe('cose header claims', () => {
   test('a bstr kid is accepted and typed', () => {
@@ -26,6 +26,17 @@ describe('cose header claims', () => {
   test('a non-bstr kid is rejected', () => {
     const bytes = cborEncode(new Map<number, unknown>([[KeyId, 'not-bytes']]))
     expect(() => UnprotectedHeaders.decode(bytes)).toThrow()
+  })
+
+  test('an empty crit array is rejected when decoding protected headers', () => {
+    const innerMap = cborEncode(new Map<number, unknown>([[Critical, []]]))
+    expect(() => ProtectedHeaders.fromEncodedStructure(innerMap)).toThrow()
+  })
+
+  test('a non-empty crit array is accepted', () => {
+    const innerMap = cborEncode(new Map<number, unknown>([[Critical, [Algorithm]]]))
+    const headers = ProtectedHeaders.fromEncodedStructure(innerMap)
+    expect(headers.headers.get(Critical)).toStrictEqual([Algorithm])
   })
 
   test('other header labels (e.g. x5chain) pass through untouched', () => {

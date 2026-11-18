@@ -1,13 +1,7 @@
-import {
-  ContentType,
-  createZodFetcher,
-  Headers,
-  InvalidFetchResponseError,
-  objectToQueryParams,
-  ValidationError,
-} from '@openid4vc/utils'
-import { type CallbackContext, HashAlgorithm } from '../callbacks'
-import { calculateJwkThumbprint } from '../common/jwk/jwk-thumbprint'
+import { createZodFetcher, Headers, InvalidFetchResponseError, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, ValidationError } from '@owf/identity-common'
+import { calculateJwkThumbprint } from '@owf/jose'
+import type { CallbackContext } from '../callbacks'
 import { zOauth2ErrorResponse } from '../common/z-oauth2-error'
 import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
 import { authorizationServerRequestWithDpopRetry } from '../dpop/dpop-retry'
@@ -25,7 +19,10 @@ export interface CreateAuthorizationRequestUrlOptions {
   /**
    * Callback context mostly for crypto related functionality
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'hash' | 'generateRandom' | 'signJwt' | 'clientAuthentication'>
+  callbacks: Pick<
+    CallbackContext,
+    'fetch' | 'fetchLimits' | 'hash' | 'generateRandom' | 'signJws' | 'clientAuthentication'
+  >
 
   /**
    * Metadata of the authorization server for which to create the authorization request url
@@ -169,7 +166,7 @@ export async function createAuthorizationRequestUrl(options: CreateAuthorization
     // If not using PAR but dpop we include the `dpop_jkt` option
     if (options.dpop) {
       authorizationRequest.dpop_jkt = await calculateJwkThumbprint({
-        hashAlgorithm: HashAlgorithm.Sha256,
+        hashAlgorithm: 'sha-256',
         hashCallback: options.callbacks.hash,
         jwk: options.dpop.signer.publicJwk,
       })
@@ -195,11 +192,11 @@ interface PushAuthorizationRequestOptions {
    */
   headers?: Record<string, unknown>
 
-  callbacks: Pick<CallbackContext, 'fetch' | 'clientAuthentication'>
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'clientAuthentication'>
 }
 
 async function pushAuthorizationRequest(options: PushAuthorizationRequestOptions) {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'pushedAuthorizationRequest')
 
   if (options.authorizationRequest.request_uri) {
     throw new Oauth2Error(
@@ -209,7 +206,7 @@ async function pushAuthorizationRequest(options: PushAuthorizationRequestOptions
 
   const headers = new Headers({
     ...options.headers,
-    'Content-Type': ContentType.XWwwFormUrlencoded,
+    'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
   })
 
   // NOTE: this will currently be called twice if we need to retry dpop.
@@ -220,13 +217,13 @@ async function pushAuthorizationRequest(options: PushAuthorizationRequestOptions
     method: 'POST',
     authorizationServerMetadata: options.authorizationServerMetadata,
     body: options.authorizationRequest,
-    contentType: ContentType.XWwwFormUrlencoded,
+    contentType: CommonMediaTypes.XWwwFormUrlencoded,
     headers,
   })
 
   const { response, result } = await fetchWithZod(
     zPushedAuthorizationResponse,
-    ContentType.Json,
+    CommonMediaTypes.Json,
     options.pushedAuthorizationRequestEndpoint,
     {
       method: 'POST',
@@ -258,7 +255,7 @@ async function pushAuthorizationRequest(options: PushAuthorizationRequestOptions
   }
 
   if (!result.success) {
-    throw new ValidationError('Error validating pushed authorization response', result.error)
+    throw new ValidationError('Error validating pushed authorization response', result.issues)
   }
 
   const dpopNonce = extractDpopNonceFromHeaders(response.headers)

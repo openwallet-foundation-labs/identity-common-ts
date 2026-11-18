@@ -1,11 +1,11 @@
 import {
-  type JwtSigner,
   type VerifiedJarRequest,
   type VerifyAuthorizationRequestOptions,
   type VerifyAuthorizationRequestReturn,
   verifyAuthorizationRequest,
   verifyJarRequest,
 } from '@openid4vc/oauth2'
+import type { JwsSigner } from '@owf/jose'
 import type { InteractiveAuthorizationInitialRequest } from './z-interactive-authorization.js'
 
 export interface VerifyInteractiveAuthorizationInitialRequestReturn extends VerifyAuthorizationRequestReturn {
@@ -29,8 +29,15 @@ export interface VerifyInteractiveAuthorizationInitialRequestOptions
    */
   interactiveAuthorizationRequestJwt?: {
     jwt: string
-    signer: JwtSigner
+    signer: JwsSigner
   }
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of the request object.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 /**
@@ -48,20 +55,21 @@ export interface VerifyInteractiveAuthorizationInitialRequestOptions
  * @example Verify initial request
  * ```ts
  * const result = await verifyInteractiveAuthorizationInitialRequest({
- *   interactiveAuthorizationRequest: request,
+ *   interactiveAuthorizationRequest,
+ *   request,
  *   authorizationServerMetadata,
- *   callbacks: { fetch, verifyJwt }
+ *   callbacks: { hash, verifyJws }
  * })
  * ```
  *
  * @example Verify JAR request
  * ```ts
  * const result = await verifyInteractiveAuthorizationInitialRequest({
- *   interactiveAuthorizationRequest: jarRequest,
- *   interactiveAuthorizationRequestJwt: jwt,
- *   jwtSigner: { ... },
+ *   interactiveAuthorizationRequest,
+ *   interactiveAuthorizationRequestJwt: { jwt: interactiveAuthorizationRequestJwt, signer: { ... } },
+ *   request,
  *   authorizationServerMetadata,
- *   callbacks: { fetch, verifyJwt }
+ *   callbacks: { hash, verifyJws }
  * })
  * ```
  */
@@ -77,6 +85,8 @@ export async function verifyInteractiveAuthorizationInitialRequest(
       jarRequestParams: options.interactiveAuthorizationRequest,
       callbacks: options.callbacks,
       jwtSigner: options.interactiveAuthorizationRequestJwt.signer,
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
   }
 

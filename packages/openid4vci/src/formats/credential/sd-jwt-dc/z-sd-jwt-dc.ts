@@ -1,3 +1,4 @@
+import { zNonEmptyString } from '@owf/identity-common'
 import z from 'zod'
 import { zIssuerMetadataClaimsDescription } from '../../../metadata/credential-issuer/z-claims-description'
 import {
@@ -10,7 +11,7 @@ export const zSdJwtDcFormatIdentifier = z.literal('dc+sd-jwt')
 export type SdJwtDcFormatIdentifier = z.infer<typeof zSdJwtDcFormatIdentifier>
 
 export const zSdJwtDcCredentialIssuerMetadata = zCredentialConfigurationSupportedCommon.extend({
-  vct: z.string(),
+  vct: zNonEmptyString,
   format: zSdJwtDcFormatIdentifier,
   credential_signing_alg_values_supported: z.array(z.string()).optional(),
   credential_metadata: zCredentialConfigurationSupportedCommonCredentialMetadata
@@ -21,7 +22,7 @@ export const zSdJwtDcCredentialIssuerMetadata = zCredentialConfigurationSupporte
 })
 
 export const zSdJwtDcCredentialIssuerMetadataDraft15 = zCredentialConfigurationSupportedCommonDraft15.extend({
-  vct: z.string(),
+  vct: zNonEmptyString,
   format: zSdJwtDcFormatIdentifier,
   claims: z.array(zIssuerMetadataClaimsDescription).optional(),
 })

@@ -14,64 +14,57 @@
  */
 
 // Constants
-export { CommitmentOIDs, CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS, JAdESProfile } from './constants'
-// Exception
-export { JAdESException } from './jades-exception'
+export { CommitmentOids, CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS, JadesProfile } from './constants'
+// Error
+export { JadesError, JadesValidationError } from './jades-error'
 // Profile validation
 export type { ProfileValidationOptions, ProfileValidationResult } from './profile'
 export { detectProfiles, validateProfile } from './profile'
 // Zod Schemas
 export {
-  AdoTstSchema,
-  ArcTstSchema,
-  CertIdSchema,
-  ClaimedSigningTimeSchema,
-  CommitmentReferenceSchema,
-  CompactJWSSchema,
-  EtsiUClearInstanceSchema,
-  EtsiUSchema,
-  FlattenedJWSSchema,
-  GeneralJWSSchema,
-  OIdSchema,
-  PkiObjectSchema,
-  ProtectedHeaderForSigningSchema,
-  ProtectedHeaderParamsSchema,
-  ProtectedHeaderSchema,
-  RRefsSchema,
-  RValsSchema,
-  SigDSchema,
-  SignAlgSchema,
-  SignaturePolicyQualifierSchema,
-  SignaturePolicySchema,
-  SignaturePolicyStoreSchema,
-  SignatureProductionPlaceSchema,
-  SignerAttributesSchema,
-  SignOptionsSchema,
-  SigTstSchema,
-  TstContainerSchema,
-  TstTokenSchema,
-  TstTokensSchema,
-  UnprotectedHeaderSchema,
-  ValidationValuesSchema,
-  VerifyOptionsSchema,
-  X5tOSchema,
-  XRefsSchema,
-  XValsSchema,
+  zAdoTst,
+  zArcTst,
+  zCertId,
+  zClaimedSigningTime,
+  zCommitmentReference,
+  zEtsiU,
+  zEtsiUClearInstance,
+  zOid,
+  zPkiObject,
+  zProtectedHeader,
+  zProtectedHeaderForSigning,
+  zProtectedHeaderParams,
+  zRRefs,
+  zRVals,
+  zSigD,
+  zSignAlg,
+  zSignaturePolicy,
+  zSignaturePolicyQualifier,
+  zSignaturePolicyStore,
+  zSignatureProductionPlace,
+  zSignerAttributes,
+  zSigTst,
+  zTstContainer,
+  zTstToken,
+  zTstTokens,
+  zUnprotectedHeader,
+  zValidationValues,
+  zX5tO,
+  zXRefs,
+  zXVals,
 } from './schemas'
-// Main Token class
-export { Token } from './token'
+// Signing
+export type { JadesSerialization, JadesSerializations, SignJadesOptions, SignJadesResult } from './sign'
+export { signJades } from './sign'
 // Types
 export type {
   AdoTst,
   ArcTst,
   CertId,
   CommitmentReference,
-  CompactJWS,
   EtsiU,
   EtsiUClearInstance,
-  FlattenedJWS,
-  GeneralJWS,
-  OId,
+  Oid,
   PkiObject,
   ProtectedHeader,
   ProtectedHeaderParams,
@@ -82,28 +75,27 @@ export type {
   SignaturePolicy,
   SignatureProductionPlace,
   SignerAttributes,
-  SignOptions,
   SigTst,
-  TokenContext,
   TstContainer,
   TstToken,
   TstTokens,
   UnprotectedHeaderParams,
   ValidationValues,
-  VerifyOptions,
   X5tO,
   XRefs,
   XVals,
 } from './types'
 // Utility functions
-export {
-  generateSigX5ts,
-  generateX5c,
-  generateX5tO,
-  generateX5tS256,
-  getLegacySigningTime,
-  getSigningTime,
-} from './utils'
-export type { VerifyResult } from './verifier'
-// Verifier functions
-export { decode, verify, verifyCompact, verifyFlattened, verifyGeneral } from './verifier'
+export { generateSigX5ts, generateX5c, generateX5tO, generateX5tS256, getSigningTime } from './utils'
+// Validation
+export type { JadesValidationCode, JadesValidationIssue, JadesValidationResult } from './validation'
+export { JADES_VALIDATION_CODES } from './validation'
+// Decoding and verification
+export type {
+  DecodedJades,
+  DecodeJadesOptions,
+  VerifyJadesJwtOptions,
+  VerifyJadesOptions,
+  VerifyJadesResult,
+} from './verify'
+export { decodeJades, verifyJades, verifyJadesJwt } from './verify'

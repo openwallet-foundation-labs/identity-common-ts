@@ -1,5 +1,5 @@
 import { type CredentialIssuerMetadata, zCredentialIssuerMetadataSchema } from '@openid4vc/openid4vci'
-import { base64url, decodeJwt } from '@owf/identity-common'
+import { base64url, decodeJwt, type FetchCallback, type FetchLimits, fetchWithLimits } from '@owf/identity-common'
 import z from 'zod'
 import type { JwtSignatureVerifier } from './crypto'
 import type { IssuerMetadataWithCredentialMetadataUri } from './issuerMetadata'
@@ -22,7 +22,7 @@ const valueTypeValues = Object.values(ValueType).join('|')
 const valueTypeRegex = new RegExp(`^template:(${valueTypeValues})$`)
 const urnRegex = /^urn:eudi:sca:[^:]+:[^:]+(:[^:]+)*:[^:]+$/
 
-const CredentialMetadataDisplaySchema = z
+const zCredentialMetadataDisplay = z
   .array(
     z.object({
       locale: z.string().optional(),
@@ -32,16 +32,16 @@ const CredentialMetadataDisplaySchema = z
   )
   .min(1)
 
-export type CredentialMetadataDisplay = z.infer<typeof CredentialMetadataDisplaySchema>
+export type CredentialMetadataDisplay = z.infer<typeof zCredentialMetadataDisplay>
 
-export const CredentialMetadataClaimsDataTypeSchema = z
+export const zCredentialMetadataClaimsDataType = z
   .object({
     claims: z.array(
       z
         .object({
           path: z.array(z.union([z.string(), z.null()])),
           mandatory: z.boolean().optional(),
-          display: CredentialMetadataDisplaySchema.optional(),
+          display: zCredentialMetadataDisplay.optional(),
           value_type: z.union([z.enum(ValueType), z.string()]).optional(),
         })
         .superRefine((val, ctx) => {
@@ -58,24 +58,31 @@ export const CredentialMetadataClaimsDataTypeSchema = z
   })
   .catchall(z.unknown())
 
-export type CredentialMetadataClaimsDataType = z.infer<typeof CredentialMetadataClaimsDataTypeSchema>
+export type CredentialMetadataClaimsDataType = z.infer<typeof zCredentialMetadataClaimsDataType>
 
-const CredentialMetadataSchema = z.object({
-  transaction_data_types: z.record(z.string().regex(urnRegex), CredentialMetadataClaimsDataTypeSchema),
+const zCredentialMetadata = z.object({
+  transaction_data_types: z.record(z.string().regex(urnRegex), zCredentialMetadataClaimsDataType),
 })
 
-export type CredentialMetadata = z.infer<typeof CredentialMetadataSchema>
+export type CredentialMetadata = z.infer<typeof zCredentialMetadata>
 
 export const parseCredentialMetadata = (credentialMetadata: Record<string, unknown>) => {
-  const cm = CredentialMetadataSchema.parse(credentialMetadata)
+  const cm = zCredentialMetadata.parse(credentialMetadata)
   return cm
 }
 
+/**
+ * Fetches the credential metadata of `credentialMetadataSource` and verifies it.
+ *
+ * @param customFetcher Defaults to the global `fetch`. It gets `{ type: 'credentialMetadata' }` as its third argument.
+ * @param fetchLimits The maximum size of the response, 10 MiB by default (see `FetchLimits` of `@owf/identity-common`).
+ */
 export async function fetchCredentialMetadata(
   verifier: JwtSignatureVerifier,
   credentialMetadataSource: string | IssuerMetadataWithCredentialMetadataUri,
-  customFetcher = fetch,
-  langCode?: string
+  customFetcher?: FetchCallback<'credentialMetadata'>,
+  langCode?: string,
+  fetchLimits?: FetchLimits<'credentialMetadata'>
 ): Promise<CredentialMetadata & CredentialIssuerMetadata> {
   const uri =
     typeof credentialMetadataSource === 'string'
@@ -85,16 +92,19 @@ export async function fetchCredentialMetadata(
     throw Error('credential_metadata_uri is not defined on the issuer metadata')
   }
 
-  const response = await customFetcher(uri, {
-    headers: {
-      Accept: 'application/jwt',
-      ...(langCode ? { 'Accept-Language': langCode } : {}),
-    },
-  })
+  const response = await fetchWithLimits(
+    { fetch: customFetcher, fetchLimits },
+    {
+      type: 'credentialMetadata',
+      url: uri,
+      accept: 'application/jwt',
+      init: { headers: langCode ? { 'Accept-Language': langCode } : {} },
+    }
+  )
 
   const payload = await validateJwt(await response.text(), uri, verifier)
 
-  return CredentialMetadataSchema.extend(zCredentialIssuerMetadataSchema.shape).parse(payload.credential_metadata)
+  return zCredentialMetadata.extend(zCredentialIssuerMetadataSchema.shape).parse(payload.credential_metadata)
 }
 
 /**
@@ -120,7 +130,8 @@ const validateJwt = async (jwt: string, credentialMetadataUri: string, verifier:
       credential_metadata: zCredentialIssuerMetadataSchema,
     })
     .refine((data) => data.exp > data.iat, { message: 'exp must be after iat', path: ['exp'] })
-    .refine((data) => new Date(data.exp) < new Date(), { message: 'exp must be after iat', path: ['exp'] })
+    // `exp` is in seconds, and expired metadata could be replayed by whoever serves it
+    .refine((data) => data.exp * 1000 > Date.now(), { message: 'exp must be in the future', path: ['exp'] })
     .refine(
       (data) => {
         return data.credential_metadata_uri === credentialMetadataUri

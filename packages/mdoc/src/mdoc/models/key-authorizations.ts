@@ -3,13 +3,13 @@ import { z } from 'zod'
 import type { DataElementIdentifier } from './data-element-identifier'
 import type { Namespace } from './namespace'
 
-const keyAuthorizationsSchema = typedMap([
+const zKeyAuthorizations = typedMap([
   ['nameSpaces', z.array(z.string()).exactOptional()],
   ['dataElements', z.map(z.string(), z.array(z.string())).exactOptional()],
 ] as const)
 
-export type KeyAuthorizationsEncodedStructure = z.input<typeof keyAuthorizationsSchema>
-export type KeyAuthorizationsDecodedStructure = z.output<typeof keyAuthorizationsSchema>
+export type KeyAuthorizationsEncodedStructure = z.input<typeof zKeyAuthorizations>
+export type KeyAuthorizationsDecodedStructure = z.output<typeof zKeyAuthorizations>
 
 export type KeyAuthorizationsOptions = {
   namespaces?: Array<Namespace>
@@ -21,7 +21,7 @@ export class KeyAuthorizations extends CborStructure<
   KeyAuthorizationsDecodedStructure
 > {
   public static override get encodingSchema() {
-    return keyAuthorizationsSchema
+    return zKeyAuthorizations
   }
 
   public get namespaces() {

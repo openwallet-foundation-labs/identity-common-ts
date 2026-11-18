@@ -8,15 +8,15 @@ import {
 import { cborDecode, cborEncode } from '../../cbor/parser.js'
 import { type AnyTypedMap, TypedMap } from '../../utils/typed-map.js'
 import { zUint8Array } from '../../utils/zod.js'
-import { type CoseHeaders, coseHeaderClaimsSchema } from './header-claims.js'
+import { type CoseHeaders, zCoseHeaderClaims } from './header-claims.js'
 
-// Wire form: the header map is wrapped in a bstr (RFC 9052). `protectedHeadersDecodedStructure` is
+// Wire form: the header map is wrapped in a bstr (RFC 9052). `zProtectedHeadersDecoded` is
 // the plain map carried inside that bstr, kept for backwards compatibility.
-export const protectedHeadersEncodedStructure = zUint8Array
-export const protectedHeadersDecodedStructure = z.map(z.number(), z.unknown())
+export const zProtectedHeadersEncoded = zUint8Array
+export const zProtectedHeadersDecoded = z.map(z.number(), z.unknown())
 
-export type ProtectedHeadersEncodedStructure = z.infer<typeof protectedHeadersEncodedStructure>
-export type ProtectedHeadersDecodedStructure = z.infer<typeof coseHeaderClaimsSchema>
+export type ProtectedHeadersEncodedStructure = z.infer<typeof zProtectedHeadersEncoded>
+export type ProtectedHeadersDecodedStructure = z.infer<typeof zCoseHeaderClaims>
 
 /**
  * Wraps a header claims schema in the bstr the protected headers are carried in (RFC 9052), giving
@@ -29,7 +29,7 @@ export type ProtectedHeadersDecodedStructure = z.infer<typeof coseHeaderClaimsSc
 export function protectedHeadersSchema<ClaimsSchema extends z.ZodType>(
   claimsSchema: z.ZodCodec<z.ZodType, ClaimsSchema>
 ) {
-  return z.codec(protectedHeadersEncodedStructure, claimsSchema.out, {
+  return z.codec(zProtectedHeadersEncoded, claimsSchema.out, {
     // TODO: Senders SHOULD encode a zero-length map as a zero-length string rather than as a zero-length map
     encode: (decoded) => cborEncode((decoded as AnyTypedMap).toMap()) as Uint8Array<ArrayBuffer>,
     decode: (encoded) =>
@@ -82,7 +82,7 @@ export class ProtectedHeaders<Headers extends AnyTypedMap = CoseHeaders> extends
   private originalEncodedStructure?: ProtectedHeadersEncodedStructure
 
   public static override get encodingSchema(): z.ZodType {
-    return protectedHeadersSchema(coseHeaderClaimsSchema)
+    return protectedHeadersSchema(zCoseHeaderClaims)
   }
 
   public get headers(): Headers {

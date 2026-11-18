@@ -1,12 +1,12 @@
 import type { DisclosureFrame } from '@sd-jwt/core'
-import { GeneralJSON, SDJwtGeneralJSONInstance, SDJwtInstance } from '@sd-jwt/core'
+import { GeneralJson, SdJwtGeneralJsonInstance, SdJwtInstance } from '@sd-jwt/core'
 import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
 
 ;(async () => {
   const { signer, verifier } = await createSignerVerifier()
 
-  // Create SDJwt instance for use
-  const sdjwt = new SDJwtInstance({
+  // Create SdJwt instance for use
+  const sdjwt = new SdJwtInstance({
     signer,
     signAlg: ES256.alg,
     verifier,
@@ -16,7 +16,7 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
     kbSignAlg: ES256.alg,
     kbVerifier: verifier,
   })
-  const generalJSONSdJwt = new SDJwtGeneralJSONInstance({
+  const generalJsonSdJwt = new SdJwtGeneralJsonInstance({
     hasher: digest,
     verifier,
   })
@@ -30,7 +30,7 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
     _sd: ['firstname', 'id'],
   }
 
-  const kbPayload = {
+  const KbJwtPayload = {
     iat: Math.floor(Date.now() / 1000),
     aud: 'https://example.com',
     nonce: '1234',
@@ -40,22 +40,22 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
   const encodedSdjwt = await sdjwt.issue(claims, disclosureFrame)
   console.log('encodedSdjwt:', encodedSdjwt)
 
-  const generalJSON = GeneralJSON.fromEncode(encodedSdjwt)
-  console.log('generalJSON(credential): ', generalJSON.toJson())
+  const generalJson = GeneralJson.fromEncode(encodedSdjwt)
+  console.log('generalJson(credential): ', generalJson.toJson())
 
   const presentedSdJwt = await sdjwt.present<typeof claims>(
     encodedSdjwt,
     { id: true },
     {
       kb: {
-        payload: kbPayload,
+        payload: KbJwtPayload,
       },
     }
   )
 
-  const generalPresentationJSON = GeneralJSON.fromEncode(presentedSdJwt)
+  const generalPresentationJson = GeneralJson.fromEncode(presentedSdJwt)
 
-  await generalPresentationJSON.addSignature(
+  await generalPresentationJson.addSignature(
     {
       alg: 'ES256',
       typ: 'sd+jwt',
@@ -65,7 +65,7 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
     'key-1'
   )
 
-  console.log('flattenJSON(presentation): ', JSON.stringify(generalPresentationJSON.toJson(), null, 2))
+  console.log('flattenJson(presentation): ', JSON.stringify(generalPresentationJson.toJson(), null, 2))
 
   const verified = await sdjwt.verify(presentedSdJwt, {
     requiredClaimKeys: ['id'],
@@ -73,6 +73,6 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
   })
   console.log(verified)
 
-  const generalVerified = await generalJSONSdJwt.verify(generalJSON)
+  const generalVerified = await generalJsonSdJwt.verify(generalJson)
   console.log(generalVerified)
 })()

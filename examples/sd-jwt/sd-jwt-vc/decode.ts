@@ -1,11 +1,11 @@
-import { SDJwtVcInstance } from '@sd-jwt/sd-jwt-vc'
+import { SdJwtVcInstance } from '@sd-jwt/sd-jwt-vc'
 import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
 
 ;(async () => {
   const { signer, verifier } = await createSignerVerifier()
 
-  // Create SDJwt instance for use
-  const sdjwt = new SDJwtVcInstance({
+  // Create SdJwt instance for use
+  const sdjwt = new SdJwtVcInstance({
     signer,
     signAlg: ES256.alg,
     verifier,

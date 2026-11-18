@@ -1,9 +1,9 @@
-import * as v from 'valibot'
+import type { z } from 'zod'
 import type { DcqlCredentialQuery } from '../dcql-query/m-dcql-credential-query.js'
 import { getTrustedAuthorityParser } from '../dcql-query/m-dcql-trusted-authorities.js'
 
 import type { DcqlTrustedAuthoritiesResult } from '../dcql-query-result/m-trusted-authorities-result.js'
-import { asNonEmptyArrayOrUndefined, type ToNonEmptyArray } from '../u-dcql.js'
+import { asNonEmptyArrayOrUndefined, parseDcql, type ToNonEmptyArray } from '../u-dcql.js'
 import type { DcqlCredential } from '../u-dcql-credential.js'
 
 export const runTrustedAuthoritiesQuery = (
@@ -16,13 +16,12 @@ export const runTrustedAuthoritiesQuery = (
     }
   }
 
-  const failedTrustedAuthorities: v.InferOutput<
-    typeof DcqlTrustedAuthoritiesResult.vTrustedAuthorityEntryFailureResult
-  >[] = []
+  const failedTrustedAuthorities: z.output<typeof DcqlTrustedAuthoritiesResult.zTrustedAuthorityEntryFailureResult>[] =
+    []
 
   for (const [trustedAuthorityIndex, trustedAuthority] of credentialQuery.trusted_authorities.entries()) {
     const trustedAuthorityParser = getTrustedAuthorityParser(trustedAuthority)
-    const parseResult = v.safeParse(trustedAuthorityParser, credential.authority)
+    const parseResult = parseDcql(trustedAuthorityParser, credential.authority)
 
     if (parseResult.success) {
       return {
@@ -30,18 +29,16 @@ export const runTrustedAuthoritiesQuery = (
         valid_trusted_authority: {
           success: true,
           trusted_authority_index: trustedAuthorityIndex,
-          output: parseResult.output,
+          output: parseResult.data,
         },
         failed_trusted_authorities: asNonEmptyArrayOrUndefined(failedTrustedAuthorities),
       }
     }
 
-    const issues = v.flatten(parseResult.issues)
     failedTrustedAuthorities.push({
       success: false,
       trusted_authority_index: trustedAuthorityIndex,
-      issues: issues.nested ?? issues,
-      output: parseResult.output,
+      issues: parseResult.issues,
     })
   }
 

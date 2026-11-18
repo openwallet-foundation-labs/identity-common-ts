@@ -1,11 +1,11 @@
 import { z } from 'zod'
-import { jsonWebKeySetSchema } from '../jsonWeb'
+import { zJsonWebKeySet } from '../jsonWeb'
 
-export const commonMetadataSchema = z.object({
+export const zCommonMetadata = z.object({
   // -- 5.2.1 Extensions for JWK Sets in Entity Metadata
   signed_jwks_uri: z.url().optional(),
   jwks_uri: z.url().optional(),
-  jwks: jsonWebKeySetSchema.optional(),
+  jwks: zJsonWebKeySet.optional(),
 
   // -- 5.2.2 informational Metadata Extensions --
   organization_name: z.string().optional(),

@@ -1,6 +1,7 @@
-import { zJwk, zJwtHeader, zJwtPayload } from '@openid4vc/oauth2'
-import { zNumericDate, zTyp } from '@openid4vc/utils'
+import { zNumericDate, zTyp } from '@owf/identity-common'
+import { zJwk, zJwtHeader, zJwtPayload } from '@owf/jose'
 import z from 'zod'
+import { refineJwtProofKeyHeaders } from '../formats/proof-type/jwt/z-jwt-proof-type'
 
 export type KeyAttestationJwtUse = 'proof_type.jwt' | 'proof_type.attestation'
 
@@ -9,19 +10,13 @@ export const zKeyAttestationJwtHeader = z
     ...zJwtHeader.shape,
     typ: zTyp(
       // OpenID4VCI 1.0/1.1 final
-      'key-attestation+jwt'
-    ).or(
+      'key-attestation+jwt',
       // Legacy (<= draft 15) typ, accepted on verification for backwards compatibility
-      zTyp('keyattestation+jwt')
+      'keyattestation+jwt'
     ),
   })
   .loose()
-  .refine(({ kid, jwk }) => jwk === undefined || kid === undefined, {
-    message: `Both 'jwk' and 'kid' are defined. Only one is allowed`,
-  })
-  .refine(({ trust_chain, kid }) => !trust_chain || kid !== undefined, {
-    message: `When 'trust_chain' is provided, 'kid' is required`,
-  })
+  .superRefine(refineJwtProofKeyHeaders)
 
 export type KeyAttestationJwtHeader = z.infer<typeof zKeyAttestationJwtHeader>
 

@@ -1,4 +1,5 @@
-import { ValidationError } from '@openid4vc/utils'
+import { IdentityError } from '@owf/identity-common'
+import { JoseInvalidArgumentError, type Jwk } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import {
   type VerifiedClientAttestationJwt,
@@ -11,7 +12,6 @@ import {
   oauthClientAttestationPopHeader,
 } from '../client-attestation/z-client-attestation'
 import { SupportedClientAuthenticationMethod } from '../client-authentication'
-import type { Jwk } from '../common/jwk/z-jwk'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { type DpopVerificationOptions, verifyDpopJwt } from '../dpop/dpop'
@@ -72,6 +72,12 @@ export interface VerifyAccessTokenRequestClientAttestation {
   clientAttestationPopJwt?: string
 
   /**
+   * The challenge the authorization server issued, which the `challenge` of the client attestation PoP must
+   * equal (draft 09 §6). If not provided the challenge won't be validated.
+   */
+  expectedChallenge?: string
+
+  /**
    * The expected client id that is bound to the authorization session, and can be used to match the client id
    * provided in the authorization request to the client used for the access token request.
    */
@@ -87,9 +93,9 @@ export interface VerifyAccessTokenRequestClientAttestation {
 
   /**
    * Allowed skew time in seconds for validity of the client attestation and client attestation pop
-   * jwts. Used for `exp` and `nbf` verification.
+   * jwts. Used for `exp`, `nbf` and `iat` verification.
    *
-   * @default 0
+   * @default 30
    */
   allowedSkewInSeconds?: number
 }
@@ -139,7 +145,7 @@ export interface VerifyPreAuthorizedCodeAccessTokenRequestOptions {
   preAuthorizedCodeExpiresAt?: Date
   now?: Date
 
-  callbacks: Pick<CallbackContext, 'hash' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'hash' | 'verifyJws'>
 }
 
 export async function verifyPreAuthorizedCodeAccessTokenRequest(
@@ -222,6 +228,13 @@ export interface VerifyAuthorizationCodeAccessTokenRequestOptions {
 
   expectedCode: string
 
+  /**
+   * The `redirect_uri` of the authorization request the code was issued for. If provided, the access token request
+   * MUST contain an identical `redirect_uri` (RFC 6749 §4.1.3). Provide it whenever the authorization request
+   * contained a `redirect_uri`.
+   */
+  expectedRedirectUri?: string
+
   clientAttestation?: VerifyAccessTokenRequestClientAttestation
   dpop?: VerifyAccessTokenRequestDpop
   pkce?: VerifyAccessTokenRequestPkce
@@ -229,7 +242,7 @@ export interface VerifyAuthorizationCodeAccessTokenRequestOptions {
   codeExpiresAt?: Date
   now?: Date
 
-  callbacks: Pick<CallbackContext, 'hash' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'hash' | 'verifyJws'>
 }
 
 export async function verifyAuthorizationCodeAccessTokenRequest(
@@ -255,6 +268,19 @@ export async function verifyAuthorizationCodeAccessTokenRequest(
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidGrant,
       error_description: `Invalid 'code' provided`,
+    })
+  }
+
+  // RFC 6749 §4.1.3: the redirect_uri must be present and identical if the authorization request included one
+  if (
+    options.expectedRedirectUri !== undefined &&
+    options.accessTokenRequest.redirect_uri !== options.expectedRedirectUri
+  ) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidGrant,
+      error_description: options.accessTokenRequest.redirect_uri
+        ? `Invalid 'redirect_uri' provided, it does not match the 'redirect_uri' of the authorization request`
+        : `Missing required 'redirect_uri' in access token request`,
     })
   }
 
@@ -293,7 +319,7 @@ export interface VerifyRefreshTokenAccessTokenRequestOptions {
   refreshTokenExpiresAt?: Date
   now?: Date
 
-  callbacks: Pick<CallbackContext, 'hash' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'hash' | 'verifyJws'>
 }
 
 export async function verifyRefreshTokenAccessTokenRequest(
@@ -344,7 +370,7 @@ export async function verifyRefreshTokenAccessTokenRequest(
 async function verifyAccessTokenRequestClientAttestation(
   options: VerifyAccessTokenRequestClientAttestation,
   authorizationServerMetadata: AuthorizationServerMetadata,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   dpopJwkThumbprint?: string,
   now?: Date
 ) {
@@ -378,6 +404,7 @@ async function verifyAccessTokenRequestClientAttestation(
     clientAttestationPopJwt: options.clientAttestationPopJwt,
     expectedClientId: options.expectedClientId,
     expectedConfirmationJwkThumbprint: options.expectedConfirmationJwkThumbprint,
+    expectedChallenge: options.expectedChallenge,
     now,
     allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
@@ -395,7 +422,7 @@ async function verifyAccessTokenRequestClientAttestation(
 async function verifyAccessTokenRequestClientAttestationDpop(
   options: VerifyAccessTokenRequestClientAttestation & { clientAttestationJwt: string },
   authorizationServerMetadata: AuthorizationServerMetadata,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   dpopJwkThumbprint?: string,
   now?: Date
 ) {
@@ -428,7 +455,9 @@ async function verifyAccessTokenRequestClientAttestationDpop(
       allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
   } catch (error) {
-    if (error instanceof Oauth2Error || error instanceof ValidationError) {
+    // Covers Oauth2Error, the jose errors and a ValidationError for a malformed client attestation. A wrong
+    // option, such as a negative skew, is a mistake of the server, not of the client.
+    if (error instanceof IdentityError && !(error instanceof JoseInvalidArgumentError)) {
       throw new Oauth2ServerErrorResponseError(
         {
           error: Oauth2ErrorCodes.InvalidClient,
@@ -465,7 +494,7 @@ function assertConfirmationKeyMatchesDpopKey(confirmationJwkThumbprint: string, 
 async function verifyAccessTokenRequestDpop(
   options: VerifyAccessTokenRequestDpop,
   request: RequestLike,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   now?: Date
 ) {
   if (options.required && !options.jwt) {

@@ -1,7 +1,7 @@
 import { encodeWwwAuthenticateHeader, parseWwwAuthenticateHeader } from '@openid4vc/utils'
 import type { SupportedAuthenticationScheme } from '../access-token/verify-access-token'
 import type { Oauth2ErrorCodes } from '../common/z-oauth2-error'
-import { Oauth2Error } from './Oauth2Error'
+import { Oauth2Error, type Oauth2ErrorOptions } from './Oauth2Error'
 
 export interface WwwAuthenticateHeaderChallenge {
   scheme: SupportedAuthenticationScheme | (string & {})
@@ -30,9 +30,10 @@ export class Oauth2ResourceUnauthorizedError extends Oauth2Error {
 
   public constructor(
     internalMessage: string | undefined,
-    wwwAuthenticateHeaders: WwwAuthenticateHeaderChallenge | Array<WwwAuthenticateHeaderChallenge>
+    wwwAuthenticateHeaders: WwwAuthenticateHeaderChallenge | Array<WwwAuthenticateHeaderChallenge>,
+    options?: Pick<Oauth2ErrorOptions, 'cause'>
   ) {
-    super(`${internalMessage}\n${JSON.stringify(wwwAuthenticateHeaders, null, 2)}`)
+    super(`${internalMessage}\n${JSON.stringify(wwwAuthenticateHeaders, null, 2)}`, options)
     this.wwwAuthenticateHeaders = Array.isArray(wwwAuthenticateHeaders)
       ? wwwAuthenticateHeaders
       : [wwwAuthenticateHeaders]

@@ -35,4 +35,44 @@ describe('Parse Authorization Request Params', () => {
       },
     })
   })
+
+  const uriRequest = (params: Record<string, string>) =>
+    `openid4vp://?${new URLSearchParams({ response_type: 'vp_token', nonce: 'nonce', ...params }).toString()}`
+
+  test('rejects a DC API request passed as a uri (OpenID4VP 1.0 Appendix A.3)', () => {
+    expect(() =>
+      parseOpenid4vpAuthorizationRequest({
+        authorizationRequest: uriRequest({
+          response_mode: 'dc_api',
+          dcql_query: JSON.stringify({ credentials: [] }),
+        }),
+      })
+    ).toThrow(/must be passed as a JSON object/)
+  })
+
+  test('rejects an IAE request passed as a uri (OpenID4VCI 1.1 Section 6.2.1.1)', () => {
+    expect(() =>
+      parseOpenid4vpAuthorizationRequest({
+        authorizationRequest: uriRequest({
+          client_id: 'issuer-client',
+          response_mode: 'iae_post',
+          expected_url: 'https://issuer.example.com/iae',
+          dcql_query: JSON.stringify({ credentials: [] }),
+        }),
+      })
+    ).toThrow(/must be passed as a JSON object/)
+  })
+
+  test('parses a DC API request passed as an object (OpenID4VP 1.0 Appendix A.3)', () => {
+    expect(
+      parseOpenid4vpAuthorizationRequest({
+        authorizationRequest: {
+          response_type: 'vp_token',
+          nonce: 'nonce',
+          response_mode: 'dc_api',
+          dcql_query: { credentials: [] },
+        },
+      })
+    ).toMatchObject({ type: 'openid4vp_dc_api', provided: 'params' })
+  })
 })

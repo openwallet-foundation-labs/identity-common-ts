@@ -8,7 +8,7 @@ import {
 import { ATTRIBUTE_TYPES, type AttributeName } from './constants'
 import { toHex } from './der'
 import type { DistinguishedName, DistinguishedNameAttribute } from './types'
-import { X509Exception } from './x509-exception'
+import { X509Error } from './x509-error'
 
 const NAME_BY_OID = new Map<string, AttributeName>(
   Object.entries(ATTRIBUTE_TYPES).map(([name, oid]) => [oid, name as AttributeName])
@@ -94,7 +94,7 @@ export function buildName(attributes: readonly NameAttributeInput[]): Name {
     if (value === undefined || value === '') continue
     const name = nameOrOid in ATTRIBUTE_TYPES ? (nameOrOid as AttributeName) : NAME_BY_OID.get(nameOrOid)
     if (!name && !/^\d+(\.\d+)+$/.test(nameOrOid)) {
-      throw new X509Exception(`Unknown name attribute: ${nameOrOid}`)
+      throw new X509Error(`Unknown name attribute: ${nameOrOid}`)
     }
     const type = name ? ATTRIBUTE_TYPES[name] : nameOrOid
     const attributeValue =

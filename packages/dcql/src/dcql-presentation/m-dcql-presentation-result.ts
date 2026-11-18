@@ -1,19 +1,22 @@
-import * as v from 'valibot'
-
+import type { z } from 'zod'
 import { DcqlInvalidPresentationRecordError, DcqlPresentationResultError } from '../dcql-error/e-dcql.js'
 import { runCredentialQuery } from '../dcql-parser/dcql-credential-query-result.js'
 import type { DcqlQuery } from '../dcql-query/m-dcql-query.js'
 import { DcqlQueryResult } from '../dcql-query-result/m-dcql-query-result.js'
+import { parseWithIssues } from '../u-dcql.js'
 import type { DcqlCredentialPresentation } from './m-dcql-credential-presentation.js'
 
 export namespace DcqlPresentationResult {
-  export const vModel = v.omit(DcqlQueryResult.vModel, ['credentials'])
+  export const zModel = DcqlQueryResult.zModel.omit({ credentials: true })
 
-  export type Input = v.InferInput<typeof vModel>
-  export type Output = v.InferOutput<typeof vModel>
+  export type Input = z.input<typeof zModel>
+  export type Output = z.output<typeof zModel>
 
-  export const parse = (input: Input | DcqlQueryResult) => {
-    return v.parse(vModel, input)
+  /**
+   * @throws {DcqlParseError} with the `issues` of the input when it is not a presentation result
+   */
+  export const parse = (input: Input | DcqlQueryResult): Output => {
+    return parseWithIssues(zModel, input, 'DCQL presentation result')
   }
 
   /**

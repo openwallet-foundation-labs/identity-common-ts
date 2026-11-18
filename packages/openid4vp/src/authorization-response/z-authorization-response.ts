@@ -1,5 +1,6 @@
 import { zOauth2ErrorResponse } from '@openid4vc/oauth2'
 import { zStringToJson } from '@openid4vc/utils'
+import { zNonEmptyString } from '@owf/identity-common'
 import { z } from 'zod'
 import { zPexPresentationSubmission } from '../models/z-pex'
 import { zVpToken } from '../vp-token/z-vp-token'
@@ -7,12 +8,12 @@ import { zVpToken } from '../vp-token/z-vp-token'
 export const zOpenid4vpAuthorizationResponse = z
   .object({
     state: z.string().optional(),
-    id_token: z.string().optional(),
+    id_token: zNonEmptyString.optional(),
     vp_token: zVpToken,
     presentation_submission: zPexPresentationSubmission.or(zStringToJson).optional(),
-    refresh_token: z.string().optional(),
-    token_type: z.string().optional(),
-    access_token: z.string().optional(),
+    refresh_token: zNonEmptyString.optional(),
+    token_type: zNonEmptyString.optional(),
+    access_token: zNonEmptyString.optional(),
     expires_in: z.coerce.number().optional(),
 
     // This allows for discriminating between error and success responses.

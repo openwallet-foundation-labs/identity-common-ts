@@ -1,4 +1,3 @@
-import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
 import { getMetaParser } from '../../dcql-parser/dcql-meta-query-result.js'
 import type { DcqlCredentialQuery } from '../../dcql-query/index.js'
@@ -48,7 +47,7 @@ const credentialSdJwtExample = {
 describe('W3C Meta Parser', () => {
   it('meta with type', () => {
     const parser = getMetaParser(metaExample)
-    const res = v.parse(parser, credentialExample)
+    const res = parser.parse(credentialExample)
 
     expect(res).toEqual({
       cryptographic_holder_binding: true,
@@ -59,7 +58,7 @@ describe('W3C Meta Parser', () => {
 
   it('meta with type and credential', () => {
     const parser = getMetaParser(metaSdJwtExample)
-    const res = v.parse(parser, credentialSdJwtExample)
+    const res = parser.parse(credentialSdJwtExample)
 
     expect(res).toEqual({
       cryptographic_holder_binding: true,
@@ -70,16 +69,18 @@ describe('W3C Meta Parser', () => {
 
   it('shows error for invalid format', () => {
     const parser = getMetaParser(metaExample)
-    const res = v.safeParse(parser, mdocCredentialExample)
+    const res = parser.safeParse(mdocCredentialExample)
 
-    expect(res.issues?.[0].message).toEqual("Expected credential format to be 'jwt_vc_json' but received 'mso_mdoc'")
+    expect(res.error?.issues[0].message).toEqual(
+      "Expected credential format to be 'jwt_vc_json' but received 'mso_mdoc'"
+    )
   })
 
   it('shows error for invalid type', () => {
     const parser = getMetaParser(metaExample)
-    const res = v.safeParse(parser, { ...credentialExample, type: ['four'] })
+    const res = parser.safeParse({ ...credentialExample, type: ['four'] })
 
-    expect(res.issues?.[0].message).toEqual(
+    expect(res.error?.issues[0].message).toEqual(
       'Expected type to include all values from one of the following subsets: [one, two] | [three]'
     )
   })

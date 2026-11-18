@@ -1,6 +1,6 @@
 import 'reflect-metadata'
 import nodeCrypto from 'node:crypto'
-import { DataItem } from '@owf/cose'
+import { DataItem, HashAlgorithm } from '@owf/cose'
 import { hex } from '@owf/identity-common'
 import * as x509 from '@peculiar/x509'
 import { describe, expect, test } from 'vitest'
@@ -13,6 +13,8 @@ import {
   Issuer,
   IssuerAuth,
   IssuerSigned,
+  ProtectedHeaders,
+  RegisteredCwtHeaderClaimKey,
   SignatureAlgorithm,
   type VerificationAssessment,
 } from '../..'
@@ -26,6 +28,8 @@ const countryCheck =
   "The 'issuing_country' if present must match the 'countryName' in the subject field within the DS certificate"
 const jurisdictionCheck =
   "The 'issuing_jurisdiction' if present must match the 'stateOrProvinceName' in the subject field within the DS certificate"
+
+const x5tCheck = 'The x5t in the protected header, if present, must be SHA-256 and match the issuer certificate'
 
 const generateKeys = async () =>
   (await nodeCrypto.webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
@@ -164,6 +168,110 @@ describe('issuer auth checks', () => {
 
     // Forwarding the decoded issuer signed keeps the null the issuer signed.
     expect(hex.encode(issuerSigned.encode())).toBe(hex.encode(issuerSignedBytes))
+  })
+
+  describe('x5t (18013-5 second edition 12.3.4)', () => {
+    /** The x5t check of an issuer signed whose protected header carries `x5t`. */
+    async function x5tCheckFor(x5t?: (certificate: Uint8Array) => Promise<unknown>) {
+      const { issuerAuth, issuerNamespaces } = await createIssuerSigned()
+      const issuerSigned = IssuerSigned.create({
+        issuerNamespaces,
+        issuerAuth: await IssuerAuth.create({
+          protectedHeaders: ProtectedHeaders.create({
+            protectedHeaders: new Map<number, unknown>([
+              [RegisteredCwtHeaderClaimKey.Algorithm, SignatureAlgorithm.ES256],
+              ...(x5t
+                ? [[RegisteredCwtHeaderClaimKey.X5T, await x5t(issuerAuth.certificate)] as [number, unknown]]
+                : []),
+            ]),
+          }),
+          unprotectedHeaders: issuerAuth.unprotectedHeaders,
+          payload: issuerAuth.payload,
+        }).sign(
+          { signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK), algorithm: SignatureAlgorithm.ES256 },
+          mdocContext.cose.sign1
+        ),
+      })
+
+      const checks: Array<VerificationAssessment> = []
+      await Holder.verifyIssuerSigned(
+        {
+          issuerSigned,
+          trustedCertificates: [{ issuance: [issuerCertificate] }],
+          verificationCallback: (check) => checks.push(check),
+        },
+        mdocContext
+      )
+
+      return checks.find((check) => check.check === x5tCheck)
+    }
+
+    const sha256 = (bytes: Uint8Array) => mdocContext.crypto.digest({ digestAlgorithm: 'SHA-256', bytes })
+
+    test('passes without an x5t, as the first edition has none', async () => {
+      expect(await x5tCheckFor()).toMatchObject({ status: 'PASSED' })
+    })
+
+    test('passes with a SHA-256 x5t of the issuer certificate', async () => {
+      expect(await x5tCheckFor(async (certificate) => [HashAlgorithm.SHA256, await sha256(certificate)])).toMatchObject(
+        {
+          status: 'PASSED',
+        }
+      )
+    })
+
+    test('includeX5t adds a SHA-256 x5t of the issuer certificate that verifies', async () => {
+      const issuer = new Issuer(mdlDocType, mdocContext)
+      issuer.addIssuerNamespace(mdlNamespace, { family_name: 'Doe' })
+      const signed = new Date(Date.now() - 60_000)
+      const issuerSigned = await issuer.sign({
+        signingKey: CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK),
+        certificates: [issuerCertificate],
+        algorithm: SignatureAlgorithm.ES256,
+        digestAlgorithm: 'SHA-256',
+        deviceKeyInfo: { deviceKey: DeviceKey.fromJwk(DEVICE_JWK_PUBLIC) },
+        validityInfo: { signed, validFrom: signed, validUntil: new Date(Date.now() + 60 * 60 * 1000) },
+        includeX5t: true,
+      })
+
+      expect(issuerSigned.issuerAuth.protectedHeaders.headers.get(RegisteredCwtHeaderClaimKey.X5T)).toEqual([
+        HashAlgorithm.SHA256,
+        await sha256(issuerCertificate),
+      ])
+
+      const checks: Array<VerificationAssessment> = []
+      await Holder.verifyIssuerSigned(
+        {
+          issuerSigned: IssuerSigned.decode(issuerSigned.encode()),
+          trustedCertificates: [{ issuance: [issuerCertificate] }],
+          verificationCallback: (check) => checks.push(check),
+        },
+        mdocContext
+      )
+      expect(checks.find((check) => check.check === x5tCheck)?.status).toBe('PASSED')
+    })
+
+    test('fails with an x5t that is not SHA-256', async () => {
+      // SHA-512 (-44)
+      expect(await x5tCheckFor(async (certificate) => [-44, await sha256(certificate)])).toMatchObject({
+        status: 'FAILED',
+        reason: "The x5t of the protected header uses hash algorithm '-44', only SHA-256 (-16) is supported",
+      })
+    })
+
+    test('fails with an x5t of another certificate', async () => {
+      expect(await x5tCheckFor(async () => [HashAlgorithm.SHA256, await sha256(new Uint8Array([1]))])).toMatchObject({
+        status: 'FAILED',
+        reason: 'The x5t of the protected header does not match the leaf of the x5chain',
+      })
+    })
+
+    test('fails with a malformed x5t', async () => {
+      expect(await x5tCheckFor(async () => [HashAlgorithm.SHA256])).toMatchObject({
+        status: 'FAILED',
+        reason: 'The x5t of the protected header is not a valid COSE_CertHash',
+      })
+    })
   })
 
   test('issuing_country is checked against the subject of the DS certificate, not its issuer', async () => {

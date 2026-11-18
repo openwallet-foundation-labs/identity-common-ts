@@ -1,4 +1,7 @@
-import { ContentType, Headers } from '@openid4vc/utils'
+import { Headers } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
+import type { Jwk } from '@owf/jose'
+import { decodeJwt, signJwt } from '@owf/jose'
 import * as jose from 'jose'
 import { beforeAll, describe, expect, test } from 'vitest'
 import { verifyPreAuthorizedCodeAccessTokenRequest } from '../../access-token/verify-access-token-request'
@@ -8,13 +11,11 @@ import {
   oauthClientAttestationPopHeader,
 } from '../../client-attestation/z-client-attestation'
 import { clientAuthenticationClientAttestationJwtDpop } from '../../client-authentication'
-import type { Jwk } from '../../common/jwk/z-jwk'
-import { decodeJwt } from '../../common/jwt/decode-jwt'
 import { createDpopJwt } from '../../dpop/dpop'
 import { zDpopJwtHeader, zDpopJwtPayload } from '../../dpop/z-dpop'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
 import { preAuthorizedCodeGrantIdentifier } from '../../z-grant-type'
-import { callbacks, getSignJwtCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback, testAttester } from '../util.mjs'
 
 const request = {
   headers: new Headers(),
@@ -41,24 +42,22 @@ function decodeDpop(compact: string) {
 
 describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
   // Attester signs the client attestation; the instance key is both the confirmation key and the DPoP key.
-  let attester: Awaited<ReturnType<typeof generateEs256Key>>
   let instance: Awaited<ReturnType<typeof generateEs256Key>>
   let other: Awaited<ReturnType<typeof generateEs256Key>>
-  let signJwt: ReturnType<typeof getSignJwtCallback>
+  let signJws: ReturnType<typeof getSignJwsCallback>
   let clientAttestationJwt: string
 
   beforeAll(async () => {
-    attester = await generateEs256Key()
     instance = await generateEs256Key()
     other = await generateEs256Key()
-    signJwt = getSignJwtCallback([attester.privateJwk, instance.privateJwk, other.privateJwk])
+    signJws = getSignJwsCallback([instance.privateJwk, other.privateJwk])
 
     clientAttestationJwt = await createClientAttestationJwt({
-      callbacks: { signJwt },
+      callbacks: { signJws },
       clientId: 'wallet',
       confirmation: { jwk: instance.publicJwk },
       expiresAt: new Date(Date.now() + 3600 * 1000),
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+      signer: testAttester.signer,
     })
   })
 
@@ -67,14 +66,14 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
       const headers = new Headers()
       await clientAuthenticationClientAttestationJwtDpop({
         clientAttestationJwt,
-        callbacks: { signJwt, generateRandom: callbacks.generateRandom, hash: callbacks.hash },
+        callbacks: { signJws, generateRandom: callbacks.generateRandom, hash: callbacks.hash },
         challenge: 'challenge-123',
       })({
         authorizationServerMetadata,
         url: authorizationServerMetadata.token_endpoint,
         method: 'POST',
         headers,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         body: {},
       })
 
@@ -95,14 +94,14 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
       const headers = new Headers()
       await clientAuthenticationClientAttestationJwtDpop({
         clientAttestationJwt,
-        callbacks: { signJwt, generateRandom: callbacks.generateRandom, hash: callbacks.hash },
+        callbacks: { signJws, generateRandom: callbacks.generateRandom, hash: callbacks.hash },
         challenge: 'static-challenge',
       })({
         authorizationServerMetadata,
         url: authorizationServerMetadata.token_endpoint,
         method: 'POST',
         headers,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         body: {},
         attestationChallenge: 'server-challenge',
       })
@@ -115,7 +114,7 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
   describe('authorization server verification', () => {
     async function createCombinedDpopProof(signerJwk: { privateJwk: Jwk; publicJwk: Jwk }, nonce?: string) {
       return createDpopJwt({
-        callbacks: { ...callbacks, signJwt },
+        callbacks: { ...callbacks, signJws },
         request,
         signer: { method: 'jwk', alg: 'ES256', publicJwk: signerJwk.publicJwk },
         nonce,
@@ -166,13 +165,12 @@ describe('DPoP-bound client attestation (attest_jwt_client_auth_dpop)', () => {
 
     test('reports a client attestation that fails schema validation as invalid_client', async () => {
       const now = Math.floor(Date.now() / 1000)
-      const { jwt: clientAttestationWithoutSub } = await signJwt(
-        { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
-        {
-          header: { typ: 'oauth-client-attestation+jwt', alg: 'ES256' },
-          payload: { iat: now, exp: now + 300, cnf: { jwk: instance.publicJwk } },
-        }
-      )
+      const { jwt: clientAttestationWithoutSub } = await signJwt({
+        signer: testAttester.signer,
+        signJwsCallback: signJws,
+        header: { typ: 'oauth-client-attestation+jwt', alg: 'ES256' },
+        payload: { iat: now, exp: now + 300, cnf: { jwk: instance.publicJwk } },
+      })
       const dpopJwt = await createCombinedDpopProof(instance)
 
       await expect(verify(dpopJwt, { clientAttestationJwt: clientAttestationWithoutSub })).rejects.toMatchObject({

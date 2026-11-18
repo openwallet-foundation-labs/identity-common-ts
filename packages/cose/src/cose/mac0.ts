@@ -24,22 +24,17 @@ import {
 import { CoseKey } from './key'
 import { coseKeyToJwkClaim } from './key/jwk'
 
-export const mac0EncodedSchema = z.tuple([
-  zUint8Array,
-  z.map(z.unknown(), z.unknown()),
-  zUint8Array.nullable(),
-  zUint8Array,
-])
+export const zMac0Encoded = z.tuple([zUint8Array, z.map(z.unknown(), z.unknown()), zUint8Array.nullable(), zUint8Array])
 
-export const mac0DecodedSchema = z.object({
+export const zMac0Decoded = z.object({
   protectedHeaders: z.instanceof(ProtectedHeaders),
   unprotectedHeaders: z.instanceof(UnprotectedHeaders),
   payload: zUint8Array.nullable(),
   tag: zUint8Array,
 })
 
-export type Mac0EncodedStructure = z.infer<typeof mac0EncodedSchema>
-export type Mac0DecodedStructure = z.infer<typeof mac0DecodedSchema>
+export type Mac0EncodedStructure = z.infer<typeof zMac0Encoded>
+export type Mac0DecodedStructure = z.infer<typeof zMac0Decoded>
 
 export type Mac0Context = {
   authenticate: (options: {
@@ -74,7 +69,7 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
   protected override _tag = Mac0.tag
 
   public static override get encodingSchema() {
-    return z.codec(mac0EncodedSchema, mac0DecodedSchema, {
+    return z.codec(zMac0Encoded, zMac0Decoded, {
       encode: ({ protectedHeaders, unprotectedHeaders, payload, tag }) => {
         if (tag.length === 0) {
           throw new Error('Tag has not been set. Required for encoding the mac0 structure')

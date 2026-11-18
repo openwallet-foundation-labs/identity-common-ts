@@ -1,12 +1,12 @@
+import type { Jwk } from '@owf/jose'
+import { decodeJwt } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
-import type { Jwk } from '../common/jwk/z-jwk'
-import { decodeJwt } from '../common/jwt/decode-jwt'
 import { createDpopJwt } from '../dpop/dpop'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
 import { Oauth2AuthorizationServer } from '../Oauth2AuthorizationServer'
 import { createPkce, PkceCodeChallengeMethod } from '../pkce'
 import { authorizationCodeGrantIdentifier, preAuthorizedCodeGrantIdentifier } from '../z-grant-type'
-import { getSignJwtCallback, callbacks as partialCallbacks } from './util.mjs'
+import { getSignJwsCallback, callbacks as partialCallbacks } from './util.mjs'
 
 const dpopSignerJwk = {
   kty: 'EC',
@@ -18,6 +18,7 @@ const dpopSignerJwk = {
 const { d: _, ...dpopSignerJwkPublic } = dpopSignerJwk
 
 const accessTokenSignerJwk = {
+  kid: 'access-token-key',
   kty: 'EC',
   d: 'V_ksBfnmJBl9vU-GLs3LiNxgA3PV8he5u7NOYqcDWfo',
   crv: 'P-256',
@@ -36,7 +37,7 @@ describe('Oauth2AuthorizationServer', () => {
   test('parse, verify and grant pre authorized code access token request', async () => {
     const callbacks = {
       ...partialCallbacks,
-      signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+      signJws: getSignJwsCallback([dpopSignerJwk, accessTokenSignerJwk]),
     }
 
     const createdDpopJwt = await createDpopJwt({
@@ -50,6 +51,8 @@ describe('Oauth2AuthorizationServer', () => {
         alg: 'ES256',
         publicJwk: dpopSignerJwkPublic,
       },
+      // The request is verified at this same moment, and the dpop proof is verified against that `now`
+      issuedAt: new Date('2024-01-01'),
     })
 
     const authorizationServer = new Oauth2AuthorizationServer({
@@ -121,9 +124,9 @@ describe('Oauth2AuthorizationServer', () => {
       // We bind the access token to the pre-auth_code
       subject: grant.preAuthorizedCode,
       signer: {
-        method: 'jwk',
+        method: 'custom',
         alg: 'ES256',
-        publicJwk: accessTokenSignerJwkPublic,
+        kid: accessTokenSignerJwkPublic.kid,
       },
       cNonce: '0f1c8dec-26d5-4014-a570-19225a3e00ae',
       cNonceExpiresIn: 300,
@@ -142,15 +145,10 @@ describe('Oauth2AuthorizationServer', () => {
       decodeJwt({
         jwt: accessTokenResponse.access_token,
       })
-    ).toEqual({
+    ).toMatchObject({
       header: {
         alg: 'ES256',
-        jwk: {
-          crv: 'P-256',
-          kty: 'EC',
-          x: 'rQbiDHRutR4YcJaWRV54Dx-sx81VlK7xuohm4-RXRT0',
-          y: 'YM4MRy90G9PW59wKcawyrHDCPp7QsE6l5QT-H2Koz_M',
-        },
+        kid: 'access-token-key',
         typ: 'at+jwt',
       },
       payload: {
@@ -172,7 +170,7 @@ describe('Oauth2AuthorizationServer', () => {
   test('parse, verify and grant authorization code access token request', async () => {
     const callbacks = {
       ...partialCallbacks,
-      signJwt: getSignJwtCallback([dpopSignerJwk, accessTokenSignerJwk]),
+      signJws: getSignJwsCallback([dpopSignerJwk, accessTokenSignerJwk]),
     }
 
     const pkce = await createPkce({
@@ -191,6 +189,8 @@ describe('Oauth2AuthorizationServer', () => {
         alg: 'ES256',
         publicJwk: dpopSignerJwkPublic,
       },
+      // The request is verified at this same moment, and the dpop proof is verified against that `now`
+      issuedAt: new Date('2024-01-01'),
     })
 
     const authorizationServer = new Oauth2AuthorizationServer({
@@ -263,9 +263,9 @@ describe('Oauth2AuthorizationServer', () => {
       expiresInSeconds: 300,
       subject: 'a9ad80ef-18b6-4087-9b88-55f5b14a33da',
       signer: {
-        method: 'jwk',
+        method: 'custom',
         alg: 'ES256',
-        publicJwk: accessTokenSignerJwkPublic,
+        kid: accessTokenSignerJwkPublic.kid,
       },
       cNonce: '0f1c8dec-26d5-4014-a570-19225a3e00ae',
       cNonceExpiresIn: 300,
@@ -284,15 +284,10 @@ describe('Oauth2AuthorizationServer', () => {
       decodeJwt({
         jwt: accessTokenResponse.access_token,
       })
-    ).toEqual({
+    ).toMatchObject({
       header: {
         alg: 'ES256',
-        jwk: {
-          crv: 'P-256',
-          kty: 'EC',
-          x: 'rQbiDHRutR4YcJaWRV54Dx-sx81VlK7xuohm4-RXRT0',
-          y: 'YM4MRy90G9PW59wKcawyrHDCPp7QsE6l5QT-H2Koz_M',
-        },
+        kid: 'access-token-key',
         typ: 'at+jwt',
       },
       payload: {

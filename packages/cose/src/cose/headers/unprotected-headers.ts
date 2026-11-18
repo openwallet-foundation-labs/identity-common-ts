@@ -1,13 +1,13 @@
 import z from 'zod'
 import { CborStructure } from '../../cbor/cbor-structure.js'
 import { type AnyTypedMap, TypedMap } from '../../utils/typed-map.js'
-import { type CoseHeaders, coseHeaderClaimsSchema } from './header-claims.js'
+import { type CoseHeaders, zCoseHeaderClaims } from './header-claims.js'
 
 // Wire form: a plain map of integer label -> value (used by the COSE_Sign1 encoded schema).
-export const unprotectedHeadersStructure = z.map(z.number(), z.unknown())
+export const zUnprotectedHeaders = z.map(z.number(), z.unknown())
 
-export type UnprotectedHeadersEncodedStructure = z.infer<typeof unprotectedHeadersStructure>
-export type UnprotectedHeadersDecodedStructure = z.infer<typeof coseHeaderClaimsSchema>
+export type UnprotectedHeadersEncodedStructure = z.infer<typeof zUnprotectedHeaders>
+export type UnprotectedHeadersDecodedStructure = z.infer<typeof zCoseHeaderClaims>
 
 // Backwards-compatible alias for the wire structure.
 export type UnprotectedHeadersStructure = UnprotectedHeadersEncodedStructure
@@ -28,7 +28,7 @@ export class UnprotectedHeaders<Headers extends AnyTypedMap = CoseHeaders> exten
   Headers
 > {
   public static override get encodingSchema(): z.ZodType {
-    return coseHeaderClaimsSchema
+    return zCoseHeaderClaims
   }
 
   public get headers(): Headers {

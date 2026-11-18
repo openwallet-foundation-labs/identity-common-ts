@@ -3,10 +3,10 @@ import { z } from 'zod'
 
 // KeyInfo uses integer keys (Map<number, unknown>)
 // Per spec: KeyInfo = { * int => any }
-const keyInfoSchema = z.map(z.number(), z.unknown())
+const zKeyInfo = z.map(z.number(), z.unknown())
 
-export type KeyInfoEncodedStructure = z.input<typeof keyInfoSchema>
-export type KeyInfoDecodedStructure = z.output<typeof keyInfoSchema>
+export type KeyInfoEncodedStructure = z.input<typeof zKeyInfo>
+export type KeyInfoDecodedStructure = z.output<typeof zKeyInfo>
 
 export type KeyInfoOptions = {
   keyInfo: Map<number, unknown>
@@ -14,7 +14,7 @@ export type KeyInfoOptions = {
 
 export class KeyInfo extends CborStructure<KeyInfoEncodedStructure, KeyInfoDecodedStructure> {
   public static override get encodingSchema() {
-    return keyInfoSchema
+    return zKeyInfo
   }
 
   public get keyInfo() {

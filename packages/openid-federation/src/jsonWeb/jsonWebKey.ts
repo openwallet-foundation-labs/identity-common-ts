@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const jsonWebKeySchema = z
+export const zJsonWebKey = z
   .object({
     kty: z.string(),
     // TODO: spec mentions kid may be undefined, but we always need a key id for open id federation
@@ -15,4 +15,4 @@ export const jsonWebKeySchema = z
   })
   .loose()
 
-export type JsonWebKey = z.input<typeof jsonWebKeySchema>
+export type JsonWebKey = z.input<typeof zJsonWebKey>

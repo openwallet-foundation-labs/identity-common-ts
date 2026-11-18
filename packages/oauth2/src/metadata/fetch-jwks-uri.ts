@@ -1,13 +1,7 @@
-import {
-  ContentType,
-  createZodFetcher,
-  type Fetch,
-  InvalidFetchResponseError,
-  parseWithErrorHandling,
-  ValidationError,
-} from '@openid4vc/utils'
+import { createZodFetcher, type Fetch, InvalidFetchResponseError } from '@openid4vc/utils'
+import { CommonMediaTypes, parseWithErrorHandling, ValidationError } from '@owf/identity-common'
+import { type JwkSet, zJwkSet } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
-import { type JwkSet, zJwkSet } from '../common/jwk/z-jwk'
 
 /**
  * Fetch JWKs from a provided JWKs URI.
@@ -23,7 +17,7 @@ import { type JwkSet, zJwkSet } from '../common/jwk/z-jwk'
  */
 export async function fetchJwks(
   jwksUrl: string,
-  fetchOrCallbacks?: Fetch | Pick<CallbackContext, 'fetch' | 'getJwks'>
+  fetchOrCallbacks?: Fetch | Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'getJwks'>
 ): Promise<JwkSet> {
   const callbacks = typeof fetchOrCallbacks === 'function' ? { fetch: fetchOrCallbacks } : fetchOrCallbacks
   const providedJwks = await callbacks?.getJwks?.(jwksUrl)
@@ -36,9 +30,9 @@ export async function fetchJwks(
     )
   }
 
-  const fetcher = createZodFetcher(callbacks?.fetch)
+  const fetcher = createZodFetcher(callbacks, 'jwks')
 
-  const { result, response } = await fetcher(zJwkSet, [ContentType.JwkSet, ContentType.Json], jwksUrl)
+  const { result, response } = await fetcher(zJwkSet, [CommonMediaTypes.JwkSet, CommonMediaTypes.Json], jwksUrl)
   if (!response.ok) {
     throw new InvalidFetchResponseError(
       `Fetching JWKs from jwks_uri '${jwksUrl}' resulted in an unsuccessful response with status code '${response.status}'.`,
@@ -48,7 +42,7 @@ export async function fetchJwks(
   }
 
   if (!result?.success) {
-    throw new ValidationError(`Validation of JWKs from jwks_uri '${jwksUrl}' failed`, result?.error)
+    throw new ValidationError(`Validation of JWKs from jwks_uri '${jwksUrl}' failed`, result?.issues ?? [])
   }
 
   return result.data

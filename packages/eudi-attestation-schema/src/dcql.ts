@@ -1,4 +1,4 @@
-import { SchemaMetaException } from './schema-meta-exception'
+import { SchemaMetaError } from './schema-meta-error'
 import type {
   AttestationFormat,
   BuildDcqlFromSchemaMetaOptions,
@@ -9,14 +9,14 @@ import type {
   DcqlTrustedAuthority,
   ResolvedSchemaReference,
   SchemaMeta,
-  SchemaURIMeta,
+  SchemaUriMeta,
 } from './types'
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function getVct(meta: SchemaURIMeta | undefined): string | undefined {
+function getVct(meta: SchemaUriMeta | undefined): string | undefined {
   if (meta && 'vct' in meta && typeof meta.vct === 'string') {
     return meta.vct
   }
@@ -24,7 +24,7 @@ function getVct(meta: SchemaURIMeta | undefined): string | undefined {
   return undefined
 }
 
-function getDocTypeValue(meta: SchemaURIMeta | undefined): string | undefined {
+function getDocTypeValue(meta: SchemaUriMeta | undefined): string | undefined {
   if (meta && 'doctype_value' in meta && typeof meta.doctype_value === 'string') {
     return meta.doctype_value
   }
@@ -32,7 +32,7 @@ function getDocTypeValue(meta: SchemaURIMeta | undefined): string | undefined {
   return undefined
 }
 
-function getFirstSchemaMetaByFormat(schemaMeta: SchemaMeta, format: AttestationFormat): SchemaURIMeta | undefined {
+function getFirstSchemaMetaByFormat(schemaMeta: SchemaMeta, format: AttestationFormat): SchemaUriMeta | undefined {
   const entry = schemaMeta.schemaURIs.find((value) => value.formatIdentifier === format)
   return entry?.meta
 }
@@ -300,7 +300,7 @@ export function toDcqlCredentialInput(params: {
     const value = getVct(schemaRef?.meta) ?? getVct(getFirstSchemaMetaByFormat(schemaMeta, format)) ?? schemaMeta.id
 
     if (!value) {
-      throw new SchemaMetaException(`DCQL mapping failed for format '${format}': missing vct value`)
+      throw new SchemaMetaError(`DCQL mapping failed for format '${format}': missing vct value`)
     }
 
     credential.meta = { vct_values: [value] }
@@ -310,7 +310,7 @@ export function toDcqlCredentialInput(params: {
     const value = getDocTypeValue(schemaRef?.meta) ?? getDocTypeValue(getFirstSchemaMetaByFormat(schemaMeta, format))
 
     if (!value) {
-      throw new SchemaMetaException(`DCQL mapping failed for format '${format}': missing doctype_value`)
+      throw new SchemaMetaError(`DCQL mapping failed for format '${format}': missing doctype_value`)
     }
 
     credential.meta = { doctype_value: value }

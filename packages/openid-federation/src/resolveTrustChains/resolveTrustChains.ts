@@ -1,13 +1,21 @@
+import type { FetchLimits } from '@owf/identity-common'
 import type { EntityConfigurationClaims } from '../entityConfiguration'
-import { entityConfigurationJwtSchema } from '../entityConfiguration/entityConfigurationJwt'
+import { zEntityConfigurationJwt } from '../entityConfiguration/entityConfigurationJwt'
 import type { EntityStatementChain, EntityStatementClaims } from '../entityStatement'
-import { entityStatementJwtSchema } from '../entityStatement/entityStatementJwt'
-import { OpenIdFederationError } from '../error/OpenIdFederationError'
+import { zEntityStatementJwt } from '../entityStatement/entityStatementJwt'
+import { OpenidFederationError } from '../error/OpenidFederationError'
 import { PolicyErrorStage } from '../error/PolicyErrorStage'
 import type { JsonWebKeySetOptions } from '../jsonWeb'
 import { verifyJwtSignature } from '../jsonWeb/verifyJsonWebToken'
 import type { Metadata } from '../metadata'
-import { addPaths, type FetchCallback, fetcher, isSameEntityId, type VerifyCallback } from '../utils'
+import {
+  addPaths,
+  type FederationFetchType,
+  type FetchCallback,
+  fetcher,
+  isSameEntityId,
+  type VerifyCallback,
+} from '../utils'
 import { validate } from '../utils/validate'
 import { applyMetadataPolicyToMetadata, combineMetadataPolicies } from './policies'
 import { mergeMetadata } from './policies/utils'
@@ -27,12 +35,18 @@ export type ResolveTrustChainsOptions = {
   entityId: string
   trustAnchors: Array<TrustAnchor>
   /**
-   * Used for every request. Pass one that applies your outbound request policy (allowed hosts, timeouts,
-   * response size), as entity configurations name the URLs that are fetched.
+   * Used for every request. Pass one that applies your outbound request policy (allowed hosts, timeouts), as entity
+   * configurations name the URLs that are fetched.
    *
    * @default globalThis.fetch
    */
   fetchCallback?: FetchCallback
+  /**
+   * The maximum sizes of the responses (see `FetchLimits` of `@owf/identity-common`).
+   *
+   * @default 10 MiB per response
+   */
+  fetchLimits?: FetchLimits<FederationFetchType>
   /**
    * @default new Date()
    */
@@ -119,7 +133,7 @@ type FetchedEntityConfiguration = { jwt: string; claims: EntityConfigurationClai
 
 const ENTITY_STATEMENT_CONTENT_TYPE = 'application/entity-statement+jwt'
 
-const fail = (message: string) => new OpenIdFederationError(PolicyErrorStage.Validation, message)
+const fail = (message: string) => new OpenidFederationError(PolicyErrorStage.Validation, message)
 
 const reasonOf = (error: unknown) => (error instanceof Error && error.message ? error.message : String(error))
 
@@ -143,6 +157,7 @@ export const resolveTrustChainsWithFailures = async (
     entityId,
     verifyJwtCallback,
     fetchCallback,
+    fetchLimits,
     clockSkewSeconds = 0,
     maxDepth = 8,
     maxRequests = 64,
@@ -160,12 +175,19 @@ export const resolveTrustChainsWithFailures = async (
   const failures: Array<TrustChainFailure> = []
   let requests = 0
   let visits = 0
-  const get = async (url: string, searchParams?: Record<string, string>) => {
+  const get = async (type: FederationFetchType, url: string, searchParams?: Record<string, string>) => {
     requests++
     if (requests > maxRequests) {
       throw fail(`trust chain resolution exceeded ${maxRequests} requests`)
     }
-    return fetcher.get({ url, searchParams, requiredContentType: ENTITY_STATEMENT_CONTENT_TYPE, fetchCallback })
+    return fetcher.get({
+      type,
+      url,
+      searchParams,
+      requiredContentType: ENTITY_STATEMENT_CONTENT_TYPE,
+      fetchCallback,
+      fetchLimits,
+    })
   }
 
   const assertCurrent = (statement: EntityStatementClaims) => {
@@ -193,9 +215,9 @@ export const resolveTrustChainsWithFailures = async (
     let pending = entityConfigurations.get(id)
     if (!pending) {
       pending = (async () => {
-        const jwt = await get(addPaths(id, '.well-known', 'openid-federation'))
+        const jwt = await get('entityConfiguration', addPaths(id, '.well-known', 'openid-federation'))
         const { claims } = validate({
-          schema: entityConfigurationJwtSchema,
+          schema: zEntityConfigurationJwt,
           data: jwt,
           errorMessage: `entity configuration of '${id}' is invalid`,
         })
@@ -286,9 +308,9 @@ export const resolveTrustChainsWithFailures = async (
         throw fail(`'${superior.claims.sub}' has no federation_fetch_endpoint`)
       }
 
-      const jwt = await get(fetchEndpoint, { sub: subject.claims.sub })
+      const jwt = await get('entityStatement', fetchEndpoint, { sub: subject.claims.sub })
       const { claims } = validate({
-        schema: entityStatementJwtSchema,
+        schema: zEntityStatementJwt,
         data: jwt,
         errorMessage: `subordinate statement about '${subject.claims.sub}' issued by '${superior.claims.sub}' is invalid`,
       })

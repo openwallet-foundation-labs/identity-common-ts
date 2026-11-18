@@ -9,17 +9,24 @@ import {
   preAuthorizedCodeGrantIdentifier,
 } from '@openid4vc/oauth2'
 import {
-  ContentType,
   createZodFetcher,
-  encodeToBase64Url,
   type Fetch,
   getQueryParams,
+  type Openid4vcFetchType,
   objectToQueryParams,
-  parseWithErrorHandling,
   URL,
   URLSearchParams,
-  ValidationError,
+  zHttpsUrl,
 } from '@openid4vc/utils'
+import {
+  base64url,
+  CommonMediaTypes,
+  type FetchLimits,
+  parseWithErrorHandling,
+  parseWithSchema,
+  type SchemaParseResult,
+  ValidationError,
+} from '@owf/identity-common'
 import type z from 'zod'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata'
 import { Openid4vciVersion } from '../version'
@@ -36,6 +43,12 @@ export interface ResolveCredentialOfferOptions {
    * Custom fetch implementation to use
    */
   fetch?: Fetch
+
+  /**
+   * The maximum size of the response of the `credential_offer_uri`, 10 MiB by default (see `FetchLimits` of
+   * `@owf/identity-common`)
+   */
+  fetchLimits?: FetchLimits<Openid4vcFetchType>
 }
 
 /**
@@ -47,16 +60,34 @@ export async function resolveCredentialOffer(
 ): Promise<CredentialOfferObject> {
   const parsedQueryParams = getQueryParams(credentialOffer)
 
-  let credentialOfferParseResult: z.ZodSafeParseResult<z.infer<typeof zCredentialOfferObject>>
+  // The offer itself is never part of an error message, as it can carry the pre-authorized code
+  let credentialOfferParseResult: SchemaParseResult<z.infer<typeof zCredentialOfferObject>>
 
   if (parsedQueryParams.credential_offer_uri) {
-    const fetchWithZod = createZodFetcher(options?.fetch)
+    const fetchWithZod = createZodFetcher(options, 'credentialOffer')
 
+    // OpenID4VCI 1.0 Section 4.1: a URL using the https scheme. The offer comes from whoever crafted it, so the
+    // wallet would otherwise request a URL of their choice, such as an internal endpoint.
+    const credentialOfferUri = parseWithErrorHandling(
+      zHttpsUrl,
+      parsedQueryParams.credential_offer_uri,
+      'Invalid credential_offer_uri'
+    )
     const { response, result } = await fetchWithZod(
       zCredentialOfferObject,
-      ContentType.Json,
-      parsedQueryParams.credential_offer_uri
-    )
+      CommonMediaTypes.Json,
+      credentialOfferUri
+    ).catch((error) => {
+      // The body of a successful response is the offer, which is kept out of the error as `textResponse`
+      if (error instanceof InvalidFetchResponseError) {
+        throw new InvalidFetchResponseError(
+          `The credential offer from '${credentialOfferUri}' could not be read. ${error.message}`,
+          '',
+          error.response
+        )
+      }
+      throw error
+    })
     if (!response.ok || !result) {
       throw new InvalidFetchResponseError(
         `Fetching credential offer from '${parsedQueryParams.credential_offer_uri}' resulted in an unsuccessful response with status '${response.status}'`,
@@ -72,19 +103,16 @@ export async function resolveCredentialOffer(
     try {
       credentialOfferJson = JSON.parse(decodeURIComponent(parsedQueryParams.credential_offer))
     } catch (_error) {
-      throw new Oauth2Error(`Error parsing JSON from 'credential_offer' param in credential offer '${credentialOffer}'`)
+      throw new Oauth2Error(`Error parsing JSON from the 'credential_offer' param of the credential offer`)
     }
 
-    credentialOfferParseResult = zCredentialOfferObject.safeParse(credentialOfferJson)
+    credentialOfferParseResult = parseWithSchema(zCredentialOfferObject, credentialOfferJson)
   } else {
     throw new Oauth2Error(`Credential offer did not contain either 'credential_offer' or 'credential_offer_uri' param.`)
   }
 
-  if (credentialOfferParseResult.error) {
-    throw new ValidationError(
-      `Error parsing credential offer in draft 11, 13 or 14 format extracted from credential offer '${credentialOffer}'`,
-      credentialOfferParseResult.error
-    )
+  if (!credentialOfferParseResult.success) {
+    throw new ValidationError('Error parsing the credential offer', credentialOfferParseResult.issues)
   }
 
   return credentialOfferParseResult.data
@@ -203,7 +231,7 @@ export async function createCredentialOffer(
     grants[preAuthorizedCodeGrantIdentifier] = {
       ...preAuthorizedCodeGrant,
       'pre-authorized_code':
-        preAuthorizedCodeGrant['pre-authorized_code'] ?? encodeToBase64Url(await options.callbacks.generateRandom(32)),
+        preAuthorizedCodeGrant['pre-authorized_code'] ?? base64url.encode(await options.callbacks.generateRandom(32)),
     }
 
     // Draft 11 support

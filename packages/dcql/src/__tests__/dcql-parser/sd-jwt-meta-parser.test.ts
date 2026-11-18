@@ -1,4 +1,3 @@
-import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
 import { getMetaParser } from '../../dcql-parser/dcql-meta-query-result.js'
 import type { DcqlCredentialQuery } from '../../dcql-query/index.js'
@@ -48,7 +47,7 @@ const legacyCredentialExample = {
 describe('SD-JWT VC Meta Parser', () => {
   it('meta with vct', () => {
     const parser = getMetaParser(metaExample)
-    const res = v.parse(parser, credentialExample)
+    const res = parser.parse(credentialExample)
 
     expect(res).toEqual({
       cryptographic_holder_binding: true,
@@ -60,7 +59,7 @@ describe('SD-JWT VC Meta Parser', () => {
   // TODO: remove this test when we remove legacy SD-JWT VCs.
   it('legacy meta with vct', () => {
     const parser = getMetaParser(legacyMetaExample)
-    const res = v.parse(parser, legacyCredentialExample)
+    const res = parser.parse(legacyCredentialExample)
 
     expect(res).toEqual({
       cryptographic_holder_binding: true,
@@ -71,16 +70,16 @@ describe('SD-JWT VC Meta Parser', () => {
 
   it('shows error for invalid format', () => {
     const parser = getMetaParser(metaExample)
-    const res = v.safeParse(parser, mdocCredentialExample)
+    const res = parser.safeParse(mdocCredentialExample)
 
-    expect(res.issues?.[0].message).toEqual("Expected credential format to be 'dc+sd-jwt' but received 'mso_mdoc'")
+    expect(res.error?.issues[0].message).toEqual("Expected credential format to be 'dc+sd-jwt' but received 'mso_mdoc'")
   })
 
   it('shows error for invalid vct', () => {
     const parser = getMetaParser(metaExample)
-    const res = v.safeParse(parser, { ...credentialExample, vct: 'something-else' })
+    const res = parser.safeParse({ ...credentialExample, vct: 'something-else' })
 
-    expect(res.issues?.[0].message).toEqual(
+    expect(res.error?.issues[0].message).toEqual(
       "Expected vct to be 'something' | 'really-something' but received 'something-else'"
     )
   })

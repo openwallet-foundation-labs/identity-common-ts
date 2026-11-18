@@ -39,6 +39,16 @@ export type Base64urlString = string
 
 export type OrPromise<T> = T | Promise<T>
 
+/**
+ * `T` with the keys in `K` made optional. Not `Omit<T, K> & Partial<Pick<T, K>>`, as `Omit` reduces a
+ * type with an index signature, such as a `.loose()` schema, to only that signature.
+ */
+export type MarkOptional<T, K extends PropertyKey> = {
+  [P in keyof T as P extends K ? never : P]: T[P]
+} & {
+  [P in keyof T as P extends K ? P : never]?: T[P]
+}
+
 export type Signer = (data: string) => OrPromise<string>
 export type Verifier<T = unknown> = (data: string, sig: string, options?: T) => OrPromise<boolean>
 export type Hasher = (data: string | ArrayBuffer, alg: string) => OrPromise<Uint8Array>

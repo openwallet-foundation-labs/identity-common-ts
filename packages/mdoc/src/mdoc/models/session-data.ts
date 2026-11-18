@@ -2,13 +2,13 @@ import { CborStructure, typedMap, zUint8Array } from '@owf/cose'
 import { z } from 'zod'
 
 // Zod schema for SessionData
-const sessionDataSchema = typedMap([
+const zSessionData = typedMap([
   ['status', z.number().exactOptional()],
   ['data', zUint8Array.exactOptional()],
 ] as const)
 
-export type SessionDataEncodedStructure = z.input<typeof sessionDataSchema>
-export type SessionDataDecodedStructure = z.output<typeof sessionDataSchema>
+export type SessionDataEncodedStructure = z.input<typeof zSessionData>
+export type SessionDataDecodedStructure = z.output<typeof zSessionData>
 
 export type SessionDataOptions = {
   status?: number
@@ -17,7 +17,7 @@ export type SessionDataOptions = {
 
 export class SessionData extends CborStructure<SessionDataEncodedStructure, SessionDataDecodedStructure> {
   public static override get encodingSchema() {
-    return sessionDataSchema
+    return zSessionData
   }
 
   public get status() {

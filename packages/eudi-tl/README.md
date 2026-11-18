@@ -84,9 +84,22 @@ const anchors = getPointerSigningCertificates(lotl, { schemeTerritory: 'ES' });
 const esList = await loadTrustedList(esXml, { trustAnchors: anchors });
 ```
 
+Each pointer has the `mimeType` of the list it points to, which
+`getPointerSigningCertificates` filters by as well, so a verifier can skip the
+PDF form of a list that the LOTL points to next to the XML:
+
+```typescript
+const xmlPointers = (lotl.pointersToOtherLists ?? []).filter(
+  (pointer) => pointer.mimeType?.toLowerCase() === 'application/vnd.etsi.tsl+xml',
+);
+```
+
 `loadEuLotl` verifies the signature against `getEuLotlTrustAnchors()` and checks
 the `TrustedListProfiles.euLotl` profile. Pass your own `trustAnchors` to
 override the shipped set.
+
+`loadTrustedList` requires `trustAnchors`, and an empty list fails closed, for
+example when the LOTL has no pointer with a certificate for the territory.
 
 #### Why the LOTL signers are pinned, and how to update them
 
@@ -106,7 +119,7 @@ a release of this package:
 
    ```typescript
    const current = getPointerSigningCertificates(lotl, {
-     tslType: TSLType.EUlistofthelists,
+     tslType: TslType.EUlistofthelists,
    });
    ```
 
@@ -125,8 +138,12 @@ authenticity is established elsewhere, or for inspection:
 import { parseTrustedList, validateTrustedList } from '@owf/eudi-tl';
 
 const trustedList = parseTrustedList(xml);
-const { valid, errors } = validateTrustedList(trustedList);
+const { valid, issues } = validateTrustedList(trustedList);
 ```
+
+Each issue has a `severity`, a `code`, a `path` into the list, such as
+`['providers', 0, 'services', 1, 'serviceStatus']`, and a `message`, the same
+`ValidationIssue` that the other validators of this repository return.
 
 The certificates embedded in a list are parsed with the `asn1js` defaults
 (`maxDepth` 100, `maxNodes` 10000, `maxContentLength` 16MB). Pass
@@ -153,9 +170,16 @@ const { signerCertificateBase64 } = await verifyTrustedListSignature(xml, {
 });
 ```
 
-Without `trustAnchors`, only the cryptographic validity of the enveloped
+The signature must verify with the key of a pinned certificate in its
+`KeyInfo`, and the list must have exactly one `ds:Signature`, as a child of its
+root. Before any transform runs, the signature is checked against the profile of
+ETSI TS 119 612 Annex B: it may only use the enveloped-signature transform and
+canonicalization, each once per reference, and it must reference the
+`TrustServiceStatusList` itself (`URI=""` or the `Id` of the root) and otherwise
+only its XAdES `SignedProperties`. Without `trustAnchors`, only the cryptographic validity of the enveloped
 signature is checked — that proves integrity, not trust. Production callers
-should always pin the scheme operator certificate(s).
+should always pin the scheme operator certificate(s); `loadTrustedList` requires
+them.
 
 Verification uses the global Web Crypto API by default. To run it through a
 reviewed or policy-constrained engine ("bring your own crypto"), install your
@@ -211,10 +235,12 @@ CAs. Narrow further with your own `ProfileRule` when you need to.
 
 ## Error Handling
 
-All failures throw a subclass of `TrustedListException`:
+All failures throw a subclass of `TrustedListError`:
 
-- `TrustedListParseException` — the XML is not a well-formed TS 119 612 list
-- `TrustedListSignatureException` — the signature is missing, invalid, or not
+- `TrustedListParseError` — the XML is not a well-formed TS 119 612 list
+- `TrustedListValidationError` — a `ValidationError` of `@owf/identity-common` for a list that does
+  not conform to the schema or a profile, with the `issues` of the validation
+- `TrustedListSignatureError` — the signature is missing, invalid, or not
   signed by a pinned trust anchor. Treat this as fail-closed.
 
 When a failure wraps an underlying error (e.g. a crypto error during

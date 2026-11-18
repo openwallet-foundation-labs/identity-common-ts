@@ -1,4 +1,3 @@
-import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
 import { getMdocClaimParser } from '../../dcql-parser/dcql-claims-query-result.js'
 
@@ -17,14 +16,14 @@ const claimsPathPointerExample = {
 describe('Mdoc Claim Parser', () => {
   it('name', () => {
     const parser = getMdocClaimParser({ path: ['org.iso.18013.5.1', 'given_name'] })
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({ 'org.iso.18013.5.1': { given_name: 'Arthur' } })
   })
 
   it('driving privileges', (_t) => {
     const parser = getMdocClaimParser({ path: ['org.iso.18013.5.1', 'driving_privileges'] })
-    const res = v.parse(parser, claimsPathPointerExample)
+    const res = parser.parse(claimsPathPointerExample)
 
     expect(res).toEqual({
       'org.iso.18013.5.1': {
@@ -39,23 +38,25 @@ describe('Mdoc Claim Parser', () => {
 
   it('shows error for missing namespace', () => {
     const parser = getMdocClaimParser({ path: ['custom.namespace', 'driving_privileges'] })
-    const res = v.safeParse(parser, claimsPathPointerExample)
+    const res = parser.safeParse(claimsPathPointerExample)
 
-    expect(res.issues?.[0].message).toEqual("Expected claim 'custom.namespace'.'driving_privileges' to be defined")
+    expect(res.error?.issues[0].message).toEqual("Expected claim 'custom.namespace'.'driving_privileges' to be defined")
   })
 
   it('shows error for correct namespace but missing claim', () => {
     const parser = getMdocClaimParser({ path: ['org.iso.18013.5.1', 'driving_privileges2'] })
-    const res = v.safeParse(parser, claimsPathPointerExample)
+    const res = parser.safeParse(claimsPathPointerExample)
 
-    expect(res.issues?.[0].message).toEqual("Expected claim 'org.iso.18013.5.1'.'driving_privileges2' to be defined")
+    expect(res.error?.issues[0].message).toEqual(
+      "Expected claim 'org.iso.18013.5.1'.'driving_privileges2' to be defined"
+    )
   })
 
   it('shows error for present namespace and claim, but incorrect value', () => {
     const parser = getMdocClaimParser({ path: ['org.iso.18013.5.1', 'family_name'], values: ['NotDent', 'WhyDent'] })
-    const res = v.safeParse(parser, claimsPathPointerExample)
+    const res = parser.safeParse(claimsPathPointerExample)
 
-    expect(res.issues?.[0].message).toEqual(
+    expect(res.error?.issues[0].message).toEqual(
       "Expected claim 'org.iso.18013.5.1'.'family_name' to be 'NotDent' | 'WhyDent' but received 'Dent'"
     )
   })

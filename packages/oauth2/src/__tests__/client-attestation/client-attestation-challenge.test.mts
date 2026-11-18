@@ -1,4 +1,7 @@
-import { ContentType, Headers, ValidationError } from '@openid4vc/utils'
+import { Headers } from '@openid4vc/utils'
+import { CommonMediaTypes, ValidationError } from '@owf/identity-common'
+import type { Jwk } from '@owf/jose'
+import { decodeJwt } from '@owf/jose'
 import * as jose from 'jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -16,12 +19,10 @@ import {
   zClientAttestationPopJwtPayload,
 } from '../../client-attestation/z-client-attestation'
 import { clientAuthenticationClientAttestationJwt } from '../../client-authentication'
-import type { Jwk } from '../../common/jwk/z-jwk'
-import { decodeJwt } from '../../common/jwt/decode-jwt'
 import { Oauth2Error } from '../../error/Oauth2Error'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
 import { clientCredentialsGrantIdentifier } from '../../z-grant-type'
-import { callbacks, getSignJwtCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback, testAttester } from '../util.mjs'
 
 const server = setupServer()
 
@@ -50,24 +51,22 @@ function decodePop(compactPop: string) {
 }
 
 describe('Client Attestation challenge', () => {
-  let attester: Awaited<ReturnType<typeof generateEs256Key>>
   let instance: Awaited<ReturnType<typeof generateEs256Key>>
-  let signJwt: ReturnType<typeof getSignJwtCallback>
+  let signJws: ReturnType<typeof getSignJwsCallback>
   let clientAttestationJwt: string
 
   beforeAll(async () => {
     server.listen()
 
-    attester = await generateEs256Key()
     instance = await generateEs256Key()
-    signJwt = getSignJwtCallback([attester.privateJwk, instance.privateJwk])
+    signJws = getSignJwsCallback([instance.privateJwk])
 
     clientAttestationJwt = await createClientAttestationJwt({
-      callbacks: { signJwt },
+      callbacks: { signJws },
       clientId: 'wallet',
       confirmation: { jwk: instance.publicJwk },
       expiresAt: new Date(Date.now() + 3600 * 1000),
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+      signer: testAttester.signer,
     })
   })
 
@@ -85,7 +84,7 @@ describe('Client Attestation challenge', () => {
         http.post(mockAuthorizationServerMetadata.challenge_endpoint as string, () =>
           HttpResponse.json(
             { attestation_challenge: 'challenge-abc' },
-            { headers: { 'Content-Type': ContentType.Json } }
+            { headers: { 'Content-Type': CommonMediaTypes.Json } }
           )
         )
       )
@@ -110,7 +109,7 @@ describe('Client Attestation challenge', () => {
     test('throws a ValidationError when the response body is invalid', async () => {
       server.resetHandlers(
         http.post(mockAuthorizationServerMetadata.challenge_endpoint as string, () =>
-          HttpResponse.json({ not_a_challenge: true }, { headers: { 'Content-Type': ContentType.Json } })
+          HttpResponse.json({ not_a_challenge: true }, { headers: { 'Content-Type': CommonMediaTypes.Json } })
         )
       )
 
@@ -128,14 +127,14 @@ describe('Client Attestation challenge', () => {
       const headers = new Headers()
       await clientAuthenticationClientAttestationJwt({
         clientAttestationJwt,
-        callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+        callbacks: { signJws, generateRandom: callbacks.generateRandom },
         challenge: 'static-challenge',
       })({
         authorizationServerMetadata: mockAuthorizationServerMetadata,
         url: mockAuthorizationServerMetadata.token_endpoint,
         method: 'POST',
         headers,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         body: {},
       })
 
@@ -147,14 +146,14 @@ describe('Client Attestation challenge', () => {
       const headers = new Headers()
       await clientAuthenticationClientAttestationJwt({
         clientAttestationJwt,
-        callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+        callbacks: { signJws, generateRandom: callbacks.generateRandom },
         challenge: 'static-challenge',
       })({
         authorizationServerMetadata: mockAuthorizationServerMetadata,
         url: mockAuthorizationServerMetadata.token_endpoint,
         method: 'POST',
         headers,
-        contentType: ContentType.XWwwFormUrlencoded,
+        contentType: CommonMediaTypes.XWwwFormUrlencoded,
         body: {},
         attestationChallenge: 'server-challenge',
       })
@@ -218,14 +217,14 @@ describe('Client Attestation challenge', () => {
               {
                 status: 400,
                 headers: {
-                  'Content-Type': ContentType.Json,
+                  'Content-Type': CommonMediaTypes.Json,
                   [oauthClientAttestationChallengeHeader]: 'retry-challenge',
                 },
               }
             )
           }
 
-          return HttpResponse.json(mockResponse, { headers: { 'Content-Type': ContentType.Json } })
+          return HttpResponse.json(mockResponse, { headers: { 'Content-Type': CommonMediaTypes.Json } })
         })
       )
 
@@ -233,11 +232,11 @@ describe('Client Attestation challenge', () => {
         authorizationServerMetadata: mockAuthorizationServerMetadata,
         callbacks: {
           ...callbacks,
-          signJwt,
+          signJws,
           fetch,
           clientAuthentication: clientAuthenticationClientAttestationJwt({
             clientAttestationJwt,
-            callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+            callbacks: { signJws, generateRandom: callbacks.generateRandom },
           }),
         },
       })
@@ -260,7 +259,7 @@ describe('Client Attestation challenge', () => {
         http.post(mockAuthorizationServerMetadata.token_endpoint, () =>
           HttpResponse.json(mockResponse, {
             headers: {
-              'Content-Type': ContentType.Json,
+              'Content-Type': CommonMediaTypes.Json,
               [oauthClientAttestationChallengeHeader]: 'next-challenge',
             },
           })
@@ -271,11 +270,11 @@ describe('Client Attestation challenge', () => {
         authorizationServerMetadata: mockAuthorizationServerMetadata,
         callbacks: {
           ...callbacks,
-          signJwt,
+          signJws,
           fetch,
           clientAuthentication: clientAuthenticationClientAttestationJwt({
             clientAttestationJwt,
-            callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+            callbacks: { signJws, generateRandom: callbacks.generateRandom },
           }),
         },
       })

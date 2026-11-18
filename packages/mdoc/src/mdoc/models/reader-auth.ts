@@ -1,4 +1,4 @@
-import { Sign1, type Sign1DecodedStructure, type Sign1EncodedStructure, type Sign1Options } from '@owf/cose'
+import { Sign1, type Sign1DecodedStructure, type Sign1EncodedStructure, type Sign1Options, verifyX5t } from '@owf/cose'
 import type { MdocContext } from '../../context'
 import { defaultVerificationCallback, onCategoryCheck, type VerificationCallback } from '../check-callback'
 import { ReaderAuthentication, type ReaderAuthenticationOptions } from './reader-authentication'
@@ -26,7 +26,7 @@ export class ReaderAuth extends Sign1 {
       disableCertificateChainValidation?: boolean
       now?: Date
     },
-    ctx: Pick<MdocContext, 'cose' | 'x509'>
+    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto'>
   ) {
     const readerAuthentication =
       options.readerAuthentication instanceof ReaderAuthentication
@@ -59,6 +59,15 @@ export class ReaderAuth extends Sign1 {
       check: 'Reader auth signature must be valid',
       reason,
     })
+
+    // ISO/IEC 18013-5 (second edition) § 12.5.4: an x5t, if present, shall use SHA-256.
+    const x5tCheck = 'The x5t in the protected header, if present, must be SHA-256 and match the reader certificate'
+    try {
+      await verifyX5t(this, this.certificate, ctx.crypto)
+      onCheck({ status: 'PASSED', check: x5tCheck })
+    } catch (err) {
+      onCheck({ status: 'FAILED', check: x5tCheck, reason: err instanceof Error ? err.message : 'Unknown error' })
+    }
 
     if (!options.disableCertificateChainValidation) {
       try {

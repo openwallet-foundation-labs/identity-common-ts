@@ -6,10 +6,9 @@ import {
   type SignatureAlgorithm,
   UnprotectedHeaders,
 } from '@owf/cose'
-import { stringToBytes } from '@owf/identity-common'
 import type { MdocContext } from '../../context'
 import { randomUnsignedInteger } from '../../utils/randomUnsignedInteger'
-import { x5chainHeaderValue } from '../../utils/x5chain'
+import { x5chainHeaderValue, x5tHeaderValue } from '../../utils/x5chain'
 import {
   AtLeastOneCertificateRequiredError,
   DuplicateElementIdentifierError,
@@ -115,6 +114,11 @@ export class IssuerSignedBuilder {
      * list referenced from inside the signed MSO.
      */
     status?: Status | StatusOptions
+    /**
+     * Add a SHA-256 `x5t` of the leaf certificate to the protected header, as the second edition of
+     * ISO/IEC 18013-5 recommends. Off by default, as the first edition has nothing but `alg` there.
+     */
+    includeX5t?: boolean
   }): Promise<IssuerSigned> {
     if (options.signingKey.algorithm && options.signingKey.algorithm !== options.algorithm) {
       throw new SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError(
@@ -165,18 +169,18 @@ export class IssuerSignedBuilder {
     })
 
     const protectedHeaders = ProtectedHeaders.create({
-      protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, options.algorithm]]),
+      protectedHeaders: new Map<number, unknown>([[RegisteredCwtHeaderClaimKey.Algorithm, options.algorithm]]),
     })
+    if (options.includeX5t) {
+      protectedHeaders.headers.set(
+        RegisteredCwtHeaderClaimKey.X5T,
+        await x5tHeaderValue(options.certificates, this.ctx)
+      )
+    }
 
     const unprotectedHeaders = UnprotectedHeaders.create({
       unprotectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.X5Chain, x5chainHeaderValue(options.certificates)]]),
     })
-
-    if (options.signingKey.keyId) {
-      // COSE label 4 (kid) is a bstr per RFC 8152; CoseKey.keyId is the
-      // text form, so we UTF-8 encode here at the header boundary.
-      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(options.signingKey.keyId))
-    }
 
     const issuerAuth = await IssuerAuth.create({
       payload: mso,

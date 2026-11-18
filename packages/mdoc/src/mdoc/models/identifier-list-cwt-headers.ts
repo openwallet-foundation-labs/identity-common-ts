@@ -8,9 +8,9 @@ import {
 import z from 'zod'
 
 /** CWT media types used by the ISO/IEC 18013-5 revocation mechanisms. */
-export enum MediaTypes {
-  IdentifierListCwt = 'application/identifierlist+cwt',
-}
+export const MdocMediaTypes = {
+  IdentifierListCwt: 'application/identifierlist+cwt',
+} as const
 
 // § 12.3.6.4: "The value of the type claim shall be 'application/identifierlist+cwt'".
 // `typ` is a COSE header parameter (RFC 9596, label 16), not a CWT claim — the same place
@@ -20,8 +20,8 @@ export enum MediaTypes {
 const identifierListCwtProtectedHeaderClaims = extendCoseHeaderClaims([
   [
     RegisteredCwtHeaderClaimKey.Typ,
-    z.literal(MediaTypes.IdentifierListCwt, {
-      error: `Typ (protected header 16) shall be '${MediaTypes.IdentifierListCwt}' (ISO 18013-5 § 12.3.6.4)`,
+    z.literal(MdocMediaTypes.IdentifierListCwt, {
+      error: `Typ (protected header 16) shall be '${MdocMediaTypes.IdentifierListCwt}' (ISO 18013-5 § 12.3.6.4)`,
     }),
   ],
 ] as const)

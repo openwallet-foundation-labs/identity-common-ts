@@ -3,14 +3,14 @@ import { z } from 'zod'
 import { DeviceRequestInfo, type DeviceRequestInfoOptions } from './device-request-info'
 import { DocRequest, type DocRequestEncodedStructure } from './doc-request'
 
-const deviceRequestSchema = typedMap([
+const zDeviceRequest = typedMap([
   ['version', z.string()],
   ['docRequests', z.array(z.instanceof(DocRequest))],
   ['deviceRequestInfo', z.instanceof(DeviceRequestInfo).exactOptional()],
 ] as const)
 
 // Every document set of a use case points at doc requests of this device request.
-const deviceRequestOutputSchema = deviceRequestSchema.out.superRefine((map, ctx) => {
+const zDeviceRequestOutput = zDeviceRequest.out.superRefine((map, ctx) => {
   // A missing or invalid docRequests is reported by the schema itself.
   const docRequests: unknown = map.get('docRequests')
   if (!Array.isArray(docRequests)) return
@@ -26,8 +26,8 @@ const deviceRequestOutputSchema = deviceRequestSchema.out.superRefine((map, ctx)
   })
 })
 
-export type DeviceRequestDecodedStructure = z.output<typeof deviceRequestSchema>
-export type DeviceRequestEncodedStructure = z.input<typeof deviceRequestSchema>
+export type DeviceRequestDecodedStructure = z.output<typeof zDeviceRequest>
+export type DeviceRequestEncodedStructure = z.input<typeof zDeviceRequest>
 
 export type DeviceRequestOptions = {
   /**
@@ -41,7 +41,7 @@ export type DeviceRequestOptions = {
 
 export class DeviceRequest extends CborStructure<DeviceRequestEncodedStructure, DeviceRequestDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(deviceRequestSchema.in, deviceRequestOutputSchema, {
+    return z.codec(zDeviceRequest.in, zDeviceRequestOutput, {
       decode: (input) => {
         const map: DeviceRequestDecodedStructure = TypedMap.fromMap(input)
         // Anything but an array is left for the schema to reject.

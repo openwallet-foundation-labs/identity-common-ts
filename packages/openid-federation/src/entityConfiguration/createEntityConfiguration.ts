@@ -1,8 +1,8 @@
 import { createJsonWebToken, createJwtSignableInput, getUsedJsonWebKey } from '../jsonWeb'
 import type { SignCallback } from '../utils'
 import { validate } from '../utils/validate'
-import { type EntityConfigurationClaimsOptions, entityConfigurationClaimsSchema } from './entityConfigurationClaims'
-import { type EntityConfigurationHeaderOptions, entityConfigurationHeaderSchema } from './entityConfigurationHeader'
+import { type EntityConfigurationClaimsOptions, zEntityConfigurationClaims } from './entityConfigurationClaims'
+import { type EntityConfigurationHeaderOptions, zEntityConfigurationHeader } from './entityConfigurationHeader'
 
 export type CreateEntityConfigurationOptions = {
   claims: EntityConfigurationClaimsOptions
@@ -24,14 +24,14 @@ export const createEntityConfiguration = async ({
 }: CreateEntityConfigurationOptions) => {
   // Validate the input
   const validatedHeader = validate({
-    schema: entityConfigurationHeaderSchema,
+    schema: zEntityConfigurationHeader,
     data: header,
     errorMessage: 'invalid header claims provided',
   })
 
   const validatedClaims = validate({
     data: claims,
-    schema: entityConfigurationClaimsSchema,
+    schema: zEntityConfigurationClaims,
     errorMessage: 'invalid payload claims provided',
   })
 

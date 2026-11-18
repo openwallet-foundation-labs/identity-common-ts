@@ -1,4 +1,5 @@
 import type { InferOutputUnion, Simplify } from '@openid4vc/utils'
+import { addValidationIssue, unionParams, zNonEmptyString, zodErrorMap } from '@owf/identity-common'
 import z from 'zod'
 import {
   zJwtVcJsonCredentialRequestFormatDraft14,
@@ -34,13 +35,17 @@ export const allCredentialRequestFormats = [
   zLegacySdJwtVcCredentialRequestFormatDraft14,
 ] as const
 
+// The issues of a nested parse are passed on as they are. Parse like `parseWithSchema`, so they
+// have its messages and the input that tells a `missing_value` from an `invalid_type`.
+const nestedParseParams = { reportInput: true, error: zodErrorMap }
+
 export const allCredentialRequestFormatIdentifiers = allCredentialRequestFormats.map(
   (format) => format.shape.format.value
 )
 
 // Credential configuration no format used
 const zCredentialRequestCredentialConfigurationId = z.object({
-  credential_configuration_id: z.string(),
+  credential_configuration_id: zNonEmptyString,
 
   credential_identifier: z
     .never({ message: "'credential_identifier' cannot be defined when 'credential_configuration_id' is set." })
@@ -49,7 +54,7 @@ const zCredentialRequestCredentialConfigurationId = z.object({
 
 // Authorization details no format used
 const zAuthorizationDetailsCredentialRequest = z.object({
-  credential_identifier: z.string(),
+  credential_identifier: zNonEmptyString,
 
   credential_configuration_id: z
     .never({ message: "'credential_configuration_id' cannot be defined when 'credential_identifier' is set." })
@@ -58,7 +63,7 @@ const zAuthorizationDetailsCredentialRequest = z.object({
 
 const zCredentialRequestFormat = z
   .object({
-    format: z.string(),
+    format: zNonEmptyString,
 
     // We add these nevers here so that if one of these is present, we will always use
     // the new properties rather than the deprecated format
@@ -89,17 +94,11 @@ export const zCredentialRequestDraft14WithFormat = zCredentialRequestCommon
       .loose()
       // FIXME(vc+sd-jwt): use discriminated union when dropping support for legacy vc+sd-jwt format.
       .and(z.union(allCredentialRequestFormats))
-      .safeParse(data)
+      .safeParse(data, nestedParseParams)
     if (result.success) {
       return result.data as Simplify<typeof result.data & typeof data>
     }
-    for (const issue of result.error.issues) {
-      ctx.addIssue({
-        ...issue,
-        // FIXME: this used to work fine in zod 3
-        code: issue.code as 'custom',
-      })
-    }
+    for (const issue of result.error.issues) ctx.addIssue({ ...issue })
     return z.NEVER
   })
 
@@ -125,24 +124,17 @@ export const zCredentialRequestDraft11To14 = zCredentialRequestCommon
     if (!Object.keys(formatSpecificTransformations).includes(data.format)) return data
 
     const schema = formatSpecificTransformations[data.format as keyof typeof formatSpecificTransformations]
-    const result = schema.safeParse(data)
+    const result = schema.safeParse(data, nestedParseParams)
     if (result.success) return result.data
-    for (const issue of result.error.issues) {
-      ctx.addIssue({
-        ...issue,
-        // FIXME: this used to work fine in zod 3
-        code: issue.code as 'custom',
-      })
-    }
+    for (const issue of result.error.issues) ctx.addIssue({ ...issue })
     return z.NEVER
   })
   .pipe(zCredentialRequestDraft14)
 
 export const zCredentialRequestDraft14To11 = zCredentialRequestDraft14.transform((data, ctx) => {
   if (data.credential_identifier !== undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      continue: false,
+    addValidationIssue(ctx, {
+      code: 'not_allowed',
       message: `'credential_identifier' is not supported in OpenID4VCI draft 11`,
       path: ['credential_identifier'],
     })
@@ -157,26 +149,23 @@ export const zCredentialRequestDraft14To11 = zCredentialRequestDraft14.transform
   if (!Object.keys(formatSpecificTransformations).includes(data.format)) return data
 
   const schema = formatSpecificTransformations[data.format as keyof typeof formatSpecificTransformations]
-  const result = schema.safeParse(data)
+  const result = schema.safeParse(data, nestedParseParams)
   if (result.success) return result.data
-  for (const issue of result.error.issues) {
-    ctx.addIssue({
-      ...issue,
-      // FIXME: this used to work fine in zod 3
-      code: issue.code as 'custom',
-    })
-  }
+  for (const issue of result.error.issues) ctx.addIssue({ ...issue })
   return z.NEVER
 })
 
-export const zCredentialRequest = z.union([
-  zCredentialRequestDraft15,
-  zCredentialRequestDraft14,
-  zCredentialRequestDraft11To14,
-])
+export const zCredentialRequest = z.union(
+  [zCredentialRequestDraft15, zCredentialRequestDraft14, zCredentialRequestDraft11To14],
+  unionParams('Invalid credential request', [
+    'OpenID4VCI 1.0 or draft 15',
+    'OpenID4VCI draft 14',
+    'OpenID4VCI draft 11',
+  ])
+)
 
 export const zDeferredCredentialRequest = z.object({
-  transaction_id: z.string().nonempty(),
+  transaction_id: zNonEmptyString,
   credential_response_encryption: zCredentialResponseEncryption.optional(),
 })
 

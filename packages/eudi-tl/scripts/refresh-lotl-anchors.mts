@@ -24,7 +24,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { base64, hexEncode } from '@owf/identity-common'
 import * as x509 from '@peculiar/x509'
-import { TSLType } from '../src/constants'
+import { TslType } from '../src/constants'
 import { getPointerSigningCertificates, parseTrustedList } from '../src/parse'
 import { verifyTrustedListSignature } from '../src/verify'
 
@@ -52,7 +52,7 @@ console.log(
 )
 
 const lotl = parseTrustedList(xml)
-const certificates = getPointerSigningCertificates(lotl, { tslType: TSLType.EUlistofthelists })
+const certificates = getPointerSigningCertificates(lotl, { tslType: TslType.EUlistofthelists })
 if (certificates.length === 0) throw new Error('The LOTL self-pointer carries no signing certificates')
 
 const officialJournal = xml.match(/https:\/\/eur-lex\.europa\.eu\/eli\/[^<\s]+/)?.[0]

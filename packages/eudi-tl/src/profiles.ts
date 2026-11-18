@@ -1,4 +1,4 @@
-import { ServiceStatus, ServiceType, TSLType } from './constants'
+import { ServiceStatus, ServiceType, TslType } from './constants'
 import type { ProfileRule } from './validate'
 
 /** Every standard TS 119 612 service status (clause 5.5.4). */
@@ -29,7 +29,7 @@ export const TrustedListProfiles = {
    */
   euLotl: {
     name: 'eu-lotl',
-    tslType: TSLType.EUlistofthelists,
+    tslType: TslType.EUlistofthelists,
     serviceTypes: [],
     serviceStatuses: [],
   },
@@ -40,7 +40,7 @@ export const TrustedListProfiles = {
    */
   euGeneric: {
     name: 'eu-generic',
-    tslType: TSLType.EUgeneric,
+    tslType: TslType.EUgeneric,
     serviceTypes: QUALIFIED_SERVICE_TYPES,
     serviceStatuses: ALL_SERVICE_STATUSES,
   },

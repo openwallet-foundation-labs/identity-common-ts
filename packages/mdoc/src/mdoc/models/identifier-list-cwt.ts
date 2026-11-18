@@ -12,15 +12,18 @@ import {
   type UnprotectedHeaderOptions,
   type UnprotectedHeaders,
 } from '@owf/cose'
-import { hex, isMediaType } from '@owf/identity-common'
+import { fetchWithLimits, hex, IdentityCommonError, isMediaType } from '@owf/identity-common'
 import type { MdocContext } from '../../context'
 import { IdentifierFoundInRevokedListError, InvalidRevocationListError } from '../errors'
-import { IdentifierListCwtProtectedHeaders, MediaTypes } from './identifier-list-cwt-headers'
+import { IdentifierListCwtProtectedHeaders, MdocMediaTypes } from './identifier-list-cwt-headers'
 import {
   type CreateIdentifierListCwtPayloadOptions,
   IdentifierListCwtClaimKey,
   IdentifierListCwtPayload,
 } from './identifier-list-cwt-payload'
+
+/** The default maximum size of an identifier list response, as of a status list response. */
+const DEFAULT_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 
 export type IdentifierListCwtOptions = Omit<
   CwtOptions<IdentifierListCwtPayload, IdentifierListCwtProtectedHeaders>,
@@ -51,7 +54,7 @@ function identifierListProtectedHeaders(
     protectedHeaders instanceof ProtectedHeaders ? protectedHeaders.decodedStructure : protectedHeaders
   )
   if (headers.get(RegisteredCwtHeaderClaimKey.Typ) === undefined) {
-    headers.set(RegisteredCwtHeaderClaimKey.Typ, MediaTypes.IdentifierListCwt)
+    headers.set(RegisteredCwtHeaderClaimKey.Typ, MdocMediaTypes.IdentifierListCwt)
   }
 
   return IdentifierListCwtProtectedHeaders.fromDecodedStructure(TypedMap.fromMap(headers))
@@ -82,7 +85,7 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
    * Decodes an identifier list CWT from a tagged COSE_Sign1 (tag 18) or COSE_Mac0 (tag 17) token.
    *
    * @throws CwtPayloadDecodeError if the payload is not a valid identifier list claims set.
-   * @throws ZodValidationError if the protected headers do not carry the identifier list `typ`.
+   * @throws CoseValidationError (from `@owf/cose`) if the protected headers do not carry the identifier list `typ`.
    */
   public static override fromToken<T extends AnyCwt>(this: CwtStaticThis<T>, token: Uint8Array): T {
     // NOTE: `super.fromToken`, not `Cwt.fromToken`: the base implementation constructs `this`, so a
@@ -96,18 +99,28 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
   }
 
   /**
-   * Fetches the identifier list published at `uri`.
+   * Fetches the identifier list published at `uri`, in a response within the `identifierList` limit of
+   * `ctx.fetchLimits`, 16 MiB by default.
    *
    * The counterpart of `fetchStatusList`, which the Token Status List specification's own media
    * type has; an identifier list is an ISO addition that `@owf/token-status-list` does not know
    * about, so the content type negotiation for it lives here.
+   *
+   * @throws InvalidRevocationListError if the response is not an identifier list, or larger than its limit.
    */
-  public static async fetch(uri: string, ctx: Pick<MdocContext, 'fetch'>): Promise<IdentifierListCwt> {
-    const response = await ctx.fetch(
-      uri,
-      { headers: { Accept: MediaTypes.IdentifierListCwt } },
-      { type: 'identifierList' }
-    )
+  public static async fetch(uri: string, ctx: Pick<MdocContext, 'fetch' | 'fetchLimits'>): Promise<IdentifierListCwt> {
+    let response: Response
+    try {
+      response = await fetchWithLimits(ctx, {
+        type: 'identifierList',
+        url: uri,
+        accept: MdocMediaTypes.IdentifierListCwt,
+        defaultMaxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
+      })
+    } catch (error) {
+      if (!(error instanceof IdentityCommonError)) throw error
+      throw new InvalidRevocationListError(`Identifier list at ${uri}: ${error.message}`)
+    }
 
     if (!response.ok) {
       throw new InvalidRevocationListError(`Identifier list fetch at ${uri} failed with status '${response.status}'`)
@@ -117,9 +130,9 @@ export class IdentifierListCwt extends Cwt<IdentifierListCwtPayload, IdentifierL
     // without a Content-Type is let through — the token itself carries the media type in `typ`, and
     // is rejected there if it is not an identifier list.
     const contentType = response.headers.get('Content-Type')
-    if (contentType !== null && !isMediaType(contentType, MediaTypes.IdentifierListCwt)) {
+    if (contentType !== null && !isMediaType(contentType, MdocMediaTypes.IdentifierListCwt)) {
       throw new InvalidRevocationListError(
-        `Identifier list at ${uri} was served as '${contentType}', expected '${MediaTypes.IdentifierListCwt}'`
+        `Identifier list at ${uri} was served as '${contentType}', expected '${MdocMediaTypes.IdentifierListCwt}'`
       )
     }
 

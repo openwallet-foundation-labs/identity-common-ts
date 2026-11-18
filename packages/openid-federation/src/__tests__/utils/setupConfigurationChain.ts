@@ -3,11 +3,7 @@ import {
   type EntityConfigurationClaimsOptions,
   type EntityConfigurationHeaderOptions,
 } from '../../entityConfiguration'
-import {
-  createEntityStatement,
-  type EntityStatementClaimsOptions,
-  entityStatementClaimsSchema,
-} from '../../entityStatement'
+import { createEntityStatement, type EntityStatementClaimsOptions, zEntityStatementClaims } from '../../entityStatement'
 import type { JsonWebKeySetOptions } from '../../jsonWeb'
 import type { SignCallback } from '../../utils'
 import { type MockedResponse, mockGet, server } from './mockServer'
@@ -162,5 +158,5 @@ export const subordinateStatements = (
   chainData
     .slice(1)
     .flatMap(({ subordinateStatements = [] }) =>
-      subordinateStatements.map(({ claims }) => entityStatementClaimsSchema.parse(claims))
+      subordinateStatements.map(({ claims }) => zEntityStatementClaims.parse(claims))
     )

@@ -1,5 +1,5 @@
-import { type CallbackContext, HashAlgorithm } from '@openid4vc/oauth2'
-import { decodeBase64, encodeToBase64Url } from '@openid4vc/utils'
+import type { CallbackContext } from '@openid4vc/oauth2'
+import { base64, base64url } from '@owf/identity-common'
 
 export async function calculateX509HashClientIdPrefixValue({
   x509Certificate,
@@ -12,10 +12,10 @@ export async function calculateX509HashClientIdPrefixValue({
 
   hash: CallbackContext['hash']
 }) {
-  return encodeToBase64Url(
+  return base64url.encode(
     await hash(
-      typeof x509Certificate === 'string' ? decodeBase64(x509Certificate) : x509Certificate,
-      HashAlgorithm.Sha256
+      new Uint8Array(typeof x509Certificate === 'string' ? base64.decode(x509Certificate) : x509Certificate).buffer,
+      'sha-256'
     )
   )
 }

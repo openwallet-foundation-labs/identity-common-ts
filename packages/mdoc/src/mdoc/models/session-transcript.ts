@@ -34,20 +34,20 @@ const supportedHandoverStructures = [
   EngagementToAppHandover,
 ] as const
 
-export const sessionTranscriptEncodedSchema = z.tuple([
+export const zSessionTranscriptEncoded = z.tuple([
   z.instanceof<typeof DataItem<DeviceEngagementEncodedStructure>>(DataItem).nullable(),
   z.instanceof<typeof DataItem<EReaderKeyEncodedStructure>>(DataItem).nullable(),
   z.unknown(),
 ])
 
-const sessionTranscriptDecodedSchema = z.object({
+const zSessionTranscriptDecoded = z.object({
   deviceEngagement: z.instanceof(DeviceEngagement).nullable(),
   eReaderKey: z.instanceof(EReaderKey).nullable(),
   handover: z.instanceof(Handover),
 })
 
-export type SessionTranscriptDecodedStructure = z.infer<typeof sessionTranscriptDecodedSchema>
-export type SessionTranscriptEncodedStructure = z.infer<typeof sessionTranscriptEncodedSchema>
+export type SessionTranscriptDecodedStructure = z.infer<typeof zSessionTranscriptDecoded>
+export type SessionTranscriptEncodedStructure = z.infer<typeof zSessionTranscriptEncoded>
 
 export type SessionTranscriptOptions = {
   deviceEngagement?: DeviceEngagement
@@ -60,10 +60,10 @@ export class SessionTranscript extends CborStructure<
   SessionTranscriptDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(sessionTranscriptEncodedSchema, sessionTranscriptDecodedSchema, {
+    return z.codec(zSessionTranscriptEncoded, zSessionTranscriptDecoded, {
       decode: ([deviceEngagementDataItem, eReaderKeyDataItem, handoverData]): SessionTranscriptDecodedStructure => {
         // TODO: this checks if it can be decoded, a smarter check could see that the handover
-        // is e.g. OpenId4VP handover but a value in that handover is incorrect
+        // is e.g. OpenID4VP handover but a value in that handover is incorrect
         let handover: SessionTranscriptDecodedStructure['handover'] | null = null
         for (const HandoverStructure of supportedHandoverStructures) {
           handover = (HandoverStructure as typeof NfcHandover).tryDecodeHandover(handoverData)

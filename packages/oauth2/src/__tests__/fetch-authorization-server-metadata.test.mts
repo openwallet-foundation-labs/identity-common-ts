@@ -1,4 +1,4 @@
-import { ValidationError } from '@openid4vc/utils'
+import { ValidationError } from '@owf/identity-common'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
@@ -19,6 +19,32 @@ describe('fetchAuthorizationServerMetadata', () => {
   beforeAll(() => server.listen())
   afterEach(() => server.resetHandlers())
   afterAll(() => server.close())
+
+  test('fetches the metadata as authorizationServerMetadata, within its limit', async () => {
+    server.resetHandlers(
+      http.get('https://authorization-server.com/.well-known/oauth-authorization-server', () =>
+        HttpResponse.json(authorizationServerMetadata)
+      )
+    )
+    const types: string[] = []
+    const callbacks = {
+      fetch: (input: string, init: RequestInit, { type }: { type: string }) => {
+        types.push(type)
+        return fetch(input, init)
+      },
+    }
+
+    await expect(fetchAuthorizationServerMetadata(issuer, callbacks)).resolves.toEqual(authorizationServerMetadata)
+    expect(types).toEqual(['authorizationServerMetadata'])
+
+    // The metadata is far larger than 10 bytes
+    await expect(
+      fetchAuthorizationServerMetadata(issuer, {
+        ...callbacks,
+        fetchLimits: { maxResponseBytesByType: { authorizationServerMetadata: 10 } },
+      })
+    ).rejects.toThrow('The response is larger than the maximum of 10 bytes')
+  })
 
   test('uses metadata from the getAuthorizationServerMetadata callback without performing a request', async () => {
     let wellKnownRequestCount = 0

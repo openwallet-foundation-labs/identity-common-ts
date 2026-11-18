@@ -1,5 +1,5 @@
 import { Oauth2Error } from '@openid4vc/oauth2'
-import { ValidationError } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import type z from 'zod'
 import { Openid4vciError } from '../../error/Openid4vciError'
 import type { IssuerMetadataResult } from '../fetch-issuer-metadata'
@@ -78,15 +78,11 @@ export function credentialsSupportedToCredentialConfigurationsSupported(
       )
     }
 
-    const parseResult = zCredentialConfigurationSupportedDraft11ToV1.safeParse(credentialSupported)
-    if (!parseResult.success) {
-      throw new ValidationError(
-        `Error transforming credential supported with id '${credentialSupported.id}' to credential configuration supported format`,
-        parseResult.error
-      )
-    }
-
-    credentialConfigurationsSupported[credentialSupported.id] = parseResult.data
+    credentialConfigurationsSupported[credentialSupported.id] = parseWithErrorHandling(
+      zCredentialConfigurationSupportedDraft11ToV1,
+      credentialSupported,
+      `Error transforming credential supported with id '${credentialSupported.id}' to credential configuration supported format`
+    )
   }
 
   return credentialConfigurationsSupported

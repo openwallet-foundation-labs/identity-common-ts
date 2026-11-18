@@ -1,6 +1,7 @@
 import type { JarAuthorizationRequest } from '@openid4vc/oauth2'
 import { zAuthorizationRequest } from '@openid4vc/oauth2'
 import { zInteger } from '@openid4vc/utils'
+import { unionParams, zNonEmptyString } from '@owf/identity-common'
 import { z } from 'zod'
 
 /**
@@ -15,7 +16,7 @@ export const zInteractiveAuthorizationInitialRequest = z
     ...zAuthorizationRequest.omit({ response_type: true }).shape,
 
     // REQUIRED: Comma-separated list of interaction types the Wallet supports
-    interaction_types_supported: z.string(),
+    interaction_types_supported: zNonEmptyString,
 
     // response_type is always 'code' for interactive authorization
     response_type: z.literal('code').default('code'),
@@ -30,7 +31,7 @@ export const zInteractiveAuthorizationInitialRequest = z
 export const zInteractiveAuthorizationFollowUpRequest = z
   .object({
     // REQUIRED in follow-up requests
-    auth_session: z.string(),
+    auth_session: zNonEmptyString,
 
     // OPTIONAL: OpenID4VP Authorization Response (JSON-encoded object)
     // Present when responding to openid4vp_presentation interaction
@@ -38,7 +39,7 @@ export const zInteractiveAuthorizationFollowUpRequest = z
 
     // OPTIONAL: PKCE code verifier
     // Present when following up after redirect_to_web with PKCE
-    code_verifier: z.optional(z.string()),
+    code_verifier: z.optional(zNonEmptyString),
   })
   .loose()
 
@@ -52,7 +53,7 @@ const zInteractiveAuthorizationInteractionRequiredResponseBase = z.object({
   status: z.literal('require_interaction'),
 
   // REQUIRED: Session identifier for subsequent requests
-  auth_session: z.string(),
+  auth_session: zNonEmptyString,
 
   // Optional expiration time
   expires_in: z.optional(zInteger),
@@ -85,7 +86,7 @@ export const zInteractiveAuthorizationRedirectToWebResponse = zInteractiveAuthor
     type: z.literal('redirect_to_web'),
 
     // REQUIRED for redirect_to_web: Request URI for PAR
-    request_uri: z.string(),
+    request_uri: zNonEmptyString,
   })
   .loose()
 
@@ -111,7 +112,7 @@ export const zInteractiveAuthorizationCodeResponse = z
     status: z.literal('ok'),
 
     // REQUIRED: Authorization code
-    code: z.string(),
+    code: zNonEmptyString,
   })
   .loose()
 
@@ -121,10 +122,10 @@ export const zInteractiveAuthorizationCodeResponse = z
 /**
  * Union type for all possible Interactive Authorization Responses
  */
-export const zInteractiveAuthorizationResponse = z.union([
-  zInteractiveAuthorizationInteractionRequiredResponse,
-  zInteractiveAuthorizationCodeResponse,
-])
+export const zInteractiveAuthorizationResponse = z.union(
+  [zInteractiveAuthorizationInteractionRequiredResponse, zInteractiveAuthorizationCodeResponse],
+  unionParams('Invalid interactive authorization response', ['interaction required', 'authorization code'])
+)
 
 /**
  * Type exports

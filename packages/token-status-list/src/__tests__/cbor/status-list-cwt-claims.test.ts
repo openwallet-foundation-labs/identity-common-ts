@@ -1,20 +1,11 @@
-import { CoseInvalidSignatureError, CoseKey, RegisteredCwtClaimKey, SignatureAlgorithm } from '@owf/cose'
+import { CoseInvalidSignatureError, RegisteredCwtClaimKey, SignatureAlgorithm } from '@owf/cose'
 import { describe, expect, test } from 'vitest'
 import { StatusListCwt } from '../../cbor/status-list-cwt'
 import { type CreateStatusListCwtPayloadOptions, StatusListCwtPayload } from '../../cbor/status-list-cwt-payload'
 import { StatusList } from '../../status-list'
-import { SLException } from '../../status-list-exception'
+import { StatusListError } from '../../status-list-error'
 import { StatusType } from '../../types'
-import { sign1Context, signKey } from '../context'
-
-// A second key pair, to check that a token does not verify against a key that did not sign it.
-const otherSignKey = CoseKey.fromJwk({
-  kty: 'EC',
-  crv: 'P-256',
-  alg: 'ES256',
-  x: 'R7D-W2d9MEVRN_5P23yN9SodkjMEHI2Np_YHD02eTCQ',
-  y: 'c5Ynunf6XyarMKXt0hWEezNzsZv01uQpCnpT-qJoll8',
-})
+import { otherSignKey, sign1Context, signKey, statusListIssue } from '../context'
 
 const uri = 'https://example.com/statuslists/1'
 const now = new Date('2026-01-01T12:00:00.000Z')
@@ -40,7 +31,7 @@ describe('StatusListCwtPayload.verifyClaims', () => {
   })
 
   test('rejects a token published for a different uri', () => {
-    expect(() => payload().verifyClaims({ uri: 'https://example.com/statuslists/2', now })).toThrow(SLException)
+    expect(() => payload().verifyClaims({ uri: 'https://example.com/statuslists/2', now })).toThrow(StatusListError)
     expect(() => payload().verifyClaims({ uri: 'https://example.com/statuslists/2', now })).toThrow(
       `The 'Subject (2)' claim '${uri}' does not match the expected value 'https://example.com/statuslists/2'`
     )
@@ -84,7 +75,9 @@ describe('StatusListCwtPayload.verifyClaims', () => {
   })
 
   test('rejects an index that is not valid', () => {
-    expect(() => payload({ statusList: statusList([3]) }).verifyStatus(3)).toThrow("Status for id '3' is not Valid")
+    expect(() => payload({ statusList: statusList([3]) }).verifyStatus(3)).toThrow(
+      statusListIssue('status_not_valid', { idx: 3, status: 1 })
+    )
     expect(() => payload({ statusList: statusList([3]) }).verifyStatus(2)).not.toThrow()
   })
 })
@@ -118,7 +111,7 @@ describe('StatusListCwt.verify', () => {
 
     await expect(
       cwt.verify({ key: signKey, uri: 'https://example.com/other', now }, { sign1: sign1Context })
-    ).rejects.toThrow(SLException)
+    ).rejects.toThrow(StatusListError)
   })
 
   test('checks only the status at an index through verifyStatus', async () => {

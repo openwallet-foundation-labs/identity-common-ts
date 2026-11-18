@@ -1,5 +1,5 @@
 import { type CallbackContext, Oauth2Error, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import z from 'zod'
 import {
   type ParsedClientIdentifier,
@@ -38,7 +38,23 @@ export interface ResolveOpenid4vpAuthorizationRequestOptions {
    */
   responseMode: ExpectedResponseMode
 
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'decryptJwe' | 'getX509CertificateMetadata' | 'fetch' | 'hash'>
+  callbacks: Pick<
+    CallbackContext,
+    'verifyJws' | 'decryptJwe' | 'getX509CertificateMetadata' | 'fetch' | 'fetchLimits' | 'hash'
+  >
+
+  /**
+   * Date to verify the `exp`, `nbf` and `iat` of a signed request object against. If not provided the
+   * current date will be used.
+   */
+  now?: Date
+
+  /**
+   * Allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of a signed request object.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export type ResolvedOpenid4vpAuthorizationRequest = {
@@ -80,6 +96,8 @@ export async function resolveOpenid4vpAuthorizationRequest(
       wallet,
       // For IAE/DC API only request is allowed
       allowRequestUri: options.responseMode.type === 'direct_post',
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
     })
 
     authorizationRequestPayload = parseWithErrorHandling(
@@ -104,7 +122,13 @@ export async function resolveOpenid4vpAuthorizationRequest(
       !clientMetadata &&
       authorizationRequestPayload.client_metadata_uri
     ) {
-      clientMetadata = await fetchClientMetadata({ clientMetadataUri: authorizationRequestPayload.client_metadata_uri })
+      // With the fetch of the wallet, which can restrict the URLs it requests: the URL is chosen by whoever crafted
+      // the request, which is not authenticated yet
+      clientMetadata = await fetchClientMetadata({
+        clientMetadataUri: authorizationRequestPayload.client_metadata_uri,
+        fetch: callbacks.fetch,
+        fetchLimits: callbacks.fetchLimits,
+      })
     }
 
     const client = await validateOpenid4vpClientId({
@@ -124,7 +148,7 @@ export async function resolveOpenid4vpAuthorizationRequest(
 
   let payloadValidationError: Oauth2ServerErrorResponseError | undefined
   try {
-    validateOpenId4vpAuthorizationRequestPayload({
+    validateAuthorizationRequestPayloadForResponseMode({
       authorizationRequestPayload,
       wallet,
       jar: jar !== undefined,
@@ -228,7 +252,7 @@ type ExpectedResponseMode =
       type: 'direct_post'
     }
 
-function validateOpenId4vpAuthorizationRequestPayload(options: {
+function validateAuthorizationRequestPayloadForResponseMode(options: {
   authorizationRequestPayload: Openid4vpAuthorizationRequestPayload
   wallet?: WalletVerificationOptions
   jar: boolean

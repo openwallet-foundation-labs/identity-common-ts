@@ -8,6 +8,16 @@
  * an exact string match.
  */
 
+/** Media types that are not specific to one specification. */
+export const CommonMediaTypes = {
+  XWwwFormUrlencoded: 'application/x-www-form-urlencoded',
+  Json: 'application/json',
+  JwkSet: 'application/jwk-set+json',
+  Jwt: 'application/jwt',
+  Html: 'text/html',
+  TextPlain: 'text/plain',
+} as const
+
 /**
  * Extract the normalized media type (`type/subtype`) from a `Content-Type` header
  * value, dropping any parameters and lowercasing the result.
@@ -22,6 +32,17 @@
 export const extractMediaType = (contentType: string | undefined | null): string | undefined => {
   const mediaType = contentType?.split(';')[0].trim().toLowerCase()
   return mediaType ? mediaType : undefined
+}
+
+/**
+ * Whether `value` is the JOSE `typ` (or `cty`) `typ`: in any casing, and with an optional
+ * `application/` prefix. A `typ` has no parameters, so `kb+jwt; charset=utf-8` does not match.
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc7515#section-4.1.9
+ */
+export const isJwtTyp = (value: unknown, typ: string): boolean => {
+  const normalize = (type: string) => type.toLowerCase().replace(/^application\//, '')
+  return typeof value === 'string' && normalize(value) === normalize(typ)
 }
 
 /**

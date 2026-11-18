@@ -113,6 +113,33 @@ describe('pem', () => {
     })
   })
 
+  describe('untrusted input', () => {
+    it('should ignore boundaries with an unsupported or empty label', () => {
+      const pem = `-----BEGIN key-----\n-----BEGIN -----\n${SAMPLE_EC_KEY_PEM}`
+      expect(pemToDer(pem)).toBe(pemToDer(SAMPLE_EC_KEY_PEM))
+    })
+
+    it('should end a certificate at the first post-encapsulation boundary', () => {
+      const pem = `${SAMPLE_CERT_PEM}\nAAAA\n-----END CERTIFICATE-----`
+      expect(parseCertificateChain(pem)).toEqual([parseCertificate(SAMPLE_CERT_PEM)])
+    })
+
+    // The regular expressions used before took quadratic time on input with many pre-encapsulation boundaries
+    // and no post-encapsulation boundary.
+    const certificateBoundaries = '-----BEGIN CERTIFICATE-----'.repeat(30_000)
+    const pemBoundaries = `-----BEGIN  -----${'-----BEGIN  -----a'.repeat(60_000)}`
+
+    it.each([
+      ['parseCertificateChain', () => parseCertificateChain(certificateBoundaries)],
+      ['parseCertificate', () => parseCertificate(certificateBoundaries)],
+      ['pemToDer', () => pemToDer(pemBoundaries)],
+    ])('%s should reject many unterminated blocks in linear time', (_, parse) => {
+      const start = performance.now()
+      expect(parse).toThrow()
+      expect(performance.now() - start).toBeLessThan(1000)
+    })
+  })
+
   describe('base64DerToPem', () => {
     it('should wrap base64 DER in PEM headers with 64-char lines', () => {
       const base64 = 'A'.repeat(128)

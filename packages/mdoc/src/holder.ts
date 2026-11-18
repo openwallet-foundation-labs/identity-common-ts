@@ -8,6 +8,7 @@ import {
   IssuerSigned,
   type IssuerSignedVerificationResult,
   SessionTranscript,
+  type StatusVerificationOptions,
   type VerificationCallback,
 } from './mdoc'
 import { verifyAgeOverRequestLimit } from './utils/ageOver'
@@ -29,11 +30,11 @@ export class Holder {
       verificationCallback?: VerificationCallback
       now?: Date
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       trustedCertificates?: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       skewSeconds?: number
+      status?: StatusVerificationOptions
     },
-    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch'>
+    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch' | 'fetchLimits'>
   ): Promise<IssuerSignedVerificationResult> {
     const issuerSigned =
       typeof options.issuerSigned === 'string'
@@ -71,7 +72,7 @@ export class Holder {
        */
       now?: Date
     },
-    ctx: Pick<MdocContext, 'cose' | 'x509'>
+    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto'>
   ) {
     const deviceRequest =
       options.deviceRequest instanceof DeviceRequest

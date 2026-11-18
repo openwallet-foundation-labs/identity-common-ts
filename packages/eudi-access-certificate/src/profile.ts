@@ -55,7 +55,7 @@ export function toAccessCertificate(certificate: Certificate): AccessCertificate
  * certificate; it does not check it against the profile or verify its signature.
  *
  * @param input DER bytes, base64 encoded DER, or PEM
- * @throws X509Exception when the input is not a well-formed X.509 certificate
+ * @throws X509Error when the input is not a well-formed X.509 certificate
  */
 export function parseAccessCertificate(input: CertificateInput): AccessCertificate {
   return toAccessCertificate(parseCertificate(input))

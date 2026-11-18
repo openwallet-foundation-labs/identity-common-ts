@@ -15,12 +15,12 @@ import type {
   SignatureEncoding,
   SignatureVerifier,
 } from './types'
-import { X509Exception } from './x509-exception'
+import { X509Error } from './x509-error'
 
 /** AlgorithmIdentifier for a supported signature algorithm (RFC 3279, RFC 5758). */
 export function signatureAlgorithmIdentifier(name: SignatureAlgorithm): AlgorithmIdentifier {
   const algorithm = SIGNATURE_ALGORITHMS[name]
-  if (!algorithm) throw new X509Exception(`Unsupported signature algorithm: ${name}`)
+  if (!algorithm) throw new X509Error(`Unsupported signature algorithm: ${name}`)
   return new AlgorithmIdentifier({
     algorithm: algorithm.oid,
     // RSA PKCS#1 v1.5 algorithms carry NULL parameters, ECDSA ones none
@@ -33,10 +33,10 @@ export function toSerialNumber(serialNumber: Uint8Array | string): ArrayBuffer {
   const bytes = typeof serialNumber === 'string' ? hexDecode(serialNumber.replace(/^0x/i, '')) : serialNumber
   const positive = toPositiveIntegerBytes(bytes)
   if (positive.length === 0 || positive.every((b) => b === 0)) {
-    throw new X509Exception('Serial number must be a positive integer')
+    throw new X509Error('Serial number must be a positive integer')
   }
   if (positive.length > 20) {
-    throw new X509Exception('Serial number must not be longer than 20 octets (RFC 5280 clause 4.1.2.2)')
+    throw new X509Error('Serial number must not be longer than 20 octets (RFC 5280 clause 4.1.2.2)')
   }
   return toArrayBuffer(positive)
 }
@@ -55,7 +55,7 @@ export function assembleSignedStructure(
   if (algorithm.family === 'ecdsa' && signatureEncoding === 'ieee-p1363') {
     const coordinateLength = curveCoordinateLength(prepared.signerPublicKey.namedCurve)
     if (!coordinateLength) {
-      throw new X509Exception('Unable to determine the curve of the signer key for ECDSA encoding')
+      throw new X509Error('Unable to determine the curve of the signer key for ECDSA encoding')
     }
     signatureDer = ecdsaP1363ToDer(signature, coordinateLength)
   }

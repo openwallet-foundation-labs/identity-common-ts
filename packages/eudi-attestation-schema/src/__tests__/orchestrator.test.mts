@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { ES256 } from '@owf/crypto'
 import { describe, expect, it } from 'vitest'
-import { schemaMeta, schemaURI } from '../builders'
+import { schemaMeta, schemaUri } from '../builders'
 import { verifyResolveAndBuildDcql } from '../orchestrator'
 import { signSchemaMeta } from '../signer'
 
@@ -45,13 +45,13 @@ function buildMetaWithIntegrity(integrity?: string) {
     .attestationLoS('iso_18045_basic')
     .bindingType('key')
 
-  const schemaBuilder = schemaURI()
+  const schemaBuilder = schemaUri()
     .format('dc+sd-jwt')
     .uri('https://example.com/pid.json')
     .integrity(schemaIntegrity)
     .meta({ vct: 'eu.example.pid.1' })
 
-  return builder.addSchemaURI(schemaBuilder.build()).build()
+  return builder.addSchemaUri(schemaBuilder.build()).build()
 }
 
 describe('verifyResolveAndBuildDcql', () => {

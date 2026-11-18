@@ -1,3 +1,4 @@
+import type { Jwk } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import { type VerifiedClientAttestationJwt, verifyClientAttestation } from '../client-attestation/client-attestation'
 import type { VerifiedClientAttestationPopJwt } from '../client-attestation/client-attestation-pop'
@@ -5,7 +6,6 @@ import {
   oauthClientAttestationHeader,
   oauthClientAttestationPopHeader,
 } from '../client-attestation/z-client-attestation'
-import type { Jwk } from '../common/jwk/z-jwk'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { type DpopVerificationOptions, verifyDpopJwt } from '../dpop/dpop'
@@ -54,6 +54,12 @@ export interface VerifyAuthorizationRequestClientAttestation {
   clientAttestationPopJwt?: string
 
   /**
+   * The challenge the authorization server issued, which the `challenge` of the client attestation PoP must
+   * equal (draft 09 §6). If not provided the challenge won't be validated.
+   */
+  expectedChallenge?: string
+
+  /**
    * The expected JWK thumbprint of the client instance key (the `cnf` key of the client attestation), for example
    * from an earlier request of the same authorization session. A client attestation is required when this is set.
    */
@@ -61,9 +67,9 @@ export interface VerifyAuthorizationRequestClientAttestation {
 
   /**
    * Allowed skew time in seconds for validity of the client attestation and client attestation pop
-   * jwts. Used for `exp` and `nbf` verification.
+   * jwts. Used for `exp`, `nbf` and `iat` verification.
    *
-   * @default 0
+   * @default 30
    */
   allowedSkewInSeconds?: number
 }
@@ -98,8 +104,20 @@ export interface VerifyAuthorizationRequestOptions {
 
   authorizationRequest: {
     client_id?: string
+    redirect_uri?: string
   }
   request: RequestLike
+
+  /**
+   * The redirect URIs registered for the client. If provided, the `redirect_uri` of the authorization request MUST
+   * exactly match one of them (RFC 9700 §2.1 and §4.1.3), and it can only be left out if a single redirect URI is
+   * registered (RFC 6749 §3.1.2.3).
+   *
+   * The authorization server MUST validate the `redirect_uri` against the registered redirect URIs of the client
+   * before it redirects to it, either with this option or itself. On an error the authorization server MUST NOT
+   * redirect to the `redirect_uri` (RFC 6749 §4.1.2.1).
+   */
+  allowedRedirectUris?: string[]
 
   dpop?: VerifyAuthorizationRequestDpop
   clientAttestation?: VerifyAuthorizationRequestClientAttestation
@@ -109,13 +127,17 @@ export interface VerifyAuthorizationRequestOptions {
    */
   now?: Date
 
-  callbacks: Pick<CallbackContext, 'hash' | 'verifyJwt'>
+  callbacks: Pick<CallbackContext, 'hash' | 'verifyJws'>
 }
 
 // TODO: verify the request against the metadata
 export async function verifyAuthorizationRequest(
   options: VerifyAuthorizationRequestOptions
 ): Promise<VerifyAuthorizationRequestReturn> {
+  if (options.allowedRedirectUris) {
+    verifyAuthorizationRequestRedirectUri(options.authorizationRequest.redirect_uri, options.allowedRedirectUris)
+  }
+
   const dpopResult = options.dpop
     ? await verifyAuthorizationRequestDpop(options.dpop, options.request, options.callbacks, options.now)
     : undefined
@@ -142,10 +164,29 @@ export async function verifyAuthorizationRequest(
   }
 }
 
+function verifyAuthorizationRequestRedirectUri(redirectUri: string | undefined, allowedRedirectUris: string[]) {
+  if (redirectUri === undefined) {
+    if (allowedRedirectUris.length === 1) return
+
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequest,
+      error_description: `Missing required 'redirect_uri' in authorization request`,
+    })
+  }
+
+  // RFC 9700 §4.1.3: simple string comparison (RFC 3986 §6.2.1), no pattern or prefix matching
+  if (!allowedRedirectUris.includes(redirectUri)) {
+    throw new Oauth2ServerErrorResponseError({
+      error: Oauth2ErrorCodes.InvalidRequest,
+      error_description: `The 'redirect_uri' is not registered for the client`,
+    })
+  }
+}
+
 async function verifyAuthorizationRequestClientAttestation(
   options: VerifyAuthorizationRequestClientAttestation,
   authorizationServerMetadata: AuthorizationServerMetadata,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   dpopJwkThumbprint?: string,
   now?: Date,
   requestClientId?: string
@@ -174,6 +215,7 @@ async function verifyAuthorizationRequestClientAttestation(
     // Ensure the client id matches with the client id provided in the authorization request
     expectedClientId: requestClientId,
     expectedConfirmationJwkThumbprint: options.expectedConfirmationJwkThumbprint,
+    expectedChallenge: options.expectedChallenge,
     now,
     allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
@@ -199,7 +241,7 @@ async function verifyAuthorizationRequestClientAttestation(
 async function verifyAuthorizationRequestDpop(
   options: VerifyAuthorizationRequestDpop,
   request: RequestLike,
-  callbacks: Pick<CallbackContext, 'verifyJwt' | 'hash'>,
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash'>,
   now?: Date
 ) {
   if (options.required && !options.jwt && !options.jwkThumbprint) {
@@ -215,6 +257,7 @@ async function verifyAuthorizationRequestDpop(
         dpopJwt: options.jwt,
         request,
         allowedSigningAlgs: options.allowedSigningAlgs,
+        expectedNonce: options.expectedNonce,
         maxProofAgeSeconds: options.maxProofAgeSeconds,
         allowedSkewInSeconds: options.allowedSkewInSeconds,
         assertJtiUniqueness: options.assertJtiUniqueness,

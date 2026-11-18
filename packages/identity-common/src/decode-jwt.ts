@@ -1,5 +1,5 @@
 import { base64urlDecodeJson } from './base64url'
-import { IdentityCommonException } from './identity-common-exception'
+import { IdentityCommonError } from './identity-common-error'
 
 /**
  * Decode a JWT in compact JWS serialization without verifying the signature.
@@ -12,7 +12,7 @@ export const decodeJwt = <H extends Record<string, unknown>, T extends Record<st
 ): { header: H; payload: T; signature: string } => {
   const { 0: header, 1: payload, 2: signature, length } = jwt.split('.')
   if (length !== 3) {
-    throw new IdentityCommonException('Invalid JWT as input')
+    throw new IdentityCommonError('Invalid JWT as input')
   }
 
   try {
@@ -22,6 +22,6 @@ export const decodeJwt = <H extends Record<string, unknown>, T extends Record<st
       signature: signature,
     }
   } catch {
-    throw new IdentityCommonException('Invalid JWT as input')
+    throw new IdentityCommonError('Invalid JWT as input')
   }
 }

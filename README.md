@@ -57,7 +57,7 @@ Generic, reusable utilities that can be used across any identity solution:
 | [`@owf/identity-common`](./packages/identity-common) | Base types, base64url utilities, and JWT decoding | ✅ Available |
 | [`@owf/crypto`](./packages/crypto) | Web Crypto API wrappers + SHA hash functions (`@noble/hashes`) | ✅ Available |
 | [`@owf/token-status-list`](./packages/token-status-list) | Status list bitstring handling, JWT and CWT/CBOR transport | ✅ Available |
-| `@owf/jose` | JOSE/JWT implementation with common validation methods | 📋 Planned |
+| [`@owf/jose`](./packages/jose) | JOSE (JWK, JWA, JWS, JWT and JWE) with strict, schema based parsing and verification | ✅ Available |
 | `@owf/cose` | COSE/CWT implementation with common validation methods | 📋 Planned |
 | [`@owf/x509`](./packages/x509) | X.509 certificate and CRL parsing, creation, verification and revocation checking | ✅ Available |
 | [`@owf/openid-federation`](./packages/openid-federation) | OpenID Federation 1.0 entity statements, trust chain resolution and metadata policies | ✅ Available |
@@ -128,6 +128,18 @@ npm install @owf/identity-common
 ```
 
 📖 [View package documentation](./packages/identity-common/README.md)
+
+### @owf/jose
+
+[![@owf/jose version](https://img.shields.io/npm/v/@owf/jose)](https://npmjs.com/package/@owf/jose)
+
+JOSE (JWK, JWA, JWS, JWT and JWE) with strict, schema based parsing and verification. A token type is expressed as a zod schema, and signing and verification go through callbacks that sign and verify the exact bytes the library computed.
+
+```bash
+npm install @owf/jose
+```
+
+📖 [View package documentation](./packages/jose/README.md)
 
 ### @owf/crypto
 

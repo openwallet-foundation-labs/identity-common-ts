@@ -1,12 +1,15 @@
 import 'reflect-metadata'
 import { base64, base64url, stringToBytes } from '@owf/identity-common'
-import { type BitsPerStatus, MediaTypes, StatusList, StatusListCwt, StatusType } from '@owf/token-status-list'
+import { type BitsPerStatus, StatusList, StatusListCwt, StatusListMediaTypes, StatusType } from '@owf/token-status-list'
 import { X509Certificate } from '@peculiar/x509'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, expect, suite, test } from 'vitest'
 import {
   CoseKey,
+  IdentifierList,
+  IdentifierListCwt,
+  MdocMediaTypes as IdentifierListMediaTypes,
   InvalidRevocationListError,
   InvalidSignatureError,
   ProtectedHeaders,
@@ -17,6 +20,7 @@ import {
   UnableToExtractX5ChainFromJwtError,
   UnprotectedHeaders,
   UnprotectedX5ChainNotBoundError,
+  verifyIdentifierListToken,
   verifyStatusListToken,
 } from '../..'
 import { INVALID_CERTIFICATE, ISSUER_CERTIFICATE, ISSUER_PRIVATE_KEY_JWK } from '../config'
@@ -80,7 +84,10 @@ suite('verifyStatusListToken with an x5chain in the unprotected header', () => {
     server.use(
       http.get(
         uri,
-        () => new HttpResponse(new Uint8Array(token), { headers: { 'Content-Type': MediaTypes.StatusListCwt } })
+        () =>
+          new HttpResponse(new Uint8Array(token), {
+            headers: { 'Content-Type': StatusListMediaTypes.StatusListCwt },
+          })
       )
     )
 
@@ -135,7 +142,12 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
   const idx = 3
 
   const verify = async (
-    { status, expirationTime = new Date(Date.now() + 3_600_000) }: { status: StatusType; expirationTime?: Date },
+    {
+      status,
+      expirationTime = new Date(Date.now() + 3_600_000),
+      maxDecompressedBytes,
+      maxResponseBytes,
+    }: { status: StatusType; expirationTime?: Date; maxDecompressedBytes?: number; maxResponseBytes?: number },
     statusListInfo = { uri, idx }
   ) => {
     const statusListCwt = new StatusListCwt({
@@ -154,10 +166,13 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
     )
     const fetch = (async () =>
       new Response(new Uint8Array(token), {
-        headers: { 'Content-Type': MediaTypes.StatusListCwt },
+        headers: { 'Content-Type': StatusListMediaTypes.StatusListCwt },
       })) as typeof globalThis.fetch
 
-    return verifyStatusListToken({ statusListInfo, trustedCertificates: [certificate] }, { ...mdocContext, fetch })
+    return verifyStatusListToken(
+      { statusListInfo, trustedCertificates: [certificate], maxDecompressedBytes },
+      { ...mdocContext, fetch, fetchLimits: { maxResponseBytesByType: { statusList: maxResponseBytes } } }
+    )
   }
 
   test('Verify a status list with a revoked entry', async () => {
@@ -183,13 +198,31 @@ suite('verifyStatusListToken with an entry that is not Valid', () => {
     await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
   })
 
-  // Unchanged for now: `StatusList.getStatus` throws a plain `Error` for an index outside the list,
-  // which is not mapped to `InvalidRevocationListError`.
+  // Token Status List § 8.3 step 6: an index outside the list rejects the token, without a status
   test('Verify a status list with an index outside the list', async () => {
     const verification = verify({ status: StatusType.Valid }, { uri, idx: 1000 })
 
+    await expect(verification).rejects.toThrow(InvalidRevocationListError)
     await expect(verification).rejects.toThrow('Index out of bounds')
-    await expect(verification).rejects.not.toThrow(InvalidRevocationListError)
+    await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
+  })
+
+  // Ten statuses of 2 bits inflate to 3 bytes. A list that inflates to more than the maximum is not read.
+  test('Verify a status list larger than maxDecompressedBytes', async () => {
+    const verification = verify({ status: StatusType.Invalid, maxDecompressedBytes: 2 })
+
+    await expect(verification).rejects.toThrow(InvalidRevocationListError)
+    await expect(verification).rejects.toThrow('The status list is larger than the maximum of 2 bytes')
+    await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
+    await expect(verify({ status: StatusType.Valid, maxDecompressedBytes: 3 })).resolves.toBeDefined()
+  })
+
+  // The signed CWT, with its certificate, is far larger than 100 bytes
+  test('Verify a status list served in a response larger than its limit', async () => {
+    const verification = verify({ status: StatusType.Invalid, maxResponseBytes: 100 })
+
+    await expect(verification).rejects.toThrow('The response is larger than the maximum of 100 bytes')
+    await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
   })
 })
 
@@ -259,7 +292,7 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
         uri,
         () =>
           new HttpResponse(`${signingInput}.${encodedSignature ?? base64url.encode(signature)}`, {
-            headers: { 'Content-Type': MediaTypes.StatusListJwt },
+            headers: { 'Content-Type': StatusListMediaTypes.StatusListJwt },
           })
       )
     )
@@ -267,12 +300,16 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
     return uri
   }
 
-  const verify = (uri: string, options: { trustedCertificates?: Uint8Array[]; disable?: boolean } = {}) =>
+  const verify = (
+    uri: string,
+    options: { trustedCertificates?: Uint8Array[]; disable?: boolean; maxDecompressedBytes?: number } = {}
+  ) =>
     verifyStatusListToken(
       {
         statusListInfo: { uri, idx },
         trustedCertificates: options.disable ? undefined : (options.trustedCertificates ?? [certificate]),
         disableCertificateChainValidation: options.disable,
+        maxDecompressedBytes: options.maxDecompressedBytes,
       },
       mdocContext
     )
@@ -283,6 +320,17 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
     expect(statusListJwt?.statusList.getStatus(idx)).toBe(StatusType.Valid)
     expect(statusListCwt).toBeUndefined()
     expect(chain?.[0]).toEqual(certificate)
+  })
+
+  // Ten statuses of 1 bit inflate to 2 bytes
+  test('Verify a JWT status list larger than maxDecompressedBytes', async () => {
+    const uri = await mockStatusList('/too-large', { status: StatusType.Invalid })
+
+    const verification = verify(uri, { maxDecompressedBytes: 1 })
+
+    await expect(verification).rejects.toThrow(InvalidRevocationListError)
+    await expect(verification).rejects.toThrow('The status list is larger than the maximum of 1 bytes')
+    await expect(verification).rejects.not.toThrow(StatusListEntryNotValidError)
   })
 
   test('Verify a JWT status list without certificate chain validation', async () => {
@@ -351,12 +399,8 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
       error: InvalidRevocationListError,
     },
     { name: 'no x5c', options: { header: { x5c: undefined } }, error: UnableToExtractX5ChainFromJwtError },
-    { name: 'an empty x5c', options: { header: { x5c: [] } }, error: UnableToExtractX5ChainFromJwtError },
-    {
-      name: 'an x5c that is not base64',
-      options: { header: { x5c: ['!!!'] } },
-      error: UnableToExtractX5ChainFromJwtError,
-    },
+    { name: 'an empty x5c', options: { header: { x5c: [] } }, error: InvalidRevocationListError },
+    { name: 'an x5c that is not base64', options: { header: { x5c: ['!!!'] } }, error: InvalidRevocationListError },
   ])('Verify a JWT status list with $name', async ({ name, options, error }) => {
     const uri = await mockStatusList(`/broken-${name.replace(/ /g, '-')}`, { ...options, status: StatusType.Invalid })
     const verification = verify(uri)
@@ -399,16 +443,110 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
     server.use(
       http.get(uri, ({ request }) => {
         accept = request.headers.get('Accept')
-        return accept?.startsWith(MediaTypes.StatusListCwt)
-          ? new HttpResponse(new Uint8Array(cwt), { headers: { 'Content-Type': MediaTypes.StatusListCwt } })
-          : new HttpResponse('not.a.jwt', { headers: { 'Content-Type': MediaTypes.StatusListJwt } })
+        return accept?.startsWith(StatusListMediaTypes.StatusListCwt)
+          ? new HttpResponse(new Uint8Array(cwt), { headers: { 'Content-Type': StatusListMediaTypes.StatusListCwt } })
+          : new HttpResponse('not.a.jwt', { headers: { 'Content-Type': StatusListMediaTypes.StatusListJwt } })
       })
     )
 
     const result = await verify(uri)
 
-    expect(accept).toBe(`${MediaTypes.StatusListCwt}, ${MediaTypes.StatusListJwt};q=0.9`)
+    expect(accept).toBe(`${StatusListMediaTypes.StatusListCwt}, ${StatusListMediaTypes.StatusListJwt};q=0.9`)
     expect(result.statusListCwt).toBeDefined()
     expect(result.statusListJwt).toBeUndefined()
+  })
+})
+
+// The response is rejected before its body is read whole, whatever it carries
+suite('verifyIdentifierListToken with a response larger than its limit', () => {
+  test('Verify an identifier list served in a response larger than its limit', async () => {
+    const fetch = (async () =>
+      new Response(new Uint8Array(1024), {
+        headers: { 'Content-Type': IdentifierListMediaTypes.IdentifierListCwt },
+      })) as typeof globalThis.fetch
+
+    const verification = verifyIdentifierListToken(
+      {
+        identifierListInfo: { uri: 'https://example.org/identifier-list/too-large', id: new Uint8Array([0x01]) },
+        trustedCertificates: [certificate],
+      },
+      { ...mdocContext, fetch, fetchLimits: { maxResponseBytesByType: { identifierList: 100 } } }
+    )
+
+    await expect(verification).rejects.toThrow(InvalidRevocationListError)
+    await expect(verification).rejects.toThrow('The response is larger than the maximum of 100 bytes')
+  })
+})
+
+// RFC 9864 § 2.1: ESP256 (-9) is ECDSA with P-256 and SHA-256, the fully-specified form of ES256.
+// The Multipaz test issuer signs its identifier list with it.
+suite('revocation lists signed with ESP256', () => {
+  const server = setupServer()
+  beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+  afterEach(() => server.resetHandlers())
+  afterAll(() => server.close())
+
+  const signingKey = CoseKey.fromJwk(ISSUER_PRIVATE_KEY_JWK)
+  const algorithm = SignatureAlgorithm.ESP256
+  const expirationTime = new Date(Date.now() + 3_600_000)
+
+  const serve = (uri: string, token: Uint8Array, contentType: string) =>
+    server.use(
+      http.get(uri, () => new HttpResponse(new Uint8Array(token), { headers: { 'Content-Type': contentType } }))
+    )
+
+  test('Verify an identifier list CWT signed with ESP256', async () => {
+    const uri = 'https://example.org/identifier-list/esp256'
+    const identifierListCwt = new IdentifierListCwt({
+      payload: {
+        identifierList: IdentifierList.create({ identifiers: [new Uint8Array([0x01])] }),
+        uri,
+        expirationTime,
+      },
+      protectedHeaders: new Map<number, unknown>([
+        [RegisteredCwtHeaderClaimKey.Algorithm, algorithm],
+        [RegisteredCwtHeaderClaimKey.X5Chain, [certificate]],
+      ]),
+    })
+    serve(
+      uri,
+      await identifierListCwt.signAndEncode({ signingKey, algorithm }, { sign: mdocContext.cose.sign1.sign }),
+      IdentifierListMediaTypes.IdentifierListCwt
+    )
+
+    const { identifierListCwt: verified, chain } = await verifyIdentifierListToken(
+      { identifierListInfo: { uri, id: new Uint8Array([0xab, 0xcd]) }, trustedCertificates: [certificate] },
+      mdocContext
+    )
+
+    expect(verified.algorithm).toBe(SignatureAlgorithm.ESP256)
+    expect(chain?.[0]).toEqual(certificate)
+  })
+
+  test('Verify a status list CWT signed with ESP256', async () => {
+    const uri = 'https://example.org/status-list/esp256'
+    const idx = 3
+    const statusListCwt = new StatusListCwt({
+      payload: { statusList: new StatusList(new Array(10).fill(StatusType.Valid), 2), subject: uri, expirationTime },
+      protectedHeaders: ProtectedHeaders.create({
+        protectedHeaders: new Map<number, unknown>([
+          [RegisteredCwtHeaderClaimKey.Algorithm, algorithm],
+          [RegisteredCwtHeaderClaimKey.X5Chain, [certificate]],
+        ]),
+      }),
+    })
+    serve(
+      uri,
+      await statusListCwt.signAndEncode({ signingKey, algorithm }, { sign: mdocContext.cose.sign1.sign }),
+      StatusListMediaTypes.StatusListCwt
+    )
+
+    const { statusListCwt: verified } = await verifyStatusListToken(
+      { statusListInfo: { uri, idx }, trustedCertificates: [certificate] },
+      mdocContext
+    )
+
+    expect(verified?.algorithm).toBe(SignatureAlgorithm.ESP256)
+    expect(verified?.payload.statusList.getStatus(idx)).toBe(StatusType.Valid)
   })
 })

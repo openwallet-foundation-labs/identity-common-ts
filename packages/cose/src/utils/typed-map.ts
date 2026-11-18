@@ -1,3 +1,4 @@
+import { addValidationIssue, zodErrorMap } from '@owf/identity-common'
 import { z } from 'zod'
 import type zCore from 'zod/v4/core'
 
@@ -299,28 +300,28 @@ export function typedMap<const Entries extends EntriesBase>(
       // Check there's no additional keys in the map if not allowed
       const additionalKeys = Array.from(map.keys()).filter((key) => !schemaMap.has(key as string | number))
       if (additionalKeys.length > 0 && !allowAdditionalKeys) {
-        for (const additionalKey of additionalKeys) {
-          if (typeof additionalKey !== 'string' && typeof additionalKey !== 'number') {
-            ctx.addIssue({
-              code: 'invalid_key',
-              origin: 'map',
-              continue: true,
-              path: [],
-              input: map,
-              issues: [],
-              message: 'Key found in map that is not a string or number',
-            })
-          } else {
-            ctx.addIssue({
-              code: 'invalid_key',
-              origin: 'map',
-              continue: true,
-              path: [additionalKey],
-              input: map,
-              issues: [],
-              message: `Unexpected key '${labelFor(additionalKey)}' found in map, additional keys are not allowed.`,
-            })
-          }
+        if (additionalKeys.some((key) => typeof key !== 'string' && typeof key !== 'number')) {
+          ctx.addIssue({
+            code: 'invalid_key',
+            origin: 'map',
+            continue: true,
+            path: [],
+            input: map,
+            issues: [],
+            message: 'Key found in map that is not a string or number',
+          })
+        }
+        // One issue for all of them, at the map, as zod reports the unrecognized keys of an object
+        const keys = additionalKeys.filter((key) => typeof key === 'string' || typeof key === 'number')
+        if (keys.length > 0) {
+          ctx.addIssue({
+            code: 'unrecognized_keys',
+            continue: true,
+            path: [],
+            input: map,
+            keys,
+            message: `Unexpected ${keys.length === 1 ? 'key' : 'keys'} ${keys.map((key) => `'${labelFor(key)}'`).join(', ')} found in map, additional keys are not allowed.`,
+          } as unknown as zCore.$ZodSuperRefineIssue)
         }
       }
 
@@ -329,14 +330,14 @@ export function typedMap<const Entries extends EntriesBase>(
         const value = map.get(key)
 
         if (!hasKey && requiredKeys.includes(key)) {
-          ctx.addIssue({
-            code: 'invalid_value',
-            continue: true,
+          // What the value schema expects, as zod reports it for an absent value
+          const absent = valueSchema.safeParse(undefined).error?.issues[0]
+          addValidationIssue(ctx, {
+            code: 'missing_value',
             message: `Expected key '${labelFor(key)}' to be defined.`,
-            // NOTE: stringified for the same reason as the value issues below
-            path: [`${key}`],
-            values: [],
-            input: value,
+            path: [key],
+            pathLabels: [labelFor(key)],
+            context: { expected: absent?.code === 'invalid_type' ? absent.expected : 'value' },
           })
           continue
         }
@@ -346,15 +347,16 @@ export function typedMap<const Entries extends EntriesBase>(
           continue
         }
 
-        const parseResult = valueSchema.safeParse(value)
+        // The options of the parse of the map itself, which a nested parse does not get
+        const parseResult = valueSchema.safeParse(value, { reportInput: true, error: zodErrorMap })
         if (!parseResult.success) {
           for (const issue of parseResult.error.issues) {
+            // The labels of a nested typed map cover the end of its path, see `pathLabels`
+            const labels = (issue as { pathLabels?: PropertyKey[] }).pathLabels ?? []
             ctx.addIssue({
               ...issue,
-              // NOTE: if we use numbers, zod-validation-error will use "index", thinking
-              // it's an array, that's confusing. The value schema owns the message, so the
-              // key's name has to travel on the path.
-              path: [labelFor(key), ...issue.path],
+              path: [key, ...issue.path],
+              pathLabels: [labelFor(key), ...issue.path.slice(0, issue.path.length - labels.length), ...labels],
             } as zCore.$ZodSuperRefineIssue)
           }
         }

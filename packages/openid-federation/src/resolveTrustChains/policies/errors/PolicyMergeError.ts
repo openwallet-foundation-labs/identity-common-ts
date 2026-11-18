@@ -1,3 +1,4 @@
+import { IdentityError } from '@owf/identity-common'
 import type { MetadataPolicyOperator } from '../../../metadata'
 
 export type PolicyOperatorMergeErrorDetails = {
@@ -6,12 +7,11 @@ export type PolicyOperatorMergeErrorDetails = {
   operatorB: MetadataPolicyOperator
 }
 
-export class PolicyOperatorMergeError extends Error {
+export class PolicyOperatorMergeError extends IdentityError {
   public readonly details: PolicyOperatorMergeErrorDetails
 
   constructor(message: string, details: PolicyOperatorMergeErrorDetails) {
     super(message)
-    this.name = 'PolicyOperatorMergeError'
     this.details = details
   }
 }

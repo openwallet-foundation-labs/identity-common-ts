@@ -6,6 +6,7 @@ import {
   DeviceResponse,
   type DeviceResponseVerificationResult,
   type SessionTranscript,
+  type StatusVerificationOptions,
 } from './mdoc/index.js'
 import {
   type DeviceRequestMatchOptions,
@@ -23,13 +24,13 @@ export class Verifier {
       sessionTranscript: SessionTranscript | Uint8Array
       ephemeralReaderKey?: CoseKey
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       trustedCertificates: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       now?: Date
       onCheck?: VerificationCallback
       skewSeconds?: number
+      status?: StatusVerificationOptions
     },
-    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch'>
+    ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch' | 'fetchLimits'>
   ): Promise<DeviceResponseVerificationResult> {
     const deviceResponse =
       options.deviceResponse instanceof DeviceResponse

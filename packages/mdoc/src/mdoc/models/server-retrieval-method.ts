@@ -3,13 +3,13 @@ import { z } from 'zod'
 import { Oidc, type OidcEncodedStructure } from './oidc'
 import { WebApi, type WebApiEncodedStructure } from './web-api'
 
-const serverRetrievalMethodSchema = typedMap([
+const zServerRetrievalMethod = typedMap([
   ['webApi', z.instanceof(WebApi).exactOptional()],
   ['oidc', z.instanceof(Oidc).exactOptional()],
 ] as const)
 
-export type ServerRetrievalMethodDecodedStructure = z.output<typeof serverRetrievalMethodSchema>
-export type ServerRetrievalMethodEncodedStructure = z.input<typeof serverRetrievalMethodSchema>
+export type ServerRetrievalMethodDecodedStructure = z.output<typeof zServerRetrievalMethod>
+export type ServerRetrievalMethodEncodedStructure = z.input<typeof zServerRetrievalMethod>
 
 export type ServerRetrievalMethodOptions = {
   webApi?: WebApi
@@ -21,7 +21,7 @@ export class ServerRetrievalMethod extends CborStructure<
   ServerRetrievalMethodDecodedStructure
 > {
   public static override get encodingSchema() {
-    return z.codec(serverRetrievalMethodSchema.in, serverRetrievalMethodSchema.out, {
+    return z.codec(zServerRetrievalMethod.in, zServerRetrievalMethod.out, {
       decode: (input) => {
         const map: ServerRetrievalMethodDecodedStructure = TypedMap.fromMap(input)
 

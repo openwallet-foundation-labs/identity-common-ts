@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { validate } from '../utils/validate'
-import { jsonWebKeySetSchema } from './jsonWebKeySet'
+import { zJsonWebKeySet } from './jsonWebKeySet'
 
 export const getUsedJsonWebKey = (header: Record<string, unknown>, claims: Record<string, unknown>) => {
   const validatedHeader = validate({
@@ -13,7 +13,7 @@ export const getUsedJsonWebKey = (header: Record<string, unknown>, claims: Recor
     errorMessage: 'invalid header claims. Should contain a key id',
   })
   const validatedClaims = validate({
-    schema: z.object({ jwks: jsonWebKeySetSchema }).loose(),
+    schema: z.object({ jwks: zJsonWebKeySet }).loose(),
     data: claims,
     errorMessage: 'Invalid payload claims. Should contain a json web key set',
   })

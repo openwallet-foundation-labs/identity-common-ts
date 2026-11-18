@@ -1,9 +1,9 @@
 import { base64url, type Hasher, type Signer } from '@owf/identity-common'
-import type { KBJwt } from '@sd-jwt/core'
+import type { KbJwt } from '@sd-jwt/core'
 import { type CreateResponseClaimsOptions, createResponseClaims } from './responseClaims'
 
 export type CreateKbJwtOptions = CreateResponseClaimsOptions & {
-  kbJwt: KBJwt
+  kbJwt: KbJwt
 }
 
 export const createKbJwt = async (
@@ -33,7 +33,7 @@ export const createKbJwt = async (
   }
 
   // type casting is required here as `setPayload` is defined on `Jwt` which explicitly returns `Jwt` with `setPayload`
-  const combinedKbJwt = options.kbJwt.setPayload(kbJwtClaims) as unknown as KBJwt
+  const combinedKbJwt = options.kbJwt.setPayload(kbJwtClaims) as unknown as KbJwt
 
   if (ctx.signer) {
     return await combinedKbJwt.sign(ctx.signer)

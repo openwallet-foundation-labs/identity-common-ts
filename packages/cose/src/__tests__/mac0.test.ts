@@ -6,12 +6,12 @@ import {
   cborEncode,
   Mac0,
   type Mac0EncodedStructure,
-  mac0DecodedSchema,
-  mac0EncodedSchema,
   ProtectedHeaders,
   type ProtectedHeadersEncodedStructure,
   UnprotectedHeaders,
   type UnprotectedHeadersStructure,
+  zMac0Decoded,
+  zMac0Encoded,
   zUint8Array,
 } from '../../src'
 
@@ -28,13 +28,13 @@ describe('mac0', () => {
   })
 
   test('subclass decode respects subclass encodingSchema and returns subclass instance', () => {
-    const customMac0DecodedSchema = mac0DecodedSchema.extend({
+    const zCustomMac0Decoded = zMac0Decoded.extend({
       payload: zUint8Array.nullable().refine((p) => p !== null && p.length >= 5, { message: 'Payload too short' }),
     })
 
     class CustomMac0 extends Mac0 {
       public static override get encodingSchema() {
-        return z.codec(mac0EncodedSchema, customMac0DecodedSchema, {
+        return z.codec(zMac0Encoded, zCustomMac0Decoded, {
           encode: ({ protectedHeaders, unprotectedHeaders, payload, tag }) =>
             [
               protectedHeaders.encodedStructure,

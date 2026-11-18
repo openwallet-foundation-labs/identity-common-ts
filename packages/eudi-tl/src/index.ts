@@ -10,7 +10,7 @@ export {
   ACTIVE_SERVICE_STATUSES,
   ServiceStatus,
   ServiceType,
-  TSLType,
+  TslType,
 } from './constants'
 export {
   getEuLotlTrustAnchors,
@@ -32,30 +32,33 @@ export {
 } from './parse'
 export { TrustedListProfiles } from './profiles'
 export {
-  TrustedListException,
-  TrustedListParseException,
-  TrustedListSignatureException,
-} from './trusted-list-exception'
+  TrustedListError,
+  TrustedListParseError,
+  TrustedListSignatureError,
+  TrustedListValidationError,
+} from './trusted-list-error'
 export {
   type DigitalIdentity,
-  DigitalIdentitySchema,
   type ServiceHistoryInstance,
-  ServiceHistoryInstanceSchema,
   type TrustAnchor,
-  TrustAnchorSchema,
   type TrustedList,
   type TrustedListPointer,
-  TrustedListPointerSchema,
-  TrustedListSchema,
   type TrustedListService,
-  TrustedListServiceSchema,
   type TrustServiceProvider,
-  TrustServiceProviderSchema,
+  zDigitalIdentity,
+  zServiceHistoryInstance,
+  zTrustAnchor,
+  zTrustedList,
+  zTrustedListPointer,
+  zTrustedListService,
+  zTrustServiceProvider,
 } from './types'
 export {
   assertValidTrustedList,
   type ProfileRule,
-  type ValidationError,
+  TRUSTED_LIST_VALIDATION_CODES,
+  type TrustedListValidationCode,
+  type TrustedListValidationIssue,
   type ValidationResult,
   validateTrustedList,
   validateTrustedListProfile,
@@ -68,18 +71,25 @@ export {
 } from './verify'
 
 import { type ParseTrustedListOptions, parseTrustedList } from './parse'
+import { TrustedListSignatureError } from './trusted-list-error'
 import type { TrustedList } from './types'
 import { type VerifyTrustedListOptions, verifyTrustedListSignature } from './verify'
 
 /**
- * Verify the trusted list signature and, only if it is valid, parse it. This is
- * the safe entry point: it never returns a {@link TrustedList} whose
- * authenticity has not been established.
+ * Verify the trusted list signature against the `trustAnchors` and, only if it
+ * is valid, parse it. This is the safe entry point: it never returns a
+ * {@link TrustedList} whose authenticity has not been established.
+ *
+ * @throws TrustedListSignatureError when `trustAnchors` is missing or empty, or the signature is not valid.
  */
 export async function loadTrustedList(
   xml: string,
-  options: VerifyTrustedListOptions & ParseTrustedListOptions = {}
+  options: Required<VerifyTrustedListOptions> & ParseTrustedListOptions
 ): Promise<TrustedList> {
+  // Without them, the signature check would only establish the integrity of the list
+  if (!options?.trustAnchors) {
+    throw new TrustedListSignatureError('loadTrustedList needs the trustAnchors of the scheme operator')
+  }
   await verifyTrustedListSignature(xml, options)
   return parseTrustedList(xml, options)
 }

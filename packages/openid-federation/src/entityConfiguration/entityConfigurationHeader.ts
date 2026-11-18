@@ -5,13 +5,13 @@ import { z } from 'zod'
  * @todo define exact scheme
  *
  */
-export const entityConfigurationHeaderSchema = z
+export const zEntityConfigurationHeader = z
   .object({
     kid: z.string(),
     typ: z.literal('entity-statement+jwt'),
   })
   .loose()
 
-export type EntityConfigurationHeaderOptions = z.input<typeof entityConfigurationHeaderSchema>
+export type EntityConfigurationHeaderOptions = z.input<typeof zEntityConfigurationHeader>
 
-export type EntityConfigurationHeader = z.output<typeof entityConfigurationHeaderSchema>
+export type EntityConfigurationHeader = z.output<typeof zEntityConfigurationHeader>

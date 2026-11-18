@@ -1,4 +1,4 @@
-import { dateToSeconds, secondsToDate } from '@owf/identity-common'
+import { dateToSeconds, secondsToDate, ValidationIssues } from '@owf/identity-common'
 import z from 'zod'
 import { CborStructure } from '../../cbor/cbor-structure.js'
 import {
@@ -45,7 +45,7 @@ export const cwtPayloadClaimEntries = [
  * Schema for a CWT Claims Set carrying only the registered claims. Additional (application or
  * private use) claims are allowed through untyped.
  */
-export const cwtPayloadSchema = typedMap(cwtPayloadClaimEntries, {
+export const zCwtPayload = typedMap(cwtPayloadClaimEntries, {
   allowAdditionalKeys: true,
   keyLabels: RegisteredCwtClaimKey,
 })
@@ -65,7 +65,7 @@ export type ExtendedCwtPayloadClaimEntries<Entries extends EntriesBase> = Extend
  *
  * @example
  * ```ts
- * const statusListCwtPayloadSchema = extendCwtPayloadClaims(
+ * const zStatusListCwtPayload = extendCwtPayloadClaims(
  *   [
  *     // `sub` is optional in the registered claims, but required for a status list
  *     [RegisteredCwtClaimKey.Subject, z.string()],
@@ -93,8 +93,8 @@ export function extendCwtPayloadClaims<const Entries extends EntriesBase>(
   })
 }
 
-export type CwtPayloadEncodedStructure = z.input<typeof cwtPayloadSchema>
-export type CwtPayloadDecodedStructure = z.output<typeof cwtPayloadSchema>
+export type CwtPayloadEncodedStructure = z.input<typeof zCwtPayload>
+export type CwtPayloadDecodedStructure = z.output<typeof zCwtPayload>
 
 export type CreateCwtPayloadOptions = {
   issuer?: string
@@ -167,15 +167,20 @@ export type VerifyCwtClaimsOptions = {
    */
   requiredClaims?: ReadonlyArray<RegisteredCwtClaimKey | number | string>
 
-  /** The value(s) `iss` (1) is accepted with. Not checked when the token carries no `iss`. */
+  /**
+   * The value(s) `iss` (1) is accepted with.
+   *
+   * A token that does not carry the claim at all is rejected too: a claim that is absent does not
+   * hold the value the caller said it expects.
+   */
   expectedIssuer?: string | string[]
 
-  /** The value(s) `sub` (2) is accepted with. Not checked when the token carries no `sub`. */
+  /** The value(s) `sub` (2) is accepted with. See {@link expectedIssuer} for an absent claim. */
   expectedSubject?: string | string[]
 
   /**
    * The value(s) `aud` (3) is accepted with. The token is accepted when any of its audiences is
-   * one of these. Not checked when the token carries no `aud`.
+   * one of these. See {@link expectedIssuer} for an absent claim.
    */
   expectedAudience?: string | string[]
 
@@ -263,7 +268,7 @@ export class CwtPayload<Structure extends AnyTypedMap = CwtPayloadDecodedStructu
   // NOTE: widened to `z.ZodType` so a subtype can override it with its own (structurally unrelated)
   // claims schema without breaking static-side assignability.
   public static override get encodingSchema(): z.ZodType {
-    return cwtPayloadSchema
+    return zCwtPayload
   }
 
   /**
@@ -359,34 +364,44 @@ export class CwtPayload<Structure extends AnyTypedMap = CwtPayloadDecodedStructu
     keyLabels,
   }: VerifyCwtClaimsOptions = {}): void {
     const skewMs = skewSeconds * 1000
+    const issues: ClaimIssues = new ValidationIssues()
+    const at = (key: number | string) => ({
+      path: [key],
+      pathLabels: [keyLabel(key, { ...RegisteredCwtClaimKey, ...keyLabels })],
+    })
 
     // Presence is checked against the claims map rather than against the accessors, so that a claim
     // this CWT type adds — which has no accessor here — can be required too.
     for (const key of requiredClaims ?? []) {
       if (!this.structure.has(key)) {
-        throw new CwtClaimVerificationError(`The token has no ${claimLabel(key, keyLabels)} claim, which is required`)
+        addClaimMissing(issues, at, key, `The token has no ${claimLabel(key, keyLabels)} claim, which is required`)
       }
     }
 
-    verifyClaimMatches(RegisteredCwtClaimKey.Issuer, this.issuer, expectedIssuer, keyLabels)
-    verifyClaimMatches(RegisteredCwtClaimKey.Subject, this.subject, expectedSubject, keyLabels)
-    verifyAudienceMatches(this.audience, expectedAudience, keyLabels)
+    verifyClaimMatches(issues, at, RegisteredCwtClaimKey.Issuer, this.issuer, expectedIssuer, keyLabels)
+    verifyClaimMatches(issues, at, RegisteredCwtClaimKey.Subject, this.subject, expectedSubject, keyLabels)
+    verifyAudienceMatches(issues, at, this.audience, expectedAudience, keyLabels)
 
     // `exp` is the first instant the token is no longer valid, so it is an upper bound shifted
     // forward by the skew: a token that expired within the tolerance is still accepted.
     const expirationTime: Date | undefined = this.expirationTime
     if (expirationTime !== undefined && checkExpirationTime && new Date(expirationTime.getTime() + skewMs) <= now) {
-      throw new CwtClaimVerificationError(
-        `The ${claimLabel(RegisteredCwtClaimKey.ExpirationTime, keyLabels)} claim '${expirationTime.toISOString()}' is in the past (compared to '${now.toISOString()}'), and therefore not valid`
-      )
+      issues.add({
+        code: 'expired',
+        ...at(RegisteredCwtClaimKey.ExpirationTime),
+        message: `The ${claimLabel(RegisteredCwtClaimKey.ExpirationTime, keyLabels)} claim '${expirationTime.toISOString()}' is in the past (compared to '${now.toISOString()}'), and therefore not valid`,
+        context: { expiredAt: expirationTime },
+      })
     }
 
     if (checkNotBefore) {
-      verifyClaimNotInFuture(RegisteredCwtClaimKey.NotBefore, this.notBefore, now, skewMs, keyLabels)
+      verifyClaimNotInFuture(issues, at, RegisteredCwtClaimKey.NotBefore, this.notBefore, now, skewMs, keyLabels)
     }
     if (checkIssuedAt) {
-      verifyClaimNotInFuture(RegisteredCwtClaimKey.IssuedAt, this.issuedAt, now, skewMs, keyLabels)
+      verifyClaimNotInFuture(issues, at, RegisteredCwtClaimKey.IssuedAt, this.issuedAt, now, skewMs, keyLabels)
     }
+
+    if (issues.issues.length) throw new CwtClaimVerificationError('Invalid CWT claims', issues.issues)
   }
 
   public static create(options: CreateCwtPayloadOptions = {}) {
@@ -395,37 +410,82 @@ export class CwtPayload<Structure extends AnyTypedMap = CwtPayloadDecodedStructu
   }
 }
 
+/** The issues of the claim checks, with the codes and contexts of `VALIDATION_CODES` */
+type ClaimIssues = ValidationIssues<'claim_missing' | 'claim_value_mismatch' | 'expired' | 'not_yet_valid'>
+
+/** The `path` and `pathLabels` of the issue of a claim */
+type ClaimPath = (key: number | string) => { path: (number | string)[]; pathLabels: (number | string)[] }
+
+/** A required claim is absent. A claim is reported once, however many checks need it. */
+function addClaimMissing(issues: ClaimIssues, at: ClaimPath, key: number | string, message: string): void {
+  const reported = issues.issues.some((issue) => issue.code === 'claim_missing' && issue.path[0] === key)
+  if (!reported) issues.add({ code: 'claim_missing', ...at(key), message })
+}
+
 function verifyClaimMatches(
+  issues: ClaimIssues,
+  at: ClaimPath,
   key: RegisteredCwtClaimKey,
   value: string | undefined,
   expected: string | string[] | undefined,
   keyLabels?: Record<string | number, unknown>
 ) {
-  if (value === undefined || expected === undefined) return
+  if (expected === undefined) return
 
   const expectedValues = asArray(expected)
-  if (!expectedValues.includes(value)) {
-    throw new CwtClaimVerificationError(
-      `The ${claimLabel(key, keyLabels)} claim '${value}' does not match the expected value ${quoted(expectedValues)}`
+
+  // An absent claim is a mismatch rather than something to skip: a token that does not say who
+  // issued it is not a token issued by the expected issuer.
+  if (value === undefined) {
+    addClaimMissing(
+      issues,
+      at,
+      key,
+      `The token has no ${claimLabel(key, keyLabels)} claim, which is required to match the expected value ${quoted(expectedValues)}`
     )
+  } else if (!expectedValues.includes(value)) {
+    issues.add({
+      code: 'claim_value_mismatch',
+      ...at(key),
+      message: `The ${claimLabel(key, keyLabels)} claim '${value}' does not match the expected value ${quoted(expectedValues)}`,
+      context: { expected: expectedValues, actual: value },
+    })
   }
 }
 
 /** `aud` may hold several audiences, and the token is for us as soon as one of them is expected. */
 function verifyAudienceMatches(
+  issues: ClaimIssues,
+  at: ClaimPath,
   audience: string | string[] | undefined,
   expected: string | string[] | undefined,
   keyLabels?: Record<string | number, unknown>
 ) {
-  if (audience === undefined || expected === undefined) return
+  if (expected === undefined) return
+
+  const expectedValues = asArray(expected)
+  const key = RegisteredCwtClaimKey.Audience
+
+  // See `verifyClaimMatches`: a token carrying no audience is not a token for this audience.
+  if (audience === undefined) {
+    addClaimMissing(
+      issues,
+      at,
+      key,
+      `The token has no ${claimLabel(key, keyLabels)} claim, which is required to match the expected value ${quoted(expectedValues)}`
+    )
+    return
+  }
 
   const audiences = asArray(audience)
-  const expectedValues = asArray(expected)
 
   if (!audiences.some((value) => expectedValues.includes(value))) {
-    throw new CwtClaimVerificationError(
-      `The ${claimLabel(RegisteredCwtClaimKey.Audience, keyLabels)} claim ${quoted(audiences)} does not match the expected value ${quoted(expectedValues)}`
-    )
+    issues.add({
+      code: 'claim_value_mismatch',
+      ...at(key),
+      message: `The ${claimLabel(key, keyLabels)} claim ${quoted(audiences)} does not match the expected value ${quoted(expectedValues)}`,
+      context: { expected: expectedValues, actual: audience },
+    })
   }
 }
 
@@ -434,6 +494,8 @@ function verifyAudienceMatches(
  * token whose validity starts within the tolerance is already accepted.
  */
 function verifyClaimNotInFuture(
+  issues: ClaimIssues,
+  at: ClaimPath,
   key: RegisteredCwtClaimKey,
   value: Date | undefined,
   now: Date,
@@ -443,9 +505,12 @@ function verifyClaimNotInFuture(
   if (value === undefined) return
 
   if (new Date(value.getTime() - skewMs) > now) {
-    throw new CwtClaimVerificationError(
-      `The ${claimLabel(key, keyLabels)} claim '${value.toISOString()}' is in the future (compared to '${now.toISOString()}'), and therefore not valid`
-    )
+    issues.add({
+      code: 'not_yet_valid',
+      ...at(key),
+      message: `The ${claimLabel(key, keyLabels)} claim '${value.toISOString()}' is in the future (compared to '${now.toISOString()}'), and therefore not valid`,
+      context: { validFrom: value },
+    })
   }
 }
 

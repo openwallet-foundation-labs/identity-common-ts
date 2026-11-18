@@ -31,7 +31,7 @@ pnpm add @owf/eudi-attestation-schema
 ```typescript
 import {
   schemaMeta,
-  schemaURI,
+  schemaUri,
   trustAuthority,
 } from '@owf/eudi-attestation-schema';
 
@@ -52,8 +52,8 @@ const meta = schemaMeta()
   )
   .attestationLoS('iso_18045_basic')
   .bindingType('key')
-  .addSchemaURI(
-    schemaURI()
+  .addSchemaUri(
+    schemaUri()
       .format('dc+sd-jwt')
       .uri('https://example.com/schemas/gym-membership.dc+sd-jwt.json')
       .meta({ vct: 'eu.example.gym-membership.1' })
@@ -77,7 +77,7 @@ if (!result.valid) {
   console.error('Validation errors:', result.errors);
 }
 
-// Or use the assertion form (throws SchemaMetaException on invalid input)
+// Or use the assertion form (throws SchemaMetaError on invalid input)
 assertValidSchemaMeta(untrustedData);
 // untrustedData is now typed as SchemaMeta
 ```
@@ -86,7 +86,7 @@ assertValidSchemaMeta(untrustedData);
 
 ```typescript
 import { ES256 } from '@owf/crypto';
-import { signSchemaMeta, schemaMeta, schemaURI } from '@owf/eudi-attestation-schema';
+import { signSchemaMeta, schemaMeta, schemaUri } from '@owf/eudi-attestation-schema';
 
 const { privateKey } = await ES256.generateKeyPair();
 const signer = await ES256.getSigner(privateKey);
@@ -98,8 +98,8 @@ const meta = schemaMeta()
   .rulebookIntegrity('sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw=')
   .attestationLoS('iso_18045_basic')
   .bindingType('key')
-  .addSchemaURI(
-    schemaURI()
+  .addSchemaUri(
+    schemaUri()
       .format('dc+sd-jwt')
       .uri('https://example.com/schema.json')
       .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')
@@ -190,7 +190,7 @@ A `dc+sd-jwt` reference resolves to an [SD-JWT VC Type Metadata](https://www.iet
 
 `resolveSchemaReferences` handles this automatically:
 
-- The document is validated against the canonical `TypeMetadataFormatSchema` from `@sd-jwt/sd-jwt-vc`. Unknown members are preserved.
+- The document is validated against the canonical `zTypeMetadataFormat` from `@sd-jwt/sd-jwt-vc`. Unknown members are preserved.
 - Its `vct` is cross-checked against `meta.vct` from the catalogue entry; a mismatch throws.
 - The `extends` chain is followed and merged, with the extending document winning and claims merged per path. `extends#integrity` is verified on each hop. Cycles throw, and `maxExtendsDepth` (default 10) bounds the chain.
 - The merged document is available as `resolvedReference.typeMetadata`; Type Metadata itself does not contain a JSON Schema.
@@ -261,7 +261,7 @@ When a resolved reference carries Type Metadata with a non-empty `claims` array,
 A catalogue entry may carry an optional `issuanceProfile` describing the policy constraints an issuer of this attestation type must satisfy. Every member is an **allowed set or a bound, not a deployment value**: the catalogue narrows the space, and each issuer picks a conformant point inside it.
 
 ```typescript
-import { schemaMeta, schemaURI } from '@owf/eudi-attestation-schema';
+import { schemaMeta, schemaUri } from '@owf/eudi-attestation-schema';
 
 const meta = schemaMeta()
   // …required fields…
@@ -315,9 +315,9 @@ Scope notes:
 - `statusMechanism` and `maxValidityPeriod` have no expression in issuer metadata and are therefore not validated.
 - Technical conformance is not authorisation to issue — that remains governed by the trust list referenced in `trustedAuthorities`.
 
-## SchemaURI `meta` Requirements
+## SchemaUri `meta` Requirements
 
-`SchemaURI` uses `formatIdentifier` as a discriminator, and the `meta` object is validated per format.
+`SchemaUri` uses `formatIdentifier` as a discriminator, and the `meta` object is validated per format.
 
 | `formatIdentifier` | Required `meta` shape | Notes |
 |---|---|---|
@@ -327,7 +327,7 @@ Scope notes:
 Example with multiple formats:
 
 ```typescript
-import { schemaMeta, schemaURI } from '@owf/eudi-attestation-schema';
+import { schemaMeta, schemaUri } from '@owf/eudi-attestation-schema';
 
 const meta = schemaMeta()
   .id('https://example.com/attestations/pid')
@@ -336,16 +336,16 @@ const meta = schemaMeta()
   .rulebookIntegrity('sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw=')
   .attestationLoS('iso_18045_basic')
   .bindingType('key')
-  .addSchemaURI(
-    schemaURI()
+  .addSchemaUri(
+    schemaUri()
       .format('dc+sd-jwt')
       .uri('https://example.com/schemas/pid.sd-jwt.json')
       .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')
       .meta({ vct: 'eu.europa.ec.eudi.pid.1' })
       .build()
   )
-  .addSchemaURI(
-    schemaURI()
+  .addSchemaUri(
+    schemaUri()
       .format('mso_mdoc')
       .uri('https://example.com/schemas/pid.mdoc.json')
       .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')
@@ -367,9 +367,9 @@ const meta = schemaMeta()
 | `rulebookURI` | Yes | `string` (URL) | URI of the Attestation Rulebook |
 | `rulebookIntegrity` | Yes | `string` | Required W3C SRI sha256 integrity metadata for the rulebook |
 | `trustedAuthorities` | No | `TrustAuthority[]` | Trust anchors for attestation issuers |
-| `attestationLoS` | Yes | `AttestationLoS` | Level of security |
+| `attestationLoS` | Yes | `AttestationLos` | Level of security |
 | `bindingType` | Yes | `BindingType` | Cryptographic binding type |
-| `schemaURIs` | Yes | `SchemaURI[]` | Schema URIs per format |
+| `schemaURIs` | Yes | `SchemaUri[]` | Schema URIs per format |
 | `issuanceProfile` | No | `IssuanceProfile` | Policy constraints a conformant issuer must satisfy |
 
 ### IssuanceProfile
@@ -388,7 +388,7 @@ All members are optional — a catalogue entry that omits the profile simply exp
 
 A profile must not declare `cryptographicBindingMethodsSupported` or `proofTypesSupported` when `bindingType` is `none`.
 
-### SchemaURI
+### SchemaUri
 
 | Field | Required | Type | Description |
 |---|---|---|---|
@@ -421,7 +421,7 @@ A profile must not declare `cryptographicBindingMethodsSupported` or `proofTypes
 
 **AttestationFormat**: `dc+sd-jwt`, `mso_mdoc`
 
-**AttestationLoS**: `iso_18045_high`, `iso_18045_moderate`, `iso_18045_enhanced-basic`, `iso_18045_basic`
+**AttestationLos**: `iso_18045_high`, `iso_18045_moderate`, `iso_18045_enhanced-basic`, `iso_18045_basic`
 
 **BindingType**: `claim`, `key`, `biometric`, `none`
 

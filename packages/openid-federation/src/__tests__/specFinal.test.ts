@@ -1,8 +1,8 @@
 import { Buffer } from 'node:buffer'
 import { describe, expect, it } from 'vitest'
-import { createEntityConfiguration, entityConfigurationClaimsSchema } from '../entityConfiguration'
-import { metadataSchema } from '../metadata'
-import { trustMarkSchema } from '../trustMark'
+import { createEntityConfiguration, zEntityConfigurationClaims } from '../entityConfiguration'
+import { zMetadata } from '../metadata'
+import { zTrustMark } from '../trustMark'
 import type { SignCallback } from '../utils'
 import { validate } from '../utils/validate'
 
@@ -25,7 +25,7 @@ describe('OpenID Federation 1.0 final', () => {
     )
 
     const trustMark = validate({
-      schema: trustMarkSchema,
+      schema: zTrustMark,
       data: { trust_mark_type: 'https://tm.example.org/certified', trust_mark: trustMarkJwt },
     })
 
@@ -41,7 +41,7 @@ describe('OpenID Federation 1.0 final', () => {
     )
 
     expect(() =>
-      validate({ schema: trustMarkSchema, data: { id: 'https://tm.example.org/a', trust_mark: trustMarkJwt } })
+      validate({ schema: zTrustMark, data: { id: 'https://tm.example.org/a', trust_mark: trustMarkJwt } })
     ).toThrow()
   })
 
@@ -51,7 +51,7 @@ describe('OpenID Federation 1.0 final', () => {
       { iss: 'https://tm-issuer.example.org', sub: 'https://leaf.example.org', iat: 1 }
     )
 
-    expect(() => validate({ schema: trustMarkSchema, data: { trust_mark: trustMarkJwt } })).toThrow()
+    expect(() => validate({ schema: zTrustMark, data: { trust_mark: trustMarkJwt } })).toThrow()
   })
 
   it('should reject a trust mark whose type differs from the type in its JWT', () => {
@@ -67,7 +67,7 @@ describe('OpenID Federation 1.0 final', () => {
 
     expect(() =>
       validate({
-        schema: trustMarkSchema,
+        schema: zTrustMark,
         data: { trust_mark_type: 'https://tm.example.org/a', trust_mark: trustMarkJwt },
       })
     ).toThrow()
@@ -75,7 +75,7 @@ describe('OpenID Federation 1.0 final', () => {
 
   it('should keep protocol parameters and entity types the schema does not define', () => {
     const metadata = validate({
-      schema: metadataSchema,
+      schema: zMetadata,
       data: {
         oauth_authorization_server: {
           issuer: 'https://as.example.org',
@@ -99,7 +99,7 @@ describe('OpenID Federation 1.0 final', () => {
   it('should accept credential issuer and verifier metadata without client registration types', () => {
     expect(() =>
       validate({
-        schema: metadataSchema,
+        schema: zMetadata,
         data: {
           openid_credential_issuer: { credential_issuer: 'https://issuer.example.org' },
           openid_credential_verifier: { client_name: 'Verifier' },
@@ -116,14 +116,14 @@ describe('OpenID Federation 1.0 final', () => {
     }
 
     const parsed = validate({
-      schema: entityConfigurationClaimsSchema,
+      schema: zEntityConfigurationClaims,
       data: { ...claims, iat: 1700000000, exp: 1700086400 },
     })
     expect(parsed.iat).toStrictEqual(new Date(1700000000000))
 
     for (const iat of ['2023-11-14T22:13:20Z', '1700000000', new Date(1700000000000)]) {
       expect(() =>
-        validate({ schema: entityConfigurationClaimsSchema, data: { ...claims, iat, exp: 1700086400 } })
+        validate({ schema: zEntityConfigurationClaims, data: { ...claims, iat, exp: 1700086400 } })
       ).toThrow()
     }
 

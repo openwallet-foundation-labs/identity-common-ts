@@ -3,7 +3,7 @@ import { generateSalt, hasher } from '@owf/crypto'
 import { describe, expect, test } from 'vitest'
 import { createHashMapping, unpack } from '../decode'
 import { Jwt } from '../jwt'
-import { listKeys, pack, SDJwt } from '../sdjwt'
+import { listKeys, pack, SdJwt } from '../sdjwt'
 import type { DisclosureFrame, Signer } from '../types'
 import { Disclosure } from '../utils'
 
@@ -23,13 +23,13 @@ describe('SD JWT', () => {
     })
 
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({
+    const sdJwt = new SdJwt({
       jwt,
       disclosures: [],
     })
     expect(sdJwt).toBeDefined()
 
-    const encoded = sdJwt.encodeSDJwt()
+    const encoded = sdJwt.encodeSdJwt()
     expect(encoded).toBeDefined()
   })
 
@@ -46,14 +46,14 @@ describe('SD JWT', () => {
     })
 
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({
+    const sdJwt = new SdJwt({
       jwt,
       disclosures: [],
     })
 
-    const encoded = sdJwt.encodeSDJwt()
+    const encoded = sdJwt.encodeSdJwt()
 
-    const newSdJwt = await SDJwt.fromEncode(encoded, hasher)
+    const newSdJwt = await SdJwt.fromEncode(encoded, hasher)
     expect(newSdJwt).toBeDefined()
     const newJwt = newSdJwt.jwt
     expect(newJwt?.header).toEqual(jwt.header)
@@ -74,14 +74,14 @@ describe('SD JWT', () => {
     })
 
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({
+    const sdJwt = new SdJwt({
       jwt,
       disclosures: [],
     })
 
-    const encoded = sdJwt.encodeSDJwt()
+    const encoded = sdJwt.encodeSdJwt()
 
-    const newSdJwt = await SDJwt.fromEncode(encoded, hasher)
+    const newSdJwt = await SdJwt.fromEncode(encoded, hasher)
     expect(newSdJwt).toBeDefined()
     const newJwt = newSdJwt.jwt
     expect(newJwt?.header).toEqual(jwt.header)
@@ -101,7 +101,7 @@ describe('SD JWT', () => {
     })
 
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({
+    const sdJwt = new SdJwt({
       jwt,
       disclosures: [],
     })
@@ -124,7 +124,7 @@ describe('SD JWT', () => {
     })
 
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({
+    const sdJwt = new SdJwt({
       jwt,
       disclosures: [],
     })
@@ -147,7 +147,7 @@ describe('SD JWT', () => {
     })
 
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({
+    const sdJwt = new SdJwt({
       jwt,
       disclosures: [],
     })
@@ -249,7 +249,7 @@ describe('SD JWT', () => {
     })
 
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({
+    const sdJwt = new SdJwt({
       jwt,
       disclosures,
     })
@@ -361,13 +361,13 @@ describe('SD JWT', () => {
     })
 
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({
+    const sdJwt = new SdJwt({
       jwt,
       disclosures: [],
     })
 
-    const credential = sdJwt.encodeSDJwt()
-    const decoded = await SDJwt.decodeSDJwt(credential, hasher)
+    const credential = sdJwt.encodeSdJwt()
+    const decoded = await SdJwt.decodeSdJwt(credential, hasher)
     expect(jwt.header).toEqual(decoded.jwt.header)
     expect(jwt.payload).toEqual(decoded.jwt.payload)
     expect(jwt.signature).toEqual(decoded.jwt.signature)
@@ -404,10 +404,10 @@ describe('SD JWT', () => {
       payload: { ...(packedClaims as Record<string, unknown>), _sd_alg: 'sha-256' },
     })
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({ jwt, disclosures })
-    const compact = sdJwt.encodeSDJwt()
+    const sdJwt = new SdJwt({ jwt, disclosures })
+    const compact = sdJwt.encodeSdJwt()
 
-    const decoded = await SDJwt.fromEncode(compact, hasher)
+    const decoded = await SdJwt.fromEncode(compact, hasher)
     const claims1 = await decoded.getClaims(hasher)
     expect(claims1).toEqual(claims)
 
@@ -447,10 +447,10 @@ describe('SD JWT', () => {
       payload: { ...(packedClaims as Record<string, unknown>), _sd_alg: 'sha-256' },
     })
     await jwt.sign(testSigner)
-    const sdJwt = new SDJwt({ jwt, disclosures })
-    const compact = sdJwt.encodeSDJwt()
+    const sdJwt = new SdJwt({ jwt, disclosures })
+    const compact = sdJwt.encodeSdJwt()
 
-    const decoded = await SDJwt.fromEncode(compact, hasher)
+    const decoded = await SdJwt.fromEncode(compact, hasher)
     const claims1 = await decoded.getClaims(hasher)
     expect(claims1).toEqual(claims)
 

@@ -3,11 +3,11 @@ import { base64url } from '@owf/identity-common'
 import { z } from 'zod'
 import { EncryptionParameters, type EncryptionParametersEncodedStructure } from './encryption-parameters'
 
-const encryptionInfoEncodedSchema = z.tuple([z.literal('dcapi'), z.map(z.unknown(), z.unknown())])
-const encryptionInfoDecodedSchema = z.instanceof(EncryptionParameters)
+const zEncryptionInfoEncoded = z.tuple([z.literal('dcapi'), z.map(z.unknown(), z.unknown())])
+const zEncryptionInfoDecoded = z.instanceof(EncryptionParameters)
 
-export type EncryptionInfoEncodedStructure = z.infer<typeof encryptionInfoEncodedSchema>
-export type EncryptionInfoDecodedStructure = z.infer<typeof encryptionInfoDecodedSchema>
+export type EncryptionInfoEncodedStructure = z.infer<typeof zEncryptionInfoEncoded>
+export type EncryptionInfoDecodedStructure = z.infer<typeof zEncryptionInfoDecoded>
 
 export type EncryptionInfoOptions = {
   encryptionParameters: EncryptionParameters
@@ -20,7 +20,7 @@ export type EncryptionInfoOptions = {
  */
 export class EncryptionInfo extends CborStructure<EncryptionInfoEncodedStructure, EncryptionInfoDecodedStructure> {
   public static override get encodingSchema() {
-    return z.codec(encryptionInfoEncodedSchema, encryptionInfoDecodedSchema, {
+    return z.codec(zEncryptionInfoEncoded, zEncryptionInfoDecoded, {
       decode: ([, encryptionParameters]) =>
         EncryptionParameters.fromEncodedStructure(encryptionParameters as EncryptionParametersEncodedStructure),
       encode: (encryptionParameters) =>

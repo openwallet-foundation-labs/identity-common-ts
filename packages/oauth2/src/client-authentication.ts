@@ -1,5 +1,7 @@
-import type { ContentType, FetchHeaders, HttpMethod } from '@openid4vc/utils'
-import { decodeUtf8String, encodeToBase64Url } from '@openid4vc/utils'
+import type { FetchHeaders, HttpMethod } from '@openid4vc/utils'
+import { base64, stringToBytes } from '@owf/identity-common'
+import type { JwsSignerJwk } from '@owf/jose'
+import { decodeJwt } from '@owf/jose'
 import type { CallbackContext } from './callbacks'
 import { createClientAttestationPopJwt } from './client-attestation/client-attestation-pop'
 import {
@@ -8,8 +10,6 @@ import {
   zClientAttestationJwtHeader,
   zClientAttestationJwtPayload,
 } from './client-attestation/z-client-attestation'
-import { decodeJwt } from './common/jwt/decode-jwt'
-import type { JwtSignerJwk } from './common/jwt/z-jwt'
 import { createDpopJwt } from './dpop/dpop'
 import { Oauth2Error } from './error/Oauth2Error'
 import type { AuthorizationServerMetadata } from './metadata/authorization-server/z-authorization-server-metadata'
@@ -156,7 +156,7 @@ export interface ClientAuthenticationCallbackOptions {
    */
   headers: FetchHeaders
 
-  contentType: ContentType
+  contentType: string
 
   /**
    * The body as a JSON object. If content type `x-www-form-urlencoded`
@@ -197,6 +197,14 @@ export function clientAuthenticationClientSecretPost(
   }
 }
 
+// `application/x-www-form-urlencoded` encoding of RFC 6749 Appendix B: UTF-8, a space is `+`. Written out because
+// `URLSearchParams` in React Native encodes a space as `%20` and leaves `!'()~` as they are.
+function formUrlEncode(value: string) {
+  return encodeURIComponent(value)
+    .replace(/%20/g, '+')
+    .replace(/[!'()~]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)
+}
+
 export interface ClientAuthenticationClientSecretBasicOptions {
   clientId: string
   clientSecret: string
@@ -209,7 +217,10 @@ export function clientAuthenticationClientSecretBasic(
   options: ClientAuthenticationClientSecretBasicOptions
 ): ClientAuthenticationCallback {
   return ({ headers }) => {
-    const authorization = encodeToBase64Url(decodeUtf8String(`${options.clientId}:${options.clientSecret}`))
+    // The client id and secret are form-urlencoded (RFC 6749 Section 2.3.1), so a `:` in the client id can't
+    // split the pair, and then base64 encoded with padding, not base64url (RFC 7617 Section 2)
+    const credentials = `${formUrlEncode(options.clientId)}:${formUrlEncode(options.clientSecret)}`
+    const authorization = base64.encode(stringToBytes(credentials))
     headers.set('Authorization', `Basic ${authorization}`)
   }
 }
@@ -236,7 +247,7 @@ export function clientAuthenticationAnonymous(): ClientAuthenticationCallback {
 
 export interface ClientAuthenticationClientAttestationJwtOptions {
   clientAttestationJwt: string
-  callbacks: Pick<CallbackContext, 'signJwt' | 'generateRandom'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'generateRandom'>
 
   /**
    * Challenge provided by the authorization server (e.g. obtained from its `challenge_endpoint`)
@@ -269,14 +280,14 @@ export function clientAuthenticationClientAttestationJwt(
 
 export interface ClientAuthenticationClientAttestationJwtDpopOptions {
   clientAttestationJwt: string
-  callbacks: Pick<CallbackContext, 'signJwt' | 'generateRandom' | 'hash'>
+  callbacks: Pick<CallbackContext, 'signJws' | 'generateRandom' | 'hash'>
 
   /**
    * The DPoP (client instance) key signer. In the DPoP-bound method the client instance key and the
    * DPoP key are the same key. If not provided, the signer is derived from the `cnf.jwk` of the client
    * attestation.
    */
-  signer?: JwtSignerJwk
+  signer?: JwsSignerJwk
 
   /**
    * Challenge provided by the authorization server (e.g. obtained from its `challenge_endpoint`) to

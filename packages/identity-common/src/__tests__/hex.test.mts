@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hex, hexDecode, hexEncode, IdentityCommonException } from '../../src'
+import { hex, hexDecode, hexEncode, IdentityCommonError } from '../../src'
 
 describe('hex', () => {
   it('should encode and decode Uint8Array', () => {
@@ -46,9 +46,9 @@ describe('hex', () => {
     expect(decoded).toEqual(input)
   })
 
-  it('should throw IdentityCommonException for invalid hex characters', () => {
-    expect(() => hexDecode('xyz')).toThrow(IdentityCommonException)
-    expect(() => hexDecode('48656g6c6f')).toThrow(IdentityCommonException)
+  it('should throw IdentityCommonError for invalid hex characters', () => {
+    expect(() => hexDecode('xyz')).toThrow(IdentityCommonError)
+    expect(() => hexDecode('48656g6c6f')).toThrow(IdentityCommonError)
   })
 
   it('should produce lowercase hex output', () => {

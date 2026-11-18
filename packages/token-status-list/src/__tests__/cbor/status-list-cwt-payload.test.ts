@@ -71,6 +71,18 @@ suite('StatusListCwtPayload', () => {
     expect(fromEncoded.expirationTime).toBeDefined()
   })
 
+  // Draft 16 § 5.2: ttl is a positive number
+  test('rejects a ttl of 0', () => {
+    expect(() =>
+      StatusListCwtPayload.create({
+        subject: 'https://example.com/statuslists/1',
+        issuedAt: new Date(1000000 * 1000),
+        statusList: StatusListCbor.create({ statusList: new StatusList([0], 1) }),
+        timeToLive: 0,
+      })
+    ).toThrow()
+  })
+
   test('encode/decode with additional claims', () => {
     const statusList = new StatusList(new Array(10).fill(0), 4, 'https://example.com/aggregate')
     statusList.setStatus(0, 1)

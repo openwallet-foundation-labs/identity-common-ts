@@ -1,75 +1,89 @@
-import * as v from 'valibot'
+import { z } from 'zod'
 import { DcqlError } from '../dcql-error/e-base.js'
 import type { DcqlCredentialQuery } from '../dcql-query/m-dcql-credential-query.js'
 import type { DcqlMetaResult } from '../dcql-query-result/m-meta-result.js'
-import { vCustomRequiredMessage, vIncludesAll, vNonEmptyArray } from '../u-dcql.js'
+import { DCQL_VALIDATION_CODES, parseDcql, zMatch, zNonEmptyArray } from '../u-dcql.js'
 import type { DcqlCredential } from '../u-dcql-credential.js'
 
+const zCredentialFormat = <Format extends string>(format: Format) =>
+  zMatch<Format>(
+    (value) => value === format,
+    (value) => ({
+      code: DCQL_VALIDATION_CODES.CREDENTIAL_FORMAT_MISMATCH,
+      message: `Expected credential format to be '${format}' but received '${value}'`,
+      context: { expected: format, actual: value },
+    })
+  )
+
 const getCryptographicHolderBindingValue = (credentialQuery: DcqlCredentialQuery) =>
-  v.object({
+  z.object({
     cryptographic_holder_binding: credentialQuery.require_cryptographic_holder_binding
-      ? v.literal(
-          true,
-          (i) =>
-            `Expected cryptographic_holder_binding to be true (because credential query '${credentialQuery.id}' requires cryptographic holder binding), but received ${i.input}`
+      ? zMatch<true>(
+          (value) => value === true,
+          (value) => ({
+            code: DCQL_VALIDATION_CODES.CRYPTOGRAPHIC_HOLDER_BINDING_REQUIRED,
+            message: `Expected cryptographic_holder_binding to be true (because credential query '${credentialQuery.id}' requires cryptographic holder binding), but received ${value}`,
+          })
         )
-      : v.boolean(),
+      : z.boolean(),
   })
 
 const getMdocMetaParser = (credentialQuery: DcqlCredentialQuery.Mdoc) => {
-  const vDoctype = credentialQuery.meta?.doctype_value
-    ? v.literal(
-        credentialQuery.meta.doctype_value,
-        (i) => `Expected doctype to be '${credentialQuery.meta?.doctype_value}' but received '${i.input}'`
+  const doctypeValue = credentialQuery.meta?.doctype_value
+  const zDoctype = doctypeValue
+    ? zMatch<string>(
+        (value) => value === doctypeValue,
+        (value) => ({
+          code: DCQL_VALIDATION_CODES.DOCTYPE_MISMATCH,
+          message: `Expected doctype to be '${doctypeValue}' but received '${value}'`,
+          context: { expected: doctypeValue, actual: value },
+        })
       )
-    : v.string('Expected doctype to be defined')
+    : z.string('Expected doctype to be defined')
 
-  const credentialParser = v.object({
-    credential_format: v.literal(
-      'mso_mdoc',
-      (i) => `Expected credential format to be 'mso_mdoc' but received '${i.input}'`
-    ),
-    doctype: vDoctype,
-    ...getCryptographicHolderBindingValue(credentialQuery).entries,
+  return getCryptographicHolderBindingValue(credentialQuery).extend({
+    credential_format: zCredentialFormat('mso_mdoc'),
+    doctype: zDoctype,
   })
-
-  return credentialParser
 }
 
 const getSdJwtVcMetaParser = (credentialQuery: DcqlCredentialQuery.SdJwtVc) => {
-  return v.object({
-    credential_format: v.literal(
-      credentialQuery.format,
-      (i) => `Expected credential format to be '${credentialQuery.format}' but received '${i.input}'`
-    ),
-    vct: credentialQuery.meta?.vct_values
-      ? vCustomRequiredMessage(
-          v.picklist(
-            credentialQuery.meta.vct_values,
-            (i) => `Expected vct to be '${credentialQuery.meta?.vct_values?.join("' | '")}' but received '${i.input}'`
-          ),
-          (i) => `Expected vct to be '${credentialQuery.meta?.vct_values?.join("' | '")}' but received '${i.input}'`
+  const vctValues = credentialQuery.meta?.vct_values
+
+  return getCryptographicHolderBindingValue(credentialQuery).extend({
+    credential_format: zCredentialFormat(credentialQuery.format),
+    vct: vctValues
+      ? zMatch<string>(
+          (value) => vctValues.includes(value as string),
+          (value) => ({
+            code: DCQL_VALIDATION_CODES.VCT_MISMATCH,
+            message: `Expected vct to be '${vctValues.join("' | '")}' but received '${value}'`,
+            context: { expected: vctValues, actual: value },
+          })
         )
-      : vCustomRequiredMessage(v.string('Expected vct to be a string'), 'Expected vct to be defined'),
-    ...getCryptographicHolderBindingValue(credentialQuery).entries,
+      : z.string({
+          error: (issue) => (issue.input === undefined ? 'Expected vct to be defined' : 'Expected vct to be a string'),
+        }),
   })
 }
 
 const getW3cVcMetaParser = (credentialQuery: DcqlCredentialQuery.W3cVc) => {
-  return v.object({
-    credential_format: v.literal(
-      credentialQuery.format,
-      (i) => `Expected credential format to be '${credentialQuery.format}' but received '${i.input}'`
-    ),
-    type: credentialQuery.meta?.type_values
-      ? v.union(
-          credentialQuery.meta.type_values.map((values) => vIncludesAll(values)),
-          `Expected type to include all values from one of the following subsets: ${credentialQuery.meta.type_values
-            .map((values) => `[${values.join(', ')}]`)
-            .join(' | ')}`
+  const typeValues = credentialQuery.meta?.type_values
+
+  return getCryptographicHolderBindingValue(credentialQuery).extend({
+    credential_format: zCredentialFormat(credentialQuery.format),
+    type: typeValues
+      ? zMatch<string[]>(
+          (type) => Array.isArray(type) && typeValues.some((values) => values.every((value) => type.includes(value))),
+          (type) => ({
+            code: DCQL_VALIDATION_CODES.TYPE_MISMATCH,
+            message: `Expected type to include all values from one of the following subsets: ${typeValues
+              .map((values) => `[${values.join(', ')}]`)
+              .join(' | ')}`,
+            context: { expected: typeValues, actual: type },
+          })
         )
-      : vNonEmptyArray(v.string()),
-    ...getCryptographicHolderBindingValue(credentialQuery).entries,
+      : zNonEmptyArray(z.string()),
   })
 }
 
@@ -102,19 +116,17 @@ export const getMetaParser = (credentialQuery: DcqlCredentialQuery) => {
 
 export const runMetaQuery = (credentialQuery: DcqlCredentialQuery, credential: DcqlCredential): DcqlMetaResult => {
   const metaParser = getMetaParser(credentialQuery)
-  const parseResult = v.safeParse(metaParser, credential)
+  const parseResult = parseDcql(metaParser, credential)
 
   if (!parseResult.success) {
-    const issues = v.flatten(parseResult.issues)
     return {
       success: false,
-      issues: issues.nested ?? issues,
-      output: parseResult.output,
+      issues: parseResult.issues,
     }
   }
 
   return {
     success: true,
-    output: parseResult.output,
+    output: parseResult.data,
   }
 }

@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import type { z } from 'zod'
+import { zHttpsUrl } from '../../utils'
 import { createEntity } from './utils'
 
 /**
@@ -9,13 +10,13 @@ import { createEntity } from './utils'
 export const federationEntityMetadata = createEntity({
   identifier: 'federation_entity',
   additionalValidation: {
-    federation_fetch_endpoint: z.url().optional(),
-    federation_list_endpoint: z.url().optional(),
-    federation_resolve_endpoint: z.url().optional(),
-    federation_trust_mark_status_endpoint: z.url().optional(),
-    federation_trust_mark_list_endpoint: z.url().optional(),
-    federation_trust_mark_endpoint: z.url().optional(),
-    federation_historical_keys_endpoint: z.url().optional(),
+    federation_fetch_endpoint: zHttpsUrl.optional(),
+    federation_list_endpoint: zHttpsUrl.optional(),
+    federation_resolve_endpoint: zHttpsUrl.optional(),
+    federation_trust_mark_status_endpoint: zHttpsUrl.optional(),
+    federation_trust_mark_list_endpoint: zHttpsUrl.optional(),
+    federation_trust_mark_endpoint: zHttpsUrl.optional(),
+    federation_historical_keys_endpoint: zHttpsUrl.optional(),
   },
 })
 

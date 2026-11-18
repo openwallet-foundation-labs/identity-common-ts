@@ -62,11 +62,19 @@ import { Openid4vciVersion } from './version'
 
 export interface Openid4vciClientOptions {
   /**
-   * Callbacks required for the openid4vc client. The `verifyJwt` callback is only
+   * Callbacks required for the openid4vc client. The `verifyJws` callback is only
    * needed for verifying signed credential issuer metadata.
    */
-  callbacks: Omit<CallbackContext, 'verifyJwt' | 'encryptJwe'> &
-    Partial<Pick<CallbackContext, 'verifyJwt' | 'encryptJwe'>>
+  callbacks: Omit<CallbackContext, 'verifyJws' | 'encryptJwe'> &
+    Partial<Pick<CallbackContext, 'verifyJws' | 'encryptJwe'>>
+
+  /**
+   * Default allowed clock skew in seconds for the `exp`, `nbf` and `iat` checks of signed credential issuer
+   * metadata. A per-call `allowedSkewInSeconds` takes precedence, including `0`.
+   *
+   * @default 30
+   */
+  allowedSkewInSeconds?: number
 }
 
 export class Openid4vciClient {
@@ -85,16 +93,18 @@ export class Openid4vciClient {
   public async resolveCredentialOffer(credentialOffer: string): Promise<CredentialOfferObject> {
     return resolveCredentialOffer(credentialOffer, {
       fetch: this.options.callbacks.fetch,
+      fetchLimits: this.options.callbacks.fetchLimits,
     })
   }
 
   public async resolveIssuerMetadata(
     credentialIssuer: string,
-    options?: Pick<ResolveIssuerMetadataOptions, 'signedMetadata'>
+    options?: Pick<ResolveIssuerMetadataOptions, 'signedMetadata' | 'allowedSkewInSeconds'>
   ): Promise<IssuerMetadataResult> {
     return resolveIssuerMetadata(credentialIssuer, {
       callbacks: this.options.callbacks,
       signedMetadata: options?.signedMetadata,
+      allowedSkewInSeconds: options?.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
     })
   }
 
@@ -328,6 +338,7 @@ export class Openid4vciClient {
         pkceCodeVerifier: options.pkceCodeVerifier,
         redirectUri: options.redirectUri,
         scope: options.scope,
+        state: options.state,
         additionalRequestPayload: {
           ...options.additionalRequestPayload,
           issuer_state: options.credentialOffer?.grants?.authorization_code?.issuer_state,
@@ -408,6 +419,7 @@ export class Openid4vciClient {
       resource: options.issuerMetadata.credentialIssuer.credential_issuer,
       redirectUri: options.redirectUri,
       scope: options.scope,
+      state: options.state,
       pkceCodeVerifier: options.pkceCodeVerifier,
       dpop: options.dpop,
     })
@@ -553,6 +565,7 @@ export class Openid4vciClient {
     return requestNonce({
       ...options,
       fetch: this.options.callbacks.fetch,
+      fetchLimits: this.options.callbacks.fetchLimits,
     })
   }
 

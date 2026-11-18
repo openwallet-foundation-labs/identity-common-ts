@@ -6,6 +6,6 @@ export enum Openid4vciVersion {
 }
 
 /**
- * @deprecated use `OpenId4vciVersion` instead
+ * @deprecated use `Openid4vciVersion` instead
  */
 export const Openid4vciDraftVersion = Openid4vciVersion

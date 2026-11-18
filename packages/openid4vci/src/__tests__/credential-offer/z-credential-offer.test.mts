@@ -1,4 +1,5 @@
 import { preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
+import { parseWithSchema } from '@owf/identity-common'
 import { describe, expect, test } from 'vitest'
 import { zCredentialOfferObject, zCredentialOfferObjectDraft11To14 } from '../../credential-offer/z-credential-offer'
 
@@ -80,6 +81,19 @@ describe('Credential Offer', () => {
         },
       },
       success: true,
+    })
+  })
+
+  test('rejects an empty pre-authorized_code', () => {
+    const result = parseWithSchema(zCredentialOfferObject, {
+      credential_issuer: 'https://issuer.com',
+      grants: { [preAuthorizedCodeGrantIdentifier]: { 'pre-authorized_code': '' } },
+      credential_configuration_ids: ['credential-1'],
+    })
+
+    expect(result).toMatchObject({
+      success: false,
+      issues: [{ code: 'too_small', path: ['grants', preAuthorizedCodeGrantIdentifier, 'pre-authorized_code'] }],
     })
   })
 

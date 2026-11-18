@@ -16,6 +16,10 @@ import type { Openid4vpAuthorizationRequestPayload } from './z-authorization-req
  * For the `openid_federation` client identifier prefix, the trust chain is verified outside this
  * library, so verify it before treating the client as authenticated.
  *
+ * For the `pre-registered` client identifier prefix, the library cannot check the registration of the
+ * client, such as its keys and its `response_uri` (OpenID4VP 1.0 Section 5.9), so `isClientAuthenticated`
+ * is always `false`.
+ *
  * Failures before the payload is known (for example when fetching the request object) throw a plain
  * `Oauth2ServerErrorResponseError`, as there is nowhere to send the error to.
  */
@@ -37,8 +41,9 @@ export class Openid4vpAuthorizationRequestError extends Oauth2ServerErrorRespons
     super(error.errorResponse, { status: error.status, cause: error })
     this.message = error.message
     this.authorizationRequestPayload = request.authorizationRequestPayload
-    this.isClientAuthenticated = request.client !== undefined
-    this.client = request.client
+    const client = request.client?.prefix === 'pre-registered' ? undefined : request.client
+    this.isClientAuthenticated = client !== undefined
+    this.client = client
     this.jar = request.jar
   }
 }

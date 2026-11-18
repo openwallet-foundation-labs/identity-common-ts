@@ -1,12 +1,12 @@
 import type { DisclosureFrame } from '@sd-jwt/core'
-import { SDJwtVcInstance } from '@sd-jwt/sd-jwt-vc'
+import { SdJwtVcInstance } from '@sd-jwt/sd-jwt-vc'
 import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
 
 ;(async () => {
   const { signer, verifier } = await createSignerVerifier()
 
-  // Create SDJwt instance for use
-  const sdjwt = new SDJwtVcInstance({
+  // Create SdJwt instance for use
+  const sdjwt = new SdJwtVcInstance({
     signer,
     signAlg: ES256.alg,
     verifier,
@@ -26,7 +26,7 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
     _sd: ['firstname', 'id'],
   }
 
-  const kbPayload = {
+  const KbJwtPayload = {
     iat: Math.floor(Date.now() / 1000),
     aud: 'https://example.com',
     nonce: '1234',
@@ -51,7 +51,7 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
     { id: true },
     {
       kb: {
-        payload: kbPayload,
+        payload: KbJwtPayload,
       },
     }
   )

@@ -1,11 +1,9 @@
-import * as v from 'valibot'
+import { z } from 'zod'
 import { DcqlCredentialTrustedAuthority } from './dcql-query/m-dcql-trusted-authorities.js'
-import { vJsonRecord } from './u-dcql.js'
-import type { InferModelTypes } from './u-model.js'
-import { ModelDefinition } from './u-model.js'
+import { zJsonRecord } from './u-dcql.js'
 
-const vCredentialModelBase = v.object({
-  authority: v.optional(DcqlCredentialTrustedAuthority.vModel),
+const zCredentialModelBase = z.object({
+  authority: DcqlCredentialTrustedAuthority.zModel.optional(),
 
   /**
    * Indicates support/inclusion of cryptographic holder binding. This will be checked against
@@ -15,66 +13,55 @@ const vCredentialModelBase = v.object({
    * with cryptographic holder binding. In the context of a credential query this means whether
    * the credential supports cryptographic holder binding.
    */
-  cryptographic_holder_binding: v.pipe(
-    v.boolean(),
-    v.description(
+  cryptographic_holder_binding: z
+    .boolean()
+    .describe(
       'Indicates support/inclusion of cryptographic holder binding. This will be checked against the `require_cryptographic_holder_binding` property from the query.'
-    )
-  ),
+    ),
 })
 
 export namespace DcqlMdocCredential {
-  export const vNamespaces = v.record(v.string(), v.record(v.string(), v.unknown()))
-  export const vModel = v.object({
-    ...vCredentialModelBase.entries,
-    credential_format: v.literal('mso_mdoc'),
-    doctype: v.string(),
-    namespaces: vNamespaces,
+  export const zNamespaces = z.record(z.string(), z.record(z.string(), z.unknown()))
+  export const zModel = zCredentialModelBase.extend({
+    credential_format: z.literal('mso_mdoc'),
+    doctype: z.string(),
+    namespaces: zNamespaces,
   })
 
-  export const model = new ModelDefinition({ vModel })
-  export type Model = InferModelTypes<typeof model>
-  export type NameSpaces = v.InferOutput<typeof vNamespaces>
+  export type Model = { Input: z.input<typeof zModel>; Output: z.output<typeof zModel> }
+  export type NameSpaces = z.output<typeof zNamespaces>
 }
 export type DcqlMdocCredential = DcqlMdocCredential.Model['Output']
 
 export namespace DcqlSdJwtVcCredential {
-  export const vClaims = vJsonRecord
-  export const vModel = v.object({
-    ...vCredentialModelBase.entries,
-    credential_format: v.picklist(['vc+sd-jwt', 'dc+sd-jwt']),
-    vct: v.string(),
-    claims: vClaims,
+  export const zClaims = zJsonRecord
+  export const zModel = zCredentialModelBase.extend({
+    credential_format: z.enum(['vc+sd-jwt', 'dc+sd-jwt']),
+    vct: z.string(),
+    claims: zClaims,
   })
-  export const model = new ModelDefinition({ vModel })
-  export type Model = InferModelTypes<typeof model>
+  export type Model = { Input: z.input<typeof zModel>; Output: z.output<typeof zModel> }
   export type Claims = Model['Output']['claims']
 }
 export type DcqlSdJwtVcCredential = DcqlSdJwtVcCredential.Model['Output']
 
 export namespace DcqlW3cVcCredential {
-  export const vClaims = vJsonRecord
-  export const vModel = v.object({
-    ...vCredentialModelBase.entries,
-    credential_format: v.picklist(['ldp_vc', 'jwt_vc_json', 'vc+sd-jwt']),
-    claims: vClaims,
-    type: v.array(v.string()),
+  export const zClaims = zJsonRecord
+  export const zModel = zCredentialModelBase.extend({
+    credential_format: z.enum(['ldp_vc', 'jwt_vc_json', 'vc+sd-jwt']),
+    claims: zClaims,
+    type: z.array(z.string()),
   })
 
-  export const model = new ModelDefinition({ vModel })
-  export type Model = InferModelTypes<typeof model>
+  export type Model = { Input: z.input<typeof zModel>; Output: z.output<typeof zModel> }
   export type Claims = Model['Output']['claims']
 }
 export type DcqlW3cVcCredential = DcqlW3cVcCredential.Model['Output']
 
 export namespace DcqlCredential {
-  export const vModel = v.variant('credential_format', [
-    DcqlMdocCredential.vModel,
-    DcqlSdJwtVcCredential.vModel,
-    DcqlW3cVcCredential.vModel,
-  ])
+  // Not a discriminated union, as vc+sd-jwt is both an SD-JWT VC and a W3C VC format
+  export const zModel = z.union([DcqlMdocCredential.zModel, DcqlSdJwtVcCredential.zModel, DcqlW3cVcCredential.zModel])
 
-  export const model = new ModelDefinition({ vModel })
-  export type Model = InferModelTypes<typeof model>
+  export type Model = { Input: z.input<typeof zModel>; Output: z.output<typeof zModel> }
 }
 export type DcqlCredential = DcqlCredential.Model['Output']

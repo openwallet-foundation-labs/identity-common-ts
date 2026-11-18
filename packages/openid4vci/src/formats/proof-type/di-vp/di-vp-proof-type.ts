@@ -1,5 +1,5 @@
 import type { CallbackContext } from '@openid4vc/oauth2'
-import { parseWithErrorHandling } from '@openid4vc/utils'
+import { parseWithErrorHandling } from '@owf/identity-common'
 import { Openid4vciError } from '../../../error/Openid4vciError'
 import { type DataIntegrityProof, zDataIntegrityProof } from './z-di-vp-proof-type'
 

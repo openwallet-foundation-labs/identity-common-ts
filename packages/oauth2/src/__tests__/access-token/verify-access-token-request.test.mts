@@ -1,3 +1,4 @@
+import { calculateJwkThumbprint, type Jwk } from '@owf/jose'
 import * as jose from 'jose'
 import { describe, expect, test } from 'vitest'
 import {
@@ -6,11 +7,8 @@ import {
   verifyPreAuthorizedCodeAccessTokenRequest,
   verifyRefreshTokenAccessTokenRequest,
 } from '../../access-token/verify-access-token-request'
-import { HashAlgorithm } from '../../callbacks'
 import { createClientAttestationJwt } from '../../client-attestation/client-attestation'
 import { createClientAttestationPopJwt } from '../../client-attestation/client-attestation-pop'
-import { calculateJwkThumbprint } from '../../common/jwk/jwk-thumbprint'
-import type { Jwk } from '../../common/jwk/z-jwk'
 import { Oauth2ErrorCodes } from '../../common/z-oauth2-error'
 import { createDpopJwt } from '../../dpop/dpop'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
@@ -20,7 +18,7 @@ import {
   preAuthorizedCodeGrantIdentifier,
   refreshTokenGrantIdentifier,
 } from '../../z-grant-type'
-import { callbacks, getSignJwtCallback } from '../util.mjs'
+import { callbacks, getSignJwsCallback, testAttester } from '../util.mjs'
 
 const request = {
   headers: new Headers(),
@@ -282,7 +280,7 @@ describe('Verify Pre Authorized Code Access Token Request', () => {
           jwt: 'ey',
         },
       })
-    ).rejects.toThrow('Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow('Unable to parse the JWS, a compact JWS must consist of exactly three parts')
   })
 
   test('handles client attestation provided but not valid', async () => {
@@ -305,7 +303,9 @@ describe('Verify Pre Authorized Code Access Token Request', () => {
           clientAttestationPopJwt: 'something-else',
         },
       })
-    ).rejects.toThrow('Error verifying client attestation. Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow(
+      'Error verifying client attestation. Unable to parse the JWS, a compact JWS must consist of exactly three parts'
+    )
   })
 
   test('handles valid pre-authorized code access token request', async () => {
@@ -321,7 +321,7 @@ describe('Verify Pre Authorized Code Access Token Request', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopPrivateJwk]),
+        signJws: getSignJwsCallback([dpopPrivateJwk]),
       },
       request,
       signer: {
@@ -394,6 +394,28 @@ describe('Verify Authorization Code Access Token Request', () => {
         request,
       })
     ).rejects.toThrow(`Invalid 'code' provided`)
+  })
+
+  // RFC 6749 §4.1.3: the redirect_uri must be identical to the one of the authorization request
+  test('verifies the redirect_uri against the one of the authorization request', async () => {
+    const verify = (redirectUri?: string) =>
+      verifyAuthorizationCodeAccessTokenRequest({
+        authorizationServerMetadata,
+        accessTokenRequest: { grant_type: authorizationCodeGrantIdentifier, code: 'hello', redirect_uri: redirectUri },
+        grant: { grantType: authorizationCodeGrantIdentifier, code: 'hello' },
+        callbacks,
+        expectedCode: 'hello',
+        expectedRedirectUri: 'https://wallet.example/cb',
+        request,
+      })
+
+    await expect(verify('https://attacker.example/cb')).rejects.toMatchObject({
+      errorResponse: { error: Oauth2ErrorCodes.InvalidGrant },
+      message: expect.stringContaining(`Invalid 'redirect_uri' provided`),
+    })
+    await expect(verify('https://wallet.example/cb/')).rejects.toThrow(`Invalid 'redirect_uri' provided`)
+    await expect(verify()).rejects.toThrow(`Missing required 'redirect_uri' in access token request`)
+    await expect(verify('https://wallet.example/cb')).resolves.toBeDefined()
   })
 
   test('handles authorization code expired', async () => {
@@ -567,7 +589,7 @@ describe('Verify Authorization Code Access Token Request', () => {
           jwt: 'ey',
         },
       })
-    ).rejects.toThrow('Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow('Unable to parse the JWS, a compact JWS must consist of exactly three parts')
   })
 
   test('handles client attestation provided but not valid', async () => {
@@ -596,7 +618,9 @@ describe('Verify Authorization Code Access Token Request', () => {
           clientAttestationPopJwt: 'something-else',
         },
       })
-    ).rejects.toThrow('Error verifying client attestation. Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow(
+      'Error verifying client attestation. Unable to parse the JWS, a compact JWS must consist of exactly three parts'
+    )
   })
 
   test('handles valid authorization code request', async () => {
@@ -612,7 +636,7 @@ describe('Verify Authorization Code Access Token Request', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopPrivateJwk]),
+        signJws: getSignJwsCallback([dpopPrivateJwk]),
       },
       request,
       signer: {
@@ -825,7 +849,7 @@ describe('Verify Refresh Token Access Token Request', () => {
           jwt: 'ey',
         },
       })
-    ).rejects.toThrow('Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow('Unable to parse the JWS, a compact JWS must consist of exactly three parts')
   })
 
   test('handles client attestation provided but not valid', async () => {
@@ -854,7 +878,9 @@ describe('Verify Refresh Token Access Token Request', () => {
           clientAttestationPopJwt: 'something-else',
         },
       })
-    ).rejects.toThrow('Error verifying client attestation. Jwt is not a valid jwt, unable to decode')
+    ).rejects.toThrow(
+      'Error verifying client attestation. Unable to parse the JWS, a compact JWS must consist of exactly three parts'
+    )
   })
 
   test('handles valid authorization code request', async () => {
@@ -870,7 +896,7 @@ describe('Verify Refresh Token Access Token Request', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopPrivateJwk]),
+        signJws: getSignJwsCallback([dpopPrivateJwk]),
       },
       request,
       signer: {
@@ -930,20 +956,17 @@ describe('Verify client instance key of Access Token Request', () => {
   }
 
   // A new client attestation (for example after the previous one expired) with a PoP signed by the instance key
-  async function createClientAttestation(
-    attester: Awaited<ReturnType<typeof generateEs256Key>>,
-    instance: Awaited<ReturnType<typeof generateEs256Key>>
-  ) {
-    const signJwt = getSignJwtCallback([attester.privateJwk, instance.privateJwk])
+  async function createClientAttestation(instance: Awaited<ReturnType<typeof generateEs256Key>>) {
+    const signJws = getSignJwsCallback([instance.privateJwk])
     const clientAttestationJwt = await createClientAttestationJwt({
-      callbacks: { signJwt },
+      callbacks: { signJws },
       clientId: 'wallet',
       confirmation: { jwk: instance.publicJwk },
       expiresAt: new Date(Date.now() + 3600 * 1000),
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: attester.publicJwk },
+      signer: testAttester.signer,
     })
     const clientAttestationPopJwt = await createClientAttestationPopJwt({
-      callbacks: { signJwt, generateRandom: callbacks.generateRandom },
+      callbacks: { signJws, generateRandom: callbacks.generateRandom },
       authorizationServer: authorizationServerMetadata.issuer,
       clientAttestation: clientAttestationJwt,
     })
@@ -962,33 +985,31 @@ describe('Verify client instance key of Access Token Request', () => {
     })
 
   test('returns the thumbprint of the client instance key, and accepts a new client attestation for it', async () => {
-    const attester = await generateEs256Key()
     const instance = await generateEs256Key()
 
-    const first = await refreshTokenRequest(await createClientAttestation(attester, instance))
+    const first = await refreshTokenRequest(await createClientAttestation(instance))
     const confirmationJwkThumbprint = first.clientAttestation?.clientAttestation.confirmationJwkThumbprint
     expect(confirmationJwkThumbprint).toEqual(
       await calculateJwkThumbprint({
-        hashAlgorithm: HashAlgorithm.Sha256,
+        hashAlgorithm: 'sha-256',
         hashCallback: callbacks.hash,
         jwk: instance.publicJwk,
       })
     )
 
     const second = await refreshTokenRequest({
-      ...(await createClientAttestation(attester, instance)),
+      ...(await createClientAttestation(instance)),
       expectedConfirmationJwkThumbprint: confirmationJwkThumbprint,
     })
     expect(second.clientAttestation?.clientAttestation.confirmationJwkThumbprint).toEqual(confirmationJwkThumbprint)
   })
 
   test('rejects a client attestation for another client instance key', async () => {
-    const attester = await generateEs256Key()
-    const first = await refreshTokenRequest(await createClientAttestation(attester, await generateEs256Key()))
+    const first = await refreshTokenRequest(await createClientAttestation(await generateEs256Key()))
 
     await expect(
       refreshTokenRequest({
-        ...(await createClientAttestation(attester, await generateEs256Key())),
+        ...(await createClientAttestation(await generateEs256Key())),
         expectedConfirmationJwkThumbprint: first.clientAttestation?.clientAttestation.confirmationJwkThumbprint,
       })
     ).rejects.toMatchObject({

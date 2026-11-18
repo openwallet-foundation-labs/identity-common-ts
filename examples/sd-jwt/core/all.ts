@@ -1,12 +1,12 @@
 import type { DisclosureFrame } from '@sd-jwt/core'
-import { SDJwtInstance } from '@sd-jwt/core'
+import { SdJwtInstance } from '@sd-jwt/core'
 import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
 
 ;(async () => {
   const { signer, verifier } = await createSignerVerifier()
 
-  // Create SDJwt instance for use
-  const sdjwt = new SDJwtInstance({
+  // Create SdJwt instance for use
+  const sdjwt = new SdJwtInstance({
     signer,
     verifier,
     signAlg: ES256.alg,
@@ -91,7 +91,7 @@ import { createSignerVerifier, digest, ES256, generateSalt } from './utils'
   // Create a presentation using the issued credential and the presentation frame
   // return a Encoded SD JWT. Holder send the presentation to the verifier
   const presentation = await sdjwt.present<typeof claims>(credential, presentationFrame)
-  console.log('presentedSDJwt:', presentation)
+  console.log('presentedSdJwt:', presentation)
 
   // Verifier Define the required claims that need to be verified in the presentation
   const requiredClaims = ['firstname', 'id', 'data.ssn']

@@ -50,7 +50,7 @@ import type {
   SignOptions,
   X509Extension,
 } from './types'
-import { X509Exception } from './x509-exception'
+import { X509Error } from './x509-error'
 
 const REASON_BY_CODE = new Map<number, CrlReason>(
   Object.entries(CRL_REASONS).map(([name, code]) => [code, name as CrlReason])
@@ -81,7 +81,7 @@ function decodeInteger(extensions: X509Extension[], oid: string, name: string): 
   const node = parseDer(extension.value)
   const bytes = node instanceof asn1js.Integer ? new Uint8Array(node.valueBlock.valueHexView) : undefined
   if (!bytes || bytes.length === 0 || bytes[0] & 0x80) {
-    throw new X509Exception(`Invalid ${name} extension`)
+    throw new X509Error(`Invalid ${name} extension`)
   }
   return integerBytesToBigInt(bytes)
 }
@@ -130,7 +130,7 @@ const NODES_PER_ENTRY = 16
  * Parsing does not verify the signature; use {@link verifyCrlSignature} or {@link checkRevocation}.
  *
  * @param input DER bytes, base64 encoded DER, or PEM (`X509 CRL`)
- * @throws X509Exception when the input is not a well-formed CRL or exceeds the size limits
+ * @throws X509Error when the input is not a well-formed CRL or exceeds the size limits
  */
 export function parseCrl(input: CrlInput, options: ParseCrlOptions = {}): Crl {
   const der = toDer(input, PEM_LABELS.crl)
@@ -141,9 +141,9 @@ export function parseCrl(input: CrlInput, options: ParseCrlOptions = {}): Crl {
       berOptions: { maxNodes: 1_000 + maxEntries * NODES_PER_ENTRY, ...berOptions },
     })
   } catch (error) {
-    throw new X509Exception('Invalid CRL', error)
+    throw new X509Error('Invalid CRL', error)
   }
-  if (!crl.tbsCertListRaw) throw new X509Exception('Unable to extract the TBSCertList')
+  if (!crl.tbsCertListRaw) throw new X509Error('Unable to extract the TBSCertList')
 
   const tbs = crl.tbsCertList
   const extensions = toExtensions(tbs.crlExtensions)
@@ -245,10 +245,10 @@ export function getRevocationStatus(
   }
 
   if (idp) {
-    const isCA = certificate.basicConstraints?.cA === true
+    const isCa = certificate.basicConstraints?.cA === true
     if (idp.onlyContainsAttributeCerts) return unknown('out_of_scope', 'The CRL only covers attribute certificates')
-    if (idp.onlyContainsCACerts && !isCA) return unknown('out_of_scope', 'The CRL only covers CA certificates')
-    if (idp.onlyContainsUserCerts && isCA) return unknown('out_of_scope', 'The CRL only covers end-entity certificates')
+    if (idp.onlyContainsCACerts && !isCa) return unknown('out_of_scope', 'The CRL only covers CA certificates')
+    if (idp.onlyContainsUserCerts && isCa) return unknown('out_of_scope', 'The CRL only covers end-entity certificates')
     if (
       idp.distributionPointUris.length > 0 &&
       !idp.distributionPointUris.some((uri) => certificate.crlDistributionPoints.includes(uri))
@@ -314,10 +314,10 @@ export async function checkRevocation(options: {
 
 function bigintToIntegerBytes(value: bigint | number): Uint8Array {
   const n = BigInt(value)
-  if (n < BigInt(0)) throw new X509Exception('CRL numbers must not be negative')
+  if (n < BigInt(0)) throw new X509Error('CRL numbers must not be negative')
   const hex = n.toString(16)
   const bytes = toPositiveIntegerBytes(hexDecode(hex.length % 2 ? `0${hex}` : hex))
-  if (bytes.length > 20) throw new X509Exception('CRL numbers must not be longer than 20 octets')
+  if (bytes.length > 20) throw new X509Error('CRL numbers must not be longer than 20 octets')
   return bytes
 }
 
@@ -335,7 +335,7 @@ function derExtension(oid: string, value: Uint8Array | ArrayBuffer, critical = f
  */
 export function prepareCrl(template: CrlTemplate): PreparedSignedStructure {
   if (!(template.nextUpdate > template.thisUpdate)) {
-    throw new X509Exception('nextUpdate must be later than thisUpdate')
+    throw new X509Error('nextUpdate must be later than thisUpdate')
   }
   const issuer = parseIssuerCertificate(template.issuerCertificate)
 

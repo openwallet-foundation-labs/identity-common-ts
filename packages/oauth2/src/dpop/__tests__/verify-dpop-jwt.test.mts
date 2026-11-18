@@ -1,9 +1,9 @@
+import { calculateJwkThumbprint, JoseInvalidArgumentError, JoseValidationError, type Jwk } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
-import { callbacks, getSignJwtCallback } from '../../__tests__/util.mjs'
-import { HashAlgorithm } from '../../callbacks'
-import { calculateJwkThumbprint } from '../../common/jwk/jwk-thumbprint'
-import type { Jwk } from '../../common/jwk/z-jwk'
+import { callbacks, getSignJwsCallback } from '../../__tests__/util.mjs'
+import { Oauth2ServerErrorResponseError } from '../../error/Oauth2ServerErrorResponseError'
 import { createDpopJwt, verifyDpopJwt } from '../dpop'
+import { zDpopJwtHeader } from '../z-dpop'
 
 const request = {
   method: 'POST',
@@ -35,7 +35,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -46,7 +46,7 @@ describe('verifyDpopJwt', () => {
     })
 
     const expectedJwkThumbprint = await calculateJwkThumbprint({
-      hashAlgorithm: HashAlgorithm.Sha256,
+      hashAlgorithm: 'sha-256',
       hashCallback: callbacks.hash,
       jwk: dpopSignerPublicJwk,
     })
@@ -66,7 +66,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -77,7 +77,7 @@ describe('verifyDpopJwt', () => {
     })
 
     const expectedJwkThumbprint = await calculateJwkThumbprint({
-      hashAlgorithm: HashAlgorithm.Sha256,
+      hashAlgorithm: 'sha-256',
       hashCallback: callbacks.hash,
       jwk: otherSignerPublicJwk,
     })
@@ -96,7 +96,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -122,7 +122,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -154,7 +154,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -172,7 +172,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -192,7 +192,7 @@ describe('verifyDpopJwt', () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -211,14 +211,66 @@ describe('verifyDpopJwt', () => {
         now: new Date('2024-01-01T00:02:00.000Z'),
         maxProofAgeSeconds: 30,
       })
-    ).rejects.toThrow('Dpop jwt is too old')
+    ).rejects.toThrow(/iat: .* \(expired\)/)
+  })
+
+  test('adds the allowed skew to maxProofAgeSeconds, 30 seconds by default', async () => {
+    const dpopJwt = await createDpopJwt({
+      callbacks: { ...callbacks, signJws: getSignJwsCallback([dpopSignerJwk]) },
+      request,
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: dpopSignerPublicJwk },
+      issuedAt: new Date('2024-01-01T00:00:00.000Z'),
+    })
+
+    const verify = (allowedSkewInSeconds?: number) =>
+      verifyDpopJwt({
+        callbacks,
+        dpopJwt,
+        request,
+        now: new Date('2024-01-01T00:00:45.000Z'),
+        maxProofAgeSeconds: 30,
+        allowedSkewInSeconds,
+      })
+
+    await expect(verify()).resolves.toBeDefined()
+    await expect(verify(0)).rejects.toThrow(/iat: .* \(expired\)/)
+  })
+
+  test('applies allowedSkewInSeconds to a proof issued in the future', async () => {
+    const dpopJwt = await createDpopJwt({
+      callbacks: {
+        ...callbacks,
+        signJws: getSignJwsCallback([dpopSignerJwk]),
+      },
+      request,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: dpopSignerPublicJwk,
+      },
+      issuedAt: new Date('2024-01-01T00:00:45.000Z'),
+    })
+
+    const verify = (allowedSkewInSeconds: number) =>
+      verifyDpopJwt({
+        callbacks,
+        dpopJwt,
+        request,
+        now: new Date('2024-01-01T00:00:00.000Z'),
+        maxProofAgeSeconds: 30,
+        allowedSkewInSeconds,
+      })
+
+    // A skew larger than the 30 seconds `verifyJwt` allows by default is honoured for `iat` as well
+    await expect(verify(60)).resolves.toBeDefined()
+    await expect(verify(30)).rejects.toThrow('in the future')
   })
 
   test('rejects replayed jti values when uniqueness callback indicates replay', async () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -265,11 +317,42 @@ describe('verifyDpopJwt', () => {
     ).rejects.toThrow('already been used')
   })
 
+  test('checks the jti for replay only after the signature verifies', async () => {
+    const dpopJwt = await createDpopJwt({
+      callbacks: {
+        ...callbacks,
+        signJws: getSignJwsCallback([dpopSignerJwk]),
+      },
+      request,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: dpopSignerPublicJwk,
+      },
+    })
+    const [header, payload, signature] = dpopJwt.split('.')
+    const tampered = `${header}.${payload}.${signature.startsWith('A') ? 'B' : 'A'}${signature.slice(1)}`
+
+    let replayChecks = 0
+    await expect(
+      verifyDpopJwt({
+        callbacks,
+        dpopJwt: tampered,
+        request,
+        assertJtiUniqueness: () => {
+          replayChecks++
+          return true
+        },
+      })
+    ).rejects.toThrow()
+    expect(replayChecks).toBe(0)
+  })
+
   test('rejects missing nonce when nonce is expected', async () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -286,14 +369,14 @@ describe('verifyDpopJwt', () => {
         request,
         expectedNonce: 'nonce-1',
       })
-    ).rejects.toThrow('does not have a nonce value')
+    ).rejects.toThrow(/nonce: .* \(claim_missing\)/)
   })
 
   test('rejects invalid nonce values', async () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -311,14 +394,53 @@ describe('verifyDpopJwt', () => {
         request,
         expectedNonce: 'different-nonce',
       })
-    ).rejects.toThrow('but expected nonce value')
+    ).rejects.toThrow(/nonce: .* \(claim_value_mismatch\)/)
+  })
+
+  test('keeps the JoseValidationError as cause, so a caller can tell a wrong nonce from other failures', async () => {
+    const dpopJwt = await createDpopJwt({
+      callbacks: { ...callbacks, signJws: getSignJwsCallback([dpopSignerJwk]) },
+      request,
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: dpopSignerPublicJwk },
+      nonce: 'actual-nonce',
+    })
+
+    const error = await verifyDpopJwt({ callbacks, dpopJwt, request, expectedNonce: 'different-nonce' }).catch((e) => e)
+    expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
+    expect(error.cause).toBeInstanceOf(JoseValidationError)
+    expect(error.cause.findIssue('claim_value_mismatch')).toMatchObject({ path: ['nonce'] })
+  })
+
+  test('rejects a proof issued more than the skew in the future, also without maxProofAgeSeconds', async () => {
+    const dpopJwt = await createDpopJwt({
+      callbacks: { ...callbacks, signJws: getSignJwsCallback([dpopSignerJwk]) },
+      request,
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: dpopSignerPublicJwk },
+      issuedAt: new Date('2024-01-01T00:01:00.000Z'),
+    })
+
+    await expect(
+      verifyDpopJwt({ callbacks, dpopJwt, request, now: new Date('2024-01-01T00:00:00.000Z') })
+    ).rejects.toThrow('in the future')
+  })
+
+  test('throws a negative allowedSkewInSeconds as the mistake of the caller, not as an invalid proof', async () => {
+    const dpopJwt = await createDpopJwt({
+      callbacks: { ...callbacks, signJws: getSignJwsCallback([dpopSignerJwk]) },
+      request,
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: dpopSignerPublicJwk },
+    })
+
+    await expect(verifyDpopJwt({ callbacks, dpopJwt, request, allowedSkewInSeconds: -1 })).rejects.toBeInstanceOf(
+      JoseInvalidArgumentError
+    )
   })
 
   test('rejects unsupported proof algorithms', async () => {
     const dpopJwt = await createDpopJwt({
       callbacks: {
         ...callbacks,
-        signJwt: getSignJwtCallback([dpopSignerJwk]),
+        signJws: getSignJwsCallback([dpopSignerJwk]),
       },
       request,
       signer: {
@@ -336,5 +458,13 @@ describe('verifyDpopJwt', () => {
         allowedSigningAlgs: ['ES384'],
       })
     ).rejects.toThrow('allowed dpop signging alg values are ES384')
+  })
+
+  test('accepts the dpop+jwt typ in its full media type form and in any casing (RFC 7515 section 4.1.9)', () => {
+    const header = { alg: 'ES256', jwk: dpopSignerPublicJwk }
+    for (const typ of ['dpop+jwt', 'application/dpop+jwt', 'DPoP+JWT']) {
+      expect(zDpopJwtHeader.safeParse({ ...header, typ }).success).toBe(true)
+    }
+    expect(zDpopJwtHeader.safeParse({ ...header, typ: 'jwt' }).success).toBe(false)
   })
 })

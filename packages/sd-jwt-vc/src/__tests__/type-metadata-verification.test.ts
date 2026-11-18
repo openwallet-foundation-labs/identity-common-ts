@@ -1,8 +1,8 @@
 import Crypto from 'node:crypto'
 import { hasher as digest, generateSalt } from '@owf/crypto'
-import { createHashMapping, type DisclosureFrame, SDJwt, type Signer, type Verifier } from '@sd-jwt/core'
+import { createHashMapping, type DisclosureFrame, SdJwt, type Signer, type Verifier } from '@sd-jwt/core'
 import { describe, expect, test, vi } from 'vitest'
-import { type SDJWTVCConfig, SDJwtVcInstance, type TypeMetadataFormat, verifyClaimsAgainstTypeMetadata } from '..'
+import { type SdJwtVcConfig, SdJwtVcInstance, type TypeMetadataFormat, verifyClaimsAgainstTypeMetadata } from '..'
 
 const generateKeyPair = () => {
   const { publicKey, privateKey } = Crypto.generateKeyPairSync('ed25519')
@@ -19,8 +19,8 @@ const generateKeyPair = () => {
 
 const { signer, verifier } = generateKeyPair()
 
-const createInstance = (config: SDJWTVCConfig = {}) =>
-  new SDJwtVcInstance({
+const createInstance = (config: SdJwtVcConfig = {}) =>
+  new SdJwtVcInstance({
     signer,
     verifier,
     hasher: digest,
@@ -269,7 +269,7 @@ describe('SD-JWT VC Type Metadata Verification', () => {
     }
 
     const compact = await sdJwtVc.issue(payload, { user: { _sd: ['name'], roles: { _sd: [0, 1] } } })
-    const sdjwt = await SDJwt.fromEncode(compact, digest)
+    const sdjwt = await SdJwt.fromEncode(compact, digest)
     const disclosures = await createHashMapping(sdjwt.disclosures ?? [], { hasher: digest, alg: 'sha-256' })
 
     const res = verifyClaimsAgainstTypeMetadata(metadata, sdjwt.jwt?.payload ?? {}, disclosures)

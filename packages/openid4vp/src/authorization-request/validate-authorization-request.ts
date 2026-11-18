@@ -14,7 +14,7 @@ export interface ValidateOpenid4vpAuthorizationRequestPayloadOptions {
 }
 
 /**
- * Validate the OpenId4Vp Authorization Request parameters
+ * Validate the OpenID4VP Authorization Request parameters
  */
 export const validateOpenid4vpAuthorizationRequestPayload = (
   options: ValidateOpenid4vpAuthorizationRequestPayloadOptions
@@ -66,7 +66,7 @@ export const validateOpenid4vpAuthorizationRequestPayload = (
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequest,
       error_description:
-        'The "trust_chain" parameter MUST NOT be present in the authorization request if the "client_id" is not an OpenId Federation Entity Identifier starting with http:// or https://.',
+        'The "trust_chain" parameter MUST NOT be present in the authorization request if the "client_id" is not an OpenID Federation Entity Identifier starting with http:// or https://.',
     })
   }
 

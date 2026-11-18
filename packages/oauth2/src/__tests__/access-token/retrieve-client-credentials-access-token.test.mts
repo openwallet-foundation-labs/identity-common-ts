@@ -1,4 +1,4 @@
-import { ContentType } from '@openid4vc/utils'
+import { CommonMediaTypes } from '@owf/identity-common'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
@@ -7,7 +7,7 @@ import {
   retrieveClientCredentialsAccessToken,
 } from '../../access-token/retrieve-access-token'
 import type { AccessTokenResponse } from '../../access-token/z-access-token'
-import type { SignJwtCallback } from '../../callbacks'
+import type { SignJwsCallback } from '../../callbacks'
 import { Oauth2ClientErrorResponseError } from '../../error/Oauth2ClientErrorResponseError'
 import type { AuthorizationServerMetadata } from '../../metadata/authorization-server/z-authorization-server-metadata'
 import { clientCredentialsGrantIdentifier } from '../../z-grant-type'
@@ -22,9 +22,9 @@ const mockAuthorizationServerMetadata: AuthorizationServerMetadata = {
   grant_types_supported: [clientCredentialsGrantIdentifier],
 }
 
-// Mock signJwt callback that's not actually used in client credentials flow
-const mockSignJwt: SignJwtCallback = async () => {
-  throw new Error('signJwt should not be called in client credentials flow')
+// Mock signJws callback that's not actually used in client credentials flow
+const mockSignJwt: SignJwsCallback = async () => {
+  throw new Error('signJws should not be called in client credentials flow')
 }
 
 describe('retrieveClientCredentialsAccessToken', () => {
@@ -55,7 +55,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain('scope=read+write')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -65,7 +65,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       scope: 'read write',
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -89,7 +89,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).not.toContain('scope=')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -98,7 +98,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -122,7 +122,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain('resource=https%3A%2F%2Fapi.example.com')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -132,7 +132,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       resource: 'https://api.example.com',
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -152,7 +152,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
           },
           {
             status: 400,
-            headers: { 'Content-Type': ContentType.Json },
+            headers: { 'Content-Type': CommonMediaTypes.Json },
           }
         )
       })
@@ -162,7 +162,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -184,7 +184,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -206,7 +206,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain('custom_param=custom_value')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -218,7 +218,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       },
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -244,7 +244,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain('resource=https%3A%2F%2Fapi.example.com')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -255,7 +255,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       resource: 'https://api.example.com',
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
       },
     }
@@ -283,7 +283,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).toContain(`client_secret=${clientSecret}`)
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -292,7 +292,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
         clientAuthentication: async ({ body }) => {
           body.client_id = clientId
@@ -334,7 +334,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
         expect(body).not.toContain('client_secret=')
 
         return HttpResponse.json(mockResponse, {
-          headers: { 'Content-Type': ContentType.Json },
+          headers: { 'Content-Type': CommonMediaTypes.Json },
         })
       })
     )
@@ -343,7 +343,7 @@ describe('retrieveClientCredentialsAccessToken', () => {
       authorizationServerMetadata: mockAuthorizationServerMetadata,
       callbacks: {
         ...callbacks,
-        signJwt: mockSignJwt,
+        signJws: mockSignJwt,
         fetch,
         clientAuthentication: async ({ headers }) => {
           const credentials = btoa(`${clientId}:${clientSecret}`)

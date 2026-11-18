@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
-import { type CallbackContext, type Jwk, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
+import { type CallbackContext, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
+import type { Jwk } from '@owf/jose'
 import * as jose from 'jose'
 import { describe, expect, test, vi } from 'vitest'
 import {

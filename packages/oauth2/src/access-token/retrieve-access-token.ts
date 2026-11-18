@@ -1,12 +1,5 @@
-import {
-  ContentType,
-  createZodFetcher,
-  Headers,
-  InvalidFetchResponseError,
-  objectToQueryParams,
-  parseWithErrorHandling,
-  ValidationError,
-} from '@openid4vc/utils'
+import { createZodFetcher, Headers, InvalidFetchResponseError, objectToQueryParams } from '@openid4vc/utils'
+import { CommonMediaTypes, parseWithErrorHandling, ValidationError } from '@owf/identity-common'
 import type { CallbackContext } from '../callbacks'
 import {
   authorizationServerRequestWithClientAttestationChallengeRetry,
@@ -53,7 +46,10 @@ interface RetrieveAccessTokenBaseOptions {
   /**
    * Callbacks to use for requesting access token
    */
-  callbacks: Pick<CallbackContext, 'fetch' | 'generateRandom' | 'hash' | 'signJwt' | 'clientAuthentication'>
+  callbacks: Pick<
+    CallbackContext,
+    'fetch' | 'fetchLimits' | 'generateRandom' | 'hash' | 'signJws' | 'clientAuthentication'
+  >
 
   /**
    * The resource to which access is being requested. This can help the authorization
@@ -222,7 +218,7 @@ interface RetrieveAccessTokenOptions extends RetrieveAccessTokenBaseOptions {
  * Internal method
  */
 async function retrieveAccessToken(options: RetrieveAccessTokenOptions): Promise<RetrieveAccessTokenReturn> {
-  const fetchWithZod = createZodFetcher(options.callbacks.fetch)
+  const fetchWithZod = createZodFetcher(options.callbacks, 'accessTokenRequest')
 
   const accessTokenRequest = parseWithErrorHandling(
     zAccessTokenRequest,
@@ -260,7 +256,7 @@ async function retrieveAccessToken(options: RetrieveAccessTokenOptions): Promise
             : undefined
 
           const headers = new Headers({
-            'Content-Type': ContentType.XWwwFormUrlencoded,
+            'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
             ...dpopHeaders,
           })
 
@@ -270,14 +266,14 @@ async function retrieveAccessToken(options: RetrieveAccessTokenOptions): Promise
             method: 'POST',
             authorizationServerMetadata: options.authorizationServerMetadata,
             body: accessTokenRequest,
-            contentType: ContentType.XWwwFormUrlencoded,
+            contentType: CommonMediaTypes.XWwwFormUrlencoded,
             headers,
             attestationChallenge,
           })
 
           const { response, result } = await fetchWithZod(
             zAccessTokenResponse,
-            ContentType.Json,
+            CommonMediaTypes.Json,
             options.authorizationServerMetadata.token_endpoint,
             {
               body: objectToQueryParams(accessTokenRequest).toString(),
@@ -309,7 +305,7 @@ async function retrieveAccessToken(options: RetrieveAccessTokenOptions): Promise
           }
 
           if (!result.success) {
-            throw new ValidationError('Error validating access token response', result.error)
+            throw new ValidationError('Error validating access token response', result.issues)
           }
 
           const dpopNonce = extractDpopNonceFromHeaders(response.headers) ?? undefined

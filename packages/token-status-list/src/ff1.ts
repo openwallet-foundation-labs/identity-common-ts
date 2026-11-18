@@ -1,5 +1,5 @@
 import type { OrPromise } from '@owf/identity-common'
-import { SLException } from './status-list-exception'
+import { StatusListError } from './status-list-error'
 
 /** Encrypts one 16-byte block with AES under the caller's key (AES-ECB without padding). */
 export type EncryptBlock = (block: Uint8Array<ArrayBuffer>) => OrPromise<Uint8Array>
@@ -23,13 +23,13 @@ export async function ff1Encrypt(value: bigint, length: number, options: Ff1Opti
   const radixBig = BigInt(radix)
 
   if (!Number.isInteger(radix) || radix < 2 || radix > 2 ** 16) {
-    throw new SLException('FF1 radix must be between 2 and 2^16')
+    throw new StatusListError('FF1 radix must be between 2 and 2^16')
   }
   if (!Number.isInteger(length) || length < 2 || length >= 2 ** 32 || radixBig ** BigInt(length) < MIN_DOMAIN_SIZE) {
-    throw new SLException('FF1 needs at least 2 numerals and a domain of at least 1,000,000 values')
+    throw new StatusListError('FF1 needs at least 2 numerals and a domain of at least 1,000,000 values')
   }
   if (value < 0n || value >= radixBig ** BigInt(length)) {
-    throw new SLException('FF1 input is outside the domain')
+    throw new StatusListError('FF1 input is outside the domain')
   }
 
   const u = Math.floor(length / 2)
@@ -95,7 +95,7 @@ async function cbcMac(state: Uint8Array, input: Uint8Array, encryptBlock: Encryp
 async function cipher(block: Uint8Array<ArrayBuffer>, encryptBlock: EncryptBlock): Promise<Uint8Array> {
   const output = await encryptBlock(block)
   if (output.length !== BLOCK_SIZE) {
-    throw new SLException(`encryptBlock returned ${output.length} bytes, expected ${BLOCK_SIZE}`)
+    throw new StatusListError(`encryptBlock returned ${output.length} bytes, expected ${BLOCK_SIZE}`)
   }
   return new Uint8Array(output)
 }

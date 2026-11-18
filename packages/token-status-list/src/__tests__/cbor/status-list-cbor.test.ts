@@ -26,9 +26,14 @@ suite('StatusListCbor', () => {
     })
 
     const sl = new StatusList([0, 0, 0], 8, 'foo')
-    expect(sl).toStrictEqual(
-      StatusList.decompressStatusListFromBytes(sl.compressStatusListToBytes(), sl.getBitsPerStatus(), sl.aggregationUri)
+    const decompressed = StatusList.decompressStatusListFromBytes(
+      sl.compressStatusListToBytes(),
+      sl.getBitsPerStatus(),
+      sl.aggregationUri
     )
+    // A decompressed list reads its statuses from its bytes until `statusList` decodes them
+    expect(decompressed.statusList).toEqual(sl.statusList)
+    expect(sl).toStrictEqual(decompressed)
 
     const encoded = statusListCbor.encode()
     const fromEncoded = StatusListCbor.decode(encoded)

@@ -1,7 +1,7 @@
 import { ES256, parseCertificate } from '@owf/crypto'
 import { base64urlDecode } from '@owf/identity-common'
 import { describe, expect, it } from 'vitest'
-import { schemaMeta, schemaURI } from '../builders'
+import { schemaMeta, schemaUri } from '../builders'
 import { signSchemaMeta } from '../signer'
 
 // Self-signed EC P-256 certificate and matching key pair (generated via openssl)
@@ -40,8 +40,8 @@ describe('signSchemaMeta', () => {
       .rulebookIntegrity('sha256-cJe/IG7DijmXd2FpecyWJVnZ9EuKKprly5auxGm1uIw=')
       .attestationLoS('iso_18045_basic')
       .bindingType('key')
-      .addSchemaURI(
-        schemaURI()
+      .addSchemaUri(
+        schemaUri()
           .format('dc+sd-jwt')
           .uri('https://example.com/schema.json')
           .integrity('sha256-M8H+reBt9Nr/s8CRicJrthAnk7UdWyTyONW0N8Z/Axw=')

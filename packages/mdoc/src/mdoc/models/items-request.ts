@@ -9,13 +9,13 @@ import type { DocType } from './doctype'
 import type { IntentToRetain } from './intent-to-retain'
 import type { Namespace } from './namespace'
 
-const namespacesSchema = z.map(z.string(), z.map(z.string(), z.boolean()))
+const zNamespaces = z.map(z.string(), z.map(z.string(), z.boolean()))
 
 // Zod schema for ItemsRequest
-const itemsRequestSchema = typedMap(
+const zItemsRequest = typedMap(
   [
     ['docType', z.string()],
-    ['nameSpaces', namespacesSchema],
+    ['nameSpaces', zNamespaces],
     ['requestInfo', z.instanceof(DocRequestInfo).exactOptional()],
   ] as const,
   {
@@ -35,10 +35,10 @@ const itemsRequestSchema = typedMap(
   }
 )
 
-export type ItemsRequestEncodedStructure = z.input<typeof itemsRequestSchema>
-export type ItemsRequestDecodedStructure = z.output<typeof itemsRequestSchema>
+export type ItemsRequestEncodedStructure = z.input<typeof zItemsRequest>
+export type ItemsRequestDecodedStructure = z.output<typeof zItemsRequest>
 
-type NamespacesStructure = z.infer<typeof namespacesSchema>
+type NamespacesStructure = z.infer<typeof zNamespaces>
 
 export type ItemsRequestOptions = {
   docType: DocType
@@ -54,7 +54,7 @@ export class ItemsRequest extends OriginalBytesCborStructure<
   ItemsRequestDecodedStructure
 > {
   public static override get encodingSchema() {
-    return itemsRequestSchema
+    return zItemsRequest
   }
 
   public get docType() {

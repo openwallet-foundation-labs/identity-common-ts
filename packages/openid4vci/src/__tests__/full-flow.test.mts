@@ -1,10 +1,6 @@
 import {
   authorizationCodeGrantIdentifier,
-  calculateJwkThumbprint,
   clientAuthenticationClientAttestationJwt,
-  HashAlgorithm,
-  type Jwk,
-  type JwkSet,
   Oauth2AuthorizationServer,
   Oauth2Client,
   Oauth2ResourceServer,
@@ -13,14 +9,17 @@ import {
   SupportedAuthenticationScheme,
   SupportedClientAuthenticationMethod,
 } from '@openid4vc/oauth2'
-import { addSecondsToDate, ContentType, decodeUtf8String, encodeToBase64Url, type HttpMethod } from '@openid4vc/utils'
+import { addSecondsToDate, type HttpMethod } from '@openid4vc/utils'
+import { base64url, CommonMediaTypes } from '@owf/identity-common'
+import { calculateJwkThumbprint, type Jwk, type JwkSet } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import {
-  getSignJwtCallback,
+  getSignJwsCallback,
   parseXwwwFormUrlEncoded,
   callbacks as partialCallbacks,
+  testAttester,
 } from '../../../oauth2/src/__tests__/util.mjs'
 import {
   type CredentialConfigurationSupportedWithFormats,
@@ -51,6 +50,7 @@ const credentialRequestProofJwk = {
 const { d: __2, ...credentialRequestProofJwkPublic } = credentialRequestProofJwk
 
 const accessTokenJwk = {
+  kid: 'access-token-key',
   kty: 'EC',
   d: 'Y2KgM6WsS5lAiZMj96VaqPm0YpP67mclJ5yXbhM7oQE',
   crv: 'P-256',
@@ -59,21 +59,12 @@ const accessTokenJwk = {
 }
 const { d: __3, ...accessTokenJwkPublic } = accessTokenJwk
 
-const walletProviderJwk = {
-  kty: 'EC',
-  d: 'oXYK_EmjSLauIIkWF53DuRhZTx9SHg5lC5eWZmtWPxE',
-  crv: 'P-256',
-  x: '2l7WpVHYQoWWjHcB9MpfEylT7w-bhRbG3i-38Cel7EI',
-  y: 'm5c_gqV2sbLmGh4p1bhEANwyt0xtfacrc554SyomrX0',
-}
-const { d: __4, ...walletProviderJwkPublic } = walletProviderJwk
-
 const server = setupServer()
 
 const callbacks = {
   ...partialCallbacks,
   fetch,
-  signJwt: getSignJwtCallback([credentialRequestProofJwk, dpopJwk, accessTokenJwk, walletProviderJwk]),
+  signJws: getSignJwsCallback([credentialRequestProofJwk, dpopJwk, accessTokenJwk]),
 }
 
 const issuer = new Openid4vciIssuer({
@@ -184,7 +175,7 @@ describe('Full E2E test', () => {
       ),
       http.get(`${authorizationServerMetadata.jwks_uri}`, () =>
         HttpResponse.json({ keys: [accessTokenJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       ),
       http.post(authorizationServerMetadata.token_endpoint, async ({ request }) => {
@@ -252,9 +243,9 @@ describe('Full E2E test', () => {
         const accessTokenResponse = await authorizationServer.createAccessTokenResponse({
           audience: credentialIssuerMetadata.credential_issuer,
           signer: {
-            method: 'jwk',
+            method: 'custom',
             alg: 'ES256',
-            publicJwk: accessTokenJwkPublic,
+            kid: accessTokenJwkPublic.kid,
           },
           subject: parsedAccessTokenRequest.grant.preAuthorizedCode,
           expiresInSeconds: 300,
@@ -291,7 +282,7 @@ describe('Full E2E test', () => {
           jti: expect.any(String),
           cnf: {
             jkt: await calculateJwkThumbprint({
-              hashAlgorithm: HashAlgorithm.Sha256,
+              hashAlgorithm: 'sha-256',
               hashCallback: callbacks.hash,
               jwk: dpopJwkPublic as Jwk,
             }),
@@ -318,7 +309,7 @@ describe('Full E2E test', () => {
             knownCredentialConfigurations: credentialConfigurationsSupported,
           },
           credentialRequest: credentialRequest as Record<string, unknown>,
-          contentType: ContentType.Json,
+          contentType: CommonMediaTypes.Json,
         })
 
         if (!parsedCredentialRequest.proofs?.jwt) {
@@ -463,11 +454,7 @@ describe('Full E2E test', () => {
       // Valid one hour
       expiresAt: addSecondsToDate(new Date(), 3600),
       issuer: 'https://wallet-provider.com',
-      signer: {
-        method: 'jwk',
-        publicJwk: walletProviderJwkPublic,
-        alg: 'ES256',
-      },
+      signer: testAttester.signer,
       walletLink: 'https://wallet-provider.com/wallet',
       walletName: 'Wallet',
     })
@@ -512,7 +499,7 @@ describe('Full E2E test', () => {
       ),
       http.get(`${authorizationServerMetadata.jwks_uri}`, () =>
         HttpResponse.json({ keys: [accessTokenJwkPublic] } satisfies JwkSet, {
-          headers: { 'Content-Type': ContentType.JwkSet },
+          headers: { 'Content-Type': CommonMediaTypes.JwkSet },
         })
       ),
       http.post(`${authorizationServerMetadata.pushed_authorization_request_endpoint}`, async ({ request }) => {
@@ -531,6 +518,7 @@ describe('Full E2E test', () => {
         const verifiedParRequest = await authorizationServer.verifyPushedAuthorizationRequest({
           authorizationRequest,
           authorizationServerMetadata,
+          allowedRedirectUris: ['https://redirect.com'],
           request: {
             headers: request.headers,
             method: request.method as HttpMethod,
@@ -550,7 +538,7 @@ describe('Full E2E test', () => {
 
         expect(verifiedParRequest.dpop?.jwkThumbprint).toEqual(
           await calculateJwkThumbprint({
-            hashAlgorithm: HashAlgorithm.Sha256,
+            hashAlgorithm: 'sha-256',
             hashCallback: callbacks.hash,
             jwk: dpopJwkPublic,
           })
@@ -561,7 +549,7 @@ describe('Full E2E test', () => {
             header: {
               alg: 'ES256',
               typ: 'oauth-client-attestation+jwt',
-              jwk: walletProviderJwkPublic,
+              kid: testAttester.signer.kid,
             },
             payload: {
               iss: 'https://wallet-provider.com',
@@ -574,11 +562,7 @@ describe('Full E2E test', () => {
               wallet_name: 'Wallet',
               wallet_link: 'https://wallet-provider.com/wallet',
             },
-            signer: {
-              alg: 'ES256',
-              method: 'jwk',
-              publicJwk: walletProviderJwkPublic,
-            },
+            signer: { ...testAttester.signer, publicJwk: testAttester.publicJwk },
             // The client instance key is the dpop key in this flow
             confirmationJwkThumbprint: verifiedParRequest.dpop?.jwkThumbprint,
           },
@@ -620,7 +604,7 @@ describe('Full E2E test', () => {
         const accessTokenRequest = parseXwwwFormUrlEncoded(await request.text())
         expect(accessTokenRequest).toEqual({
           code: 'some-authorization-code',
-          redirect_uri: 'https://redirect-uri.com',
+          redirect_uri: 'https://redirect.com',
           code_verifier: expect.any(String),
           grant_type: 'authorization_code',
           resource: credentialIssuerMetadata.credential_issuer,
@@ -637,7 +621,7 @@ describe('Full E2E test', () => {
         expect(parsedAccessTokenRequest).toEqual({
           accessTokenRequest: {
             code: 'some-authorization-code',
-            redirect_uri: 'https://redirect-uri.com',
+            redirect_uri: 'https://redirect.com',
             code_verifier: expect.any(String),
             grant_type: 'authorization_code',
             resource: createdCredentialOffer.credentialOfferObject.credential_issuer,
@@ -668,13 +652,12 @@ describe('Full E2E test', () => {
           grant: parsedAccessTokenRequest.grant,
           accessTokenRequest: parsedAccessTokenRequest.accessTokenRequest,
           pkce: {
-            codeChallenge: encodeToBase64Url(
-              callbacks.hash(decodeUtf8String('some-code-verifier'), HashAlgorithm.Sha256)
-            ),
+            codeChallenge: base64url.encode(callbacks.hash('some-code-verifier', 'sha-256')),
             codeChallengeMethod: PkceCodeChallengeMethod.S256,
             codeVerifier: parsedAccessTokenRequest.pkceCodeVerifier,
           },
           expectedCode: 'some-authorization-code',
+          expectedRedirectUri: 'https://redirect.com',
           request: {
             method: request.method as HttpMethod,
             headers: request.headers,
@@ -685,7 +668,7 @@ describe('Full E2E test', () => {
             required: true,
             allowedSigningAlgs: authorizationServerMetadata.dpop_signing_alg_values_supported,
             expectedJwkThumbprint: await calculateJwkThumbprint({
-              hashAlgorithm: HashAlgorithm.Sha256,
+              hashAlgorithm: 'sha-256',
               hashCallback: callbacks.hash,
               jwk: dpopJwk as Jwk,
             }),
@@ -695,9 +678,9 @@ describe('Full E2E test', () => {
         const accessTokenResponse = await authorizationServer.createAccessTokenResponse({
           audience: credentialIssuerMetadata.credential_issuer,
           signer: {
-            method: 'jwk',
+            method: 'custom',
             alg: 'ES256',
-            publicJwk: accessTokenJwkPublic,
+            kid: accessTokenJwkPublic.kid,
           },
           subject: 'some-authorization-code',
           expiresInSeconds: 300,
@@ -735,7 +718,7 @@ describe('Full E2E test', () => {
           jti: expect.any(String),
           cnf: {
             jkt: await calculateJwkThumbprint({
-              hashAlgorithm: HashAlgorithm.Sha256,
+              hashAlgorithm: 'sha-256',
               hashCallback: callbacks.hash,
               jwk: dpop?.jwk as Jwk,
             }),
@@ -763,7 +746,7 @@ describe('Full E2E test', () => {
             knownCredentialConfigurations: credentialConfigurationsSupported,
           },
           credentialRequest: credentialRequest as Record<string, unknown>,
-          contentType: ContentType.Json,
+          contentType: CommonMediaTypes.Json,
         })
 
         if (!parsedCredentialRequest.proofs?.jwt) {
@@ -876,9 +859,7 @@ describe('Full E2E test', () => {
         : undefined,
     })
     expect(pkce).toStrictEqual({
-      codeChallenge: encodeToBase64Url(
-        callbacks.hash(decodeUtf8String(pkce?.codeVerifier as string), HashAlgorithm.Sha256)
-      ),
+      codeChallenge: base64url.encode(callbacks.hash(pkce?.codeVerifier as string, 'sha-256')),
       codeChallengeMethod: 'S256',
       codeVerifier: expect.any(String),
     })
@@ -912,7 +893,7 @@ describe('Full E2E test', () => {
       issuerMetadata,
       authorizationCode: authorizationResponse.code,
       pkceCodeVerifier: pkce?.codeVerifier,
-      redirectUri: 'https://redirect-uri.com',
+      redirectUri: 'https://redirect.com',
       // TODO: how to select the alg
       dpop: isDpopSupported.supported
         ? {

@@ -149,6 +149,66 @@ suite('fetch credential metadata', () => {
   beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
   afterAll(() => server.close())
 
+  // Expired metadata, with the transaction data types shown for SCA consent, could be replayed by whoever serves it
+  test('rejects expired credential metadata', async () => {
+    const [header, payload, signature] = credentialMetadataJwt.split('.')
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString())
+    const expired = `${header}.${Buffer.from(JSON.stringify({ ...claims, exp: claims.iat + 1 })).toString('base64url')}.${signature}`
+    server.use(
+      http.get(
+        'https://6800-178-225-134-215.ngrok-free.app/payments-credential-metadata',
+        () => HttpResponse.text(expired),
+        {
+          once: true,
+        }
+      )
+    )
+
+    await expect(
+      fetchCredentialMetadata(
+        async () => {},
+        'https://6800-178-225-134-215.ngrok-free.app/payments-credential-metadata'
+      )
+    ).rejects.toThrow('exp must be in the future')
+  })
+
+  test('fetches with the custom fetcher, which is told what it fetches', async () => {
+    const fetched: Array<{ url: string; type: string; accept: string | null; language: string | null }> = []
+
+    await fetchCredentialMetadata(
+      async () => {},
+      'https://6800-178-225-134-215.ngrok-free.app/payments-credential-metadata',
+      (url, init, { type }) => {
+        const headers = new Headers(init.headers)
+        fetched.push({ url, type, accept: headers.get('Accept'), language: headers.get('Accept-Language') })
+        return fetch(url, init)
+      },
+      'de'
+    )
+
+    expect(fetched).toEqual([
+      {
+        url: 'https://6800-178-225-134-215.ngrok-free.app/payments-credential-metadata',
+        type: 'credentialMetadata',
+        accept: 'application/jwt',
+        language: 'de',
+      },
+    ])
+  })
+
+  // The signed metadata is far larger than 100 bytes
+  test('rejects credential metadata larger than its limit', async () => {
+    await expect(
+      fetchCredentialMetadata(
+        async () => {},
+        'https://6800-178-225-134-215.ngrok-free.app/payments-credential-metadata',
+        undefined,
+        undefined,
+        { maxResponseBytesByType: { credentialMetadata: 100 } }
+      )
+    ).rejects.toThrow('The response is larger than the maximum of 100 bytes')
+  })
+
   test('fetch valid credential metadata', async () => {
     const metadata = await fetchCredentialMetadata(
       async () => {},

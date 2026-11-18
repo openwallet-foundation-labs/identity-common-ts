@@ -1,5 +1,5 @@
-import { decodeUtf8String, encodeToBase64Url } from '@openid4vc/utils'
-import { type CallbackContext, HashAlgorithm, type HashCallback } from './callbacks'
+import { base64url } from '@owf/identity-common'
+import type { CallbackContext } from './callbacks'
 import { Oauth2Error } from './error/Oauth2Error'
 
 export enum PkceCodeChallengeMethod {
@@ -42,7 +42,7 @@ export async function createPkce(options: CreatePkceOptions): Promise<CreatePkce
     ? PkceCodeChallengeMethod.S256
     : PkceCodeChallengeMethod.Plain
 
-  const codeVerifier = options.codeVerifier ?? encodeToBase64Url(await options.callbacks.generateRandom(64))
+  const codeVerifier = options.codeVerifier ?? base64url.encode(await options.callbacks.generateRandom(64))
   return {
     codeVerifier,
     codeChallenge: await calculateCodeChallenge({
@@ -83,14 +83,14 @@ export async function verifyPkce(options: VerifyPkceOptions) {
 async function calculateCodeChallenge(options: {
   codeVerifier: string
   codeChallengeMethod: PkceCodeChallengeMethod
-  hashCallback: HashCallback
+  hashCallback: CallbackContext['hash']
 }) {
   if (options.codeChallengeMethod === PkceCodeChallengeMethod.Plain) {
     return options.codeVerifier
   }
 
   if (options.codeChallengeMethod === PkceCodeChallengeMethod.S256) {
-    return encodeToBase64Url(await options.hashCallback(decodeUtf8String(options.codeVerifier), HashAlgorithm.Sha256))
+    return base64url.encode(await options.hashCallback(options.codeVerifier, 'sha-256'))
   }
 
   throw new Oauth2Error(`Unsupported code challenge method ${options.codeChallengeMethod}`)
