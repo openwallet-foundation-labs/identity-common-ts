@@ -21,7 +21,12 @@ import {
 import { IdentifierFoundInRevokedListError, StatusListEntryNotValidError } from '../errors.js'
 import type { IdentifierListCwt } from './identifier-list-cwt'
 import { MobileSecurityObject, type MobileSecurityObjectEncodedStructure } from './mobile-security-object.js'
-import { type StatusVerificationOptions, verifyIdentifierListToken, verifyStatusListToken } from './mso-revocation-list'
+import {
+  type StatusVerificationOptions,
+  type VerifiedStatusListJwt,
+  verifyIdentifierListToken,
+  verifyStatusListToken,
+} from './mso-revocation-list'
 
 export type IssuerAuthEncodedStructure = Sign1EncodedStructure
 export type IssuerAuthOptions = Omit<Sign1Options, 'payload'> & {
@@ -34,11 +39,10 @@ export type IssuerAuthVerificationResult = {
    * certificate chain validation is disabled, or when it failed and the verification callback did not throw.
    */
   trustedIssuanceChain?: Uint8Array[]
-  /**
-   * Only a status list served in CWT format is returned here. One served as a JWT is verified but
-   * leaves this unset; `trustedStatusListChain` is set for either when its chain was validated.
-   */
+  /** The status list, when it was served in CWT format. */
   statusList?: StatusListCwt
+  /** The status list, when it was served in JWT format instead. */
+  statusListJwt?: VerifiedStatusListJwt
   trustedStatusListChain?: Uint8Array[]
   identifierList?: IdentifierListCwt
   trustedIdentifierListChain?: Uint8Array[]
@@ -125,12 +129,7 @@ export class IssuerAuth extends Sign1 {
       disableCertificateChainValidation?: boolean
     },
     ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose' | 'crypto'>
-  ): Promise<{
-    statusList?: StatusListCwt
-    trustedStatusListChain?: Uint8Array[]
-    identifierList?: IdentifierListCwt
-    trustedIdentifierListChain?: Uint8Array[]
-  }> {
+  ): Promise<Omit<IssuerAuthVerificationResult, 'trustedIssuanceChain'>> {
     const status = this.mobileSecurityObject.status
     if (!status || (!status.statusList && !status.identifierList)) return {}
 
@@ -165,6 +164,7 @@ export class IssuerAuth extends Sign1 {
 
     return {
       statusList: statusListResult?.statusListCwt,
+      statusListJwt: statusListResult?.statusListJwt,
       trustedStatusListChain: statusListResult?.chain,
       identifierList: identifierListResult?.identifierListCwt,
       trustedIdentifierListChain: identifierListResult?.chain,
@@ -304,6 +304,7 @@ export class IssuerAuth extends Sign1 {
     }
 
     let statusList: StatusListCwt | undefined
+    let statusListJwt: VerifiedStatusListJwt | undefined
     let trustedStatusListChain: Uint8Array[] | undefined
     let identifierList: IdentifierListCwt | undefined
     let trustedIdentifierListChain: Uint8Array[] | undefined
@@ -322,16 +323,17 @@ export class IssuerAuth extends Sign1 {
       })
     } else if (!disableStatusValidation && !hasFailedCheck) {
       try {
-        ;({ statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } = await this.verifyStatus(
-          {
-            now,
-            skewSeconds,
-            checkFreshness: true,
-            trustedStatusCertificates,
-            maxDecompressedBytes: options.status?.maxDecompressedBytes,
-          },
-          ctx
-        ))
+        ;({ statusList, statusListJwt, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
+          await this.verifyStatus(
+            {
+              now,
+              skewSeconds,
+              checkFreshness: true,
+              trustedStatusCertificates,
+              maxDecompressedBytes: options.status?.maxDecompressedBytes,
+            },
+            ctx
+          ))
       } catch (err) {
         // The default callback throws the reason without the check, so the reason names the lists.
         const { statusList: statusListInfo, identifierList: identifierListInfo } =
@@ -354,6 +356,7 @@ export class IssuerAuth extends Sign1 {
     return {
       trustedIssuanceChain,
       statusList,
+      statusListJwt,
       trustedStatusListChain,
       identifierList,
       trustedIdentifierListChain,

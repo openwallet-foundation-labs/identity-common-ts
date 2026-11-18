@@ -237,7 +237,7 @@ async function verifyStatusListJwt(
 
   await assertStatusValid(statusList, uri, idx)
 
-  return { statusListJwt: { header, payload, statusList }, chain }
+  return { statusListJwt: { jwt, header, payload, statusList }, chain }
 }
 
 /**
@@ -271,6 +271,7 @@ export type VerifyStatusListTokenOptions = {
 
 /** A status list served in JWT format, once verified. */
 export type VerifiedStatusListJwt = {
+  jwt: string
   header: Record<string, unknown>
   payload: StatusListJwtPayload
   statusList: StatusList

@@ -302,27 +302,19 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
             : undefined,
       })
 
-      const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
-        await document.issuerSigned.verify(
-          {
-            verificationCallback: onCheck,
-            disableCertificateChainValidation: options.disableCertificateChainValidation,
-            now: options.now,
-            trustedCertificates: options.trustedCertificates,
-            skewSeconds: options.skewSeconds,
-            status: options.status,
-          },
-          ctx
-        )
+      const issuerSignedResult = await document.issuerSigned.verify(
+        {
+          verificationCallback: onCheck,
+          disableCertificateChainValidation: options.disableCertificateChainValidation,
+          now: options.now,
+          trustedCertificates: options.trustedCertificates,
+          skewSeconds: options.skewSeconds,
+          status: options.status,
+        },
+        ctx
+      )
 
-      documentResults.push({
-        trustedIssuanceChain,
-        statusList,
-        trustedStatusListChain,
-        identifierList,
-        trustedIdentifierListChain,
-        document,
-      })
+      documentResults.push({ ...issuerSignedResult, document })
     }
 
     let deviceRequestMatch: DeviceRequestMatchResult | undefined

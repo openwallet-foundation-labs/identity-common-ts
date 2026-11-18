@@ -621,9 +621,11 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    // The JWT list is verified, but only a CWT list is returned as `statusList`.
-    const { statusList, trustedStatusListChain } = await verifyIssuerSigned(credential)
+    const { statusList, statusListJwt, trustedStatusListChain } = await verifyIssuerSigned(credential)
     expect(statusList).toBeUndefined()
+    expect(statusListJwt?.jwt.split('.')).toHaveLength(3)
+    expect(statusListJwt?.payload.sub).toBe(uri)
+    expect(statusListJwt?.statusList.getStatus(idx)).toBe(StatusType.Valid)
     expect(trustedStatusListChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
   })
 
