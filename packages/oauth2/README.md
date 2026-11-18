@@ -17,6 +17,10 @@ An implementation of the [OAuth 2.0 Authorization Framework](https://datatracker
 
 A client attestation must be signed by an attester that is identified by `x5c`, a federation `trust_chain`, a DID, or another `kid`. The `verifyJws` callback decides whether the attester is trusted, for example by validating the `x5c` chain. For a DID, it must check that the DID belongs to a trusted attester: resolving the DID is not enough, as anyone can create a did:jwk or did:key, or host a did:web. An attestation signed with a key from a `jwk` header is rejected, as the client could choose that key itself.
 
+The package does not keep client registrations. An authorization server must check the `redirect_uri` of an authorization request against the redirect URIs registered for the client before it redirects to it, by passing them as `allowedRedirectUris` to the authorization request verification (RFC 9700 Section 4.1.3). It must also store the `redirect_uri` with the authorization code and pass it as `expectedRedirectUri` to `verifyAuthorizationCodeAccessTokenRequest` (RFC 6749 Section 4.1.3).
+
+The package does not keep client registrations. An authorization server must check the `redirect_uri` of an authorization request against the redirect URIs registered for the client before it redirects to it, by passing them as `allowedRedirectUris` to the authorization request verification (RFC 9700 Section 4.1.3). It must also store the `redirect_uri` with the authorization code and pass it as `expectedRedirectUri` to `verifyAuthorizationCodeAccessTokenRequest` (RFC 6749 Section 4.1.3).
+
 This package was previously developed in the [oid4vc-ts](https://github.com/openwallet-foundation-labs/oid4vc-ts) repository. The `@openid4vc/*` packages are versioned together, separately from the other packages in this repository.
 
 ## Installation

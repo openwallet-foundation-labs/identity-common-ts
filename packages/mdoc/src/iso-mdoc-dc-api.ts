@@ -34,6 +34,7 @@ import {
   ReaderAuth,
   ReaderAuthentication,
   SessionTranscript,
+  type StatusVerificationOptions,
   type VerificationCallback,
 } from './mdoc'
 import { verifyAgeOverRequestLimit } from './utils/ageOver'
@@ -464,12 +465,10 @@ export class IsoMdocDcApi {
       deviceRequestMatchOptions?: DeviceRequestMatchOptions
       trustedCertificates: Array<{ issuance: Array<Uint8Array>; status?: Array<Uint8Array> }>
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       onCheck?: VerificationCallback
       now?: Date
       skewSeconds?: number
-      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
-      maxStatusListDecompressedBytes?: number
+      status?: StatusVerificationOptions
     },
     ctx: Pick<MdocContext, 'crypto' | 'cose' | 'x509' | 'fetch' | 'fetchLimits'>
   ): Promise<{
@@ -485,11 +484,10 @@ export class IsoMdocDcApi {
         sessionTranscript,
         trustedCertificates: options.trustedCertificates,
         disableCertificateChainValidation: options.disableCertificateChainValidation,
-        disableStatusValidation: options.disableStatusValidation,
         onCheck: options.onCheck,
         now: options.now,
         skewSeconds: options.skewSeconds,
-        maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
+        status: options.status,
       },
       ctx
     )

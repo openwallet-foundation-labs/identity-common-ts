@@ -5,6 +5,7 @@ import { getOpenid4vpClientId } from '../client-identifier-prefix/parse-client-i
 import type { VerifiedJarmAuthorizationResponse } from '../jarm/jarm-authorization-response/verify-jarm-authorization-response'
 import type { JarmHeader } from '../jarm/jarm-authorization-response/z-jarm-authorization-response'
 import { isJarmResponseMode } from '../jarm/jarm-response-mode'
+import { throwAsInvalidAuthorizationResponse } from './invalid-authorization-response'
 import { parseOpenid4vpAuthorizationResponsePayload } from './parse-authorization-response-payload'
 import { parseJarmAuthorizationResponse } from './parse-jarm-authorization-response'
 import { validateOpenid4vpAuthorizationResponsePayload } from './validate-authorization-response'
@@ -44,6 +45,13 @@ export type ParsedOpenid4vpAuthorizationResponse = ValidateOpenid4vpAuthorizatio
   }
 }
 
+/**
+ * Parses and validates an authorization response, and verifies it if it is a JARM response.
+ *
+ * @throws Oauth2ServerErrorResponseError with error `invalid_request` when the response is not valid, with the error
+ *   of `@owf/jose`, `@owf/identity-common` or `@openid4vc/utils` as `cause` if there is one.
+ * @throws Openid4vpAuthorizationResponseError when the wallet returned an authorization error response.
+ */
 export async function parseOpenid4vpAuthorizationResponse(
   options: ParseOpenid4vpAuthorizationResponseOptions
 ): Promise<ParsedOpenid4vpAuthorizationResponse> {
@@ -66,12 +74,17 @@ export async function parseOpenid4vpAuthorizationResponse(
     })
   }
 
-  const authorizationResponsePayload = parseOpenid4vpAuthorizationResponsePayload(authorizationResponse)
-
-  const validatedOpenid4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
-    authorizationRequestPayload: authorizationRequestPayload,
-    authorizationResponsePayload: authorizationResponsePayload,
-  })
+  let authorizationResponsePayload: Openid4vpAuthorizationResponse
+  let validatedOpenid4vpResponse: ValidateOpenid4vpAuthorizationResponseResult
+  try {
+    authorizationResponsePayload = parseOpenid4vpAuthorizationResponsePayload(authorizationResponse)
+    validatedOpenid4vpResponse = validateOpenid4vpAuthorizationResponsePayload({
+      authorizationRequestPayload: authorizationRequestPayload,
+      authorizationResponsePayload: authorizationResponsePayload,
+    })
+  } catch (error) {
+    throwAsInvalidAuthorizationResponse(error, 'Invalid authorization response.')
+  }
 
   if (authorizationRequestPayload.response_mode && isJarmResponseMode(authorizationRequestPayload.response_mode)) {
     throw new Oauth2ServerErrorResponseError(

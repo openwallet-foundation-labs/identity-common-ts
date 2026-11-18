@@ -76,9 +76,9 @@ describe('Oauth2ResourceServer', () => {
       },
       expiresInSeconds: 300,
       signer: {
-        method: 'jwk',
+        method: 'custom',
         alg: 'ES256',
-        publicJwk: accessTokenSignerJwkPublic,
+        kid: accessTokenSignerJwkPublic.kid,
       },
       subject: 'pre-auth-code',
       dpop: {
@@ -162,9 +162,9 @@ describe('Oauth2ResourceServer', () => {
       },
       expiresInSeconds: 300,
       signer: {
-        method: 'jwk',
+        method: 'custom',
         alg: 'ES256',
-        publicJwk: accessTokenSignerJwkPublic,
+        kid: accessTokenSignerJwkPublic.kid,
       },
       subject: 'pre-auth-code',
       dpop: {
@@ -257,7 +257,7 @@ describe('Oauth2ResourceServer', () => {
       signer: {
         method: 'custom',
         alg: 'ES256',
-        kid: accessTokenSignerJwk.kid,
+        kid: accessTokenSignerJwkPublic.kid,
       },
       subject: 'pre-auth-code',
       now: new Date('2024-10-01'),
@@ -309,9 +309,9 @@ describe('Oauth2ResourceServer', () => {
       },
       expiresInSeconds: 300,
       signer: {
-        method: 'jwk',
+        method: 'custom',
         alg: 'ES256',
-        publicJwk: accessTokenSignerJwkPublic,
+        kid: accessTokenSignerJwkPublic.kid,
       },
       subject: 'pre-auth-code',
       now: new Date('2024-10-01'),
@@ -362,9 +362,9 @@ describe('Oauth2ResourceServer', () => {
       },
       expiresInSeconds: 300,
       signer: {
-        method: 'jwk',
+        method: 'custom',
         alg: 'ES256',
-        publicJwk: accessTokenSignerJwkPublic,
+        kid: accessTokenSignerJwkPublic.kid,
       },
       subject: 'pre-auth-code',
       now: new Date('2024-10-01'),
@@ -393,7 +393,7 @@ describe('Oauth2ResourceServer', () => {
         authorizationServer: authorizationServerMetadata.issuer,
         callbacks: { ...callbacks, signJws: getSignJwsCallback([accessTokenSignerJwk]) },
         expiresInSeconds: 300,
-        signer: { method: 'jwk', alg: 'ES256', publicJwk: accessTokenSignerJwkPublic },
+        signer: { method: 'custom', alg: 'ES256', kid: accessTokenSignerJwkPublic.kid },
         subject: 'pre-auth-code',
         now: new Date('2024-10-01'),
       })
@@ -443,7 +443,7 @@ describe('Oauth2ResourceServer', () => {
       authorizationServer: authorizationServerMetadata.issuer,
       callbacks: { ...callbacks, signJws: getSignJwsCallback([accessTokenSignerJwk]) },
       expiresInSeconds: 300,
-      signer: { method: 'jwk', alg: 'ES256', publicJwk: accessTokenSignerJwkPublic },
+      signer: { method: 'custom', alg: 'ES256', kid: accessTokenSignerJwkPublic.kid },
       subject: 'pre-auth-code',
       now: new Date('2024-10-01T00:00:00Z'),
     })
@@ -634,7 +634,7 @@ describe('Oauth2ResourceServer', () => {
         })
       )
 
-      const accessTokenSigner = { method: 'jwk', alg: 'ES256', publicJwk: accessTokenSignerJwkPublic } as const
+      const accessTokenSigner = { method: 'custom', alg: 'ES256', kid: accessTokenSignerJwkPublic.kid } as const
       const { jwt } = await createAccessTokenJwt({
         audience,
         authorizationServer: firstAuthorizationServer.issuer,
@@ -672,7 +672,7 @@ describe('Oauth2ResourceServer', () => {
   })
 
   describe('access token typ', () => {
-    const accessTokenSigner = { method: 'jwk', alg: 'ES256', publicJwk: accessTokenSignerJwkPublic } as const
+    const accessTokenSigner = { method: 'custom', alg: 'ES256', kid: accessTokenSignerJwkPublic.kid } as const
     const getJwks = () => ({ keys: [accessTokenSignerJwkPublic] })
 
     // An access token as `createAccessTokenJwt` creates it, but with the given typ
@@ -727,6 +727,79 @@ describe('Oauth2ResourceServer', () => {
 
       expect(error).toBeInstanceOf(JoseValidationError)
       expect(error.message).toContain(`typ: typ must be at+jwt (invalid_typ)`)
+    })
+  })
+
+  // RFC 9068 Section 4: a resource server verifies with the keys of the authorization server, and selects one
+  // by the `kid` of the header (RFC 7515 Section 4.1.4)
+  describe('access token key selection', () => {
+    const accessTokenSigner = { method: 'custom', alg: 'ES256', kid: accessTokenSignerJwkPublic.kid } as const
+    const otherJwkPublic = { ...dpopSignerJwkPublic, kid: 'previous-access-token-key' }
+
+    const verify = (accessToken: string, keys: Jwk[]) =>
+      verifyJwtProfileAccessToken({
+        accessToken,
+        callbacks: { ...callbacks, getJwks: () => ({ keys }) },
+        authorizationServers: [authorizationServerMetadata],
+        resourceServer: 'https://resource-server.com',
+        now: new Date('2024-10-01'),
+      })
+
+    const createAccessTokenWithoutKid = async () => {
+      const { jwt } = await signJwt({
+        header: { typ: 'at+jwt' },
+        payload: {
+          iss: authorizationServerMetadata.issuer,
+          aud: 'https://resource-server.com',
+          sub: 'pre-auth-code',
+          iat: 1727740800,
+          exp: 1727741100,
+          jti: 'access-token-jti',
+        },
+        signer: accessTokenSigner,
+        signJwsCallback: getSignJwsCallback([accessTokenSignerJwk]),
+      })
+
+      return jwt
+    }
+
+    test('creates an access token with the kid of the signer, and verifies it against a jwks with several keys', async () => {
+      const { jwt } = await createAccessTokenJwt({
+        audience: 'https://resource-server.com',
+        authorizationServer: authorizationServerMetadata.issuer,
+        callbacks: { ...callbacks, signJws: getSignJwsCallback([accessTokenSignerJwk]) },
+        expiresInSeconds: 300,
+        signer: accessTokenSigner,
+        subject: 'pre-auth-code',
+        now: new Date('2024-10-01'),
+      })
+
+      const { header } = await verify(jwt, [otherJwkPublic, accessTokenSignerJwkPublic])
+      expect(header).toEqual({ typ: 'at+jwt', alg: 'ES256', kid: 'access-token-key' })
+    })
+
+    test('rejects an access token without kid against a jwks with several keys', async () => {
+      await expect(
+        verify(await createAccessTokenWithoutKid(), [otherJwkPublic, accessTokenSignerJwkPublic])
+      ).rejects.toThrow('No kid provided and the jwks contains 2 keys for this use.')
+    })
+
+    test('creates an access token without kid when the signer has none', async () => {
+      const { kid: _, ...privateJwkWithoutKid } = accessTokenSignerJwk
+      const { kid: __, ...publicJwkWithoutKid } = accessTokenSignerJwkPublic
+
+      const { jwt } = await createAccessTokenJwt({
+        audience: 'https://resource-server.com',
+        authorizationServer: authorizationServerMetadata.issuer,
+        callbacks: { ...callbacks, signJws: getSignJwsCallback([privateJwkWithoutKid]) },
+        expiresInSeconds: 300,
+        signer: { method: 'custom', alg: 'ES256' },
+        subject: 'pre-auth-code',
+        now: new Date('2024-10-01'),
+      })
+
+      const { header } = await verify(jwt, [publicJwkWithoutKid])
+      expect(header).toStrictEqual({ typ: 'at+jwt', alg: 'ES256' })
     })
   })
 })

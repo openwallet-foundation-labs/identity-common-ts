@@ -21,7 +21,7 @@ import {
 import { IdentifierFoundInRevokedListError, StatusListEntryNotValidError } from '../errors.js'
 import type { IdentifierListCwt } from './identifier-list-cwt'
 import { MobileSecurityObject, type MobileSecurityObjectEncodedStructure } from './mobile-security-object.js'
-import { verifyIdentifierListToken, verifyStatusListToken } from './mso-revocation-list'
+import { type StatusVerificationOptions, verifyIdentifierListToken, verifyStatusListToken } from './mso-revocation-list'
 
 export type IssuerAuthEncodedStructure = Sign1EncodedStructure
 export type IssuerAuthOptions = Omit<Sign1Options, 'payload'> & {
@@ -111,8 +111,8 @@ export class IssuerAuth extends Sign1 {
       checkFreshness,
       trustedStatusCertificates,
       disableCertificateChainValidation,
-      maxStatusListDecompressedBytes,
-    }: {
+      maxDecompressedBytes,
+    }: Omit<StatusVerificationOptions, 'disableValidation'> & {
       now?: Date
       /** Tolerance applied to the `exp` and `iat` of a revocation list. Defaults to 30 seconds. */
       skewSeconds?: number
@@ -123,8 +123,6 @@ export class IssuerAuth extends Sign1 {
        * certificate chain against `trustedStatusCertificates`. The revocation status is still checked.
        */
       disableCertificateChainValidation?: boolean
-      /** The maximum size in bytes the status list may inflate to, 16 MiB by default. */
-      maxStatusListDecompressedBytes?: number
     },
     ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose' | 'crypto'>
   ): Promise<{
@@ -145,7 +143,7 @@ export class IssuerAuth extends Sign1 {
             now,
             skewSeconds,
             checkFreshness,
-            maxDecompressedBytes: maxStatusListDecompressedBytes,
+            maxDecompressedBytes,
           },
           ctx
         )
@@ -197,21 +195,24 @@ export class IssuerAuth extends Sign1 {
       now?: Date
       trustedCertificates?: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       skewSeconds?: number
-      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
-      maxStatusListDecompressedBytes?: number
+      status?: StatusVerificationOptions
     },
     ctx: Pick<MdocContext, 'x509' | 'cose' | 'fetch' | 'fetchLimits' | 'crypto'>
   ): Promise<IssuerAuthVerificationResult> {
     const verificationCallback = options.verificationCallback ?? defaultVerificationCallback
     const now = options.now ?? new Date()
     const disableCertificateChainValidation = options.disableCertificateChainValidation ?? false
-    const disableStatusValidation = options.disableStatusValidation ?? false
+    const disableStatusValidation = options.status?.disableValidation ?? false
     const trustedCertificates = options.trustedCertificates ?? []
     const skewSeconds = options.skewSeconds ?? 30
 
-    const onCheck = onCategoryCheck(verificationCallback, 'ISSUER_AUTH')
+    const onIssuerAuthCheck = onCategoryCheck(verificationCallback, 'ISSUER_AUTH')
+    let hasFailedCheck = false
+    const onCheck: typeof onIssuerAuthCheck = (item) => {
+      if (item.status === 'FAILED') hasFailedCheck = true
+      onIssuerAuthCheck(item)
+    }
 
     onCheck({
       status: this.getIssuingCountry(ctx) ? 'PASSED' : 'FAILED',
@@ -271,52 +272,6 @@ export class IssuerAuth extends Sign1 {
       check: 'Issuer auth signature is invalid',
     })
 
-    let statusList: StatusListCwt | undefined
-    let trustedStatusListChain: Uint8Array[] | undefined
-    let identifierList: IdentifierListCwt | undefined
-    let trustedIdentifierListChain: Uint8Array[] | undefined
-    // The revocation list URIs come from the MSO, so they are only fetched once the MSO is known to be
-    // signed by a trusted issuer. A forged MSO must not make the verifier request a URI of its choosing.
-    // Without chain validation, the signature only shows that the MSO is signed with the key of its own
-    // certificate, so the status is left to `verifyStatus` once the caller trusts the issuer.
-    if (!disableStatusValidation && isSignatureValid && disableCertificateChainValidation) {
-      onCheck({
-        status: 'WARNING',
-        check: 'Status information must be valid',
-        reason:
-          'The status is not checked without certificate chain validation. Call IssuerAuth.verifyStatus once the issuer is trusted.',
-      })
-    } else if (!disableStatusValidation && isSignatureValid) {
-      try {
-        ;({ statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } = await this.verifyStatus(
-          {
-            now,
-            skewSeconds,
-            checkFreshness: true,
-            trustedStatusCertificates,
-            maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
-          },
-          ctx
-        ))
-      } catch (err) {
-        // The default callback throws the reason without the check, so the reason names the lists.
-        const { statusList: statusListInfo, identifierList: identifierListInfo } =
-          this.mobileSecurityObject.status ?? {}
-        const lists = [
-          statusListInfo && `status list ${statusListInfo.uri}`,
-          identifierListInfo && `identifier list ${identifierListInfo.uri}`,
-        ]
-          .filter(Boolean)
-          .join(' and ')
-        onCheck({
-          status: 'FAILED',
-          check: 'Status information must be valid',
-          reason: `Verifying the ${lists} failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-          result: this.revocationResult(err),
-        })
-      }
-    }
-
     const { validityInfo } = this.mobileSecurityObject
 
     const { notAfter, notBefore } = await ctx.x509.getCertificateData({
@@ -346,6 +301,54 @@ export class IssuerAuth extends Sign1 {
         reason:
           'Unable to determine a trusted issuance chain for the provided trusted certificates and the signer of the issuer auth',
       })
+    }
+
+    let statusList: StatusListCwt | undefined
+    let trustedStatusListChain: Uint8Array[] | undefined
+    let identifierList: IdentifierListCwt | undefined
+    let trustedIdentifierListChain: Uint8Array[] | undefined
+    // Token Status List § 8.3: the status of a Referenced Token is only evaluated once the token itself
+    // is valid, so the revocation lists are not fetched for an MSO that failed a check above, such as
+    // an expired one, also when the verification callback does not throw. As their URIs come from the
+    // MSO, this also keeps a forged MSO from making the verifier request a URI of its choosing.
+    // Without chain validation, the signature only shows that the MSO is signed with the key of its own
+    // certificate, so the status is left to `verifyStatus` once the caller trusts the issuer.
+    if (!disableStatusValidation && !hasFailedCheck && disableCertificateChainValidation) {
+      onCheck({
+        status: 'WARNING',
+        check: 'Status information must be valid',
+        reason:
+          'The status is not checked without certificate chain validation. Call IssuerAuth.verifyStatus once the issuer is trusted.',
+      })
+    } else if (!disableStatusValidation && !hasFailedCheck) {
+      try {
+        ;({ statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } = await this.verifyStatus(
+          {
+            now,
+            skewSeconds,
+            checkFreshness: true,
+            trustedStatusCertificates,
+            maxDecompressedBytes: options.status?.maxDecompressedBytes,
+          },
+          ctx
+        ))
+      } catch (err) {
+        // The default callback throws the reason without the check, so the reason names the lists.
+        const { statusList: statusListInfo, identifierList: identifierListInfo } =
+          this.mobileSecurityObject.status ?? {}
+        const lists = [
+          statusListInfo && `status list ${statusListInfo.uri}`,
+          identifierListInfo && `identifier list ${identifierListInfo.uri}`,
+        ]
+          .filter(Boolean)
+          .join(' and ')
+        onCheck({
+          status: 'FAILED',
+          check: 'Status information must be valid',
+          reason: `Verifying the ${lists} failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          result: this.revocationResult(err),
+        })
+      }
     }
 
     return {

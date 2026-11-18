@@ -8,7 +8,7 @@ import {
   typedMap,
   UnprotectedHeaders,
 } from '@owf/cose'
-import { base64url, stringToBytes } from '@owf/identity-common'
+import { base64url } from '@owf/identity-common'
 import { z } from 'zod'
 import type { MdocContext } from '../../context'
 import { describeAgeOverLimitViolations, findAgeOverLimitViolations } from '../../utils/ageOver'
@@ -60,6 +60,7 @@ import { IssuerNamespaces } from './issuer-namespaces'
 import { IssuerSigned } from './issuer-signed'
 import type { IssuerSignedItem } from './issuer-signed-item'
 import type { KeyAuthorizations } from './key-authorizations'
+import type { StatusVerificationOptions } from './mso-revocation-list'
 import type { Namespace } from './namespace'
 import type { SessionTranscript } from './session-transcript'
 
@@ -239,13 +240,11 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       sessionTranscript: SessionTranscript | Uint8Array
       ephemeralReaderKey?: CoseKey
       disableCertificateChainValidation?: boolean
-      disableStatusValidation?: boolean
       trustedCertificates: Array<{ issuance: Uint8Array[]; status?: Uint8Array[] }>
       now?: Date
       onCheck?: VerificationCallback
       skewSeconds?: number
-      /** The maximum size in bytes the status list of an mdoc may inflate to, 16 MiB by default. */
-      maxStatusListDecompressedBytes?: number
+      status?: StatusVerificationOptions
     },
     ctx: Pick<MdocContext, 'cose' | 'x509' | 'crypto' | 'fetch' | 'fetchLimits'>
   ): Promise<DeviceResponseVerificationResult> {
@@ -289,22 +288,9 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
         ctx
       )
 
-      const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
-        await document.issuerSigned.verify(
-          {
-            verificationCallback: onCheck,
-            disableCertificateChainValidation: options.disableCertificateChainValidation,
-            now: options.now,
-            trustedCertificates: options.trustedCertificates,
-            skewSeconds: options.skewSeconds,
-            disableStatusValidation: options.disableStatusValidation,
-            maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
-          },
-          ctx
-        )
-
       // 18013-5 9.3.1 step 4: the docType of the document is not signed, so it must be the docType of
-      // the MSO, whether or not a device request is matched.
+      // the MSO, whether or not a device request is matched. Checked before `issuerSigned.verify`, which
+      // ends with the status check of the MSO (Token Status List § 8.3).
       const mobileSecurityObjectDocType = document.issuerSigned.issuerAuth.mobileSecurityObject.docType
       onCheck({
         status: document.docType === mobileSecurityObjectDocType ? 'PASSED' : 'FAILED',
@@ -315,6 +301,19 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
             ? `Document has docType '${document.docType}', but the mobile security object has docType '${mobileSecurityObjectDocType}'`
             : undefined,
       })
+
+      const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
+        await document.issuerSigned.verify(
+          {
+            verificationCallback: onCheck,
+            disableCertificateChainValidation: options.disableCertificateChainValidation,
+            now: options.now,
+            trustedCertificates: options.trustedCertificates,
+            skewSeconds: options.skewSeconds,
+            status: options.status,
+          },
+          ctx
+        )
 
       documentResults.push({
         trustedIssuanceChain,
@@ -420,11 +419,6 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     }).encode({ asDataItem: true })
 
     const unprotectedHeaders = UnprotectedHeaders.create({})
-    if (signingKey.keyId) {
-      // COSE label 4 (kid) is a bstr per RFC 8152; UTF-8 encode
-      // the text form at the header boundary.
-      unprotectedHeaders.headers?.set(RegisteredCwtHeaderClaimKey.KeyId, stringToBytes(signingKey.keyId))
-    }
 
     const deviceAuthOptions: DeviceAuthOptions = {}
     if (useSignature) {

@@ -1,5 +1,11 @@
 import { Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
-import { JoseSignatureVerificationError, JoseValidationError, type Jwk, signJwt } from '@owf/jose'
+import {
+  JoseInvalidArgumentError,
+  JoseSignatureVerificationError,
+  JoseValidationError,
+  type Jwk,
+  signJwt,
+} from '@owf/jose'
 import * as jose from 'jose'
 import { describe, expect, test } from 'vitest'
 import { callbacks, getSignJwsCallback } from '../../../../oauth2/src/__tests__/util.mjs'
@@ -42,10 +48,31 @@ const verify = (jarmAuthorizationResponseJwt: string) =>
 
 // JARM Section 2.4: the signing key is identified by the header of the response
 describe('verifyJarmAuthorizationResponse with a signed response', () => {
-  test('rejects a response whose header has no kid, jwk or x5c', async () => {
+  test('rejects a response whose header has no kid, jwk or x5c as invalid_request', async () => {
     const wallet = await generateKeyPair()
 
-    await expect(verify(await createResponse({}, wallet))).rejects.toBeInstanceOf(JoseValidationError)
+    const error = await verify(await createResponse({}, wallet)).catch((error) => error)
+    expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
+    expect(error.errorResponse.error).toBe('invalid_request')
+    expect(error.errorResponse.error_description).toBe('Invalid JWS protected header')
+    expect(error.status).toBe(400)
+    expect(error.cause).toBeInstanceOf(JoseValidationError)
+    expect(error.cause.message).toContain(`'kid', 'jwk' or 'x5c'`)
+  })
+
+  test('throws an invalid option of the verifier as is', async () => {
+    const wallet = await generateKeyPair()
+
+    await expect(
+      verifyJarmAuthorizationResponse({
+        jarmAuthorizationResponseJwt: await createResponse({ jwk: wallet.publicJwk }, wallet),
+        authorizationRequestPayload,
+        expectedClientId: 'verifier',
+        callbacks,
+        now,
+        allowedSkewInSeconds: -1,
+      })
+    ).rejects.toBeInstanceOf(JoseInvalidArgumentError)
   })
 
   test('keeps the jose error as cause when the signature does not verify', async () => {

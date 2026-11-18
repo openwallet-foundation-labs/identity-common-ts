@@ -1,4 +1,4 @@
-import { base64, hexEncode } from '@owf/identity-common'
+import { base64, hexEncode, isMediaType } from '@owf/identity-common'
 import { AsnConvert, type IAsnParseOptions } from '@peculiar/asn1-schema'
 import { Certificate, id_ce_subjectKeyIdentifier, SubjectKeyIdentifier } from '@peculiar/asn1-x509'
 import { DOMParser, type Element } from '@xmldom/xmldom'
@@ -16,6 +16,8 @@ import { assertValidTrustedList, stripScheme } from './validate'
 
 const TSL_NS = 'http://uri.etsi.org/02231/v2#'
 const SIE_NS = 'http://uri.etsi.org/TrstSvc/SvcInfoExt/eSigDir-1999-93-EC-TrustedList/#'
+// Namespace of the additional types of ETSI TS 119 612, among them the MimeType of a pointer (clause 5.3.13)
+const TSLX_NS = 'http://uri.etsi.org/02231/v2/additionaltypes#'
 
 function descendants(el: Element, name: string, ns = TSL_NS): Element[] {
   return Array.from(el.getElementsByTagNameNS(ns, name))
@@ -136,6 +138,8 @@ function parsePointers(
       location,
       tslType: textOf(firstDescendant(pointer, 'TSLType')),
       schemeTerritory: textOf(firstDescendant(pointer, 'SchemeTerritory')),
+      // ETSI TS 119 612 clause 5.3.13: the format of the pointed-to list, as the EU LOTL points to a PDF next to the XML
+      mimeType: textOf(firstDescendant(pointer, 'MimeType', TSLX_NS)),
       // The pointer's own ServiceDigitalIdentities: the certificate(s) the
       // pointed-to list is signed with.
       digitalIdentities: parseDigitalIdentities(pointer, certificateParseOptions),
@@ -224,6 +228,8 @@ export interface TrustedListPointerFilter {
   tslType?: string
   /** Exact `TSLLocation` URL of the pointed-to list. */
   location?: string
+  /** `MimeType` of the pointed-to list (e.g. `application/vnd.etsi.tsl+xml`), ignoring casing and parameters. */
+  mimeType?: string
 }
 
 /**
@@ -258,6 +264,7 @@ export function getPointerSigningCertificates(
       continue
     }
     if (filter.tslType && stripScheme(pointer.tslType) !== stripScheme(filter.tslType)) continue
+    if (filter.mimeType && !isMediaType(pointer.mimeType, filter.mimeType)) continue
     for (const identity of pointer.digitalIdentities) {
       if (!identity.certificate || seen.has(identity.certificate)) continue
       seen.add(identity.certificate)
