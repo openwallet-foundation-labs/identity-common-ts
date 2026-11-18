@@ -8,6 +8,8 @@ import type { AuthorizationServerMetadata } from '../metadata/authorization-serv
 import {
   type AuthorizationCodeGrantIdentifier,
   authorizationCodeGrantIdentifier,
+  type ClientCredentialsGrantIdentifier,
+  clientCredentialsGrantIdentifier,
   getGrantTypesSupported,
   type PreAuthorizedCodeGrantIdentifier,
   preAuthorizedCodeGrantIdentifier,
@@ -32,10 +34,19 @@ export interface ParsedAccessTokenRefreshTokenRequestGrant {
   refreshToken: string
 }
 
+/**
+ * The client credentials grant has no grant specific parameters, the client authentication is the grant
+ * (RFC 6749 Section 4.4.1). The optional `scope` and `resource` are in the `accessTokenRequest`.
+ */
+export interface ParsedAccessTokenClientCredentialsRequestGrant {
+  grantType: ClientCredentialsGrantIdentifier
+}
+
 type ParsedAccessTokenRequestGrant =
   | ParsedAccessTokenPreAuthorizedCodeRequestGrant
   | ParsedAccessTokenAuthorizationCodeRequestGrant
   | ParsedAccessTokenRefreshTokenRequestGrant
+  | ParsedAccessTokenClientCredentialsRequestGrant
 
 export interface ParseAccessTokenRequestResult {
   accessTokenRequest: AccessTokenRequest
@@ -153,6 +164,8 @@ export function parseAccessTokenRequest(options: ParseAccessTokenRequestOptions)
       grantType: refreshTokenGrantIdentifier,
       refreshToken: accessTokenRequest.refresh_token,
     }
+  } else if (accessTokenRequest.grant_type === clientCredentialsGrantIdentifier) {
+    grant = { grantType: clientCredentialsGrantIdentifier }
   } else {
     // Unsupported grant type
     throw new Oauth2ServerErrorResponseError({

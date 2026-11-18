@@ -7,9 +7,11 @@ import {
 import { type ParseAccessTokenRequestOptions, parseAccessTokenRequest } from './access-token/parse-access-token-request'
 import {
   type VerifyAuthorizationCodeAccessTokenRequestOptions,
+  type VerifyClientCredentialsAccessTokenRequestOptions,
   type VerifyPreAuthorizedCodeAccessTokenRequestOptions,
   type VerifyRefreshTokenAccessTokenRequestOptions,
   verifyAuthorizationCodeAccessTokenRequest,
+  verifyClientCredentialsAccessTokenRequest,
   verifyPreAuthorizedCodeAccessTokenRequest,
   verifyRefreshTokenAccessTokenRequest,
 } from './access-token/verify-access-token-request'
@@ -123,6 +125,24 @@ export class Oauth2AuthorizationServer {
 
   public verifyRefreshTokenAccessTokenRequest(options: Omit<VerifyRefreshTokenAccessTokenRequestOptions, 'callbacks'>) {
     return verifyRefreshTokenAccessTokenRequest({
+      ...options,
+      callbacks: this.options.callbacks,
+      clientAttestation: this.withDefaultSkew(options.clientAttestation),
+      dpop: this.withDefaultSkew(options.dpop),
+    })
+  }
+
+  /**
+   * Verify the DPoP proof and client attestation of a client credentials access token request.
+   *
+   * The client must authenticate for this grant (RFC 6749 Section 4.4.2). Set `clientAttestation.required` when clients
+   * authenticate with a client attestation, otherwise authenticate the client yourself, for example with its client
+   * secret. Check as well that the client may use this grant (`unauthorized_client`, RFC 6749 Section 5.2).
+   */
+  public verifyClientCredentialsAccessTokenRequest(
+    options: Omit<VerifyClientCredentialsAccessTokenRequestOptions, 'callbacks'>
+  ) {
+    return verifyClientCredentialsAccessTokenRequest({
       ...options,
       callbacks: this.options.callbacks,
       clientAttestation: this.withDefaultSkew(options.clientAttestation),

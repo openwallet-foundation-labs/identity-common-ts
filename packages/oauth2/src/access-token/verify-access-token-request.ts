@@ -367,6 +367,46 @@ export async function verifyRefreshTokenAccessTokenRequest(
   return { dpop: dpopResult, clientAttestation: clientAttestationResult }
 }
 
+export interface VerifyClientCredentialsAccessTokenRequestOptions {
+  authorizationServerMetadata: AuthorizationServerMetadata
+
+  request: RequestLike
+
+  clientAttestation?: VerifyAccessTokenRequestClientAttestation
+  dpop?: VerifyAccessTokenRequestDpop
+
+  now?: Date
+
+  callbacks: Pick<CallbackContext, 'hash' | 'verifyJws'>
+}
+
+/**
+ * Verify the DPoP proof and client attestation of a client credentials access token request.
+ *
+ * The client must authenticate for this grant (RFC 6749 Section 4.4.2). Set `clientAttestation.required` when clients
+ * authenticate with a client attestation, otherwise authenticate the client yourself, for example with its client
+ * secret. Check as well that the client may use this grant (`unauthorized_client`, RFC 6749 Section 5.2).
+ */
+export async function verifyClientCredentialsAccessTokenRequest(
+  options: VerifyClientCredentialsAccessTokenRequestOptions
+): Promise<VerifyAccessTokenRequestReturn> {
+  const dpopResult = options.dpop
+    ? await verifyAccessTokenRequestDpop(options.dpop, options.request, options.callbacks, options.now)
+    : undefined
+
+  const clientAttestationResult = options.clientAttestation
+    ? await verifyAccessTokenRequestClientAttestation(
+        options.clientAttestation,
+        options.authorizationServerMetadata,
+        options.callbacks,
+        dpopResult?.jwkThumbprint,
+        options.now
+      )
+    : undefined
+
+  return { dpop: dpopResult, clientAttestation: clientAttestationResult }
+}
+
 async function verifyAccessTokenRequestClientAttestation(
   options: VerifyAccessTokenRequestClientAttestation,
   authorizationServerMetadata: AuthorizationServerMetadata,
