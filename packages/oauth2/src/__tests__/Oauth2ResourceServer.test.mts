@@ -385,7 +385,7 @@ describe('Oauth2ResourceServer', () => {
     expect(jwksRequestCount).toEqual(1)
   })
 
-  describe('authorization servers given as issuer identifier', () => {
+  describe('authorization servers given by issuer', () => {
     const otherIssuer = 'https://other-authorization-server.com'
     const verify = async (authorizationServers: string[]) => {
       const { jwt } = await createAccessTokenJwt({
@@ -409,7 +409,7 @@ describe('Oauth2ResourceServer', () => {
           },
         },
       }).verifyResourceRequest({
-        authorizationServers,
+        authorizationServers: authorizationServers.map((issuer) => ({ issuer, allowIntrospection: false })),
         request: {
           method: 'POST',
           url: 'https://resource-server.com/endpoint',
@@ -534,33 +534,25 @@ describe('Oauth2ResourceServer', () => {
       )
     })
 
-    test('resolves authorization servers given as issuer identifier one at a time, until one reports the token as active', async () => {
-      server.resetHandlers(
-        http.post(firstAuthorizationServer.introspection_endpoint, () => HttpResponse.json({ active: false })),
-        http.post(secondAuthorizationServer.introspection_endpoint, () =>
-          HttpResponse.json({ active: true, sub: 'pre-auth-code' })
-        )
-      )
-
-      const authorizationServers = [firstAuthorizationServer, secondAuthorizationServer]
+    const verifyOpaqueTokenByIssuer = async (
+      authorizationServers: Array<{ issuer: string; allowIntrospection: boolean }>
+    ) => {
+      const knownAuthorizationServers = [firstAuthorizationServer, secondAuthorizationServer]
       const resolvedIssuers: string[] = []
-      const { authorizationServer } = await new Oauth2ResourceServer({
+      const result = new Oauth2ResourceServer({
         callbacks: {
           ...callbacks,
           fetch,
           clientAuthentication: () => {},
           getAuthorizationServerMetadata: (issuer) => {
             resolvedIssuers.push(issuer)
-            return authorizationServers.find((authorizationServer) => authorizationServer.issuer === issuer) ?? null
+            return (
+              knownAuthorizationServers.find((authorizationServer) => authorizationServer.issuer === issuer) ?? null
+            )
           },
         },
       }).verifyResourceRequest({
-        authorizationServers: [
-          'https://unknown-authorization-server.com',
-          firstAuthorizationServer.issuer,
-          secondAuthorizationServer.issuer,
-          'https://third-authorization-server.com',
-        ],
+        authorizationServers,
         request: {
           method: 'POST',
           url: 'https://resource-server.com/endpoint',
@@ -569,13 +561,49 @@ describe('Oauth2ResourceServer', () => {
         resourceServer: 'https://resource-server.com',
       })
 
-      expect(authorizationServer).toEqual(secondAuthorizationServer.issuer)
+      return { result, resolvedIssuers }
+    }
+
+    test('resolves authorization servers given by issuer one at a time, until one reports the token as active', async () => {
+      server.resetHandlers(
+        http.post(firstAuthorizationServer.introspection_endpoint, () => HttpResponse.json({ active: false })),
+        http.post(secondAuthorizationServer.introspection_endpoint, () =>
+          HttpResponse.json({ active: true, sub: 'pre-auth-code' })
+        )
+      )
+
+      const { result, resolvedIssuers } = await verifyOpaqueTokenByIssuer([
+        { issuer: 'https://unknown-authorization-server.com', allowIntrospection: true },
+        { issuer: firstAuthorizationServer.issuer, allowIntrospection: true },
+        { issuer: secondAuthorizationServer.issuer, allowIntrospection: true },
+        { issuer: 'https://third-authorization-server.com', allowIntrospection: true },
+      ])
+
+      await expect(result).resolves.toMatchObject({ authorizationServer: secondAuthorizationServer.issuer })
       // An authorization server without metadata is skipped, and the one after the active result is never resolved
       expect(resolvedIssuers).toEqual([
         'https://unknown-authorization-server.com',
         firstAuthorizationServer.issuer,
         secondAuthorizationServer.issuer,
       ])
+    })
+
+    test('does not resolve or introspect at an authorization server that does not allow introspection', async () => {
+      let introspectionCount = 0
+      server.resetHandlers(
+        http.post(firstAuthorizationServer.introspection_endpoint, () => {
+          introspectionCount++
+          return HttpResponse.json({ active: true, sub: 'pre-auth-code' })
+        })
+      )
+
+      const { result, resolvedIssuers } = await verifyOpaqueTokenByIssuer([
+        { issuer: firstAuthorizationServer.issuer, allowIntrospection: false },
+      ])
+
+      await expect(result).rejects.toThrow('Could not verify token as jwt or using token introspection.')
+      expect(resolvedIssuers).toEqual([])
+      expect(introspectionCount).toBe(0)
     })
 
     test('uses the authorization server that reports the token as active', async () => {

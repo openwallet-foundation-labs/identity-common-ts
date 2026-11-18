@@ -41,11 +41,11 @@ export interface VerifyJwtProfileAccessTokenOptions {
   resourceServer: string
 
   /**
-   * The authorization servers that this resource endpoint supports, as metadata or issuer identifier. Only the
-   * authorization server whose issuer identifier is the `iss` of the access token is resolved, with the
+   * The authorization servers that this resource endpoint supports, as metadata or as an object with their `issuer`.
+   * Only the authorization server whose `issuer` is the `iss` of the access token is resolved, with the
    * `getAuthorizationServerMetadata` callback or else over HTTP.
    */
-  authorizationServers: Array<AuthorizationServerMetadata | string>
+  authorizationServers: Array<AuthorizationServerMetadata | { issuer: string }>
 }
 
 /**
@@ -63,11 +63,7 @@ export async function verifyJwtProfileAccessToken(options: VerifyJwtProfileAcces
     payloadSchema: zAccessTokenProfileJwtPayload,
   })
 
-  const listedAuthorizationServer = options.authorizationServers.find(
-    (authorizationServer) =>
-      (typeof authorizationServer === 'string' ? authorizationServer : authorizationServer.issuer) ===
-      decodedJwt.payload.iss
-  )
+  const listedAuthorizationServer = options.authorizationServers.find(({ issuer }) => issuer === decodedJwt.payload.iss)
   if (!listedAuthorizationServer) {
     // Authorization server not found
     throw new Oauth2Error(
