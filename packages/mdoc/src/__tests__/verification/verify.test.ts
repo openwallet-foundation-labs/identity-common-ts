@@ -188,23 +188,12 @@ suite('Verification', () => {
     )
 
     expect(result.documents).toHaveLength(1)
-    const [
-      {
-        document,
-        trustedIssuanceChain,
-        statusList,
-        trustedStatusListChain,
-        identifierList,
-        trustedIdentifierListChain,
-      },
-    ] = result.documents
+    const [{ document, trustedIssuanceChain, statusList, identifierList }] = result.documents
     expect(document).toBeDefined()
     expect(trustedIssuanceChain).toHaveLength(1)
     expect(trustedIssuanceChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
     expect(statusList).toBeUndefined()
-    expect(trustedStatusListChain).toBeUndefined()
     expect(identifierList).toBeUndefined()
-    expect(trustedIdentifierListChain).toBeUndefined()
   })
 
   test('Verify mdoc with selective disclosure', async () => {
@@ -576,9 +565,9 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    const { statusList, trustedStatusListChain } = await verifyIssuerSigned(credential)
-    expect(statusList).toBeDefined()
-    expect(trustedStatusListChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
+    const { statusList } = await verifyIssuerSigned(credential)
+    expect(statusList?.format).toBe('cwt')
+    expect(statusList?.trustedChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
   })
 
   test('Verify mdoc with a revoked entry in a status list', async () => {
@@ -616,10 +605,12 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    // The JWT list is verified, but only a CWT list is returned as `statusList`.
-    const { statusList, trustedStatusListChain } = await verifyIssuerSigned(credential)
-    expect(statusList).toBeUndefined()
-    expect(trustedStatusListChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
+    const { statusList } = await verifyIssuerSigned(credential)
+    if (statusList?.format !== 'jwt') throw new Error('Expected a JWT status list')
+    expect(statusList.compact.split('.')).toHaveLength(3)
+    expect(statusList.payload.sub).toBe(uri)
+    expect(statusList.statusList.getStatus(idx)).toBe(StatusType.Valid)
+    expect(statusList.trustedChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
   })
 
   test('Verify mdoc with a revoked entry in a status list served as a JWT', async () => {
@@ -874,12 +865,12 @@ suite('Verification', () => {
 
     const credential = await issueMdocWithStatus({ statusList: { idx, uri } })
 
-    const { statusList, trustedStatusListChain } = await credential.issuerAuth.verifyStatus(
+    const { statusList } = await credential.issuerAuth.verifyStatus(
       { disableCertificateChainValidation: true },
       mdocContext
     )
     expect(statusList).toBeDefined()
-    expect(trustedStatusListChain).toBeUndefined()
+    expect(statusList?.trustedChain).toBeUndefined()
   })
 
   test('Verify a revoked entry in a status list with IssuerAuth.verifyStatus without certificate chain validation', async () => {
@@ -1078,23 +1069,12 @@ suite('Verification', () => {
     )
 
     expect(result.documents).toHaveLength(1)
-    const [
-      {
-        document,
-        trustedIssuanceChain,
-        statusList: resultStatusList,
-        trustedStatusListChain,
-        identifierList,
-        trustedIdentifierListChain,
-      },
-    ] = result.documents
+    const [{ document, trustedIssuanceChain, statusList: resultStatusList, identifierList }] = result.documents
     expect(document).toBeDefined()
     expect(trustedIssuanceChain).toHaveLength(1)
     expect(trustedIssuanceChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
-    expect(trustedStatusListChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
-    expect(resultStatusList).toBeDefined()
+    expect(resultStatusList?.trustedChain?.[0]).toEqual(new Uint8Array(new X509Certificate(ISSUER_CERTIFICATE).rawData))
     expect(identifierList).toBeUndefined()
-    expect(trustedIdentifierListChain).toBeUndefined()
   })
 
   test('Verify mdoc with status status_list check with trusted certificates', async () => {

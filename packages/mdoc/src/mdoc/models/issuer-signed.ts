@@ -105,8 +105,7 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
     })
 
     // Verify the issuer auth
-    const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
-      await this.issuerAuth.verify(options, ctx)
+    const verificationResult = await this.issuerAuth.verify(options, ctx)
 
     const namespaces = this.issuerNamespaces?.issuerNamespaces ?? new Map<string, IssuerSignedItem[]>()
 
@@ -195,7 +194,7 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
       })
     )
 
-    return { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain }
+    return verificationResult
   }
 
   public static create(options: IssuerSignedOptions): IssuerSigned {

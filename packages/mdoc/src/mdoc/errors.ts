@@ -80,7 +80,6 @@ export class InvalidValidityInfoError extends MdlError {}
 export class UnsupportedDeviceMacAlgorithmError extends MdlError {}
 export class SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError extends MdlError {}
 export class UnableToExtractX5ChainFromCwtError extends MdlError {}
-export class UnableToExtractX5ChainFromJwtError extends MdlError {}
 export class NoPublicKeySetOnStatusListError extends MdlError {}
 export class InvalidSignatureError extends MdlError {}
 

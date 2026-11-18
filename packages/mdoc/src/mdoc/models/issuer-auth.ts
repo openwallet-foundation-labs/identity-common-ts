@@ -9,7 +9,6 @@ import {
   zUint8Array,
 } from '@owf/cose'
 import { compareBytes } from '@owf/identity-common'
-import type { StatusListCwt } from '@owf/token-status-list'
 import z from 'zod'
 import type { MdocContext } from '../../context.js'
 import {
@@ -19,9 +18,14 @@ import {
   type VerificationCallback,
 } from '../check-callback.js'
 import { IdentifierFoundInRevokedListError, StatusListEntryNotValidError } from '../errors.js'
-import type { IdentifierListCwt } from './identifier-list-cwt'
 import { MobileSecurityObject, type MobileSecurityObjectEncodedStructure } from './mobile-security-object.js'
-import { type StatusVerificationOptions, verifyIdentifierListToken, verifyStatusListToken } from './mso-revocation-list'
+import {
+  type StatusVerificationOptions,
+  type VerifiedIdentifierList,
+  type VerifiedStatusList,
+  verifyIdentifierListToken,
+  verifyStatusListToken,
+} from './mso-revocation-list'
 
 export type IssuerAuthEncodedStructure = Sign1EncodedStructure
 export type IssuerAuthOptions = Omit<Sign1Options, 'payload'> & {
@@ -34,14 +38,8 @@ export type IssuerAuthVerificationResult = {
    * certificate chain validation is disabled, or when it failed and the verification callback did not throw.
    */
   trustedIssuanceChain?: Uint8Array[]
-  /**
-   * Only a status list served in CWT format is returned here. One served as a JWT is verified but
-   * leaves this unset; `trustedStatusListChain` is set for either when its chain was validated.
-   */
-  statusList?: StatusListCwt
-  trustedStatusListChain?: Uint8Array[]
-  identifierList?: IdentifierListCwt
-  trustedIdentifierListChain?: Uint8Array[]
+  statusList?: VerifiedStatusList
+  identifierList?: VerifiedIdentifierList
 }
 
 export class IssuerAuth extends Sign1 {
@@ -125,16 +123,11 @@ export class IssuerAuth extends Sign1 {
       disableCertificateChainValidation?: boolean
     },
     ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose' | 'crypto'>
-  ): Promise<{
-    statusList?: StatusListCwt
-    trustedStatusListChain?: Uint8Array[]
-    identifierList?: IdentifierListCwt
-    trustedIdentifierListChain?: Uint8Array[]
-  }> {
+  ): Promise<Omit<IssuerAuthVerificationResult, 'trustedIssuanceChain'>> {
     const status = this.mobileSecurityObject.status
     if (!status || (!status.statusList && !status.identifierList)) return {}
 
-    const statusListResult = status.statusList
+    const statusList = status.statusList
       ? await verifyStatusListToken(
           {
             statusListInfo: status.statusList,
@@ -149,7 +142,7 @@ export class IssuerAuth extends Sign1 {
         )
       : undefined
 
-    const identifierListResult = status.identifierList
+    const identifierList = status.identifierList
       ? await verifyIdentifierListToken(
           {
             identifierListInfo: status.identifierList,
@@ -164,10 +157,8 @@ export class IssuerAuth extends Sign1 {
       : undefined
 
     return {
-      statusList: statusListResult?.statusListCwt,
-      trustedStatusListChain: statusListResult?.chain,
-      identifierList: identifierListResult?.identifierListCwt,
-      trustedIdentifierListChain: identifierListResult?.chain,
+      statusList,
+      identifierList,
     }
   }
 
@@ -267,10 +258,7 @@ export class IssuerAuth extends Sign1 {
       check: 'Issuer auth signature is invalid',
     })
 
-    let statusList: StatusListCwt | undefined
-    let trustedStatusListChain: Uint8Array[] | undefined
-    let identifierList: IdentifierListCwt | undefined
-    let trustedIdentifierListChain: Uint8Array[] | undefined
+    let statusResult: Omit<IssuerAuthVerificationResult, 'trustedIssuanceChain'> = {}
     // The revocation list URIs come from the MSO, so they are only fetched once the MSO is known to be
     // signed by a trusted issuer. A forged MSO must not make the verifier request a URI of its choosing.
     // Without chain validation, the signature only shows that the MSO is signed with the key of its own
@@ -284,7 +272,7 @@ export class IssuerAuth extends Sign1 {
       })
     } else if (!disableStatusValidation && isSignatureValid) {
       try {
-        ;({ statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } = await this.verifyStatus(
+        statusResult = await this.verifyStatus(
           {
             now,
             skewSeconds,
@@ -293,7 +281,7 @@ export class IssuerAuth extends Sign1 {
             maxDecompressedBytes: options.status?.maxDecompressedBytes,
           },
           ctx
-        ))
+        )
       } catch (err) {
         // The default callback throws the reason without the check, so the reason names the lists.
         const { statusList: statusListInfo, identifierList: identifierListInfo } =
@@ -344,12 +332,6 @@ export class IssuerAuth extends Sign1 {
       })
     }
 
-    return {
-      trustedIssuanceChain,
-      statusList,
-      trustedStatusListChain,
-      identifierList,
-      trustedIdentifierListChain,
-    }
+    return { trustedIssuanceChain, ...statusResult }
   }
 }

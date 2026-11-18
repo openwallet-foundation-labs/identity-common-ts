@@ -54,7 +54,7 @@ These packages parse and verify credentials, so every input is untrusted.
 ## Changesets
 
 - Every change to a published package needs a changeset.
-- All packages except `dcql` are below 1.0: a feature or breaking change is `minor`, a fix is `patch`. Don't use `major` for them.
+- All packages except `dcql` are below 1.0: only a breaking change is `minor`. Features and fixes are `patch`. Don't use `major` for them.
 - Packages are bumped in fixed groups (`.changeset/config.json`), so one changeset bumps the whole group.
 - Keep changesets short and write them for the user of the package: name the exported functions and say what changes for them, or for a fix, what was wrong. A breaking change adds a `**Breaking:**` paragraph on how to migrate.
 

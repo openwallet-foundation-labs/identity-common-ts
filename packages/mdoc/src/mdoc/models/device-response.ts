@@ -288,18 +288,17 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
         ctx
       )
 
-      const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
-        await document.issuerSigned.verify(
-          {
-            verificationCallback: onCheck,
-            disableCertificateChainValidation: options.disableCertificateChainValidation,
-            now: options.now,
-            trustedCertificates: options.trustedCertificates,
-            skewSeconds: options.skewSeconds,
-            status: options.status,
-          },
-          ctx
-        )
+      const issuerSignedResult = await document.issuerSigned.verify(
+        {
+          verificationCallback: onCheck,
+          disableCertificateChainValidation: options.disableCertificateChainValidation,
+          now: options.now,
+          trustedCertificates: options.trustedCertificates,
+          skewSeconds: options.skewSeconds,
+          status: options.status,
+        },
+        ctx
+      )
 
       // 18013-5 9.3.1 step 4: the docType of the document is not signed, so it must be the docType of
       // the MSO, whether or not a device request is matched.
@@ -314,14 +313,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
             : undefined,
       })
 
-      documentResults.push({
-        trustedIssuanceChain,
-        statusList,
-        trustedStatusListChain,
-        identifierList,
-        trustedIdentifierListChain,
-        document,
-      })
+      documentResults.push({ ...issuerSignedResult, document })
     }
 
     let deviceRequestMatch: DeviceRequestMatchResult | undefined

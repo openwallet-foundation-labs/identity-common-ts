@@ -1,7 +1,8 @@
 import { base64url, stringToBytes } from '@owf/identity-common'
 import { JoseSignatureVerificationError, JoseValidationError, signJwt } from '@owf/jose'
 import { describe, expect, it, vi } from 'vitest'
-import { JWT_STATUS_LIST_TYPE } from '../jwt-types'
+import z from 'zod'
+import { JWT_STATUS_LIST_TYPE, zStatusListJwtHeader } from '../jwt-types'
 import { StatusList } from '../status-list'
 import {
   type CreateStatusListJwtPayload,
@@ -174,6 +175,29 @@ describe('decodeStatusListJwt', () => {
     expect(() => decodeStatusListJwt(`${encode({ alg: 'ES256', typ: 'JWT' })}.${payload}.${signature}`)).toThrow(
       JoseValidationError
     )
+  })
+
+  it('validates the header with a headerSchema on top of the status list header', async () => {
+    const encode = (value: unknown) => base64url.encode(stringToBytes(JSON.stringify(value)))
+    const [, payload, signature] = (await signToken()).split('.')
+    const headerSchema = zStatusListJwtHeader.required({ kid: true })
+
+    const { header } = decodeStatusListJwt(
+      `${encode({ alg: 'ES256', typ: JWT_STATUS_LIST_TYPE, kid: 'key-1' })}.${payload}.${signature}`,
+      { headerSchema }
+    )
+    expect(header.kid).toBe('key-1')
+
+    expect(() =>
+      decodeStatusListJwt(`${encode({ alg: 'ES256', typ: JWT_STATUS_LIST_TYPE })}.${payload}.${signature}`, {
+        headerSchema,
+      })
+    ).toThrow('- kid: ')
+    expect(() =>
+      decodeStatusListJwt(`${encode({ alg: 'ES256', typ: 'JWT', kid: 'key-1' })}.${payload}.${signature}`, {
+        headerSchema: zStatusListJwtHeader.extend({ typ: z.string() }),
+      })
+    ).toThrow('- typ: ')
   })
 
   it('rejects a token without a status_list claim', async () => {

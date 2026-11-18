@@ -15,6 +15,7 @@ import {
 import z from 'zod'
 import {
   JWT_STATUS_LIST_TYPE,
+  type StatusListJwtHeaderParameters,
   type StatusListJwtPayload,
   zStatusListJwtHeader,
   zStatusListJwtPayload,
@@ -23,6 +24,9 @@ import { type DecompressStatusListOptions, StatusList, verifyStatusValid } from 
 
 type StatusListJwtHeaderSchema = typeof zStatusListJwtHeader
 type StatusListJwtPayloadSchema = typeof zStatusListJwtPayload
+
+// Not `typeof zStatusListJwtHeader`, which the schemas `.required(...)` and `.extend(...)` create do not satisfy
+type CustomStatusListJwtHeaderSchema = z.ZodType<StatusListJwtHeaderParameters, StatusListJwtHeaderParameters>
 
 // Only `statuslist+jwt` is signed, while decoding also accepts other forms of it, such as `application/statuslist+jwt`
 const zStatusListJwtHeaderToSign = zStatusListJwtHeader.extend({ typ: z.literal(JWT_STATUS_LIST_TYPE) })
@@ -75,7 +79,16 @@ export async function signStatusListJwt({
   })
 }
 
-export type DecodeStatusListJwtResult = DecodeJwtResult<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema> & {
+export type DecodeStatusListJwtOptions<
+  HeaderSchema extends CustomStatusListJwtHeaderSchema = StatusListJwtHeaderSchema,
+> = DecompressStatusListOptions & {
+  /** Schema to validate the header with, on top of {@link zStatusListJwtHeader}, which is always applied. */
+  headerSchema?: HeaderSchema
+}
+
+export type DecodeStatusListJwtResult<
+  HeaderSchema extends CustomStatusListJwtHeaderSchema = StatusListJwtHeaderSchema,
+> = DecodeJwtResult<HeaderSchema, StatusListJwtPayloadSchema> & {
   /**
    * Decompressed on first read, so read it only once the token verified. Throws a `StatusListValidationError`
    * when `lst` is not a compressed status list.
@@ -91,8 +104,18 @@ export type DecodeStatusListJwtResult = DecodeJwtResult<StatusListJwtHeaderSchem
  * @throws JoseParseError if the token is not well-formed.
  * @throws JoseValidationError if the token is not a Status List Token.
  */
-export function decodeStatusListJwt(jwt: string, options: DecompressStatusListOptions = {}): DecodeStatusListJwtResult {
-  const decoded = decodeJwt({ jwt, headerSchema: zStatusListJwtHeader, payloadSchema: zStatusListJwtPayload })
+export function decodeStatusListJwt<HeaderSchema extends CustomStatusListJwtHeaderSchema = StatusListJwtHeaderSchema>(
+  jwt: string,
+  { headerSchema, ...options }: DecodeStatusListJwtOptions<HeaderSchema> = {}
+): DecodeStatusListJwtResult<HeaderSchema> {
+  const decoded = decodeJwt({
+    jwt,
+    // The pipe outputs what the given schema does, which TypeScript cannot follow for a generic schema
+    headerSchema: (headerSchema
+      ? zStatusListJwtHeader.pipe(headerSchema)
+      : zStatusListJwtHeader) as unknown as HeaderSchema,
+    payloadSchema: zStatusListJwtPayload,
+  })
   const { bits, lst, aggregation_uri } = decoded.payload.status_list
 
   let statusList: StatusList | undefined
@@ -124,21 +147,26 @@ export function verifyStatusListJwtClaims(
   verifyJwtClaims(payload, { ...options, expectedSubject: uri })
 }
 
-export type VerifyStatusListJwtOptions = Omit<
-  VerifyJwtOptions<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema>,
+export type VerifyStatusListJwtOptions<
+  HeaderSchema extends CustomStatusListJwtHeaderSchema = StatusListJwtHeaderSchema,
+> = Omit<
+  VerifyJwtOptions<HeaderSchema, StatusListJwtPayloadSchema>,
   'jwt' | 'headerSchema' | 'payloadSchema' | 'expectedSubject' | 'understoodCriticalParameters'
-> & {
-  /** The compact token, or a decoded one, of which only `compact` is used. */
-  jwt: string | DecodeStatusListJwtResult
+> &
+  DecodeStatusListJwtOptions<HeaderSchema> & {
+    /** The compact token, or a decoded one, of which only `compact` is used. */
+    jwt: string | DecodeStatusListJwtResult<HeaderSchema>
 
-  /** The `uri` of the status list reference, which `sub` must equal. */
-  uri: string
+    /** The `uri` of the status list reference, which `sub` must equal. */
+    uri: string
 
-  /** When given, the status at this index must be `Valid`. */
-  idx?: number
-} & DecompressStatusListOptions
+    /** When given, the status at this index must be `Valid`. */
+    idx?: number
+  }
 
-export type VerifyStatusListJwtResult = VerifyJwtResult<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema> & {
+export type VerifyStatusListJwtResult<
+  HeaderSchema extends CustomStatusListJwtHeaderSchema = StatusListJwtHeaderSchema,
+> = VerifyJwtResult<HeaderSchema, StatusListJwtPayloadSchema> & {
   statusList: StatusList
 }
 
@@ -151,16 +179,22 @@ export type VerifyStatusListJwtResult = VerifyJwtResult<StatusListJwtHeaderSchem
  *   `maxDecompressedBytes`, 16 MiB by default (`invalid_status_list`), or `idx` is not in it (`index_out_of_range`) or
  *   its status is not `Valid` (`status_not_valid`).
  */
-export async function verifyStatusListJwt({
+export async function verifyStatusListJwt<
+  HeaderSchema extends CustomStatusListJwtHeaderSchema = StatusListJwtHeaderSchema,
+>({
   jwt,
   uri,
   idx,
   maxDecompressedBytes,
+  headerSchema,
   ...options
-}: VerifyStatusListJwtOptions): Promise<VerifyStatusListJwtResult> {
-  const decoded = decodeStatusListJwt(typeof jwt === 'string' ? jwt : jwt.compact, { maxDecompressedBytes })
+}: VerifyStatusListJwtOptions<HeaderSchema>): Promise<VerifyStatusListJwtResult<HeaderSchema>> {
+  const decoded = decodeStatusListJwt(typeof jwt === 'string' ? jwt : jwt.compact, {
+    maxDecompressedBytes,
+    headerSchema,
+  })
 
-  const verified = await verifyJwt<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema>({
+  const verified = await verifyJwt<HeaderSchema, StatusListJwtPayloadSchema>({
     ...options,
     jwt: decoded,
     expectedSubject: uri,
