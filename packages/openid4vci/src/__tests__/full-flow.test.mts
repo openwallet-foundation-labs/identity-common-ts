@@ -50,6 +50,7 @@ const credentialRequestProofJwk = {
 const { d: __2, ...credentialRequestProofJwkPublic } = credentialRequestProofJwk
 
 const accessTokenJwk = {
+  kid: 'access-token-key',
   kty: 'EC',
   d: 'Y2KgM6WsS5lAiZMj96VaqPm0YpP67mclJ5yXbhM7oQE',
   crv: 'P-256',
@@ -242,9 +243,9 @@ describe('Full E2E test', () => {
         const accessTokenResponse = await authorizationServer.createAccessTokenResponse({
           audience: credentialIssuerMetadata.credential_issuer,
           signer: {
-            method: 'jwk',
+            method: 'custom',
             alg: 'ES256',
-            publicJwk: accessTokenJwkPublic,
+            kid: accessTokenJwkPublic.kid,
           },
           subject: parsedAccessTokenRequest.grant.preAuthorizedCode,
           expiresInSeconds: 300,
@@ -517,6 +518,7 @@ describe('Full E2E test', () => {
         const verifiedParRequest = await authorizationServer.verifyPushedAuthorizationRequest({
           authorizationRequest,
           authorizationServerMetadata,
+          allowedRedirectUris: ['https://redirect.com'],
           request: {
             headers: request.headers,
             method: request.method as HttpMethod,
@@ -602,7 +604,7 @@ describe('Full E2E test', () => {
         const accessTokenRequest = parseXwwwFormUrlEncoded(await request.text())
         expect(accessTokenRequest).toEqual({
           code: 'some-authorization-code',
-          redirect_uri: 'https://redirect-uri.com',
+          redirect_uri: 'https://redirect.com',
           code_verifier: expect.any(String),
           grant_type: 'authorization_code',
           resource: credentialIssuerMetadata.credential_issuer,
@@ -619,7 +621,7 @@ describe('Full E2E test', () => {
         expect(parsedAccessTokenRequest).toEqual({
           accessTokenRequest: {
             code: 'some-authorization-code',
-            redirect_uri: 'https://redirect-uri.com',
+            redirect_uri: 'https://redirect.com',
             code_verifier: expect.any(String),
             grant_type: 'authorization_code',
             resource: createdCredentialOffer.credentialOfferObject.credential_issuer,
@@ -655,6 +657,7 @@ describe('Full E2E test', () => {
             codeVerifier: parsedAccessTokenRequest.pkceCodeVerifier,
           },
           expectedCode: 'some-authorization-code',
+          expectedRedirectUri: 'https://redirect.com',
           request: {
             method: request.method as HttpMethod,
             headers: request.headers,
@@ -675,9 +678,9 @@ describe('Full E2E test', () => {
         const accessTokenResponse = await authorizationServer.createAccessTokenResponse({
           audience: credentialIssuerMetadata.credential_issuer,
           signer: {
-            method: 'jwk',
+            method: 'custom',
             alg: 'ES256',
-            publicJwk: accessTokenJwkPublic,
+            kid: accessTokenJwkPublic.kid,
           },
           subject: 'some-authorization-code',
           expiresInSeconds: 300,
@@ -890,7 +893,7 @@ describe('Full E2E test', () => {
       issuerMetadata,
       authorizationCode: authorizationResponse.code,
       pkceCodeVerifier: pkce?.codeVerifier,
-      redirectUri: 'https://redirect-uri.com',
+      redirectUri: 'https://redirect.com',
       // TODO: how to select the alg
       dpop: isDpopSupported.supported
         ? {

@@ -14,6 +14,7 @@ import {
 } from '@owf/jose'
 import type { Openid4vpAuthorizationRequest } from '../../authorization-request/z-authorization-request'
 import type { Openid4vpAuthorizationRequestDcApi } from '../../authorization-request/z-authorization-request-dc-api'
+import { throwAsInvalidAuthorizationResponse } from '../../authorization-response/invalid-authorization-response'
 import { extractEncryptionJwkFromJwks } from '../jarm-extract-jwks'
 import { jarmAuthorizationResponseValidate } from './jarm-validate-authorization-response'
 import {
@@ -144,93 +145,96 @@ export type VerifiedJarmAuthorizationResponse = Awaited<ReturnType<typeof verify
  * * A `jwk` or `x5c` in the header only proves that the response was signed with that key: the `verifyJws`
  *   callback decides whether it trusts the signer, and so whether the returned `issuer` can be relied on.
  *
- * @throws Oauth2ServerErrorResponseError with error `invalid_request` when the response cannot be decrypted, its
- *   signature does not verify, or its `aud`, `exp`, `nbf` or `iat` is not valid. When `@owf/jose` rejected the
- *   signature or a time claim, its error is the `cause`.
- * @throws JoseValidationError when the header or the claims of a signed response do not validate, and the
- *   `ValidationError` of `@owf/identity-common` when the parameters of a response that is only encrypted do not.
+ * @throws Oauth2ServerErrorResponseError with error `invalid_request` when the response cannot be decoded, decrypted
+ *   or parsed, its header or claims do not validate, its signature does not verify, or its `aud`, `exp`, `nbf` or
+ *   `iat` is not valid, with the error of `@owf/jose`, `@owf/identity-common` or `@openid4vc/utils` as `cause` if
+ *   there is one.
  */
 export async function verifyJarmAuthorizationResponse(options: VerifyJarmAuthorizationResponseOptions) {
-  const { jarmAuthorizationResponseJwt, callbacks, expectedClientId, authorizationRequestPayload } = options
+  try {
+    const { jarmAuthorizationResponseJwt, callbacks, expectedClientId, authorizationRequestPayload } = options
 
-  const requestDataIsEncrypted = zCompactJwe.safeParse(jarmAuthorizationResponseJwt).success
-  const decryptedRequestData = requestDataIsEncrypted
-    ? await decryptJarmAuthorizationResponseJwt({
-        jarmAuthorizationResponseJwt,
-        callbacks,
-        authorizationRequestPayload,
+    const requestDataIsEncrypted = zCompactJwe.safeParse(jarmAuthorizationResponseJwt).success
+    const decryptedRequestData = requestDataIsEncrypted
+      ? await decryptJarmAuthorizationResponseJwt({
+          jarmAuthorizationResponseJwt,
+          callbacks,
+          authorizationRequestPayload,
+        })
+      : { payload: jarmAuthorizationResponseJwt, decryptionJwk: undefined }
+
+    const responseIsSigned = zCompactJwt.safeParse(decryptedRequestData.payload).success
+    if (!requestDataIsEncrypted && !responseIsSigned) {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'The JARM authorization response must be either encrypted, signed, or signed and encrypted.',
       })
-    : { payload: jarmAuthorizationResponseJwt, decryptionJwk: undefined }
+    }
 
-  const responseIsSigned = zCompactJwt.safeParse(decryptedRequestData.payload).success
-  if (!requestDataIsEncrypted && !responseIsSigned) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: 'The JARM authorization response must be either encrypted, signed, or signed and encrypted.',
-    })
-  }
+    let jarmAuthorizationResponse: JarmAuthorizationResponse | JarmAuthorizationResponseEncryptedOnly
 
-  let jarmAuthorizationResponse: JarmAuthorizationResponse | JarmAuthorizationResponseEncryptedOnly
-
-  if (responseIsSigned) {
-    const decodedJwt = decodeJwt({
-      jwt: decryptedRequestData.payload,
-      headerSchema: zSignedJarmAuthorizationResponseHeader,
-      payloadSchema: zJarmAuthorizationResponse,
-    })
-
-    try {
-      await verifyJwt({
-        jwt: decodedJwt,
-        verifyJwsCallback: options.callbacks.verifyJws,
-        // The time claims are verified below together with the other claims, the same way for a
-        // response that is signed as for one that is only encrypted
-        checkExpirationTime: false,
-        checkNotBefore: false,
-        checkIssuedAt: false,
+    if (responseIsSigned) {
+      const decodedJwt = decodeJwt({
+        jwt: decryptedRequestData.payload,
+        headerSchema: zSignedJarmAuthorizationResponseHeader,
+        payloadSchema: zJarmAuthorizationResponse,
       })
-    } catch (error) {
-      // The jose error, which says what did not verify, is kept as the cause
-      throw new Oauth2ServerErrorResponseError(
-        {
-          error: Oauth2ErrorCodes.InvalidRequest,
-          error_description: signatureVerificationErrorDescription(error),
-        },
-        { cause: error }
+
+      try {
+        await verifyJwt({
+          jwt: decodedJwt,
+          verifyJwsCallback: options.callbacks.verifyJws,
+          // The time claims are verified below together with the other claims, the same way for a
+          // response that is signed as for one that is only encrypted
+          checkExpirationTime: false,
+          checkNotBefore: false,
+          checkIssuedAt: false,
+        })
+      } catch (error) {
+        // The jose error, which says what did not verify, is kept as the cause
+        throw new Oauth2ServerErrorResponseError(
+          {
+            error: Oauth2ErrorCodes.InvalidRequest,
+            error_description: signatureVerificationErrorDescription(error),
+          },
+          { cause: error }
+        )
+      }
+
+      jarmAuthorizationResponse = decodedJwt.payload
+    } else {
+      const jsonRequestData = stringToJsonWithErrorHandling(
+        decryptedRequestData.payload,
+        'Unable to parse decrypted JARM JWE body to JSON'
+      )
+      jarmAuthorizationResponse = parseWithErrorHandling(
+        zJarmAuthorizationResponseEncryptedOnly,
+        jsonRequestData,
+        'Invalid JARM authorization response'
       )
     }
 
-    jarmAuthorizationResponse = decodedJwt.payload
-  } else {
-    const jsonRequestData = stringToJsonWithErrorHandling(
-      decryptedRequestData.payload,
-      'Unable to parse decrypted JARM JWE body to JSON'
-    )
-    jarmAuthorizationResponse = parseWithErrorHandling(
-      zJarmAuthorizationResponseEncryptedOnly,
-      jsonRequestData,
-      'Invalid JARM authorization response'
-    )
-  }
+    jarmAuthorizationResponseValidate({
+      expectedClientId,
+      authorizationResponse: jarmAuthorizationResponse,
+      now: options.now,
+      allowedSkewInSeconds: options.allowedSkewInSeconds,
+    })
+    const type: JarmMode =
+      requestDataIsEncrypted && responseIsSigned
+        ? JarmMode.SignedEncrypted
+        : requestDataIsEncrypted
+          ? JarmMode.Encrypted
+          : JarmMode.Signed
 
-  jarmAuthorizationResponseValidate({
-    expectedClientId,
-    authorizationResponse: jarmAuthorizationResponse,
-    now: options.now,
-    allowedSkewInSeconds: options.allowedSkewInSeconds,
-  })
-  const type: JarmMode =
-    requestDataIsEncrypted && responseIsSigned
-      ? JarmMode.SignedEncrypted
-      : requestDataIsEncrypted
-        ? JarmMode.Encrypted
-        : JarmMode.Signed
-
-  const issuer = jarmAuthorizationResponse.iss
-  return {
-    jarmAuthorizationResponse,
-    type,
-    issuer,
-    decryptionJwk: decryptedRequestData.decryptionJwk,
+    const issuer = jarmAuthorizationResponse.iss
+    return {
+      jarmAuthorizationResponse,
+      type,
+      issuer,
+      decryptionJwk: decryptedRequestData.decryptionJwk,
+    }
+  } catch (error) {
+    throwAsInvalidAuthorizationResponse(error, 'Invalid JARM authorization response.')
   }
 }

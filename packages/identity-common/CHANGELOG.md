@@ -1,5 +1,38 @@
 # @owf/identity-common
 
+## 0.8.0
+
+### Minor Changes
+
+- 0f663bf: Add `fetchWithLimits` and `fetchAndParse`, through which the packages of this repository fetch. They read the body of a response within a maximum size, and return a `Response` that holds the body in memory. `fetchAndParse` also parses the body of a 2xx response, e.g. with a zod schema or into a class instance, and rejects a 2xx response of a media type it does not accept.
+  
+  A package takes a `fetch` (`FetchCallback`) and `fetchLimits` (`FetchLimits`), both generic in the types the package fetches. The fetch callback gets what is fetched as its third argument, `{ type }`, e.g. `statusList` or `jwks`, so it can apply its own policy per type and does not have to limit the size of the response. The global `fetch` still fits. `FetchLimits` sets `maxResponseBytes` for every type and `maxResponseBytesByType` per type. Without either, a package sets the default for the type, such as 16 MiB for a status list, and otherwise a response is at most 10 MiB.
+- ebd0b4b: `zTyp` compares the `typ` as RFC 7515 section 4.1.9 does: in any casing, and with or without the `application/` prefix. `parseWithErrorHandling` takes an optional error class to throw. An issue whose context has only optional members no longer needs `context: {}`. New: the codes `claim_missing`, `claim_value_mismatch`, `invalid_crit` and `unsupported_crit`, `ValidationError.findIssue(code)`, `isJwtTyp`, `zNonEmptyString`, `zBase64Url` and `MarkOptional`.
+- 21cd668: `bytesToString` takes a `stripByteOrderMark` option to remove a leading byte order mark, as `Response.text()` does.
+- ec2ed51: `@owf/identity-common` exports `ValidationError`, which carries the validation `issues` of a value that does not validate, and `parseWithErrorHandling`, which parses with a zod schema and throws it. It also exports `zNumericDate`, `BaseSchema` and `zodErrorMap`, an error map to pass per parse. `parseWithSchema` without `codes` gives a custom issue that has no code `invalid_value` instead of throwing. With it, the messages of zod leave out their prefix, e.g. `Invalid input:`, as the code says it. An issue can have `pathLabels`, the path as a reader knows it, which the message of a validation error shows. The schema code `missing` is now `missing_value`, with the `expected` value as context. A union that no member matches has the issues of each member as `branches`, and a discriminated union the allowed discriminator values. A validation error message lists the members of such a union as numbered options, named by the labels of `unionParams(message, labels)`. New: `SchemaParseResult`. The output of `zTyp` is a `string`, so compare it with `isJwtTyp`.
+  
+  BREAKING: `@owf/cose` throws `CoseValidationError` instead of `ValidationError`. It extends the `ValidationError` of `@owf/identity-common`, whose `issues` replace `zodError`. Its issues have the CBOR keys as `path` and their names as `pathLabels`, and the unexpected keys of a map are one `unrecognized_keys` issue at the map, as zod reports them for an object. `@owf/cose` also no longer configures zod globally with `z.config` when it is imported, and no longer depends on `zod-validation-error`.
+- cb487f1: Validation issues have typed codes with their context, and a failed validation throws an error with the same `issues`.
+  
+  - `@owf/identity-common`: issue codes are a closed union, so `issue.code === 'expired'` narrows the context. Schema issues get a code of `SCHEMA_VALIDATION_CODES` (`missing_value`, `invalid_type`, `invalid_value`, `too_small`, …) instead of the zod code. New: `ValidationIssues`, `parseWithSchema`, `addValidationIssue` and `zTyp`. `@owf/identity-common` now depends on zod.
+  - Each package throws its own validation error with `issues`: `TrustedListValidationError`, `LoteValidationError`, `RegistrationCertificateValidationError` and `AccessCertificateValidationError`. Each extends the `ValidationError` of `@owf/identity-common`, not the error of its package.
+  - `createAccessCertificate` reports all invalid options at once, with a path into the options.
+  - `checkOverAsking` parses the DCQL query with the `dcql` library. A query it rejects gets the issues of `dcql`, with their location in the query and a code of `DCQL_VALIDATION_CODES` or a schema code. A credential query needs an `id`, and the `namespace`/`claim_name` form of earlier drafts gives an `invalid_query` issue (OpenID4VP 1.0 section 6).
+  
+  **Breaking:** `*Exception` is renamed to `*Error` in these packages, e.g. `WRPRCException` to `WRPRCError`. Zod schemas are named `zFoo` instead of `FooSchema`, e.g. `zTrustedList`. `@owf/identity-common` no longer exports `ValidationIssueParams` and `SchemaIssue`: add an issue with a code in a zod refinement with `addValidationIssue`. `schemaIssueToValidationIssue` takes a zod issue.
+- 5fff735: Media types are compared with `isMediaType` and JOSE `typ` values with `isJwtTyp`, both from `@owf/identity-common`. New: `CommonMediaTypes` of `@owf/identity-common`, the media types that are not specific to one specification, and `Oauth2MediaTypes` of `@openid4vc/oauth2`, with the JAR request object media type. JARM accepts its `Content-Type` in any casing. A Key Binding JWT and a registration certificate accept their `typ` in any casing and with the `application/` prefix (RFC 7515 Section 4.1.9).
+  
+  **Breaking:** `isContentType` and `isResponseContentType` are removed from `@openid4vc/utils`. Replace `isContentType(contentType, value)` with `isMediaType(value, contentType)` and `isResponseContentType(contentType, response)` with `isMediaType(response.headers.get('Content-Type'), contentType)`. `MediaTypes` is renamed to `StatusListMediaTypes` in `@owf/token-status-list` and to `MdocMediaTypes` in `@owf/mdoc`. `ContentType` is removed from `@openid4vc/utils`: use `CommonMediaTypes`, and `Oauth2MediaTypes.AuthorizationRequestJwt` for `ContentType.OauthAuthorizationRequestJwt`. The `expectedContentType` of a `ZodFetcher` is a `string`.
+- 04cfd04: Error classes are named `FooError` and zod schemas `zFoo` in all packages.
+  
+  **Breaking:** `*Exception` is renamed to `*Error`, e.g. `IdentityException` to `IdentityError`, `SDJWTException` to `SdJwtError`, `JwtTimeClaimException` to `JwtTimeClaimError`, `X509Exception` to `X509Error` and `SLException` to `StatusListError`. The `name` of the errors changes with it. Zod schemas are renamed from `FooSchema` (or `fooSchema`) to `zFoo`, e.g. `TypeMetadataFormatSchema` to `zTypeMetadataFormat`, `SchemaMetaSchema` to `zSchemaMeta`, `issuerSignedItemSchema` to `zIssuerSignedItem` and `Iso4217CurrencyCode` to `zIso4217CurrencyCode`.
+
+### Patch Changes
+
+- ec2ed51: Fix `instanceof` for subclasses of `IdentityError`. It set the prototype of every instance to `IdentityError.prototype`, so `new MyError() instanceof MyError` was false unless `MyError` set its prototype again, and always false for a subclass of `MyError`.
+  
+  A subclass that does not set its own `name` is now named after its class rather than `IdentityError`.
+
 ## 0.7.0
 
 ### Minor Changes
