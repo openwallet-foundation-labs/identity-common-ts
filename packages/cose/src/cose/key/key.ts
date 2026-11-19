@@ -4,11 +4,8 @@ import { CborStructure } from '../../cbor'
 import { TypedMap, typedMap } from '../../utils/typed-map'
 import { zUint8Array } from '../../utils/zod'
 import {
-  CoseDNotDefinedError,
   CoseInvalidKtyForRawError,
   CoseInvalidValueForKtyError,
-  CoseKeyTypeNotSupportedForPrivateKeyExtractionError,
-  CoseKNotDefinedError,
   CoseXNotDefinedError,
   CoseYNotDefinedError,
 } from '../error'
@@ -223,32 +220,6 @@ export class CoseKey extends CborStructure<CoseKeyEncodedStructure, CoseKeyDecod
     }
 
     return concatBytes(Uint8Array.from([0x04]), this.x, this.y)
-  }
-
-  /**
-   *
-   * @returns the `d` value for `ec` and `okp` key types
-   * @returns the `k` value for `oct` key types
-   *
-   */
-  public get privateKey() {
-    if (this.keyType === KeyType.Ec || this.keyType === KeyType.Okp) {
-      if (!this.d) {
-        throw new CoseDNotDefinedError()
-      }
-
-      return this.d
-    }
-
-    if (this.keyType === KeyType.Oct) {
-      if (!this.k) {
-        throw new CoseKNotDefinedError()
-      }
-
-      return this.k
-    }
-
-    throw new CoseKeyTypeNotSupportedForPrivateKeyExtractionError()
   }
 
   public get jwk(): Record<string, unknown> {

@@ -88,7 +88,7 @@ suite('kid header', async () => {
               {
                 issuerSigned: await createIssuerSigned(),
                 docRequestIndex: 0,
-                mac: { ephemeralKey: readerKey, signingKey: deviceKey },
+                mac: { deviceKey, ephemeralReaderKey: readerKey },
               },
             ],
           },
@@ -113,8 +113,8 @@ suite('kid header', async () => {
       sessionTranscript,
     })
     const tagged = await new DeviceSignedBuilder(mdlDocType, mdocContext).tag({
-      privateKey: deviceKey,
-      publicKey: readerKey,
+      deviceKey,
+      ephemeralReaderKey: readerKey,
       sessionTranscript,
       algorithm: MacAlgorithm.HS256,
     })

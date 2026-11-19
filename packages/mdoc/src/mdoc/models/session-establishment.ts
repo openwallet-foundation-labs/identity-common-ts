@@ -1,10 +1,6 @@
 import { CborStructure, TypedMap, typedMap, zUint8Array } from '@owf/cose'
-import { stringToBytes } from '@owf/identity-common'
 import { z } from 'zod'
-import type { MdocContext } from '../../context'
-import type { EDeviceKey } from './e-device-key'
 import { EReaderKey } from './e-reader-key'
-import type { SessionTranscript } from './session-transcript'
 
 const zSessionEstablishment = typedMap([
   ['eReaderKey', z.instanceof(EReaderKey)],
@@ -48,30 +44,6 @@ export class SessionEstablishment extends CborStructure<
 
   public get data() {
     return this.structure.get('data')
-  }
-
-  public async decryptedData(
-    options: {
-      eDeviceKeyPrivate: EDeviceKey
-      eReaderKeyPublic: EReaderKey
-      sessionTranscript: SessionTranscript
-    },
-    ctx: Pick<MdocContext, 'crypto'>
-  ) {
-    const _key = await ctx.crypto.hdkf({
-      digestAlgorithm: 'SHA-256',
-      privateKey: options.eDeviceKeyPrivate.privateKey,
-      publicKey: options.eReaderKeyPublic.publicKey,
-      // 18013-5 9.1.1.5: the salt is SHA-256(SessionTranscriptBytes).
-      salt: await ctx.crypto.digest({
-        digestAlgorithm: 'SHA-256',
-        bytes: options.sessionTranscript.encode({ asDataItem: true }),
-      }),
-      info: stringToBytes('SKReader'),
-    })
-
-    // TODO: we need to add a ctx.crypto.decrypt method
-    throw new Error('unimplemented: ctx.crypto.decrypt must be added')
   }
 
   public static create(options: SessionEstablishmentOptions): SessionEstablishment {

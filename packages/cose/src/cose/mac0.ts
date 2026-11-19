@@ -21,7 +21,7 @@ import {
   UnprotectedHeaders,
   type UnprotectedHeadersStructure,
 } from './headers/unprotected-headers'
-import { CoseKey } from './key'
+import type { CoseKey } from './key'
 import { coseKeyToJwkClaim } from './key/jwk'
 
 export const zMac0Encoded = z.tuple([zUint8Array, z.map(z.unknown(), z.unknown()), zUint8Array.nullable(), zUint8Array])
@@ -39,13 +39,13 @@ export type Mac0DecodedStructure = z.infer<typeof zMac0Decoded>
 export type Mac0Context = {
   authenticate: (options: {
     toBeAuthenticated: Uint8Array
-    key: CoseKey | Uint8Array
-    algorithm?: MacAlgorithm
+    key: CoseKey
+    algorithm: MacAlgorithm
   }) => Promise<Uint8Array>
   verify: (options: {
     toBeAuthenticated: Uint8Array
     tag: Uint8Array
-    key: CoseKey | Uint8Array
+    key: CoseKey
     algorithm?: MacAlgorithm
   }) => Promise<boolean>
 }
@@ -141,6 +141,14 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
   }
 
   /**
+   * The MAC_structure that earlier versions of this library built without `external_aad`, so their
+   * tags still verify. Call only after {@link toBeAuthenticated}, which checks the payload.
+   */
+  protected legacyToBeAuthenticated(options?: { detachedPayload?: Uint8Array }): Uint8Array {
+    return cborEncode(['MAC0', this.protectedHeaders.encodedStructure, this.payload ?? options?.detachedPayload])
+  }
+
+  /**
    * Decodes CBOR bytes into a Mac0 instance.
    * Uses the encodingSchema's decode() method to validate and transform the decoded data.
    */
@@ -167,11 +175,13 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
     protectedHeaders: ProtectedHeaders
     externalAad?: Uint8Array
   }) {
-    const toBeAuthenticated = ['MAC0', options.protectedHeaders.encodedStructure]
-    if (options.externalAad) toBeAuthenticated.push(options.externalAad)
-    toBeAuthenticated.push(options.payload)
-
-    return cborEncode(toBeAuthenticated)
+    // RFC 9052 6.3: external_aad is always part of the MAC_structure, a zero-length bstr when not supplied.
+    return cborEncode([
+      'MAC0',
+      options.protectedHeaders.encodedStructure,
+      options.externalAad ?? new Uint8Array(),
+      options.payload,
+    ])
   }
 
   public get algorithm(): MacAlgorithm | undefined {
@@ -219,7 +229,7 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
 
   public async authenticate(
     options: {
-      key: CoseKey | Uint8Array
+      key: CoseKey
       detachedPayload?: Uint8Array
       algorithm?: MacAlgorithm
       externalAad?: Uint8Array
@@ -238,14 +248,11 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
       throw new CosePayloadMustBeDefinedError()
     }
 
-    // TODO: do we want to check whether key.algorithm and options.algorithm exist?
-    const macAlgorithm = (options.key instanceof CoseKey ? options.key.algorithm : options.algorithm) as
-      | MacAlgorithm
-      | undefined
+    const macAlgorithm = options.algorithm ?? (options.key.algorithm as MacAlgorithm | undefined)
 
     if (!macAlgorithm) {
       throw new CoseInvalidAlgorithmError(
-        'Could not establish mac algorithm. Either provide it in the options directly, or provide it in the signingKey'
+        'Could not establish mac algorithm. Either provide it in the options directly, or provide it in the key'
       )
     }
 
@@ -274,12 +281,13 @@ export class Mac0 extends CborStructure<Mac0EncodedStructure, Mac0DecodedStructu
       throw new Error('Cannot provide detachedPayload when the Mac0 already contains an embedded payload')
     }
 
-    return await ctx.verify({
-      key,
-      tag: this.tag,
-      toBeAuthenticated: this.toBeAuthenticated({ detachedPayload, externalAad }),
-      algorithm: this.algorithm,
-    })
+    const verify = (toBeAuthenticated: Uint8Array) =>
+      ctx.verify({ key, tag: this.tag, toBeAuthenticated, algorithm: this.algorithm })
+
+    if (await verify(this.toBeAuthenticated({ detachedPayload, externalAad }))) return true
+    if (externalAad !== undefined) return false
+
+    return await verify(this.legacyToBeAuthenticated({ detachedPayload }))
   }
 }
 

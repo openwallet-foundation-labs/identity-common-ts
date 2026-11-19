@@ -78,6 +78,11 @@ export class InvalidValidityInfoError extends MdlError {}
  * ISO/IEC 18013-5 9.1.3.5: the device MAC shall use HMAC 256/256.
  */
 export class UnsupportedDeviceMacAlgorithmError extends MdlError {}
+
+/**
+ * The mdoc context has no `crypto.deviceMac`, which device MAC authentication needs.
+ */
+export class DeviceMacNotSupportedError extends MdlError {}
 export class SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError extends MdlError {}
 export class UnableToExtractX5ChainFromCwtError extends MdlError {}
 export class UnableToExtractX5ChainFromJwtError extends MdlError {}

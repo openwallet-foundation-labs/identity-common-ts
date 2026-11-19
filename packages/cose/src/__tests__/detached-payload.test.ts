@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { CoseKey, Mac0, MacAlgorithm, Sign1, SignatureAlgorithm } from '../../src'
+import { CoseKey, KeyType, Mac0, MacAlgorithm, Sign1, SignatureAlgorithm } from '../../src'
 import { mac0Context, sign1Context } from './context'
 
 const key = CoseKey.fromJwk({
@@ -133,7 +133,7 @@ describe('Sign1 - detached payload', () => {
 })
 
 describe('Mac0 - detached payload', () => {
-  const macKey = new Uint8Array(32).fill(0xab)
+  const macKey = CoseKey.create({ keyType: KeyType.Oct, k: new Uint8Array(32).fill(0xab) })
 
   describe('create()', () => {
     test('creates Mac0 with embedded payload', () => {

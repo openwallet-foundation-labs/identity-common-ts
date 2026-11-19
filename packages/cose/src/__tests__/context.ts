@@ -7,7 +7,7 @@ import { CoseKey, type Mac0Context, type Sign1Context } from '../cose'
 export const sign1Context: Sign1Context = {
   sign: async (input) => {
     const { key, toBeSigned } = input
-    return p256.sign(toBeSigned, key.privateKey, { format: 'compact' })
+    return p256.sign(toBeSigned, key.d as Uint8Array, { format: 'compact' })
   },
   verify: async (input) => {
     const { signature, toBeVerified, key } = input
@@ -18,15 +18,9 @@ export const sign1Context: Sign1Context = {
 }
 
 export const mac0Context: Mac0Context = {
-  authenticate: async (input) => {
-    const { key, toBeAuthenticated } = input
-    const keyBytes = key instanceof CoseKey ? key.privateKey : key
-    return hmac(sha256, keyBytes, toBeAuthenticated)
-  },
-  verify: async (input) => {
-    const { tag, toBeAuthenticated, key } = input
-    return timingSafeEqual(tag, hmac(sha256, key instanceof CoseKey ? key.privateKey : key, toBeAuthenticated))
-  },
+  authenticate: async ({ key, toBeAuthenticated }) => hmac(sha256, key.k as Uint8Array, toBeAuthenticated),
+  verify: async ({ tag, toBeAuthenticated, key }) =>
+    timingSafeEqual(tag, hmac(sha256, key.k as Uint8Array, toBeAuthenticated)),
 }
 
 export const signKey = CoseKey.fromJwk({
