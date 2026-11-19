@@ -193,10 +193,7 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
 
     // The issuer auth comes last, as it ends with the status check of the MSO, which must not run for an
     // mdoc that fails a check that needs no network access (Token Status List § 8.3).
-    const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
-      await this.issuerAuth.verify(options, ctx)
-
-    return { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain }
+    return this.issuerAuth.verify(options, ctx)
   }
 
   public static create(options: IssuerSignedOptions): IssuerSigned {

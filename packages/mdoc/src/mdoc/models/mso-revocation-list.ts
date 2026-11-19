@@ -20,7 +20,9 @@ import {
   StatusType,
   type VerifyStatusListJwtOptions,
   verifyStatusListJwt as verifyTokenStatusListJwt,
+  zStatusListJwtHeader,
 } from '@owf/token-status-list'
+import type z from 'zod'
 import type { MdocContext } from '../../context'
 import {
   InvalidIdentifierListSignatureError,
@@ -32,7 +34,6 @@ import {
   TrustedRevocationCertificatesMustContainAtleastOneCertificateError,
   UnableToExtractX5ChainFromCwtError,
   UnableToExtractX5ChainFromIdentifierListError,
-  UnableToExtractX5ChainFromJwtError,
   UnprotectedX5ChainNotBoundError,
 } from '../errors'
 import { IdentifierListCwt } from './identifier-list-cwt'
@@ -141,6 +142,10 @@ const jwsSignatureAlgorithms = new Map<string, JwsSignatureAlgorithm>([
   ['ES512', { algorithm: SignatureAlgorithm.ES512, signatureLength: 132 }],
 ])
 
+/** The signer of a status list in JWT format is only established through its `x5c` chain. */
+const zMdocStatusListJwtHeader = zStatusListJwtHeader.required({ x5c: true })
+export type MdocStatusListJwtHeader = z.infer<typeof zMdocStatusListJwtHeader>
+
 /**
  * Checks the status at `idx`, only once the list verified, so that a list that does not verify is never
  * reported as a status (Token Status List § 8.3). § 12.3.6.1 accepts no status but Valid.
@@ -182,7 +187,8 @@ async function verifyStatusListJwt(
     signer,
     { signingInputBytes, signature }
   ) => {
-    if (signer.method !== 'x5c') throw new UnableToExtractX5ChainFromJwtError()
+    // Unreachable, as the header schema requires `x5c`, but it narrows `signer`
+    if (signer.method !== 'x5c') throw new InvalidRevocationListError(`The status list at ${uri} has no x5c header`)
     // Set, as `allowedAlgorithms` only has the keys of the map
     const { algorithm, signatureLength } = jwsSignatureAlgorithms.get(signer.alg) as JwsSignatureAlgorithm
 
@@ -222,6 +228,7 @@ async function verifyStatusListJwt(
     () =>
       verifyTokenStatusListJwt({
         jwt,
+        headerSchema: zMdocStatusListJwtHeader,
         uri,
         now,
         skewSeconds,
@@ -237,7 +244,7 @@ async function verifyStatusListJwt(
 
   await assertStatusValid(statusList, uri, idx)
 
-  return { statusListJwt: { header, payload, statusList }, chain }
+  return { format: 'jwt', compact: jwt, header, payload, statusList, trustedChain: chain } satisfies VerifiedStatusList
 }
 
 /**
@@ -269,21 +276,21 @@ export type VerifyStatusListTokenOptions = {
   maxDecompressedBytes?: number
 }
 
-/** A status list served in JWT format, once verified. */
-export type VerifiedStatusListJwt = {
-  header: Record<string, unknown>
-  payload: StatusListJwtPayload
+/** A status list once verified, in the format it was served in. */
+export type VerifiedStatusList = {
+  /** The list itself, whichever format it was served in. */
   statusList: StatusList
-}
-
-export type VerifyStatusListTokenResult = {
-  /** The verified list, when it was served in CWT format. */
-  statusListCwt?: StatusListCwt
-  /** The verified list, when it was served in JWT format instead. */
-  statusListJwt?: VerifiedStatusListJwt
   /** The validated certificate chain of the list signer, leaf first. Not set without chain validation. */
-  chain?: Array<Uint8Array>
-}
+  trustedChain?: Array<Uint8Array>
+} & (
+  | { format: 'cwt'; statusListCwt: StatusListCwt }
+  | {
+      format: 'jwt'
+      compact: string
+      header: MdocStatusListJwtHeader
+      payload: StatusListJwtPayload
+    }
+)
 
 /**
  * Fetch and verify the status list a `StatusListInfo` points at.
@@ -314,7 +321,7 @@ export async function verifyStatusListToken(
     maxDecompressedBytes,
   }: VerifyStatusListTokenOptions,
   ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose' | 'crypto'>
-): Promise<VerifyStatusListTokenResult> {
+): Promise<VerifiedStatusList> {
   if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
 
   const { uri, idx } = statusListInfo
@@ -330,7 +337,7 @@ export async function verifyStatusListToken(
   // NOTE: a JWT is NOT allowed by § 12.3.6.3, but some issuers serve the status list of an mdoc
   // as JWT only. So it is accepted as a fallback, with the same checks and status handling as a CWT.
   if (typeof token === 'string') {
-    const { statusListJwt, chain } = await verifyStatusListJwt(
+    return verifyStatusListJwt(
       {
         jwt: token,
         uri,
@@ -344,8 +351,6 @@ export async function verifyStatusListToken(
       },
       ctx
     )
-
-    return { statusListJwt, chain }
   }
 
   const statusListCwt = StatusListCwt.fromToken(token)
@@ -397,7 +402,7 @@ export async function verifyStatusListToken(
   )
   await assertStatusValid(statusList, uri, idx)
 
-  return { statusListCwt, chain }
+  return { format: 'cwt', statusListCwt, statusList, trustedChain: chain }
 }
 
 export type VerifyIdentifierListTokenOptions = {
@@ -416,10 +421,12 @@ export type VerifyIdentifierListTokenOptions = {
   checkFreshness?: boolean
 }
 
-export type VerifyIdentifierListTokenResult = {
+/** An identifier list once verified. Only the CWT format exists for it. */
+export type VerifiedIdentifierList = {
+  format: 'cwt'
   identifierListCwt: IdentifierListCwt
   /** The validated certificate chain of the list signer, leaf first. Not set without chain validation. */
-  chain?: Array<Uint8Array>
+  trustedChain?: Array<Uint8Array>
 }
 
 /**
@@ -442,7 +449,7 @@ export async function verifyIdentifierListToken(
     checkFreshness,
   }: VerifyIdentifierListTokenOptions,
   ctx: Pick<MdocContext, 'fetch' | 'fetchLimits' | 'x509' | 'cose'>
-): Promise<VerifyIdentifierListTokenResult> {
+): Promise<VerifiedIdentifierList> {
   if (!disableCertificateChainValidation) assertTrustedCertificates({ trustedCertificates })
 
   const { uri, id } = identifierListInfo
@@ -473,5 +480,5 @@ export async function verifyIdentifierListToken(
     InvalidIdentifierListSignatureError
   )
 
-  return { identifierListCwt, chain }
+  return { format: 'cwt', identifierListCwt, trustedChain: chain }
 }

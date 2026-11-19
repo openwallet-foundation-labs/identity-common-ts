@@ -17,7 +17,6 @@ import {
   SignatureAlgorithm,
   StatusListEntryNotValidError,
   UnableToExtractX5ChainFromCwtError,
-  UnableToExtractX5ChainFromJwtError,
   UnprotectedHeaders,
   UnprotectedX5ChainNotBoundError,
   verifyIdentifierListToken,
@@ -100,10 +99,11 @@ suite('verifyStatusListToken with an x5chain in the unprotected header', () => {
   test('Verify a status list with an unprotected x5chain bound by a protected x5t', async () => {
     const uri = await mockStatusList('/bound', { x5t: await x5tOf(certificate) })
 
-    const { statusListCwt, chain } = await verify(uri)
+    const { format, statusList, trustedChain } = await verify(uri)
 
-    expect(statusListCwt?.payload.statusList.getStatus(idx)).toBe(StatusType.Valid)
-    expect(chain?.[0]).toEqual(certificate)
+    expect(format).toBe('cwt')
+    expect(statusList.getStatus(idx)).toBe(StatusType.Valid)
+    expect(trustedChain?.[0]).toEqual(certificate)
   })
 
   test('Verify a status list without an x5chain', async () => {
@@ -122,9 +122,9 @@ suite('verifyStatusListToken with an x5chain in the unprotected header', () => {
     // The protected chain is used; the unbound unprotected one is ignored.
     const uri = await mockStatusList('/both', { protectedX5Chain: true, x5chain: otherCertificate })
 
-    const { chain } = await verify(uri)
+    const { trustedChain } = await verify(uri)
 
-    expect(chain?.[0]).toEqual(certificate)
+    expect(trustedChain?.[0]).toEqual(certificate)
   })
 
   test('Verify a status list with an unprotected x5chain and the x5t of another certificate', async () => {
@@ -315,11 +315,12 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
     )
 
   test('Verify a JWT status list with a Valid entry', async () => {
-    const { statusListJwt, statusListCwt, chain } = await verify(await mockStatusList('/valid'))
+    const result = await verify(await mockStatusList('/valid'))
 
-    expect(statusListJwt?.statusList.getStatus(idx)).toBe(StatusType.Valid)
-    expect(statusListCwt).toBeUndefined()
-    expect(chain?.[0]).toEqual(certificate)
+    expect(result.format).toBe('jwt')
+    expect(result.statusList.getStatus(idx)).toBe(StatusType.Valid)
+    expect(result.format === 'jwt' && result.header.x5c).toEqual([base64.encode(certificate)])
+    expect(result.trustedChain?.[0]).toEqual(certificate)
   })
 
   // Ten statuses of 1 bit inflate to 2 bytes
@@ -334,10 +335,10 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
   })
 
   test('Verify a JWT status list without certificate chain validation', async () => {
-    const { statusListJwt, chain } = await verify(await mockStatusList('/no-chain-validation'), { disable: true })
+    const { statusList, trustedChain } = await verify(await mockStatusList('/no-chain-validation'), { disable: true })
 
-    expect(statusListJwt?.statusList.getStatus(idx)).toBe(StatusType.Valid)
-    expect(chain).toBeUndefined()
+    expect(statusList.getStatus(idx)).toBe(StatusType.Valid)
+    expect(trustedChain).toBeUndefined()
   })
 
   test.each([
@@ -398,7 +399,7 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
       options: { payload: { status_list: { bits: 1, lst: base64url.encode(new Uint8Array([1, 2, 3])) } } },
       error: InvalidRevocationListError,
     },
-    { name: 'no x5c', options: { header: { x5c: undefined } }, error: UnableToExtractX5ChainFromJwtError },
+    { name: 'no x5c', options: { header: { x5c: undefined } }, error: InvalidRevocationListError },
     { name: 'an empty x5c', options: { header: { x5c: [] } }, error: InvalidRevocationListError },
     { name: 'an x5c that is not base64', options: { header: { x5c: ['!!!'] } }, error: InvalidRevocationListError },
   ])('Verify a JWT status list with $name', async ({ name, options, error }) => {
@@ -452,8 +453,7 @@ suite('verifyStatusListToken with a status list in JWT format', () => {
     const result = await verify(uri)
 
     expect(accept).toBe(`${StatusListMediaTypes.StatusListCwt}, ${StatusListMediaTypes.StatusListJwt};q=0.9`)
-    expect(result.statusListCwt).toBeDefined()
-    expect(result.statusListJwt).toBeUndefined()
+    expect(result.format).toBe('cwt')
   })
 })
 
@@ -514,13 +514,13 @@ suite('revocation lists signed with ESP256', () => {
       IdentifierListMediaTypes.IdentifierListCwt
     )
 
-    const { identifierListCwt: verified, chain } = await verifyIdentifierListToken(
+    const { identifierListCwt: verified, trustedChain } = await verifyIdentifierListToken(
       { identifierListInfo: { uri, id: new Uint8Array([0xab, 0xcd]) }, trustedCertificates: [certificate] },
       mdocContext
     )
 
     expect(verified.algorithm).toBe(SignatureAlgorithm.ESP256)
-    expect(chain?.[0]).toEqual(certificate)
+    expect(trustedChain?.[0]).toEqual(certificate)
   })
 
   test('Verify a status list CWT signed with ESP256', async () => {
@@ -541,12 +541,13 @@ suite('revocation lists signed with ESP256', () => {
       StatusListMediaTypes.StatusListCwt
     )
 
-    const { statusListCwt: verified } = await verifyStatusListToken(
+    const verified = await verifyStatusListToken(
       { statusListInfo: { uri, idx }, trustedCertificates: [certificate] },
       mdocContext
     )
+    if (verified.format !== 'cwt') throw new Error('Expected a CWT status list')
 
-    expect(verified?.algorithm).toBe(SignatureAlgorithm.ESP256)
-    expect(verified?.payload.statusList.getStatus(idx)).toBe(StatusType.Valid)
+    expect(verified.statusListCwt.algorithm).toBe(SignatureAlgorithm.ESP256)
+    expect(verified.statusList.getStatus(idx)).toBe(StatusType.Valid)
   })
 })

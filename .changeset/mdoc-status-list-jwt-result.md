@@ -1,0 +1,7 @@
+---
+'@owf/mdoc': minor
+---
+
+`IssuerAuth.verify` and `verifyStatus`, `IssuerSigned.verify`, `Holder.verifyIssuerSigned` and `DeviceResponse.verify` (per document) now return a status list served as a JWT too. `statusList` is a `VerifiedStatusList`, which `verifyStatusListToken` also returns. `format` tells a CWT from a JWT, and `statusList.statusList` is the list in either format. A CWT has `statusListCwt`. A JWT has the `compact` token, its `header` and `payload`, so a caller can cache it until its `exp` or for its `ttl`. `identifierList` is a `VerifiedIdentifierList` of the same shape, which `verifyIdentifierListToken` also returns, with `format: 'cwt'` and `identifierListCwt`.
+
+**Breaking:** read a CWT status list from `statusList.statusListCwt` instead of `statusList`, and an identifier list from `identifierList.identifierListCwt` instead of `identifierList`. The signer chains moved to `statusList.trustedChain` and `identifierList.trustedChain`, from `trustedStatusListChain` and `trustedIdentifierListChain`. `verifyStatusListToken` and `verifyIdentifierListToken` return the same objects, with `trustedChain` instead of `chain`. `VerifyStatusListTokenResult` and `VerifyIdentifierListTokenResult` are replaced by `VerifiedStatusList` and `VerifiedIdentifierList`. A status list in JWT format without an `x5c` header throws `InvalidRevocationListError` instead of `UnableToExtractX5ChainFromJwtError`, which is removed.

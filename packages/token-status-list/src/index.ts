@@ -65,6 +65,7 @@ export { createFeistelStatusListIndexAllocator, FeistelStatusListIndexAllocator 
 export type {
   CreateStatusListJwtHeader,
   CreateStatusListJwtPayload,
+  DecodeStatusListJwtOptions,
   DecodeStatusListJwtResult,
   SignStatusListJwtOptions,
   VerifyStatusListJwtClaimsOptions,
