@@ -154,6 +154,13 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
     credential_endpoint: zHttpsUrl,
     deferred_credential_endpoint: zHttpsUrl.optional(),
     notification_endpoint: zHttpsUrl.optional(),
+    /**
+     * OpenID4VCI 1.1 draft Section 13.2.4: the values allowed as `issuer_redirect_uri` of a credential offer.
+     *
+     * @experimental Implements https://github.com/openid/OpenID4VCI/pull/759, which is not merged. It can change at
+     * any point to align with the specification.
+     */
+    expected_redirect_uris: z.array(zHttpsUrl).min(1).optional(),
 
     // Added after draft 14, but needed for proper
     nonce_endpoint: zHttpsUrl.optional(),

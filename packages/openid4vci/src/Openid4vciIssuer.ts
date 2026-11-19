@@ -138,6 +138,7 @@ export class Openid4vciIssuer {
       | 'credentialOfferUri'
       | 'credentialOfferScheme'
       | 'credentialConfigurationIds'
+      | 'issuerRedirectUri'
     >
   ) {
     return createCredentialOffer({
@@ -145,6 +146,7 @@ export class Openid4vciIssuer {
       credentialConfigurationIds: options.credentialConfigurationIds,
       grants: options.grants,
       issuerMetadata: options.issuerMetadata,
+      issuerRedirectUri: options.issuerRedirectUri,
       additionalPayload: options.additionalPayload,
       credentialOfferScheme: options.credentialOfferScheme,
       credentialOfferUri: options.credentialOfferUri,

@@ -61,6 +61,26 @@ advertised JWK passed to it.
 Request and response compression are not supported; `zip` parameters are rejected
 and issuers must not advertise compression support.
 
+### Redirect to the Credential Issuer
+
+> **⚠️ Experimental:** This implements [openid/OpenID4VCI#759](https://github.com/openid/OpenID4VCI/pull/759), which is not merged. It can change at any point to align with the specification.
+
+A credential offer can carry an `issuer_redirect_uri` that the wallet opens once
+the issuance flow has concluded, whether it succeeded, failed, was cancelled or
+is deferred.
+
+Issuers list the allowed values as `expected_redirect_uris` in their metadata and
+pass one of them as `issuerRedirectUri` to `createCredentialOffer`.
+
+The credential offer is not authenticated, so wallets read the value with
+`getIssuerRedirectUriFromCredentialOffer({ credentialOffer, issuerMetadata })`.
+It returns the `issuer_redirect_uri` when the issuer metadata lists it, and
+ignores it when the issuer metadata has no `expected_redirect_uris`.
+
+An `issuer_redirect_uri` that is not one of the `expected_redirect_uris` is
+rejected. `getIssuerRedirectUriFromCredentialOffer` throws, and so do the
+`Openid4vciClient` methods that take a credential offer.
+
 ## Dependencies
 
 - [@openid4vc/oauth2](https://www.npmjs.com/package/@openid4vc/oauth2)

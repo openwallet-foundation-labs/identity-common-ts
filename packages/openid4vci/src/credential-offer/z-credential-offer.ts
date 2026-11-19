@@ -47,6 +47,13 @@ const zCredentialOfferObjectDraft14 = z
     credential_issuer: zHttpsUrl,
     credential_configuration_ids: z.array(zNonEmptyString),
     grants: z.optional(zCredentialOfferGrants),
+    /**
+     * OpenID4VCI 1.1 draft Section 4.1.1. Not authenticated, use `getIssuerRedirectUriFromCredentialOffer` to read it.
+     *
+     * @experimental Implements https://github.com/openid/OpenID4VCI/pull/759, which is not merged. It can change at
+     * any point to align with the specification.
+     */
+    issuer_redirect_uri: zHttpsUrl.optional(),
   })
   .loose()
 export type CredentialOfferObject = z.input<typeof zCredentialOfferObjectDraft14>

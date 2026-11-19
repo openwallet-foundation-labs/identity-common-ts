@@ -3,8 +3,13 @@ import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { callbacks } from '../../../../oauth2/src/__tests__/util.mjs'
-import { createCredentialOffer, resolveCredentialOffer } from '../../credential-offer/credential-offer'
+import {
+  createCredentialOffer,
+  getIssuerRedirectUriFromCredentialOffer,
+  resolveCredentialOffer,
+} from '../../credential-offer/credential-offer'
 import type { IssuerMetadataResult } from '../../metadata/fetch-issuer-metadata'
+import { Openid4vciClient } from '../../Openid4vciClient'
 import { Openid4vciVersion } from '../../version'
 
 const issuerMetadata = {
@@ -243,5 +248,108 @@ describe('Credential Offer', () => {
 
     await expect(resolveCredentialOffer(offer, { fetch })).rejects.toThrow('Invalid credential_offer_uri')
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  describe('issuer_redirect_uri (OpenID4VCI 1.1 draft Sections 4.1.1 and 13.2.4)', () => {
+    const issuerRedirectUri = 'https://credential-issuer.example.com/return'
+    const issuerMetadataWithRedirect = {
+      ...issuerMetadata,
+      credentialIssuer: { ...issuerMetadata.credentialIssuer, expected_redirect_uris: [issuerRedirectUri] },
+    } satisfies IssuerMetadataResult
+    const credentialOffer = {
+      credential_issuer: issuerMetadata.credentialIssuer.credential_issuer,
+      credential_configuration_ids: ['test'],
+    }
+
+    test('create credential offer with an issuer redirect uri from expected_redirect_uris', async () => {
+      const { credentialOfferObject } = await createCredentialOffer({
+        credentialConfigurationIds: ['test'],
+        grants: {},
+        issuerRedirectUri,
+        callbacks,
+        issuerMetadata: issuerMetadataWithRedirect,
+      })
+
+      expect(credentialOfferObject.issuer_redirect_uri).toEqual(issuerRedirectUri)
+    })
+
+    test('throws error when the issuer redirect uri is not in expected_redirect_uris', async () => {
+      const options = { credentialConfigurationIds: ['test'], grants: {}, callbacks }
+
+      await expect(createCredentialOffer({ ...options, issuerRedirectUri, issuerMetadata })).rejects.toThrow(
+        "Issuer redirect uri 'https://credential-issuer.example.com/return' not found in the credential issuer metadata 'expected_redirect_uris'. Available uris are none."
+      )
+      await expect(
+        createCredentialOffer({
+          ...options,
+          issuerRedirectUri: 'https://attacker.example.com',
+          issuerMetadata: issuerMetadataWithRedirect,
+        })
+      ).rejects.toThrow(
+        "Issuer redirect uri 'https://attacker.example.com' not found in the credential issuer metadata 'expected_redirect_uris'. Available uris are https://credential-issuer.example.com/return."
+      )
+    })
+
+    test('rejects a credential offer with an issuer_redirect_uri that is not an https url', async () => {
+      const offer = `openid-credential-offer://?credential_offer=${encodeURIComponent(JSON.stringify({ ...credentialOffer, issuer_redirect_uri: 'javascript:alert(1)' }))}`
+
+      await expect(resolveCredentialOffer(offer)).rejects.toThrow('Error parsing the credential offer')
+    })
+
+    test('returns an issuer_redirect_uri that is identical to one of the expected_redirect_uris and throws for any other', () => {
+      expect(
+        getIssuerRedirectUriFromCredentialOffer({
+          credentialOffer: { ...credentialOffer, issuer_redirect_uri: issuerRedirectUri },
+          issuerMetadata: issuerMetadataWithRedirect,
+        })
+      ).toEqual(issuerRedirectUri)
+
+      expect(
+        getIssuerRedirectUriFromCredentialOffer({ credentialOffer, issuerMetadata: issuerMetadataWithRedirect })
+      ).toBeUndefined()
+
+      // The offer is not authenticated, so without expected_redirect_uris the value is ignored
+      expect(
+        getIssuerRedirectUriFromCredentialOffer({
+          credentialOffer: { ...credentialOffer, issuer_redirect_uri: issuerRedirectUri },
+          issuerMetadata,
+        })
+      ).toBeUndefined()
+
+      // Compared as strings, without normalization
+      for (const issuer_redirect_uri of [
+        'https://attacker.example.com/return',
+        'https://credential-issuer.example.com/return/',
+        'https://credential-issuer.example.com/return?session=1',
+        'https://CREDENTIAL-ISSUER.example.com/return',
+        'https://credential-issuer.example.com/return/../other',
+      ]) {
+        expect(() =>
+          getIssuerRedirectUriFromCredentialOffer({
+            credentialOffer: { ...credentialOffer, issuer_redirect_uri },
+            issuerMetadata: issuerMetadataWithRedirect,
+          })
+        ).toThrow(
+          `Credential offer contains 'issuer_redirect_uri' with value '${issuer_redirect_uri}' but credential issuer metadata does not include this uri. Available 'expected_redirect_uris' values are https://credential-issuer.example.com/return.`
+        )
+      }
+    })
+
+    test('the client rejects a credential offer with an issuer_redirect_uri that is not in expected_redirect_uris', async () => {
+      const client = new Openid4vciClient({ callbacks: { ...callbacks, fetch: vi.fn(), signJws: vi.fn() } })
+
+      await expect(
+        client.retrievePreAuthorizedCodeAccessTokenFromOffer({
+          credentialOffer: {
+            ...credentialOffer,
+            grants: { [preAuthorizedCodeGrantIdentifier]: { 'pre-authorized_code': 'code' } },
+            issuer_redirect_uri: 'https://attacker.example.com/return',
+          },
+          issuerMetadata: issuerMetadataWithRedirect,
+        })
+      ).rejects.toThrow(
+        "Credential offer contains 'issuer_redirect_uri' with value 'https://attacker.example.com/return'"
+      )
+    })
   })
 })

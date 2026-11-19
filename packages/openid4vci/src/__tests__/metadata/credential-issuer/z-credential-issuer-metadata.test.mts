@@ -429,4 +429,25 @@ describe('Credential Issuer Metadata', () => {
       issues: [{ code: 'missing_value', path: ['credentials_supported', 0, 'id'], context: { expected: 'string' } }],
     })
   })
+
+  // OpenID4VCI 1.1 draft Section 13.2.4: a non-empty array of https URLs
+  test('parses expected_redirect_uris and rejects an empty array or a url that is not https', () => {
+    const metadata = {
+      credential_issuer: 'https://credential-issuer.example.com',
+      credential_endpoint: 'https://credential-issuer.example.com/credential',
+      credential_configurations_supported: {},
+    }
+    const expectedRedirectUris = ['https://credential-issuer.example.com/return']
+
+    expect(
+      zCredentialIssuerMetadata.safeParse({ ...metadata, expected_redirect_uris: expectedRedirectUris })
+    ).toMatchObject({ success: true, data: { expected_redirect_uris: expectedRedirectUris } })
+    expect(zCredentialIssuerMetadata.safeParse({ ...metadata, expected_redirect_uris: [] }).success).toBe(false)
+    expect(
+      zCredentialIssuerMetadata.safeParse({
+        ...metadata,
+        expected_redirect_uris: ['http://credential-issuer.example.com'],
+      }).success
+    ).toBe(false)
+  })
 })

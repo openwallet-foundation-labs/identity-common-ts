@@ -1,6 +1,10 @@
 // Re-export some types from utils (we don't want people depending on that lib)
 export { getGlobalConfig, type Oid4vcTsConfig, setGlobalConfig } from '@openid4vc/utils'
-export { determineAuthorizationServerForCredentialOffer } from './credential-offer/credential-offer'
+export {
+  determineAuthorizationServerForCredentialOffer,
+  type GetIssuerRedirectUriFromCredentialOfferOptions,
+  getIssuerRedirectUriFromCredentialOffer,
+} from './credential-offer/credential-offer'
 export type {
   CredentialOfferAuthorizationCodeGrant,
   CredentialOfferGrants,

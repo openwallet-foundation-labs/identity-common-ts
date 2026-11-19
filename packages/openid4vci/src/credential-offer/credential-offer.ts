@@ -139,6 +139,15 @@ export interface CreateCredentialOfferOptions {
   grants: CreateCredentialOfferGrantsOptions
 
   /**
+   * URL the wallet navigates the user to once the issuance flow has concluded (OpenID4VCI 1.1 draft Section 4.1.1).
+   * Must be one of the `expected_redirect_uris` of the credential issuer metadata, as wallets ignore it otherwise.
+   *
+   * @experimental Implements https://github.com/openid/OpenID4VCI/pull/759, which is not merged. It can change at any
+   * point to align with the specification.
+   */
+  issuerRedirectUri?: string
+
+  /**
    * Additional payload to include in the body of the credential offer. Will be applied
    * after the other fields, allowing to override common properties, so be cautious.
    */
@@ -250,11 +259,19 @@ export async function createCredentialOffer(
     )
   }
 
+  const expectedRedirectUris = options.issuerMetadata.credentialIssuer.expected_redirect_uris
+  if (options.issuerRedirectUri && !expectedRedirectUris?.includes(options.issuerRedirectUri)) {
+    throw new Oauth2Error(
+      `Issuer redirect uri '${options.issuerRedirectUri}' not found in the credential issuer metadata 'expected_redirect_uris'. Available uris are ${expectedRedirectUris?.join(', ') ?? 'none'}.`
+    )
+  }
+
   const credentialOfferScheme = options.credentialOfferScheme ?? 'openid-credential-offer://'
   const credentialOfferObject = parseWithErrorHandling(zCredentialOfferObject, {
     credential_issuer: options.issuerMetadata.credentialIssuer.credential_issuer,
     credential_configuration_ids: options.credentialConfigurationIds,
     grants,
+    ...(options.issuerRedirectUri ? { issuer_redirect_uri: options.issuerRedirectUri } : {}),
     ...options.additionalPayload,
   } satisfies CredentialOfferObject)
 
@@ -277,6 +294,43 @@ export async function createCredentialOffer(
     credentialOffer: url.toString(),
     credentialOfferObject,
   }
+}
+
+/**
+ * @experimental Implements https://github.com/openid/OpenID4VCI/pull/759, which is not merged. It can change at any
+ * point to align with the specification.
+ */
+export interface GetIssuerRedirectUriFromCredentialOfferOptions {
+  credentialOffer: CredentialOfferObject
+  issuerMetadata: IssuerMetadataResult
+}
+
+/**
+ * The `issuer_redirect_uri` of a credential offer, or `undefined` when the offer has none or the credential issuer
+ * metadata has no `expected_redirect_uris` (OpenID4VCI 1.1 draft Sections 4.1.1 and 13.2.4).
+ *
+ * Throws when the `expected_redirect_uris` do not list the `issuer_redirect_uri`. The credential offer is not
+ * authenticated, so never navigate to the `issuer_redirect_uri` of the offer itself.
+ *
+ * @experimental Implements https://github.com/openid/OpenID4VCI/pull/759, which is not merged. It can change at any
+ * point to align with the specification.
+ */
+export function getIssuerRedirectUriFromCredentialOffer(
+  options: GetIssuerRedirectUriFromCredentialOfferOptions
+): string | undefined {
+  const issuerRedirectUri = options.credentialOffer.issuer_redirect_uri
+  const expectedRedirectUris = options.issuerMetadata.credentialIssuer.expected_redirect_uris
+  // Without `expected_redirect_uris` the wallet MUST ignore the `issuer_redirect_uri`
+  if (!issuerRedirectUri || !expectedRedirectUris) return undefined
+
+  // Identical to one of the values, compared as strings without normalization
+  if (!expectedRedirectUris.includes(issuerRedirectUri)) {
+    throw new Oauth2Error(
+      `Credential offer contains 'issuer_redirect_uri' with value '${issuerRedirectUri}' but credential issuer metadata does not include this uri. Available 'expected_redirect_uris' values are ${expectedRedirectUris.join(', ')}.`
+    )
+  }
+
+  return issuerRedirectUri
 }
 
 /**

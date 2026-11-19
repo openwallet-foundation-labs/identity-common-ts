@@ -26,6 +26,7 @@ import {
 } from './authorization-flow'
 import {
   determineAuthorizationServerForCredentialOffer,
+  getIssuerRedirectUriFromCredentialOffer,
   resolveCredentialOffer,
 } from './credential-offer/credential-offer'
 import type { CredentialOfferObject } from './credential-offer/z-credential-offer'
@@ -139,6 +140,8 @@ export class Openid4vciClient {
     }
 
     const authorizationCodeGrant = options.credentialOffer.grants[authorizationCodeGrantIdentifier]
+    // Rejects an offer with an `issuer_redirect_uri` that is not in the `expected_redirect_uris`
+    getIssuerRedirectUriFromCredentialOffer(options)
     const authorizationServer = determineAuthorizationServerForCredentialOffer({
       issuerMetadata: options.issuerMetadata,
       grantAuthorizationServer: authorizationCodeGrant.authorization_server,
@@ -182,6 +185,8 @@ export class Openid4vciClient {
       throw new Oauth2Error(`Provided credential offer does not include the 'authorization_code' grant.`)
     }
 
+    // Rejects an offer with an `issuer_redirect_uri` that is not in the `expected_redirect_uris`
+    getIssuerRedirectUriFromCredentialOffer(options)
     const authorizationServer = determineAuthorizationServerForCredentialOffer({
       issuerMetadata: options.issuerMetadata,
       grantAuthorizationServer: authorizationCodeGrant.authorization_server,
@@ -240,6 +245,8 @@ export class Openid4vciClient {
     }
 
     const authorizationCodeGrant = options.credentialOffer.grants[authorizationCodeGrantIdentifier]
+    // Rejects an offer with an `issuer_redirect_uri` that is not in the `expected_redirect_uris`
+    getIssuerRedirectUriFromCredentialOffer(options)
     const authorizationServer = determineAuthorizationServerForCredentialOffer({
       issuerMetadata: options.issuerMetadata,
       grantAuthorizationServer: authorizationCodeGrant.authorization_server,
@@ -399,6 +406,8 @@ export class Openid4vciClient {
     }
 
     const authorizationCodeGrant = options.credentialOffer.grants[authorizationCodeGrantIdentifier]
+    // Rejects an offer with an `issuer_redirect_uri` that is not in the `expected_redirect_uris`
+    getIssuerRedirectUriFromCredentialOffer(options)
     const authorizationServer = determineAuthorizationServerForCredentialOffer({
       issuerMetadata: options.issuerMetadata,
       grantAuthorizationServer: authorizationCodeGrant.authorization_server,
@@ -462,6 +471,8 @@ export class Openid4vciClient {
     }
 
     const preAuthorizedCode = credentialOffer.grants[preAuthorizedCodeGrantIdentifier]['pre-authorized_code']
+    // Rejects an offer with an `issuer_redirect_uri` that is not in the `expected_redirect_uris`
+    getIssuerRedirectUriFromCredentialOffer({ credentialOffer, issuerMetadata })
     const authorizationServer = determineAuthorizationServerForCredentialOffer({
       grantAuthorizationServer: credentialOffer.grants[preAuthorizedCodeGrantIdentifier].authorization_server,
       issuerMetadata,
@@ -528,6 +539,8 @@ export class Openid4vciClient {
       throw new Oauth2Error(`The credential offer does not contain the '${authorizationCodeGrantIdentifier}' grant.`)
     }
 
+    // Rejects an offer with an `issuer_redirect_uri` that is not in the `expected_redirect_uris`
+    getIssuerRedirectUriFromCredentialOffer({ credentialOffer, issuerMetadata })
     const authorizationServer = determineAuthorizationServerForCredentialOffer({
       grantAuthorizationServer: credentialOffer.grants[authorizationCodeGrantIdentifier].authorization_server,
       issuerMetadata,
