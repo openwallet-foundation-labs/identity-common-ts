@@ -1,4 +1,5 @@
 export * from './base64url'
+export * from './config'
 export * from './content-type'
 export * from './dates'
 export * from './decode-jwt'

@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { inspect } from 'node:util'
+import { afterEach, describe, expect, it } from 'vitest'
+import { setIdentityCommonConfig } from '../config'
 import { IdentityCommonError } from '../identity-common-error'
 import { IdentityError } from '../identity-error'
 
@@ -77,5 +79,26 @@ describe('IdentityError', () => {
 
     expect(error.details).toEqual({ claim: 'iss' })
     expect(error.getFullMessage()).toBe('IdentityCommonError: something is off - {"claim":"iss"}')
+  })
+
+  describe('sensitive values', () => {
+    afterEach(() => setIdentityCommonConfig({ includeSensitiveErrorDetails: false }))
+
+    it('keeps them out of the message and the serialized error, but on the error', () => {
+      const error = new IdentityError('state does not match', undefined, { sensitive: { expected: 'secret-state' } })
+
+      expect(error.message).toBe('state does not match')
+      expect(error.sensitive).toEqual({ expected: 'secret-state' })
+      expect(JSON.stringify(error)).not.toContain('secret-state')
+      expect(inspect(error)).not.toContain('secret-state')
+    })
+
+    it('adds them to the message when sensitive error details are enabled', () => {
+      setIdentityCommonConfig({ includeSensitiveErrorDetails: true })
+
+      const error = new IdentityError('state does not match', undefined, { sensitive: { expected: 'secret-state' } })
+
+      expect(error.message).toBe('state does not match {"expected":"secret-state"}')
+    })
   })
 })
