@@ -4,6 +4,7 @@ import {
   MacAlgorithm,
   ProtectedHeaders,
   RegisteredCwtHeaderClaimKey,
+  type SignatureAlgorithm,
   TypedMap,
   typedMap,
   UnprotectedHeaders,
@@ -38,6 +39,7 @@ import {
   EitherSignatureOrMacMustBeProvidedError,
   InvalidElementSelectionError,
   MissingRequestedElementError,
+  SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError,
   UnsatisfiedDeviceRequestError,
 } from '../errors'
 import type { AlternativeDataElementsSet } from './alternative-data-elements-set'
@@ -160,6 +162,7 @@ export type DeviceResponseDocumentOptions = {
   deviceNamespaces?: DeviceNamespaces
   signature?: {
     signingKey: CoseKey
+    algorithm: SignatureAlgorithm
   }
   mac?: {
     deviceKey: CoseKey
@@ -362,6 +365,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       deviceNamespaces?: DeviceNamespaces
       signature?: {
         signingKey: CoseKey
+        algorithm: SignatureAlgorithm
       }
       mac?: {
         deviceKey: CoseKey
@@ -421,14 +425,24 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     const unprotectedHeaders = UnprotectedHeaders.create({})
 
     const deviceAuthOptions: DeviceAuthOptions = {}
-    if (useSignature) {
+    if (options.signature) {
+      const { algorithm } = options.signature
+      if (deviceKey.algorithm && deviceKey.algorithm !== algorithm) {
+        throw new SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError(
+          `Signing key algorithm '${deviceKey.algorithm}' does not match the supplied algorithm '${algorithm}'`
+        )
+      }
+
       const deviceSignature = await DeviceSignature.create({
         unprotectedHeaders,
         protectedHeaders: ProtectedHeaders.create({
-          protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, deviceKey.algorithm]]),
+          protectedHeaders: new Map([[RegisteredCwtHeaderClaimKey.Algorithm, algorithm]]),
         }),
         payload: null,
-      }).sign({ signingKey: deviceKey, detachedPayload: deviceAuthenticationBytes }, { sign: ctx.cose.sign1.sign })
+      }).sign(
+        { signingKey: deviceKey, algorithm, detachedPayload: deviceAuthenticationBytes },
+        { sign: ctx.cose.sign1.sign }
+      )
 
       deviceAuthOptions.deviceSignature = deviceSignature
     } else {

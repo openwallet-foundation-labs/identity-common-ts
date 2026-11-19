@@ -59,7 +59,11 @@ suite('kid header', async () => {
             deviceRequest,
             sessionTranscript,
             documents: [
-              { issuerSigned: await createIssuerSigned(), docRequestIndex: 0, signature: { signingKey: deviceKey } },
+              {
+                issuerSigned: await createIssuerSigned(),
+                docRequestIndex: 0,
+                signature: { signingKey: deviceKey, algorithm: SignatureAlgorithm.ES256 },
+              },
             ],
           },
           mdocContext

@@ -166,7 +166,7 @@ suite('Verification', () => {
           {
             issuerSigned: credential,
             docRequestIndex: 0,
-            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
           },
         ],
       },
@@ -276,7 +276,7 @@ suite('Verification', () => {
           {
             issuerSigned: credential,
             docRequestIndex: 0,
-            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
           },
         ],
       },
@@ -373,7 +373,7 @@ suite('Verification', () => {
           {
             issuerSigned: credential,
             docRequestIndex: 0,
-            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
           },
         ],
       },
@@ -680,7 +680,7 @@ suite('Verification', () => {
           {
             issuerSigned: credential,
             docRequestIndex: 0,
-            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
           },
         ],
       },
@@ -1136,7 +1136,7 @@ suite('Verification', () => {
           {
             issuerSigned: credential,
             docRequestIndex: 0,
-            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
           },
         ],
       },
@@ -1271,7 +1271,7 @@ suite('Verification', () => {
           {
             issuerSigned: credential,
             docRequestIndex: 0,
-            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
           },
         ],
       },
@@ -1658,7 +1658,7 @@ suite('Verification', () => {
             {
               issuerSigned: credential,
               docRequestIndex: 0,
-              signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+              signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
             },
           ],
         },
@@ -1784,7 +1784,7 @@ suite('Verification', () => {
           {
             issuerSigned: credential,
             docRequestIndex: 0,
-            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE) },
+            signature: { signingKey: CoseKey.fromJwk(DEVICE_JWK_PRIVATE), algorithm: SignatureAlgorithm.ES256 },
           },
         ],
       },

@@ -70,6 +70,7 @@ export class DeviceSignedBuilder {
     await deviceSignature.sign(
       {
         signingKey: options.signingKey,
+        algorithm: options.algorithm,
         detachedPayload: deviceAuthentication.encode({ asDataItem: true }),
       },
       { sign: this.ctx.cose.sign1.sign }

@@ -8,6 +8,7 @@ import {
   DeviceRequest,
   DeviceResponse,
   DeviceSignature,
+  DeviceSignedBuilder,
   DocRequest,
   Holder,
   Issuer,
@@ -16,6 +17,7 @@ import {
   RegisteredCwtHeaderClaimKey,
   SessionTranscript,
   SignatureAlgorithm,
+  SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError,
   Verifier,
 } from '../..'
 import { DEVICE_JWK_PRIVATE, DEVICE_JWK_PUBLIC, ISSUER_CERTIFICATE, ISSUER_PRIVATE_KEY_JWK } from '../config'
@@ -34,14 +36,14 @@ const trustedCertificates = [
   },
 ]
 
-/** The P-256 device key, with the `alg` the device signature is created with. */
-const deviceSigningKey = (algorithm: SignatureAlgorithm) => {
+/** The P-256 device key, with `alg` set when `algorithm` is given. */
+const deviceSigningKey = (algorithm?: SignatureAlgorithm) => {
   const { keyType, curve, x, y, d } = CoseKey.fromJwk(DEVICE_JWK_PRIVATE)
   return CoseKey.create({ keyType, curve, x, y, d, algorithm })
 }
 
 /** Issue an mdoc and present it with a device signature of `algorithm`. */
-async function presentMdoc(algorithm: SignatureAlgorithm) {
+async function presentMdoc(algorithm: SignatureAlgorithm, signingKey = deviceSigningKey(algorithm)) {
   const issuer = new Issuer('org.iso.18013.5.1', mdocContext)
   issuer.addIssuerNamespace('org.iso.18013.5.1.mDL', { first_name: 'First' })
 
@@ -78,7 +80,7 @@ async function presentMdoc(algorithm: SignatureAlgorithm) {
         {
           issuerSigned: IssuerSigned.fromEncodedForOid4Vci(issuerSigned.encodedForOid4Vci),
           docRequestIndex: 0,
-          signature: { signingKey: deviceSigningKey(algorithm) },
+          signature: { signingKey, algorithm },
         },
       ],
     },
@@ -93,6 +95,45 @@ async function presentMdoc(algorithm: SignatureAlgorithm) {
 }
 
 suite('device signature algorithm', () => {
+  test('a device key without alg signs with the supplied algorithm', async () => {
+    const { deviceResponse, deviceRequest, sessionTranscript } = await presentMdoc(
+      SignatureAlgorithm.ESP256,
+      deviceSigningKey()
+    )
+
+    const deviceSignature = deviceResponse.documents?.[0].deviceSigned.deviceAuth.deviceSignature
+    expect(deviceSignature?.algorithm).toBe(SignatureAlgorithm.ESP256)
+
+    await expect(
+      Verifier.verifyDeviceResponse(
+        { deviceRequest, deviceResponse, sessionTranscript, trustedCertificates },
+        mdocContext
+      )
+    ).resolves.toBeDefined()
+  })
+
+  test('a device key alg other than the supplied algorithm throws', async () => {
+    await expect(presentMdoc(SignatureAlgorithm.ESP256, deviceSigningKey(SignatureAlgorithm.ES256))).rejects.toThrow(
+      SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError
+    )
+  })
+
+  test('DeviceSignedBuilder.sign signs with the supplied algorithm', async () => {
+    const sign = vi.fn(mdocContext.cose.sign1.sign)
+    const sessionTranscript = await SessionTranscript.forOid4Vp(
+      { clientId: 'my-client-id', responseUri: 'my-response-uri.com', nonce: 'my-random-nonce' },
+      mdocContext
+    )
+
+    const deviceSigned = await new DeviceSignedBuilder('org.iso.18013.5.1', {
+      ...mdocContext,
+      cose: { ...mdocContext.cose, sign1: { ...mdocContext.cose.sign1, sign } },
+    }).sign({ signingKey: deviceSigningKey(), algorithm: SignatureAlgorithm.ESP256, sessionTranscript })
+
+    expect(deviceSigned.deviceAuth.deviceSignature?.algorithm).toBe(SignatureAlgorithm.ESP256)
+    expect(sign).toHaveBeenCalledWith(expect.objectContaining({ algorithm: SignatureAlgorithm.ESP256 }))
+  })
+
   // RFC 9864 § 2.1: ESP256 is ECDSA with P-256 and SHA-256.
   test('a device signature with ESP256 verifies end to end', async () => {
     const { deviceResponse, deviceRequest, sessionTranscript } = await presentMdoc(SignatureAlgorithm.ESP256)

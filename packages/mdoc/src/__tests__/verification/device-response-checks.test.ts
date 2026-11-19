@@ -14,6 +14,7 @@ import {
   KeyAuthorizations,
   MissingRequestedElementError,
   SessionTranscript,
+  SignatureAlgorithm,
   type VerificationAssessment,
 } from '../..'
 import { Handover } from '../../mdoc/models/handover'
@@ -28,6 +29,7 @@ class NullHandover extends Handover<null> {
 }
 
 const deviceKey = CoseKey.fromJwk(DEVICE_JWK_PRIVATE)
+const signature = { signingKey: deviceKey, algorithm: SignatureAlgorithm.ES256 }
 const sessionTranscript = SessionTranscript.create({ handover: NullHandover.fromEncodedStructure(null) })
 const deviceNamespace = 'com.example.device'
 
@@ -54,7 +56,7 @@ const createDeviceResponse = async (options: { issuerSigned: IssuerSigned; devic
           issuerSigned: options.issuerSigned,
           docRequestIndex: 0,
           deviceNamespaces: options.deviceNamespaces,
-          signature: { signingKey: deviceKey },
+          signature,
         },
       ],
     },
@@ -179,7 +181,7 @@ describe('key authorizations (18013-5 9.1.3.4)', () => {
             issuerSigned: await createIssuerSigned(),
             docRequestIndex: 0,
             deviceNamespaces: sessionIdNamespaces,
-            signature: { signingKey: deviceKey },
+            signature,
           },
         ],
       },
