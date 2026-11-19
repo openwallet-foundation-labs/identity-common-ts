@@ -4,6 +4,7 @@ import { Oauth2ServerErrorResponseError } from '../../error/Oauth2ServerErrorRes
 import type { AuthorizationServerMetadata } from '../../index'
 import {
   authorizationCodeGrantIdentifier,
+  clientCredentialsGrantIdentifier,
   preAuthorizedCodeGrantIdentifier,
   refreshTokenGrantIdentifier,
 } from '../../z-grant-type'
@@ -203,6 +204,65 @@ describe('Parse Access Token Request', () => {
       dpopJwt: undefined,
       pkceCodeVerifier: undefined,
     })
+  })
+
+  test('handles client credentials grant', () => {
+    const dpopJwt =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.dpop'
+
+    expect(
+      parseAccessTokenRequest({
+        accessTokenRequest: {
+          grant_type: clientCredentialsGrantIdentifier,
+          scope: 'read write',
+          resource: 'https://api.example.com',
+        },
+        request: {
+          headers: new Headers({ DPoP: dpopJwt }),
+          method: 'POST',
+          url: 'https://request.com/token',
+        },
+        authorizationServerMetadata: {
+          ...baseAuthorizationServerMetadata,
+          grant_types_supported: [clientCredentialsGrantIdentifier],
+        },
+      })
+    ).toEqual({
+      accessTokenRequest: {
+        grant_type: clientCredentialsGrantIdentifier,
+        scope: 'read write',
+        resource: 'https://api.example.com',
+      },
+      grant: {
+        grantType: clientCredentialsGrantIdentifier,
+      },
+      dpop: { jwt: dpopJwt },
+      pkceCodeVerifier: undefined,
+    })
+  })
+
+  test('rejects client credentials grant not in grant_types_supported', () => {
+    expect(() =>
+      parseAccessTokenRequest({
+        accessTokenRequest: {
+          grant_type: clientCredentialsGrantIdentifier,
+        },
+        request: {
+          headers: new Headers(),
+          method: 'POST',
+          url: 'https://request.com/token',
+        },
+        authorizationServerMetadata: {
+          ...baseAuthorizationServerMetadata,
+          grant_types_supported: [authorizationCodeGrantIdentifier],
+        },
+      })
+    ).toThrow(
+      new Oauth2ServerErrorResponseError({
+        error: 'unsupported_grant_type',
+        error_description: `The grant type '${clientCredentialsGrantIdentifier}' is not supported by the authorization server. Supported grant types are: ${authorizationCodeGrantIdentifier}`,
+      })
+    )
   })
 
   test('handles invalid dpop jwt', () =>

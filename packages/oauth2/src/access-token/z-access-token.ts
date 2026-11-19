@@ -22,6 +22,9 @@ export const zAccessTokenRequest = z.intersection(
       // Refresh token grant
       refresh_token: z.optional(zNonEmptyString),
 
+      // RFC 6749 Section 3.3, for the client credentials (Section 4.4.2) and refresh token (Section 6) grants
+      scope: z.optional(zNonEmptyString),
+
       resource: z.optional(zHttpsUrl),
       code_verifier: z.optional(zNonEmptyString),
 

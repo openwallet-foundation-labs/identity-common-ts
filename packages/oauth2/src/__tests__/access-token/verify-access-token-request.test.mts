@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest'
 import {
   type VerifyAccessTokenRequestClientAttestation,
   verifyAuthorizationCodeAccessTokenRequest,
+  verifyClientCredentialsAccessTokenRequest,
   verifyPreAuthorizedCodeAccessTokenRequest,
   verifyRefreshTokenAccessTokenRequest,
 } from '../../access-token/verify-access-token-request'
@@ -943,6 +944,50 @@ describe('Verify Refresh Token Access Token Request', () => {
     })
 
     expect(dpop).toEqual({ jwk: dpopPublicJwk, jwkThumbprint: 'VyMJnrA8aEQPnpDn0kCkNIkjfQgt94xDbK0N1O9Os_4' })
+  })
+})
+
+describe('Verify Client Credentials Access Token Request', () => {
+  test('verifies the DPoP proof', async () => {
+    const dpopPrivateJwk = {
+      kty: 'EC',
+      d: 'UxBOEoXuH9qlZ0Bo2E1sCuZDkAzVl99eenarvWMrgH0',
+      crv: 'P-256',
+      x: 'BvowcNvKitnPOIU7EQSP6mvHG46mqJp1iVEeaHRkzMQ',
+      y: 'h2kx9opNMxfK1_mcx2t5SIPf-kg4oNXS77tBxDvy1TM',
+    }
+    const { d, ...dpopPublicJwk } = dpopPrivateJwk
+
+    const dpopJwt = await createDpopJwt({
+      callbacks: { ...callbacks, signJws: getSignJwsCallback([dpopPrivateJwk]) },
+      request,
+      signer: { method: 'jwk', publicJwk: dpopPublicJwk, alg: 'ES256' },
+    })
+
+    const { dpop } = await verifyClientCredentialsAccessTokenRequest({
+      authorizationServerMetadata,
+      callbacks,
+      request: { ...request, headers: new Headers({ DPoP: dpopJwt }) },
+      dpop: { required: true, jwt: dpopJwt, allowedSigningAlgs: ['ES256'] },
+    })
+
+    expect(dpop).toEqual({ jwk: dpopPublicJwk, jwkThumbprint: 'VyMJnrA8aEQPnpDn0kCkNIkjfQgt94xDbK0N1O9Os_4' })
+  })
+
+  test('requires a client attestation when it is required', async () => {
+    await expect(
+      verifyClientCredentialsAccessTokenRequest({
+        authorizationServerMetadata,
+        callbacks,
+        request,
+        clientAttestation: { required: true },
+      })
+    ).rejects.toMatchObject({
+      errorResponse: {
+        error: Oauth2ErrorCodes.InvalidClient,
+        error_description: expect.stringContaining('Missing required client attestation parameters'),
+      },
+    })
   })
 })
 
