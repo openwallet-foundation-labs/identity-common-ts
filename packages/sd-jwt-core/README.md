@@ -59,6 +59,14 @@ const { payload } = await sdjwt.verify(presentation)
 console.log(payload) // { firstname: 'John', ... }
 ```
 
+`verify`, `validate`, `present`, `getClaims` and `keys` also accept the `SdJwt` that `decode` returned, so an SD-JWT that is used more than once is decoded and hashed once. `issueSdJwt` issues like `issue` and returns that `SdJwt`.
+
+```ts
+const decoded = await sdjwt.decode(presentation)
+const claims = await sdjwt.getClaims(decoded)
+const verified = await sdjwt.verify(decoded)
+```
+
 ## Examples
 
 Runnable examples are available in [`examples/sd-jwt/core`](../../examples/sd-jwt/core). Run them from the repository root:

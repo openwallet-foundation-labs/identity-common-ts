@@ -84,10 +84,6 @@ export const mdocContext: MdocContext = {
   },
 
   x509: {
-    getSubjectNameField: (input) => {
-      const certificate = new X509Certificate(input.certificate as Uint8Array<ArrayBuffer>)
-      return certificate.subjectName.getField(input.field)
-    },
     getPublicKey: async (input) => {
       const certificate = new X509Certificate(input.certificate as Uint8Array<ArrayBuffer>)
 
@@ -200,6 +196,10 @@ export const mdocContext: MdocContext = {
       return {
         issuerName: certificate.issuerName.toString(),
         subjectName: certificate.subjectName.toString(),
+        subject: {
+          countryName: certificate.subjectName.getField('C')[0],
+          stateOrProvinceName: certificate.subjectName.getField('ST')[0],
+        },
         pem: certificate.toString(),
         serialNumber: certificate.serialNumber,
         thumbprint: thumbprintHex,

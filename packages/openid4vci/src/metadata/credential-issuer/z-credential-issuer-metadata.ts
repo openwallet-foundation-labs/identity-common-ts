@@ -8,7 +8,6 @@ import {
 } from '@owf/jose'
 import z from 'zod'
 import {
-  type CredentialFormatIdentifier,
   zJwtVcJsonCredentialIssuerMetadata,
   zJwtVcJsonCredentialIssuerMetadataDraft11To14,
   zJwtVcJsonCredentialIssuerMetadataDraft14,
@@ -79,32 +78,42 @@ export const allCredentialIssuerMetadataFormatIdentifiers = allCredentialIssuerM
   (format) => format.shape.format.value
 )
 
+// Built once per format, not for every credential configuration that is validated
+const credentialIssuerMetadataFormatSchemas = new Map(
+  allCredentialIssuerMetadataFormatIdentifiers.map((format) => {
+    const validators = allCredentialIssuerMetadataFormats.filter(
+      (formatValidator) => formatValidator.shape.format.value === format
+    ) as CredentialIssuerMetadataFormatValidator[]
+
+    return [
+      format as string,
+      z
+        // We use object and passthrough as otherwise the non-format specific properties will be stripped
+        .object({})
+        .loose()
+        .and(
+          validators.length > 1
+            ? z.union(
+                validators as [
+                  CredentialIssuerMetadataFormatValidator,
+                  CredentialIssuerMetadataFormatValidator,
+                  ...CredentialIssuerMetadataFormatValidator[],
+                ]
+              )
+            : validators[0]
+        ),
+    ] as const
+  })
+)
+
 export const zCredentialConfigurationSupportedWithFormats = z
   .union([zCredentialConfigurationSupportedCommon, zCredentialConfigurationSupportedCommonDraft15])
   .transform((data, ctx) => {
     // No additional validation for unknown formats
-    if (!allCredentialIssuerMetadataFormatIdentifiers.includes(data.format as CredentialFormatIdentifier)) return data
+    const formatSchema = credentialIssuerMetadataFormatSchemas.get(data.format)
+    if (!formatSchema) return data
 
-    const validators = allCredentialIssuerMetadataFormats.filter(
-      (formatValidator) => formatValidator.shape.format.value === data.format
-    ) as CredentialIssuerMetadataFormatValidator[]
-
-    const result = z
-      // We use object and passthrough as otherwise the non-format specific properties will be stripped
-      .object({})
-      .loose()
-      .and(
-        validators.length > 1
-          ? z.union(
-              validators as [
-                CredentialIssuerMetadataFormatValidator,
-                CredentialIssuerMetadataFormatValidator,
-                ...CredentialIssuerMetadataFormatValidator[],
-              ]
-            )
-          : validators[0]
-      )
-      .safeParse(data, nestedParseParams)
+    const result = formatSchema.safeParse(data, nestedParseParams)
 
     if (result.success) {
       return result.data as Simplify<typeof result.data & typeof data>
@@ -477,47 +486,10 @@ export const zCredentialIssuerMetadata = z.union(
 
 export const zCredentialIssuerMetadataWithDraftVersion = z.union(
   [
-    zCredentialIssuerMetadataDraft14Draft15V1.transform((credentialIssuerMetadata) => {
-      const credentialConfigurations = Object.values(credentialIssuerMetadata.credential_configurations_supported)
-
-      const isDraft15 = credentialConfigurations.some((configuration) => {
-        const knownConfiguration = configuration as CredentialConfigurationSupportedWithFormats
-
-        // Added in draft 15, it's not possible to detect with 100% guarantee
-        if (knownConfiguration.format === zSdJwtDcFormatIdentifier.value) return true
-        if (Array.isArray(knownConfiguration.claims)) return true
-        if (
-          Object.values(knownConfiguration.proof_types_supported ?? {}).some(
-            (proofType) => proofType.key_attestations_required !== undefined
-          )
-        )
-          return true
-
-        // For now we assume draft 14 if we don't have any evidence it's draft 15
-        return false
-      })
-
-      // we assume V1 is used when we detect V1
-      const isV1 =
-        credentialIssuerMetadata.credential_request_encryption !== undefined ||
-        credentialConfigurations.some(
-          (configuration) =>
-            // Added in draft 16, but since there's no other breaking changes
-            configuration.credential_metadata ||
-            // Was changed to COSE algorithms in Draft 16 (which we detect as v1)
-            (configuration.format === 'mso_mdoc' &&
-              configuration.credential_signing_alg_values_supported?.some((supported) => typeof supported === 'number'))
-        )
-
-      return {
-        credentialIssuerMetadata,
-        originalDraftVersion: isV1
-          ? Openid4vciVersion.V1
-          : isDraft15
-            ? Openid4vciVersion.Draft15
-            : Openid4vciVersion.Draft14,
-      }
-    }),
+    zCredentialIssuerMetadataDraft14Draft15V1.transform((credentialIssuerMetadata) => ({
+      credentialIssuerMetadata,
+      originalDraftVersion: detectCredentialIssuerMetadataDraftVersion(credentialIssuerMetadata),
+    })),
     // Then try parsing draft 11 and transform into draft 16
     zCredentialIssuerMetadataDraft11ToV1.transform((credentialIssuerMetadata) => ({
       credentialIssuerMetadata,
@@ -526,3 +498,39 @@ export const zCredentialIssuerMetadataWithDraftVersion = z.union(
   ],
   unionParams('Invalid credential issuer metadata', ['OpenID4VCI 1.0 or drafts 13 to 15', 'OpenID4VCI draft 11'])
 )
+
+/** Detects the draft version of credential issuer metadata that validated as draft 14 or later */
+export function detectCredentialIssuerMetadataDraftVersion(credentialIssuerMetadata: CredentialIssuerMetadata) {
+  const credentialConfigurations = Object.values(credentialIssuerMetadata.credential_configurations_supported)
+
+  const isDraft15 = credentialConfigurations.some((configuration) => {
+    const knownConfiguration = configuration as CredentialConfigurationSupportedWithFormats
+
+    // Added in draft 15, it's not possible to detect with 100% guarantee
+    if (knownConfiguration.format === zSdJwtDcFormatIdentifier.value) return true
+    if (Array.isArray(knownConfiguration.claims)) return true
+    if (
+      Object.values(knownConfiguration.proof_types_supported ?? {}).some(
+        (proofType) => proofType.key_attestations_required !== undefined
+      )
+    )
+      return true
+
+    // For now we assume draft 14 if we don't have any evidence it's draft 15
+    return false
+  })
+
+  // we assume V1 is used when we detect V1
+  const isV1 =
+    credentialIssuerMetadata.credential_request_encryption !== undefined ||
+    credentialConfigurations.some(
+      (configuration) =>
+        // Added in draft 16, but since there's no other breaking changes
+        configuration.credential_metadata ||
+        // Was changed to COSE algorithms in Draft 16 (which we detect as v1)
+        (configuration.format === 'mso_mdoc' &&
+          configuration.credential_signing_alg_values_supported?.some((supported) => typeof supported === 'number'))
+    )
+
+  return isV1 ? Openid4vciVersion.V1 : isDraft15 ? Openid4vciVersion.Draft15 : Openid4vciVersion.Draft14
+}

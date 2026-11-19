@@ -1,12 +1,12 @@
 import { JoseInvalidArgumentError, preAuthorizedCodeGrantIdentifier } from '@openid4vc/oauth2'
 import { addSecondsToDate } from '@openid4vc/utils'
 import { CommonMediaTypes } from '@owf/identity-common'
-import { type JwsSigner, signJwt } from '@owf/jose'
+import { decodeJwt, type JwsSigner, signJwt } from '@owf/jose'
 import { describe, expect, test } from 'vitest'
 import { callbacks, getSignJwsCallback, testAttester } from '../../../oauth2/src/__tests__/util.mjs'
 import { parseCredentialRequestPayload } from '../credential-request/parse-credential-request-payload.js'
 import { createCredentialRequestJwtProof } from '../formats/proof-type/jwt/jwt-proof-type.js'
-import { createKeyAttestationJwt } from '../key-attestation/key-attestation.js'
+import { createKeyAttestationJwt, parseKeyAttestationJwt } from '../key-attestation/key-attestation.js'
 import type { IssuerMetadataResult } from '../metadata/fetch-issuer-metadata.js'
 import { Openid4vciIssuer } from '../Openid4vciIssuer.js'
 import { Openid4vciVersion } from '../version.js'
@@ -200,6 +200,23 @@ describe('Openid4vciIssuer', () => {
       },
       nonce: 'some-nonce',
     })
+
+    // An already parsed key attestation is accepted as well
+    const credentialRequestJwtFromParsed = await createCredentialRequestJwtProof({
+      callbacks: {
+        ...callbacks,
+        signJws: getSignJwsCallback([credentialRequestProofJwk]),
+      },
+      keyAttestationJwt: parseKeyAttestationJwt({ keyAttestationJwt, use: 'proof_type.jwt' }),
+      credentialIssuer: credentialIssuerMetadata.credential_issuer,
+      signer: {
+        method: 'jwk',
+        alg: 'ES256',
+        publicJwk: credentialRequestProofJwkPublic,
+      },
+      nonce: 'some-nonce',
+    })
+    expect(decodeJwt({ jwt: credentialRequestJwtFromParsed }).header.key_attestation).toEqual(keyAttestationJwt)
 
     const parsedCredentialRequest = parseCredentialRequestPayload({
       issuerMetadata: {

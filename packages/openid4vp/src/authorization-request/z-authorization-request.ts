@@ -2,6 +2,7 @@ import { URL, zHttpsUrl, zStringToJson } from '@openid4vc/utils'
 import { zNonEmptyString } from '@owf/identity-common'
 import { z } from 'zod'
 import { zClientMetadata } from '../models/z-client-metadata'
+import { zPexPresentationDefinition } from '../models/z-pex'
 import { zVerifierAttestations } from '../models/z-verifier-attestations'
 
 export const zOpenid4vpAuthorizationRequest = z
@@ -16,16 +17,15 @@ export const zOpenid4vpAuthorizationRequest = z
     nonce: zNonEmptyString,
     wallet_nonce: zNonEmptyString.optional(),
     scope: zNonEmptyString.optional(),
-    presentation_definition: z
-      .record(z.string(), z.any())
+    presentation_definition: zPexPresentationDefinition
       // for backwards compat
-      .or(zStringToJson)
+      .or(zStringToJson.pipe(zPexPresentationDefinition))
       .optional(),
     presentation_definition_uri: zHttpsUrl.optional(),
     dcql_query: z
       .record(z.string(), z.any())
       // for backwards compat
-      .or(zStringToJson)
+      .or(zStringToJson.pipe(z.record(z.string(), z.any())))
       .optional(),
     client_metadata: zClientMetadata.optional(),
     client_metadata_uri: zHttpsUrl.optional(),

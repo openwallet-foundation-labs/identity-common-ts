@@ -5,6 +5,7 @@ export {
 export { Openid4vpAuthorizationRequestError } from './authorization-request/Openid4vpAuthorizationRequestError'
 export {
   type ParseOpenid4vpAuthorizationRequestOptions,
+  type ParseOpenid4vpAuthorizationRequestResult,
   parseOpenid4vpAuthorizationRequest,
 } from './authorization-request/parse-authorization-request-params'
 export {

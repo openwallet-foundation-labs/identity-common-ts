@@ -1,9 +1,12 @@
 /** JAdES decoding and verification (ETSI TS 119 182-1 V1.2.1), on the JWS verification of `@owf/jose`. */
-import { type SchemaValidationCode, ValidationIssues } from '@owf/identity-common'
+import { parseWithErrorHandling, type SchemaValidationCode, ValidationIssues } from '@owf/identity-common'
 import {
+  type DecodeJwtResult,
   decodeBase64UrlJsonObject,
   type FlattenedJws,
   type GeneralJws,
+  JoseNotSupportedError,
+  JoseValidationError,
   type JwsSignerWithJwk,
   type ParsedJws,
   parseJws,
@@ -13,6 +16,7 @@ import {
   type VerifyJwtResult,
   verifyJwsSignature,
   verifyJwt,
+  zJwtPayload,
 } from '@owf/jose'
 import { CRITICAL_PARAMETERS, DETACHED_MECHANISM_IDS, JadesProfile } from './constants'
 import { JadesValidationError } from './jades-error'
@@ -64,11 +68,28 @@ export interface VerifyJadesResult extends DecodedJades {
   signer: JwsSignerWithJwk
 }
 
-export interface VerifyJadesJwtOptions
-  extends Omit<VerifyJadesOptions, 'jws' | 'detachedPayload' | 'signatureIndex'>,
-    VerifyJwtClaimsOptions {
+export interface DecodeJadesJwtOptions
+  extends Omit<DecodeJadesOptions, 'jws' | 'detachedPayload' | 'signatureIndex' | 'understoodCriticalParameters'> {
   /** A JWT signed as a compact JAdES signature */
   jwt: string
+
+  /** Critical header parameters the caller understands. A JWT uses neither `sigD` nor `b64`, so none by default. */
+  understoodCriticalParameters?: ReadonlyArray<string>
+}
+
+/** A decoded JWT signed as a compact JAdES signature, as `decodeJwt` of `@owf/jose` returns it */
+export type DecodedJadesJwt = DecodeJwtResult<typeof zProtectedHeader>
+
+export interface VerifyJadesJwtOptions
+  extends Omit<VerifyJadesOptions, 'jws' | 'detachedPayload' | 'signatureIndex' | 'understoodCriticalParameters'>,
+    Pick<DecodeJadesJwtOptions, 'understoodCriticalParameters'>,
+    VerifyJwtClaimsOptions {
+  /**
+   * A JWT signed as a compact JAdES signature, or what {@link decodeJadesJwt} returned for it. `profile`,
+   * `profileOptions` and `understoodCriticalParameters` were applied when that was decoded, and are not used again.
+   * It is verified as it is passed, like `verifyJwt` of `@owf/jose` does, so pass it unmodified.
+   */
+  jwt: string | DecodedJadesJwt
 }
 
 /**
@@ -80,14 +101,33 @@ export interface VerifyJadesJwtOptions
  * @throws The errors of `parseJws` of `@owf/jose`, e.g. a `JoseValidationError` for a header that does not meet clause 5
  */
 export function decodeJades(options: DecodeJadesOptions): DecodedJades {
+  return decode(options, false)
+}
+
+/**
+ * {@link decodeJades}, and for `isJwt` a signature that is a JWT. A JWT attaches its claims set as the base64url JWS
+ * Payload, so it uses neither `sigD` nor `b64`, and they are not understood in `crit` unless the caller names them.
+ */
+function decode(options: DecodeJadesOptions, isJwt: boolean): DecodedJades {
   const signatureIndex = options.signatureIndex ?? 0
-  const objectByUriHash = isObjectByUriHash(options.jws, signatureIndex)
+  // Not for a JWT, so `parseJws` rejects its empty payload
+  const objectByUriHash = !isJwt && isObjectByUriHash(options.jws, signatureIndex)
   const decoded = parseJws({
     jws: options.jws,
     detachedPayload: objectByUriHash ? '' : options.detachedPayload,
     signatureIndex,
-    understoodCriticalParameters: [...CRITICAL_PARAMETERS, ...(options.understoodCriticalParameters ?? [])],
+    understoodCriticalParameters: [
+      ...(isJwt ? [] : CRITICAL_PARAMETERS),
+      ...(options.understoodCriticalParameters ?? []),
+    ],
   })
+
+  // Reached when the caller understands `b64`. The error is that of `decodeJwt` of `@owf/jose`.
+  if (isJwt && decoded.registeredProtectedHeader.b64 === false) {
+    throw new JoseNotSupportedError(
+      `Unable to decode the JWT, its header sets 'b64' to false. An unencoded payload is not valid for a JWT.`
+    )
+  }
 
   // The JAdES checks are made here rather than as schemas of `parseJws`, so their issues keep the JAdES codes
   const profile = options.profile ?? JadesProfile.B_B
@@ -134,10 +174,44 @@ export async function verifyJades(options: VerifyJadesOptions): Promise<VerifyJa
 }
 
 /**
- * Verify a JWT signed as a JAdES signature: {@link decodeJades}, and then `verifyJwt` of `@owf/jose`, which verifies the
- * signature and the claims, such as `exp` and `iat` against `now`.
+ * Decode a JWT signed as a JAdES signature without verifying it: {@link decodeJades}, and the claims set as `decodeJwt`
+ * of `@owf/jose` validates it. Pass the result to {@link verifyJadesJwt} to verify it without decoding it again.
  *
- * @throws The errors of {@link decodeJades}, and of `verifyJwt` of `@owf/jose`
+ * @throws The errors of {@link decodeJades}, and of `decodeJwt` of `@owf/jose`. A signature that is not a JWT is
+ *   rejected: one with `sigD`, without a payload, or with `b64` false.
+ */
+export function decodeJadesJwt({
+  jwt,
+  profile,
+  profileOptions,
+  understoodCriticalParameters,
+}: DecodeJadesJwtOptions): DecodedJadesJwt {
+  const jades = decode({ jws: jwt, profile, profileOptions, understoodCriticalParameters }, true)
+
+  // The header was parsed and validated by `decode`, so only the claims set is left
+  const payload = parseWithErrorHandling(
+    zJwtPayload,
+    decodeBase64UrlJsonObject(jades.encodedPayload, 'JWT payload'),
+    'Invalid JWT payload',
+    JoseValidationError
+  )
+  return {
+    header: jades.protectedHeader as DecodedJadesJwt['header'],
+    payload,
+    registeredHeader: jades.registeredProtectedHeader,
+    registeredPayload: payload,
+    payloadBytes: jades.payload,
+    signature: jades.signature,
+    signingInput: jades.signingInput,
+    compact: jwt,
+  }
+}
+
+/**
+ * Verify a JWT signed as a JAdES signature: {@link decodeJadesJwt}, and then `verifyJwt` of `@owf/jose`, which verifies
+ * the signature and the claims, such as `exp` and `iat` against `now`.
+ *
+ * @throws The errors of {@link decodeJadesJwt}, and of `verifyJwt` of `@owf/jose`
  */
 export async function verifyJadesJwt({
   jwt,
@@ -146,14 +220,10 @@ export async function verifyJadesJwt({
   understoodCriticalParameters,
   ...options
 }: VerifyJadesJwtOptions): Promise<VerifyJwtResult<typeof zProtectedHeader>> {
-  decodeJades({ jws: jwt, profile, profileOptions, understoodCriticalParameters })
+  const decoded =
+    typeof jwt === 'string' ? decodeJadesJwt({ jwt, profile, profileOptions, understoodCriticalParameters }) : jwt
 
-  // The header was validated by `decodeJades`
-  return verifyJwt<typeof zProtectedHeader>({
-    ...options,
-    jwt,
-    understoodCriticalParameters: [...CRITICAL_PARAMETERS, ...(understoodCriticalParameters ?? [])],
-  })
+  return verifyJwt<typeof zProtectedHeader>({ ...options, jwt: decoded })
 }
 
 /** Whether the signature uses `ObjectIdByURIHash`, whose empty JWS Payload the caller is not given (clause 5.2.8.3) */

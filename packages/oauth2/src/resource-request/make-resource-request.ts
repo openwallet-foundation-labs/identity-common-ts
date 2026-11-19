@@ -6,7 +6,12 @@ import {
   type Openid4vcFetchType,
 } from '@openid4vc/utils'
 import type { CallbackContext } from '../callbacks'
-import { createDpopHeadersForRequest, extractDpopNonceFromHeaders, type RequestDpopOptions } from '../dpop/dpop'
+import {
+  calculateDpopAccessTokenHash,
+  createDpopHeadersForRequest,
+  extractDpopNonceFromHeaders,
+  type RequestDpopOptions,
+} from '../dpop/dpop'
 import { shouldRetryResourceRequestWithDpopNonce } from '../dpop/dpop-retry'
 import {
   Oauth2ResourceUnauthorizedError,
@@ -77,6 +82,17 @@ export interface ResourceRequestResponseNotOk extends ResourceRequestResponseBas
 export async function resourceRequest(
   options: ResourceRequestOptions
 ): Promise<ResourceRequestResponseOk | ResourceRequestResponseNotOk> {
+  return resourceRequestWithAccessTokenHash(
+    options,
+    options.dpop ? await calculateDpopAccessTokenHash(options.accessToken, options.callbacks) : undefined
+  )
+}
+
+// The hash of the access token is the same on the DPoP nonce retry, so it is calculated once
+async function resourceRequestWithAccessTokenHash(
+  options: ResourceRequestOptions,
+  accessTokenHash?: string
+): Promise<ResourceRequestResponseOk | ResourceRequestResponseNotOk> {
   const dpopHeaders = options.dpop
     ? await createDpopHeadersForRequest({
         request: {
@@ -88,6 +104,7 @@ export async function resourceRequest(
         callbacks: options.callbacks,
         nonce: options.dpop.nonce,
         accessToken: options.accessToken,
+        accessTokenHash,
       })
     : undefined
 
@@ -128,15 +145,18 @@ export async function resourceRequest(
 
   // only retry if retryWithNonce is set
   if (shouldRetryWithNonce && dpopRetry?.retry && options.dpop) {
-    return await resourceRequest({
-      ...options,
-      dpop: {
-        ...options.dpop,
-        nonce: dpopRetry.dpopNonce,
-        // We'll never try multiple times (to prevent endless recursion)
-        retryWithNonce: false,
+    return await resourceRequestWithAccessTokenHash(
+      {
+        ...options,
+        dpop: {
+          ...options.dpop,
+          nonce: dpopRetry.dpopNonce,
+          // We'll never try multiple times (to prevent endless recursion)
+          retryWithNonce: false,
+        },
       },
-    })
+      accessTokenHash
+    )
   }
 
   return {

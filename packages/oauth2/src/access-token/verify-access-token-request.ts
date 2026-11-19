@@ -15,6 +15,7 @@ import { SupportedClientAuthenticationMethod } from '../client-authentication'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { type DpopVerificationOptions, verifyDpopJwt } from '../dpop/dpop'
+import type { DpopJwtHeader, DpopJwtPayload } from '../dpop/z-dpop'
 import { Oauth2Error } from '../error/Oauth2Error'
 import { Oauth2ServerErrorResponseError } from '../error/Oauth2ServerErrorResponseError'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
@@ -116,6 +117,16 @@ export interface VerifyAccessTokenRequestReturn {
     jwkThumbprint: string
 
     jwk: Jwk
+
+    /**
+     * The header of the verified DPoP proof
+     */
+    header: DpopJwtHeader
+
+    /**
+     * The payload of the verified DPoP proof, e.g. to read its `nonce`
+     */
+    payload: DpopJwtPayload
   }
 
   clientAttestation?: {
@@ -486,7 +497,7 @@ async function verifyAccessTokenRequestDpop(
 
   if (!options.jwt) return undefined
 
-  const { header, jwkThumbprint } = await verifyDpopJwt({
+  const { header, payload, jwkThumbprint } = await verifyDpopJwt({
     callbacks,
     dpopJwt: options.jwt,
     request,
@@ -502,6 +513,8 @@ async function verifyAccessTokenRequestDpop(
   return {
     jwk: header.jwk,
     jwkThumbprint,
+    header,
+    payload,
   }
 }
 

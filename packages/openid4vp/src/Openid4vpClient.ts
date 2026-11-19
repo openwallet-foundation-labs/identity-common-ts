@@ -18,6 +18,8 @@ import type {
   Openid4vpAuthorizationResponse,
 } from './authorization-response/z-authorization-response'
 
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
 export interface Openid4vpClientOptions {
   /**
    * Callbacks required for the openid4vp client
@@ -41,7 +43,7 @@ export class Openid4vpClient {
   }
 
   public async resolveOpenid4vpAuthorizationRequest(
-    options: Omit<ResolveOpenid4vpAuthorizationRequestOptions, 'callbacks'>
+    options: DistributiveOmit<ResolveOpenid4vpAuthorizationRequestOptions, 'callbacks'>
   ) {
     return resolveOpenid4vpAuthorizationRequest({
       ...options,

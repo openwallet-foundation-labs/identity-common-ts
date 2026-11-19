@@ -45,7 +45,7 @@ const { protectedHeader, payload, signer } = await verifyJades({ jws, verifyJwsC
 const { payload: claims } = await verifyJadesJwt({ jwt, verifyJwsCallback, expectedIssuer: 'https://issuer.example' })
 ```
 
-The callback verifies the signature and decides whether the signing certificate is trusted. `verify*` first decode the signature with `decodeJades`, which checks the headers against clause 5 and the B-B profile, or the one given as `profile`. `decodeJades` does the same without verifying the signature.
+The callback verifies the signature and decides whether the signing certificate is trusted. `verify*` first decode the signature with `decodeJades`, which checks the headers against clause 5 and the B-B profile, or the one given as `profile`. `decodeJades` does the same without verifying the signature, and `decodeJadesJwt` also decodes the claims of a JWT. `verifyJadesJwt` takes what `decodeJadesJwt` returned as `jwt`, and then does not decode it again. Both reject a JWT with `b64` in `crit` unless `understoodCriticalParameters` names it, as `decodeJwt` of `@owf/jose` does.
 
 ## Errors and validation issues
 

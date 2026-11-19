@@ -3,6 +3,7 @@ import { dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
 import { decodeJwt, type JwsSigner, jwsHeaderFromSigner, signJwt, verifyJwt } from '@owf/jose'
 import { Openid4vciError } from '../../../error/Openid4vciError'
 import {
+  type ParsedKeyAttestationJwt,
   type VerifyKeyAttestationJwtReturn,
   verifyKeyAttestationJwt,
   verifyKeyAttestationRequirements,
@@ -44,8 +45,10 @@ export interface CreateCredentialRequestJwtProofOptions {
   /**
    * Key attestation jwt that the proof should based on. In this case it is required that the `signer` uses
    * a key from the `attested_keys` in the key attestation jwt payload.
+   *
+   * Can be the result of {@link parseKeyAttestationJwt}, so that the key attestation is not decoded again.
    */
-  keyAttestationJwt?: string
+  keyAttestationJwt?: string | ParsedKeyAttestationJwt
 
   signer: JwsSigner
   callbacks: Pick<CallbackContext, 'signJws' | 'hash'>
@@ -56,7 +59,8 @@ export async function createCredentialRequestJwtProof(
 ): Promise<string> {
   const header = parseWithErrorHandling(zCredentialRequestJwtProofTypeHeader, {
     ...jwsHeaderFromSigner(options.signer),
-    key_attestation: options.keyAttestationJwt,
+    key_attestation:
+      typeof options.keyAttestationJwt === 'string' ? options.keyAttestationJwt : options.keyAttestationJwt?.compact,
     typ: 'openid4vci-proof+jwt',
   } satisfies CredentialRequestJwtProofTypeHeader)
 
@@ -76,15 +80,18 @@ export async function createCredentialRequestJwtProof(
 
   // Check the jwt is signed with an key from attested_keys in the key_attestation jwt
   if (options.keyAttestationJwt) {
-    const decodedKeyAttestation = decodeJwt({
-      jwt: options.keyAttestationJwt,
-      headerSchema: zKeyAttestationJwtHeader,
-      payloadSchema: zKeyAttestationJwtPayload,
-    })
+    const keyAttestation =
+      typeof options.keyAttestationJwt === 'string'
+        ? decodeJwt({
+            jwt: options.keyAttestationJwt,
+            headerSchema: zKeyAttestationJwtHeader,
+            payloadSchema: zKeyAttestationJwtPayload,
+          })
+        : options.keyAttestationJwt
 
     const isSigedWithAttestedKey = await isJwkInSet({
       jwk: signerJwk,
-      jwks: decodedKeyAttestation.payload.attested_keys,
+      jwks: keyAttestation.payload.attested_keys,
       callbacks: options.callbacks,
     })
 

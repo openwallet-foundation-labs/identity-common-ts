@@ -16,6 +16,7 @@ import type { PexPresentationDefinition } from '../models/z-pex'
 import { type ParsedTransactionDataEntry, parseTransactionData } from '../transaction-data/parse-transaction-data'
 import { type Openid4vpVersionNumber, parseAuthorizationRequestVersion } from '../version'
 import { Openid4vpAuthorizationRequestError } from './Openid4vpAuthorizationRequestError'
+import type { ParseOpenid4vpAuthorizationRequestResult } from './parse-authorization-request-params'
 import {
   validateOpenid4vpAuthorizationRequestPayload,
   type WalletVerificationOptions,
@@ -29,8 +30,7 @@ import {
   zOpenid4vpAuthorizationRequestPayload,
 } from './z-authorization-request-payload'
 
-export interface ResolveOpenid4vpAuthorizationRequestOptions {
-  authorizationRequestPayload: Openid4vpAuthorizationRequestPayload | Openid4vpJarAuthorizationRequest
+export type ResolveOpenid4vpAuthorizationRequestOptions = {
   wallet?: WalletVerificationOptions
 
   /**
@@ -55,7 +55,20 @@ export interface ResolveOpenid4vpAuthorizationRequestOptions {
    * @default 30
    */
   allowedSkewInSeconds?: number
-}
+} & (
+  | {
+      authorizationRequestPayload: Openid4vpAuthorizationRequestPayload | Openid4vpJarAuthorizationRequest
+      parsedAuthorizationRequest?: never
+    }
+  | {
+      /**
+       * The result of `parseOpenid4vpAuthorizationRequest`, instead of `authorizationRequestPayload`. The request is
+       * then not parsed a second time.
+       */
+      parsedAuthorizationRequest: ParseOpenid4vpAuthorizationRequestResult
+      authorizationRequestPayload?: never
+    }
+)
 
 export type ResolvedOpenid4vpAuthorizationRequest = {
   transactionData?: ParsedTransactionDataEntry[]
@@ -79,13 +92,15 @@ export type ResolvedOpenid4vpAuthorizationRequest = {
 export async function resolveOpenid4vpAuthorizationRequest(
   options: ResolveOpenid4vpAuthorizationRequestOptions
 ): Promise<ResolvedOpenid4vpAuthorizationRequest> {
-  const { wallet, callbacks } = options
+  const { wallet, callbacks, parsedAuthorizationRequest: parseResult } = options
 
-  const parsed = parseWithErrorHandling(
-    z.union([zOpenid4vpAuthorizationRequestPayload, zOpenid4vpJarAuthorizationRequest]),
-    options.authorizationRequestPayload,
-    'Invalid authorization request. Could not parse openid4vp authorization request as openid4vp or jar auth request.'
-  )
+  const parsed =
+    parseResult?.params ??
+    parseWithErrorHandling(
+      z.union([zOpenid4vpAuthorizationRequestPayload, zOpenid4vpJarAuthorizationRequest]),
+      options.authorizationRequestPayload,
+      'Invalid authorization request. Could not parse openid4vp authorization request as openid4vp or jar auth request.'
+    )
 
   let jar: VerifiedJarRequest | undefined
   let authorizationRequestPayload: Openid4vpAuthorizationRequestPayload

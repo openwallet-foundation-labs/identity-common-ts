@@ -6,9 +6,14 @@ import type { DcqlTrustedAuthoritiesResult } from '../dcql-query-result/m-truste
 import { asNonEmptyArrayOrUndefined, parseDcql, type ToNonEmptyArray } from '../u-dcql.js'
 import type { DcqlCredential } from '../u-dcql-credential.js'
 
+/** The parser of each trusted authority of the credential query, which is the same for every credential */
+export const getTrustedAuthoritiesParsers = (credentialQuery: DcqlCredentialQuery) =>
+  credentialQuery.trusted_authorities?.map(getTrustedAuthorityParser)
+
 export const runTrustedAuthoritiesQuery = (
   credentialQuery: DcqlCredentialQuery,
-  credential: DcqlCredential
+  credential: DcqlCredential,
+  parsers = getTrustedAuthoritiesParsers(credentialQuery)
 ): DcqlTrustedAuthoritiesResult => {
   if (!credentialQuery.trusted_authorities) {
     return {
@@ -19,9 +24,11 @@ export const runTrustedAuthoritiesQuery = (
   const failedTrustedAuthorities: z.output<typeof DcqlTrustedAuthoritiesResult.zTrustedAuthorityEntryFailureResult>[] =
     []
 
-  for (const [trustedAuthorityIndex, trustedAuthority] of credentialQuery.trusted_authorities.entries()) {
-    const trustedAuthorityParser = getTrustedAuthorityParser(trustedAuthority)
-    const parseResult = parseDcql(trustedAuthorityParser, credential.authority)
+  for (const trustedAuthorityIndex of credentialQuery.trusted_authorities.keys()) {
+    const parseResult = parseDcql(
+      parsers?.[trustedAuthorityIndex] as ReturnType<typeof getTrustedAuthorityParser>,
+      credential.authority
+    )
 
     if (parseResult.success) {
       return {

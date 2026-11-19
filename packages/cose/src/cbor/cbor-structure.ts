@@ -22,6 +22,8 @@ export type CborStructureStaticThis<T extends AnyCborStructure> = {
   new (structure: any): T
   encodingSchema: z.ZodType<any, any, any> | undefined
   fromEncodedStructure: (encodedStructure: EncodedStructureType<T>) => { decodedStructure: DecodedStructureType<T> }
+  // NoInfer, as T would otherwise be inferred as the constraint of the generic `fromDataItem`
+  fromDataItem: (dataItem: unknown) => NoInfer<T>
 }
 
 export class CborStructure<EncodedStructure = unknown, DecodedStructure = EncodedStructure> {
@@ -73,9 +75,13 @@ export class CborStructure<EncodedStructure = unknown, DecodedStructure = Encode
   /**
    * Decodes CBOR bytes into a structure instance.
    * Uses the encodingSchema's decode() method to validate and transform the decoded data.
+   *
+   * Bytes wrapped in tag 24 are decoded with `fromDataItem`, so a subclass that overrides it sees the
+   * data item.
    */
   public static decode<T extends AnyCborStructure>(this: CborStructureStaticThis<T>, bytes: Uint8Array): T {
-    const rawStructure = cborDecode(bytes)
+    const rawStructure = cborDecode(bytes, { unwrapTopLevelDataItem: false })
+    if (rawStructure instanceof DataItem) return this.fromDataItem(rawStructure)
 
     // May feel weird, but using new this makes TypeScript understand we may return a subclass
     return new this(this.fromEncodedStructure(rawStructure as EncodedStructureType<T>).decodedStructure)

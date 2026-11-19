@@ -3,7 +3,7 @@ import { FlattenJson } from './flattenJson'
 import { GeneralJson } from './generalJson'
 import { Jwt, type VerifierOptions, validateJwtPayload } from './jwt'
 import { KbJwt } from './kbjwt'
-import { pack, SdJwt } from './sdjwt'
+import { listKeys, pack, SdJwt } from './sdjwt'
 import {
   DEFAULT_SECURE_HASH_ALGORITHMS,
   type DisclosureFrame,
@@ -122,6 +122,17 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     return jwt.verify<T>(this.userConfig.verifier, options)
   }
 
+  /**
+   * Decodes a compact SD-JWT, or returns the SD-JWT when it is already decoded.
+   */
+  protected async toSdJwt(sdJwt: string | SdJwt): Promise<SdJwt> {
+    if (typeof sdJwt !== 'string') return sdJwt
+    if (!this.userConfig.hasher) {
+      throw new SdJwtError('Hasher not found')
+    }
+    return SdJwt.fromEncode(sdJwt, this.userConfig.hasher)
+  }
+
   public async issue<Payload extends ExtendedPayload>(
     payload: Payload,
     disclosureFrame?: DisclosureFrame<Payload>,
@@ -129,6 +140,20 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
       header?: object // This is for customizing the header of the jwt
     }
   ): Promise<SdJwtCompact> {
+    return (await this.issueSdJwt(payload, disclosureFrame, options)).encodeSdJwt()
+  }
+
+  /**
+   * Issues the SD-JWT like `issue`, and returns it decoded: the signed JWT and its disclosures. `encodeSdJwt()` gives
+   * the compact form that `issue` returns.
+   */
+  public async issueSdJwt<Payload extends ExtendedPayload>(
+    payload: Payload,
+    disclosureFrame?: DisclosureFrame<Payload>,
+    options?: {
+      header?: object // This is for customizing the header of the jwt
+    }
+  ): Promise<SdJwt> {
     if (!this.userConfig.hasher) {
       throw new SdJwtError('Hasher not found')
     }
@@ -174,12 +199,10 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     })
     await this.SignJwt(jwt)
 
-    const sdJwt = new SdJwt({
+    return new SdJwt({
       jwt,
       disclosures,
     })
-
-    return sdJwt.encodeSdJwt()
   }
 
   /**
@@ -195,8 +218,12 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     return
   }
 
+  /**
+   * Creates a presentation of the SD-JWT with the disclosures the presentation frame selects.
+   * @param encodedSdJwt - The compact SD-JWT, or the `SdJwt` that `decode` or `issueSdJwt` returned for it
+   */
   public async present<T extends Record<string, unknown>>(
-    encodedSdJwt: string,
+    encodedSdJwt: string | SdJwt,
     presentationFrame?: PresentationFrame<T>,
     options?: {
       kb?: KbOptions
@@ -207,13 +234,17 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     }
     const hasher = this.userConfig.hasher
 
-    const sdjwt = await SdJwt.fromEncode(encodedSdJwt, hasher)
+    const sdjwt = await this.toSdJwt(encodedSdJwt)
     if (sdjwt.kbJwt) {
       throw new SdJwtError('Holder cannot present an SD-JWT with KB-JWT')
     }
 
     if (!sdjwt.jwt?.payload) throw new SdJwtError('Payload not found')
-    const presentSdJwtWithoutKb = await sdjwt.present(presentationFrame, hasher)
+    const presented = new SdJwt({
+      jwt: sdjwt.jwt,
+      disclosures: await sdjwt.getPresentDisclosures(presentationFrame, hasher),
+    })
+    const presentSdJwtWithoutKb = presented.encodeSdJwt()
 
     if (!options?.kb) {
       return presentSdJwtWithoutKb
@@ -221,27 +252,28 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
 
     const sdHashStr = await this.calculateSdHash(presentSdJwtWithoutKb, sdjwt, hasher)
 
-    sdjwt.kbJwt = await this.createKbJwt(options.kb, sdHashStr)
-    return sdjwt.present(presentationFrame, hasher)
+    presented.kbJwt = await this.createKbJwt(options.kb, sdHashStr)
+    return presented.encodeSdJwt()
   }
 
-  // This function is for verifying the SD JWT
-  // If requiredClaimKeys is provided, it will check if the required claim keys are presentation in the SD JWT
-  // If requireKeyBindings is true, it will check if the key binding JWT is presentation and verify it
-  public async verify(encodedSdJwt: string, options?: T & VerifierOptions) {
+  /**
+   * Verifies the SD-JWT: `validate`, then the required claim keys and, with a `keyBindingNonce`, the Key Binding JWT.
+   * @param encodedSdJwt - The compact SD-JWT, or the `SdJwt` that `decode` returned for it
+   */
+  public async verify(encodedSdJwt: string | SdJwt, options?: T & VerifierOptions) {
     if (!this.userConfig.hasher) {
       throw new SdJwtError('Hasher not found')
     }
     const hasher = this.userConfig.hasher
 
-    const sdjwt = await SdJwt.fromEncode(encodedSdJwt, hasher)
+    const sdjwt = await this.toSdJwt(encodedSdJwt)
     if (!sdjwt.jwt?.payload) {
       throw new SdJwtError('Invalid SD JWT')
     }
-    const { payload, header } = await this.validate(encodedSdJwt, options)
+    const { payload, header } = await this.validate(sdjwt, options)
 
     if (options?.requiredClaimKeys) {
-      const keys = await sdjwt.keys(hasher)
+      const keys = listKeys(payload)
       const missingKeys = options.requiredClaimKeys.filter((k) => !keys.includes(k))
       if (missingKeys.length > 0) {
         throw new SdJwtError(`Missing required claim keys: ${missingKeys.join(', ')}`)
@@ -288,12 +320,12 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
    * Safe verification that collects all errors instead of failing fast.
    * Returns a result object with either the verified data or an array of all errors.
    *
-   * @param encodedSdJwt - The encoded SD-JWT to verify
+   * @param encodedSdJwt - The encoded SD-JWT to verify, or the `SdJwt` that `decode` returned for it
    * @param options - Verification options
    * @returns A SafeVerifyResult containing either success data or collected errors
    */
   public async safeVerify(
-    encodedSdJwt: string,
+    encodedSdJwt: string | SdJwt,
     options?: T & VerifierOptions
   ): Promise<
     SafeVerifyResult<{
@@ -343,7 +375,7 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     let header: Record<string, unknown> | undefined
 
     try {
-      sdjwt = await SdJwt.fromEncode(encodedSdJwt, hasher)
+      sdjwt = await this.toSdJwt(encodedSdJwt)
       if (!sdjwt.jwt?.payload) {
         addError('INVALID_SD_JWT', 'Invalid SD JWT: missing JWT or payload')
       }
@@ -373,7 +405,7 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     // Check required claim keys
     if (sdjwt && options?.requiredClaimKeys) {
       try {
-        const keys = await sdjwt.keys(hasher)
+        const keys = payload ? listKeys(payload) : await sdjwt.keys(hasher)
         const missingKeys = options.requiredClaimKeys.filter((k) => !keys.includes(k))
         if (missingKeys.length > 0) {
           addError('MISSING_REQUIRED_CLAIMS', `Missing required claim keys: ${missingKeys.join(', ')}`, { missingKeys })
@@ -457,17 +489,17 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
   /**
    * This function is for validating the SD JWT
    * Checking signature, if provided the iat and exp when provided and return its the claims
-   * @param encodedSdJwt
+   * @param encodedSdJwt - The compact SD-JWT, or the `SdJwt` that `decode` returned for it
    * @param options
    * @returns
    */
-  public async validate(encodedSdJwt: string, options?: T & VerifierOptions) {
+  public async validate(encodedSdJwt: string | SdJwt, options?: T & VerifierOptions) {
     if (!this.userConfig.hasher) {
       throw new SdJwtError('Hasher not found')
     }
     const hasher = this.userConfig.hasher
 
-    const sdjwt = await SdJwt.fromEncode(encodedSdJwt, hasher)
+    const sdjwt = await this.toSdJwt(encodedSdJwt)
     if (!sdjwt.jwt) {
       throw new SdJwtError('Invalid SD JWT')
     }
@@ -498,27 +530,27 @@ export class SdJwtInstance<ExtendedPayload extends SdJwtPayload, T = unknown> {
     return SdJwt.fromEncode<Header, ExtendedPayload>(encodedSdJwt, this.userConfig.hasher)
   }
 
-  public async keys(encodedSdJwt: SdJwtCompact) {
+  public async keys(encodedSdJwt: SdJwtCompact | SdJwt) {
     if (!this.userConfig.hasher) {
       throw new SdJwtError('Hasher not found')
     }
-    const sdjwt = await SdJwt.fromEncode<Record<string, unknown>, ExtendedPayload>(encodedSdJwt, this.userConfig.hasher)
+    const sdjwt = await this.toSdJwt(encodedSdJwt)
     return sdjwt.keys(this.userConfig.hasher)
   }
 
-  public async presentableKeys(encodedSdJwt: SdJwtCompact) {
+  public async presentableKeys(encodedSdJwt: SdJwtCompact | SdJwt) {
     if (!this.userConfig.hasher) {
       throw new SdJwtError('Hasher not found')
     }
-    const sdjwt = await SdJwt.fromEncode<Record<string, unknown>, ExtendedPayload>(encodedSdJwt, this.userConfig.hasher)
+    const sdjwt = await this.toSdJwt(encodedSdJwt)
     return sdjwt.presentableKeys(this.userConfig.hasher)
   }
 
-  public async getClaims(encodedSdJwt: SdJwtCompact): Promise<ExtendedPayload> {
+  public async getClaims(encodedSdJwt: SdJwtCompact | SdJwt): Promise<ExtendedPayload> {
     if (!this.userConfig.hasher) {
       throw new SdJwtError('Hasher not found')
     }
-    const sdjwt = await SdJwt.fromEncode<Record<string, unknown>, ExtendedPayload>(encodedSdJwt, this.userConfig.hasher)
+    const sdjwt = await this.toSdJwt(encodedSdJwt)
     return sdjwt.getClaims<ExtendedPayload>(this.userConfig.hasher)
   }
 
@@ -684,7 +716,7 @@ export class SdJwtGeneralJsonInstance<ExtendedPayload extends SdJwtPayload> {
       return presentedGeneralJson
     }
 
-    const presentSdJwtWithoutKb = await sdjwt.present(presentationFrame, hasher)
+    const presentSdJwtWithoutKb = new SdJwt({ jwt: sdjwt.jwt, disclosures }).encodeSdJwt()
 
     const sdHashStr = await this.calculateSdHash(presentSdJwtWithoutKb, sdjwt, hasher)
 

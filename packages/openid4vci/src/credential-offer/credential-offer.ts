@@ -101,7 +101,8 @@ export async function resolveCredentialOffer(
     let credentialOfferJson: Record<string, unknown>
 
     try {
-      credentialOfferJson = JSON.parse(decodeURIComponent(parsedQueryParams.credential_offer))
+      // `getQueryParams` already decoded the value, decoding it again would alter or reject a literal `%`
+      credentialOfferJson = JSON.parse(parsedQueryParams.credential_offer)
     } catch (_error) {
       throw new Oauth2Error(`Error parsing JSON from the 'credential_offer' param of the credential offer`)
     }

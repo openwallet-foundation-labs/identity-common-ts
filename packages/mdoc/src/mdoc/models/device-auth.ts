@@ -16,7 +16,7 @@ import { DeviceAuthentication } from './device-authentication'
 import { DeviceMac, type DeviceMacEncodedStructure } from './device-mac'
 import { DeviceSignature, type DeviceSignatureEncodedStructure } from './device-signature'
 import type { Document } from './document'
-import type { SessionTranscript } from './session-transcript'
+import { SessionTranscript } from './session-transcript'
 
 const zDeviceAuth = typedMap([
   ['deviceSignature', z.instanceof(DeviceSignature).exactOptional()],
@@ -108,8 +108,9 @@ export class DeviceAuth extends CborStructure<DeviceAuthEncodedStructure, Device
       return
     }
 
+    const sessionTranscript = SessionTranscript.from(options.sessionTranscript)
     const deviceAuthenticationBytes = DeviceAuthentication.create({
-      sessionTranscript: options.sessionTranscript,
+      sessionTranscript,
       docType: options.document.docType,
       deviceNamespaces: options.document.deviceSigned.deviceNamespaces,
     }).encode({ asDataItem: true })
@@ -157,7 +158,7 @@ export class DeviceAuth extends CborStructure<DeviceAuthEncodedStructure, Device
           {
             publicKey: deviceKey,
             privateKey: options.ephemeralMacPrivateKey,
-            sessionTranscript: options.sessionTranscript,
+            sessionTranscript,
             info: 'EMacKey',
             detachedPayload: deviceAuthenticationBytes,
           },

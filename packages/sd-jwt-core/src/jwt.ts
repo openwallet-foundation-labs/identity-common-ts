@@ -313,8 +313,9 @@ export class Jwt<
     }
     const data = this.getUnsignedToken()
     this.signature = await signer(data)
+    this.encoded = `${data}.${this.signature}`
 
-    return this.encodeJwt()
+    return this.encoded
   }
 
   public encodeJwt(): string {

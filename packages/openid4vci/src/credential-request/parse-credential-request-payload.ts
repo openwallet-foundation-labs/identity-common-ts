@@ -22,6 +22,10 @@ import {
   zCredentialRequestProofs,
 } from './z-credential-request-common'
 
+const zKnownCredentialRequestProof = z.union(allCredentialRequestProofs)
+const zKnownCredentialRequestFormat = z.union(allCredentialRequestFormats)
+const knownProofTypes = Object.keys(zCredentialRequestProofs.shape)
+
 export interface ParseCredentialRequestPayloadOptions {
   issuerMetadata: IssuerMetadataResult
   credentialRequest: unknown
@@ -100,14 +104,14 @@ export function parseCredentialRequestPayload(
   )
   let proofs: CredentialRequestProofsFormatSpecific | undefined
 
-  // Try to parse the known proofs from the `proofs` object
-  const knownProofs = zCredentialRequestProofs.strict().safeParse(credentialRequest.proofs)
-  if (knownProofs.success) {
-    proofs = knownProofs.data
+  // The credential request schema validated the known proof types of the `proofs` object, so they are
+  // used when it has no unknown proof type
+  if (credentialRequest.proofs && Object.keys(credentialRequest.proofs).every((key) => knownProofTypes.includes(key))) {
+    proofs = credentialRequest.proofs
   }
 
   // Try to parse the known proof from the `proof`
-  const knownProof = z.union(allCredentialRequestProofs).safeParse(credentialRequest.proof)
+  const knownProof = zKnownCredentialRequestProof.safeParse(credentialRequest.proof)
   if (knownProof.success && knownProof.data.proof_type === jwtProofTypeIdentifier) {
     proofs = { [jwtProofTypeIdentifier]: [knownProof.data.jwt] }
   } else if (knownProof.success && knownProof.data.proof_type === attestationProofTypeIdentifier) {
@@ -163,7 +167,7 @@ export function parseCredentialRequestPayload(
     return {
       // Removes all claims that are not specific to this format
       format: parseWithErrorHandling(
-        z.union(allCredentialRequestFormats),
+        zKnownCredentialRequestFormat,
         credentialRequest,
         'Unable to validate format specific properties from credential request'
       ),

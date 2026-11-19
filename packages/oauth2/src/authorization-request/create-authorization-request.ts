@@ -8,7 +8,7 @@ import { authorizationServerRequestWithDpopRetry } from '../dpop/dpop-retry'
 import { Oauth2ClientErrorResponseError } from '../error/Oauth2ClientErrorResponseError'
 import { Oauth2Error } from '../error/Oauth2Error'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
-import { createPkce } from '../pkce'
+import { type CreatePkceReturn, createPkce } from '../pkce'
 import {
   type AuthorizationRequest,
   type PushedAuthorizationRequest,
@@ -71,6 +71,12 @@ export interface CreateAuthorizationRequestUrlOptions {
   pkceCodeVerifier?: string
 
   /**
+   * PKCE values that were already created with `createPkce` for this authorization server. They are
+   * used as is instead of hashing `pkceCodeVerifier` again.
+   */
+  pkce?: CreatePkceReturn
+
+  /**
    * DPoP options
    *
    * If PAR is not used only the `dpop_jkt` property will be included in the request
@@ -97,11 +103,12 @@ export async function createAuthorizationRequestUrl(options: CreateAuthorization
 
   // PKCE
   const pkce = authorizationServerMetadata.code_challenge_methods_supported
-    ? await createPkce({
+    ? (options.pkce ??
+      (await createPkce({
         allowedCodeChallengeMethods: authorizationServerMetadata.code_challenge_methods_supported,
         callbacks: options.callbacks,
         codeVerifier: options.pkceCodeVerifier,
-      })
+      })))
     : undefined
 
   const authorizationRequest: AuthorizationRequest = {
@@ -209,8 +216,8 @@ async function pushAuthorizationRequest(options: PushAuthorizationRequestOptions
     'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
   })
 
-  // NOTE: this will currently be called twice if we need to retry dpop.
-  // Probably have to think about caching it in some way.
+  // Called again on a DPoP nonce retry: a Client Attestation PoP has to be fresh for each request
+  // (draft-ietf-oauth-attestation-based-client-auth-12 Section 10.2), so it cannot be reused.
   // Apply client authentication
   await options.callbacks.clientAuthentication({
     url: options.pushedAuthorizationRequestEndpoint,

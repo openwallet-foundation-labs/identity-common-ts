@@ -43,6 +43,14 @@ export const allCredentialRequestFormatIdentifiers = allCredentialRequestFormats
   (format) => format.shape.format.value
 )
 
+// Built once, not for every credential request that is validated
+const zCredentialRequestKnownFormat = z
+  // We use object and passthrough as otherwise the non-format specific properties will be stripped
+  .object({})
+  .loose()
+  // FIXME(vc+sd-jwt): use discriminated union when dropping support for legacy vc+sd-jwt format.
+  .and(z.union(allCredentialRequestFormats))
+
 // Credential configuration no format used
 const zCredentialRequestCredentialConfigurationId = z.object({
   credential_configuration_id: zNonEmptyString,
@@ -88,13 +96,7 @@ export const zCredentialRequestDraft14WithFormat = zCredentialRequestCommon
     )
       return data
 
-    const result = z
-      // We use object and passthrough as otherwise the non-format specific properties will be stripped
-      .object({})
-      .loose()
-      // FIXME(vc+sd-jwt): use discriminated union when dropping support for legacy vc+sd-jwt format.
-      .and(z.union(allCredentialRequestFormats))
-      .safeParse(data, nestedParseParams)
+    const result = zCredentialRequestKnownFormat.safeParse(data, nestedParseParams)
     if (result.success) {
       return result.data as Simplify<typeof result.data & typeof data>
     }

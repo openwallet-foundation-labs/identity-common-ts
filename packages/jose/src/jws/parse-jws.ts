@@ -246,12 +246,14 @@ export function parseJws<
     'Invalid JWS protected header',
     JoseValidationError
   )
-  const protectedHeader = parseWithErrorHandling(
-    options.protectedHeaderSchema ?? zJwsProtectedHeader,
-    protectedHeaderJson,
-    'Invalid JWS protected header',
-    JoseValidationError
-  )
+  const protectedHeader = options.protectedHeaderSchema
+    ? parseWithErrorHandling(
+        options.protectedHeaderSchema,
+        protectedHeaderJson,
+        'Invalid JWS protected header',
+        JoseValidationError
+      )
+    : registeredHeader
 
   const unprotectedHeader = parts.unprotectedHeader
     ? parseWithErrorHandling(

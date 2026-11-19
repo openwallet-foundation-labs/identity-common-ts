@@ -60,6 +60,7 @@ describe('verifyDpopJwt', () => {
     })
 
     expect(result.jwkThumbprint).toBe(expectedJwkThumbprint)
+    expect(result.jwk).toEqual(dpopSignerPublicJwk)
   })
 
   test('rejects proofs signed by the wrong key', async () => {

@@ -1,13 +1,14 @@
 import { CommonMediaTypes } from '@owf/identity-common'
-import { JoseValidationError, type Jwk, type JwkSet, jwsHeaderFromSigner, signJwt } from '@owf/jose'
+import { decodeJwt, JoseValidationError, type Jwk, type JwkSet, jwsHeaderFromSigner, signJwt } from '@owf/jose'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { createAccessTokenJwt } from '../access-token/create-access-token'
 import { verifyJwtProfileAccessToken } from '../access-token/verify-access-token'
 import { createDpopJwt } from '../dpop/dpop'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
 import { Oauth2ResourceServer } from '../Oauth2ResourceServer'
+import { resourceRequest } from '../resource-request/make-resource-request'
 import { callbacks, getSignJwsCallback } from './util.mjs'
 
 const server = setupServer()
@@ -123,6 +124,9 @@ describe('Oauth2ResourceServer', () => {
     })
 
     expect(dpop?.jwk).toEqual(dpopSignerJwkPublic)
+    expect(dpop?.jwkThumbprint).toEqual('-ROyTPYQqpxRbFqDVzNZrt_U0-zeAz0Wxmpv4TxlgLM')
+    expect(dpop?.header).toMatchObject({ typ: 'dpop+jwt', jwk: dpopSignerJwkPublic })
+    expect(dpop?.payload).toMatchObject({ htm: 'POST', htu: 'https://resource-server.com/endpoint' })
     expect(tokenPayload).toEqual({
       aud: 'https://resource-server.com',
       cnf: {
@@ -135,6 +139,51 @@ describe('Oauth2ResourceServer', () => {
       scope: 'PidSdJwt PidMdoc',
       sub: 'pre-auth-code',
     })
+  })
+
+  test('createAccessTokenJwt uses a provided dpop jwk thumbprint instead of calculating it', async () => {
+    const hash = vi.fn(callbacks.hash)
+    const { jwt } = await createAccessTokenJwt({
+      audience: 'https://resource-server.com',
+      authorizationServer: authorizationServerMetadata.issuer,
+      callbacks: { ...callbacks, hash, signJws: getSignJwsCallback([accessTokenSignerJwk]) },
+      expiresInSeconds: 300,
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: accessTokenSignerJwkPublic },
+      subject: 'subject',
+      dpop: { jwk: dpopSignerJwkPublic, jwkThumbprint: '-ROyTPYQqpxRbFqDVzNZrt_U0-zeAz0Wxmpv4TxlgLM' },
+    })
+
+    expect(hash).not.toHaveBeenCalled()
+    expect(decodeJwt({ jwt }).payload.cnf).toEqual({ jkt: '-ROyTPYQqpxRbFqDVzNZrt_U0-zeAz0Wxmpv4TxlgLM' })
+  })
+
+  test('resourceRequest hashes the access token once when it retries with a dpop nonce', async () => {
+    let requests = 0
+    server.resetHandlers(
+      http.get('https://resource-server.com/endpoint', () =>
+        ++requests === 1
+          ? new HttpResponse(null, {
+              status: 401,
+              headers: { 'WWW-Authenticate': 'DPoP error="use_dpop_nonce"', 'DPoP-Nonce': 'nonce' },
+            })
+          : new HttpResponse(null, { status: 200 })
+      )
+    )
+
+    const hash = vi.fn(callbacks.hash)
+    const signJws = vi.fn(getSignJwsCallback([dpopSignerJwk]))
+    const response = await resourceRequest({
+      accessToken: 'access-token',
+      url: 'https://resource-server.com/endpoint',
+      requestOptions: {},
+      callbacks: { ...callbacks, fetch, hash, signJws },
+      dpop: { signer: { method: 'jwk', alg: 'ES256', publicJwk: dpopSignerJwkPublic } },
+    })
+
+    expect(response.ok).toBe(true)
+    expect(requests).toBe(2)
+    expect(signJws).toHaveBeenCalledTimes(2)
+    expect(hash).toHaveBeenCalledTimes(1)
   })
 
   test('matches the authentication scheme case-insensitively', async () => {

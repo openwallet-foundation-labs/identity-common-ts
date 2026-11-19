@@ -1,4 +1,10 @@
-import { bytesToString, type FetchCallback, type FetchLimits, fetchWithLimits, isMediaType } from '@owf/identity-common'
+import {
+  bytesToString,
+  type FetchCallback,
+  type FetchLimits,
+  fetchBodyWithLimits,
+  isMediaType,
+} from '@owf/identity-common'
 import { StatusListError } from './status-list-error'
 import { StatusListMediaTypes } from './types'
 
@@ -32,7 +38,7 @@ export const fetchStatusList = async ({
       throw new StatusListError(`At least one accepted format (cwt, jwt) needs to be provided`)
     }
 
-    const response = await fetchWithLimits(
+    const { response, body } = await fetchBodyWithLimits(
       { fetch: customFetcher, fetchLimits },
       {
         type: 'statusList',
@@ -50,9 +56,9 @@ export const fetchStatusList = async ({
 
     const contentType = response.headers.get('Content-Type')
     if (isMediaType(contentType, StatusListMediaTypes.StatusListJwt)) {
-      return bytesToString(new Uint8Array(await response.arrayBuffer()))
+      return bytesToString(body)
     } else if (isMediaType(contentType, StatusListMediaTypes.StatusListCwt)) {
-      return new Uint8Array(await response.arrayBuffer())
+      return body
     }
 
     throw new StatusListError('Content type was either not provided in the response or invalid.')

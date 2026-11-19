@@ -106,8 +106,8 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
     })
 
     // Verify the issuer auth
-    const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
-      await this.issuerAuth.verify(options, ctx)
+    const issuerAuthResult = await this.issuerAuth.verify(options, ctx)
+    const { documentSignerCertificate } = issuerAuthResult
 
     const namespaces = this.issuerNamespaces?.issuerNamespaces ?? new Map<string, IssuerSignedItem[]>()
 
@@ -154,49 +154,36 @@ export class IssuerSigned extends CborStructure<IssuerSignedEncodedStructure, Is
         }
 
         if (ns === 'org.iso.18013.5.1') {
-          const certificateData = await ctx.x509.getCertificateData({
-            certificate: this.issuerAuth.certificate,
+          const invalidCountry = verifications
+            .filter((v) => v.ns === ns && v.ev.elementIdentifier === 'issuing_country')
+            .find((v) => !v.isValid || !v.ev.matchCertificate(documentSignerCertificate))
+
+          onCheck({
+            status: invalidCountry ? 'FAILED' : 'PASSED',
+            check:
+              "The 'issuing_country' if present must match the 'countryName' in the subject field within the DS certificate",
+            reason: invalidCountry
+              ? `The 'issuing_country' (${invalidCountry.ev.elementValue}) must match the 'countryName' (${documentSignerCertificate.subject.countryName}) in the subject field within the issuer certificate`
+              : undefined,
           })
-          if (!certificateData.issuerName) {
-            onCheck({
-              status: 'FAILED',
-              check:
-                "The 'issuing_country' if present must match the 'countryName' in the subject field within the DS certificate",
-              reason:
-                "The 'issuing_country' and 'issuing_jurisdiction' cannot be verified because the DS certificate was not provided",
-            })
-          } else {
-            const invalidCountry = verifications
-              .filter((v) => v.ns === ns && v.ev.elementIdentifier === 'issuing_country')
-              .find((v) => !v.isValid || !v.ev.matchCertificate(this.issuerAuth, ctx))
 
-            onCheck({
-              status: invalidCountry ? 'FAILED' : 'PASSED',
-              check:
-                "The 'issuing_country' if present must match the 'countryName' in the subject field within the DS certificate",
-              reason: invalidCountry
-                ? `The 'issuing_country' (${invalidCountry.ev.elementValue}) must match the 'countryName' (${this.issuerAuth.getIssuingCountry(ctx)}) in the subject field within the issuer certificate`
-                : undefined,
-            })
+          const invalidJurisdiction = verifications
+            .filter((v) => v.ns === ns && v.ev.elementIdentifier === 'issuing_jurisdiction')
+            .find((v) => !v.isValid || !v.ev.matchCertificate(documentSignerCertificate))
 
-            const invalidJurisdiction = verifications
-              .filter((v) => v.ns === ns && v.ev.elementIdentifier === 'issuing_jurisdiction')
-              .find((v) => !v.isValid || !v.ev.matchCertificate(this.issuerAuth, ctx))
-
-            onCheck({
-              status: invalidJurisdiction ? 'FAILED' : 'PASSED',
-              check:
-                "The 'issuing_jurisdiction' if present must match the 'stateOrProvinceName' in the subject field within the DS certificate",
-              reason: invalidJurisdiction
-                ? `The 'issuing_jurisdiction' (${invalidJurisdiction.ev.elementValue}) must match the 'stateOrProvinceName' (${this.issuerAuth.getIssuingStateOrProvince(ctx)}) in the subject field within the issuer certificate`
-                : undefined,
-            })
-          }
+          onCheck({
+            status: invalidJurisdiction ? 'FAILED' : 'PASSED',
+            check:
+              "The 'issuing_jurisdiction' if present must match the 'stateOrProvinceName' in the subject field within the DS certificate",
+            reason: invalidJurisdiction
+              ? `The 'issuing_jurisdiction' (${invalidJurisdiction.ev.elementValue}) must match the 'stateOrProvinceName' (${documentSignerCertificate.subject.stateOrProvinceName}) in the subject field within the issuer certificate`
+              : undefined,
+          })
         }
       })
     )
 
-    return { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain }
+    return issuerAuthResult
   }
 
   public static create(options: IssuerSignedOptions): IssuerSigned {

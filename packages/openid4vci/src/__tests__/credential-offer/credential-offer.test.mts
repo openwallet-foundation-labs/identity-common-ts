@@ -202,6 +202,21 @@ describe('Credential Offer', () => {
     )
   })
 
+  // OpenID4VCI 1.0 Section 4.1: `credential_offer` is a URI query parameter, so it is percent-decoded once
+  test('does not percent-decode the credential_offer query parameter a second time', async () => {
+    const credentialOffer = {
+      credential_issuer: 'https://issuer.example',
+      credential_configuration_ids: ['test'],
+      grants: { [authorizationCodeGrantIdentifier]: { issuer_state: '50%off and a%2Fb' } },
+    }
+
+    await expect(
+      resolveCredentialOffer(
+        `openid-credential-offer://?credential_offer=${encodeURIComponent(JSON.stringify(credentialOffer))}`
+      )
+    ).resolves.toMatchObject(credentialOffer)
+  })
+
   test('does not put the credential offer, which can carry the pre-authorized code, in the error message', async () => {
     const offer = (credentialOffer: unknown) =>
       `openid-credential-offer://?credential_offer=${encodeURIComponent(JSON.stringify(credentialOffer))}`

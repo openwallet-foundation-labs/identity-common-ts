@@ -33,6 +33,11 @@ export const zOpenid4vpAuthorizationRequestIae = zOpenid4vpAuthorizationRequestD
 
     // Required for IAE, no support for PEX
     dcql_query: z.record(z.string(), z.any()),
+    presentation_definition: z
+      .never(
+        "The 'presentation_definition' parameter MUST NOT be present when using Interactive Authorization response mode. "
+      )
+      .optional(),
 
     // OpenID4VCI 1.1 Interactive Authorization Endpoint - expected_url parameter
     // Used in signed requests to prevent replay attacks from malicious verifiers

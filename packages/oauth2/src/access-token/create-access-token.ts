@@ -17,6 +17,12 @@ export interface CreateAccessTokenOptions {
    */
   dpop?: {
     jwk: Jwk
+
+    /**
+     * The SHA-256 thumbprint of `jwk`, if it was already calculated, e.g. the `jwkThumbprint` of
+     * `verifyAccessTokenRequest`. It is used as is instead of calculating it again.
+     */
+    jwkThumbprint?: string
   }
 
   /**
@@ -84,11 +90,12 @@ export async function createAccessTokenJwt(options: CreateAccessTokenOptions) {
   // Awaited outside the payload: older Hermes (React Native) compilers return the last property
   // value instead of the object when an object literal in a ternary branch contains an `await`.
   const dpopJkt = options.dpop
-    ? await calculateJwkThumbprint({
+    ? (options.dpop.jwkThumbprint ??
+      (await calculateJwkThumbprint({
         hashAlgorithm: 'sha-256',
         hashCallback: options.callbacks.hash,
         jwk: options.dpop.jwk,
-      })
+      })))
     : undefined
 
   const payload = parseWithErrorHandling(zAccessTokenProfileJwtPayload, {

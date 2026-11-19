@@ -91,13 +91,20 @@ export async function signJwt<
 
   // Always validated against the registered header parameters and claims, and only then against the
   // caller's schemas, the same way `decodeJwt` validates a token that is read.
-  parseWithErrorHandling(zJwtHeader, headerJson, 'Unable to sign the JWT, invalid header', JoseValidationError)
-  const header = parseWithErrorHandling(
-    options.headerSchema ?? zJwtHeader,
+  const registeredHeader = parseWithErrorHandling(
+    zJwtHeader,
     headerJson,
     'Unable to sign the JWT, invalid header',
     JoseValidationError
   )
+  const header = options.headerSchema
+    ? parseWithErrorHandling(
+        options.headerSchema,
+        headerJson,
+        'Unable to sign the JWT, invalid header',
+        JoseValidationError
+      )
+    : registeredHeader
 
   // RFC 7519 defines the claims set as base64url encoded JSON, so a JWT with an unencoded payload
   // (RFC 7797) would be a token that `decodeJwt` rejects. The header that is signed is the one the
@@ -108,23 +115,27 @@ export async function signJwt<
     )
   }
 
-  parseWithErrorHandling(
+  const registeredPayload = parseWithErrorHandling(
     zJwtPayload,
     options.payload,
     'Unable to sign the JWT, invalid claims set',
     JoseValidationError
   )
-  const payload = parseWithErrorHandling(
-    options.payloadSchema ?? zJwtPayload,
-    options.payload,
-    'Unable to sign the JWT, invalid claims set',
-    JoseValidationError
-  )
+  const payload = options.payloadSchema
+    ? parseWithErrorHandling(
+        options.payloadSchema,
+        options.payload,
+        'Unable to sign the JWT, invalid claims set',
+        JoseValidationError
+      )
+    : registeredPayload
 
   // What the caller's schema returned is what gets signed, so it is validated against the registered
   // claims too: a schema that transforms or fills in a registered claim must not be able to sign one
   // that `decodeJwt` would reject.
-  parseWithErrorHandling(zJwtPayload, payload, 'Unable to sign the JWT, invalid claims set', JoseValidationError)
+  if (options.payloadSchema) {
+    parseWithErrorHandling(zJwtPayload, payload, 'Unable to sign the JWT, invalid claims set', JoseValidationError)
+  }
 
   const { compact, signerJwk } = await signCompactJws({
     protectedHeader: header,

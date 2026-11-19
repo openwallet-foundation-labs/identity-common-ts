@@ -11,6 +11,7 @@ import {
   type CredentialConfigurationsSupported,
   type CredentialConfigurationsSupportedWithFormats,
   type CredentialIssuerMetadata,
+  detectCredentialIssuerMetadataDraftVersion,
   zCredentialConfigurationSupportedWithFormats,
   zCredentialIssuerMetadataWithDraftVersion,
 } from './z-credential-issuer-metadata'
@@ -188,14 +189,10 @@ export async function fetchCredentialIssuerMetadata(
       errorMessage: `Verification of the signed credential issuer metadata at '${metadataUrl}' failed`,
     })
 
-    const issuerMetadata = parseWithErrorHandling(
-      zCredentialIssuerMetadataWithDraftVersion,
-      payload,
-      'Unable to determine version for signed issuer metadata'
-    )
-
+    // The payload schema holds the credential issuer metadata schema, so the payload is not validated again
     issuerMetadataWithVersion = {
-      ...issuerMetadata,
+      credentialIssuerMetadata: payload,
+      originalDraftVersion: detectCredentialIssuerMetadataDraftVersion(payload),
       signed: {
         signer: verifyResult.signer,
         jwt: decodedJwt,
@@ -231,16 +228,10 @@ export function extractKnownCredentialConfigurationSupportedFormats(
 ): CredentialConfigurationsSupportedWithFormats {
   return Object.fromEntries(
     Object.entries(credentialConfigurationsSupported).filter(
-      (entry): entry is [string, CredentialConfigurationSupportedWithFormats] => {
-        // Type guard to ensure that the returned entries have known formats
-        const credentialConfiguration = zCredentialConfigurationSupportedWithFormats.safeParse(entry[1]) // Validate structure
-        if (!credentialConfiguration.success) {
-          return false
-        }
-        return allCredentialIssuerMetadataFormatIdentifiers.includes(
-          credentialConfiguration.data.format as CredentialFormatIdentifier
-        )
-      }
+      (entry): entry is [string, CredentialConfigurationSupportedWithFormats] =>
+        // An unknown format is never included, so only a configuration with a known format is validated
+        allCredentialIssuerMetadataFormatIdentifiers.includes(entry[1]?.format as CredentialFormatIdentifier) &&
+        zCredentialConfigurationSupportedWithFormats.safeParse(entry[1]).success
     )
   )
 }

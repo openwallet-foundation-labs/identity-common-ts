@@ -115,6 +115,8 @@ describe('Oauth2AuthorizationServer', () => {
     })
 
     expect(dpop?.jwk).toEqual(dpopSignerJwkPublic)
+    expect(dpop?.header).toMatchObject({ typ: 'dpop+jwt', jwk: dpopSignerJwkPublic })
+    expect(dpop?.payload).toMatchObject({ htm: 'POST' })
 
     const accessTokenResponse = await authorizationServer.createAccessTokenResponse({
       audience: 'https://credential-issuer.com',

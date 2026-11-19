@@ -35,6 +35,16 @@ CI installs with `--frozen-lockfile`, so commit `pnpm-lock.yaml` with every depe
 - Comment only what the code can't show: why it does something, or the requirement of the specification it implements. Don't comment self-explanatory code. Exported functions and types get JSDoc.
 - Shorter code must not drop a check: keep the validation of untrusted input and the error handling.
 
+## Do work once
+
+Within one flow, decode, parse, validate, hash and verify each value once, and pass the result on. See [CONTRIBUTING.md](CONTRIBUTING.md#do-work-once) for examples.
+
+- Don't decode in a parse function and again in the verify function it calls. Pass the decoded value down: `verifyJwt({ jwt: decoded })`, not the compact string again.
+- A function that takes an encoded value also accepts the decoded form in the same parameter: `accessToken: string | DecodedJwtProfileAccessToken`. No second parameter. Name and export the decoded type.
+- Return what the caller would compute again, e.g. `dpop.jwkThumbprint` next to `dpop.jwk`.
+- Build zod schemas at module level, not per call or inside a loop.
+- Reuse only the result of the same check on the same bytes. Never drop a validation or a signature check to save a pass.
+
 ## Security
 
 These packages parse and verify credentials, so every input is untrusted.

@@ -6,7 +6,7 @@ import { authorizationServerRequestWithDpopRetry } from '../dpop/dpop-retry'
 import { Oauth2ClientAuthorizationChallengeError } from '../error/Oauth2ClientAuthorizationChallengeError'
 import { Oauth2Error } from '../error/Oauth2Error'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
-import { createPkce } from '../pkce'
+import { type CreatePkceReturn, createPkce } from '../pkce'
 import {
   type AuthorizationChallengeRequest,
   zAuthorizationChallengeErrorResponse,
@@ -73,6 +73,12 @@ export interface SendAuthorizationChallengeRequestOptions {
   pkceCodeVerifier?: string
 
   /**
+   * PKCE values that were already created with `createPkce` for this authorization server. They are
+   * used as is instead of hashing `pkceCodeVerifier` again.
+   */
+  pkce?: CreatePkceReturn
+
+  /**
    * DPoP options
    */
   dpop?: RequestDpopOptions
@@ -100,11 +106,12 @@ export async function sendAuthorizationChallengeRequest(options: SendAuthorizati
   // If auth session is included it's likely not needed to use PKCE
   const pkce =
     authorizationServerMetadata.code_challenge_methods_supported && !options.authSession
-      ? await createPkce({
+      ? (options.pkce ??
+        (await createPkce({
           allowedCodeChallengeMethods: authorizationServerMetadata.code_challenge_methods_supported,
           callbacks: options.callbacks,
           codeVerifier: options.pkceCodeVerifier,
-        })
+        })))
       : undefined
 
   const authorizationChallengeRequest = parseWithErrorHandling(zAuthorizationChallengeRequest, {

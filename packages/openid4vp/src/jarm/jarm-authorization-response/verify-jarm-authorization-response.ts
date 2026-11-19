@@ -7,6 +7,7 @@ import {
   JoseAlgorithmNotAllowedError,
   JoseSignerError,
   type Jwk,
+  type JwtHeader,
   verifyJwt,
   zCompactJwe,
   zCompactJwt,
@@ -103,6 +104,7 @@ const decryptJarmAuthorizationResponseJwt = async (options: {
   return {
     decryptionJwk: result.decryptionJwk,
     payload: result.payload,
+    header,
   }
 }
 
@@ -160,7 +162,7 @@ export async function verifyJarmAuthorizationResponse(options: VerifyJarmAuthori
         callbacks,
         authorizationRequestPayload,
       })
-    : { payload: jarmAuthorizationResponseJwt, decryptionJwk: undefined }
+    : { payload: jarmAuthorizationResponseJwt, decryptionJwk: undefined, header: undefined }
 
   const responseIsSigned = zCompactJwt.safeParse(decryptedRequestData.payload).success
   if (!requestDataIsEncrypted && !responseIsSigned) {
@@ -171,6 +173,7 @@ export async function verifyJarmAuthorizationResponse(options: VerifyJarmAuthori
   }
 
   let jarmAuthorizationResponse: JarmAuthorizationResponse | JarmAuthorizationResponseEncryptedOnly
+  let signedHeader: JwtHeader | undefined
 
   if (responseIsSigned) {
     const decodedJwt = decodeJwt({
@@ -201,6 +204,7 @@ export async function verifyJarmAuthorizationResponse(options: VerifyJarmAuthori
     }
 
     jarmAuthorizationResponse = decodedJwt.payload
+    signedHeader = decodedJwt.registeredHeader
   } else {
     const jsonRequestData = stringToJsonWithErrorHandling(
       decryptedRequestData.payload,
@@ -232,5 +236,11 @@ export async function verifyJarmAuthorizationResponse(options: VerifyJarmAuthori
     type,
     issuer,
     decryptionJwk: decryptedRequestData.decryptionJwk,
+
+    /**
+     * The validated header of `jarmAuthorizationResponseJwt`: of the JWE when the response is encrypted,
+     * otherwise of the signed JWT.
+     */
+    header: (decryptedRequestData.header ?? signedHeader) as JwtHeader,
   }
 }

@@ -35,6 +35,7 @@ import {
 } from './dialect'
 import { RegistrationCertificateValidationError } from './registration-certificate-error'
 import type {
+  DecodedRegistrationCertificateCwt,
   RegistrationCertificateCwtHeader,
   RegistrationCertificatePayload,
   SignCwtOptions,
@@ -42,11 +43,10 @@ import type {
   VerifyCoseCallback,
 } from './types'
 import {
-  assertValidRegistrationCertificatePayload,
   asValidationError,
   parseRegistrationCertificatePayload,
+  validatePayload,
   validateRegistrationCertificateCwtHeader,
-  validateRegistrationCertificatePayload,
   validationError,
 } from './validator'
 
@@ -144,8 +144,7 @@ export async function signRegistrationCertificateCwt(
       ? options.payload
       : RegistrationCertificateCwtPayload.fromRegistrationCertificate(options.payload, options.dialect)
 
-  const json = payload.registrationCertificate
-  assertValidRegistrationCertificatePayload(json, accessCertificateSub)
+  const parsed = parseRegistrationCertificatePayload(payload.registrationCertificate, accessCertificateSub)
 
   if (certificates.length === 0) {
     throw validationError('Unable to sign the registration certificate', {
@@ -182,7 +181,7 @@ export async function signRegistrationCertificateCwt(
       { sign: signCoseCallback }
     ),
     header: { typ: 'rc-wrp+cwt', alg: algorithm, x5chain } as RegistrationCertificateCwtHeader,
-    payload: parseRegistrationCertificatePayload(json, accessCertificateSub),
+    payload: parsed,
   }
 }
 
@@ -193,23 +192,20 @@ export async function signRegistrationCertificateCwt(
  * unprotected (RFC 9596 section 2), and the signer's chain is part of the signed data of an advanced electronic signature
  * (GEN-5.2.1-05).
  *
+ * The identifier of the WRP links a registration certificate to the access certificate it came with (ETSI TS 119 475
+ * clause 4.5 and GEN-5.1.1-02). Leave out `accessCertificateSub` only to read a registration certificate before that
+ * subject is known: `sub` and `intermediary.sub` are then not compared with it, which `verifyRegistrationCertificate`
+ * always does.
+ *
  * @param cwt - The encoded COSE_Sign1
- * @returns Decoded registration certificate with header and payload
+ * @param accessCertificateSub - Subject of the access certificate the registration certificate came with
+ * @returns Decoded registration certificate with header and payload, and the decoded CWT to verify the signature of
  * @throws RegistrationCertificateValidationError with the issues, whose paths start with `header` or `payload`
  */
 export function decodeRegistrationCertificateCwt(
   cwt: Uint8Array,
-  accessCertificateSub: string
-): SignedRegistrationCertificateCwt {
-  const { registrationCertificateCwt: _, ...decoded } = parseRegistrationCertificateCwt(cwt, accessCertificateSub)
-  return decoded
-}
-
-/** {@link decodeRegistrationCertificateCwt}, with the decoded CWT to verify the signature of */
-export function parseRegistrationCertificateCwt(
-  cwt: Uint8Array,
-  accessCertificateSub: string
-): SignedRegistrationCertificateCwt & { registrationCertificateCwt: RegistrationCertificateCwt } {
+  accessCertificateSub?: string
+): DecodedRegistrationCertificateCwt {
   let token: RegistrationCertificateCwt
   try {
     token = RegistrationCertificateCwt.fromToken(cwt)
@@ -254,16 +250,19 @@ export function parseRegistrationCertificateCwt(
     throw asValidationError(error, 'Invalid registration certificate', { code: 'invalid_value', path: ['payload'] })
   }
 
+  const { result: payloadResult, data: payload } = validatePayload(json, accessCertificateSub)
   const result = toValidationResult([
     ...prefixIssuePaths('header', validateRegistrationCertificateCwtHeader(header).issues),
-    ...prefixIssuePaths('payload', validateRegistrationCertificatePayload(json, accessCertificateSub).issues),
+    ...prefixIssuePaths('payload', payloadResult.issues),
   ])
-  if (!result.valid) throw new RegistrationCertificateValidationError('Invalid registration certificate', result.issues)
+  if (!result.valid || !payload) {
+    throw new RegistrationCertificateValidationError('Invalid registration certificate', result.issues)
+  }
 
   return {
     cwt,
     header: header as RegistrationCertificateCwtHeader,
-    payload: parseRegistrationCertificatePayload(json, accessCertificateSub),
+    payload,
     registrationCertificateCwt: token,
   }
 }

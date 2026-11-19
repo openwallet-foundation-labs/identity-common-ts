@@ -220,7 +220,10 @@ const decoded = decodeRegistrationCertificateJwt(jwsString, accessCertificateSub
 
 console.log(decoded.header)  // { typ: 'rc-wrp+jwt', alg: 'ES256', ... }
 console.log(decoded.payload) // { name: '...', sub: '...', ... }
+console.log(decoded.compact) // Compact JWS string
 ```
+
+It returns the decoded JWT as `decodeJwt` of [`@owf/jose`](../jose) does, with the header and payload of the registration certificate.
 
 ### CWT registration certificates
 
@@ -323,7 +326,8 @@ A registration certificate without `status` is rejected, as REV-6.2.6.2-03 has e
 import { verifyRegistrationCertificate } from '@owf/eudi-registration-certificate'
 
 const verified = await verifyRegistrationCertificate({
-  // a compact JWS, the bytes of a CWT, or what a decode function returned
+  // a compact JWS, the bytes of a CWT, or what a decode function returned. That is verified as it is passed,
+  // without decoding it again, so pass it unmodified
   registrationCertificate,
   accessCertificateSub,
   callbacks: {
@@ -366,7 +370,7 @@ for (const issue of result.issues) {
 }
 ```
 
-`accessCertificateSub` is required for payload validation, parsing, signing, and decoding. It is compared with `intermediary.sub` when the registration certificate has an intermediary, and with `sub` otherwise.
+`accessCertificateSub` is required for payload validation, parsing, signing, and verification. It is compared with `intermediary.sub` when the registration certificate has an intermediary, and with `sub` otherwise (ETSI TS 119 475 clause 4.5 and GEN-5.1.1-02). `decodeRegistrationCertificateJwt` and `decodeRegistrationCertificateCwt` can be called without it, to read a registration certificate before the subject of the access certificate is known. The comparison is then left to `verifyRegistrationCertificate`, which always makes it.
 
 Each issue has a `severity`, a `code` from `REGISTRATION_CERTIFICATE_VALIDATION_CODES` or, for schema issues, from `SCHEMA_VALIDATION_CODES` of `@owf/identity-common`, a `path` into the payload and, where a check has one, the ETSI TS 119 475 `requirement`. Checks that recur in other specifications use the codes of `VALIDATION_CODES` from `@owf/identity-common` and carry a typed `context`:
 
@@ -487,6 +491,8 @@ This library is **platform agnostic** and works in:
 - `RegistrationCertificatePayload` - Registration certificate payload type
 - `RegistrationCertificateJwtHeader` - JWT header type
 - `SignedRegistrationCertificateJwt` - Signed registration certificate with JWS string
+- `DecodedRegistrationCertificateJwt` - Decoded JWT registration certificate, a `DecodeJwtResult` of `@owf/jose`
+- `DecodedRegistrationCertificateCwt` - Decoded CWT registration certificate, with the decoded CWT as `registrationCertificateCwt`
 - `SignedRegistrationCertificateCwt` - Signed registration certificate with the encoded COSE_Sign1
 - `Credential` - Credential specification type
 - `ProvidedAttestation` - Provided attestation credential type with `format` and `meta` only
@@ -517,11 +523,11 @@ This library is **platform agnostic** and works in:
 ### Signer
 
 - `signRegistrationCertificateJwt(options)` - Sign a registration certificate payload to a JAdES B-B signed JWT
-- `decodeRegistrationCertificateJwt(jws, accessCertificateSub)` - Decode and validate a signed registration certificate
+- `decodeRegistrationCertificateJwt(jws, accessCertificateSub?)` - Decode and validate a signed registration certificate
 - `parseRegistrationCertificateJwt(jws)` - Parse without validation
 - `signRegistrationCertificateCwt(options)` - Sign a registration certificate payload to CWT
 - `RegistrationCertificateCwt`, `RegistrationCertificateCwtPayload` - The CWT and its claims set as CBOR structures
-- `decodeRegistrationCertificateCwt(cwt, accessCertificateSub)` - Decode and validate a CWT registration certificate
+- `decodeRegistrationCertificateCwt(cwt, accessCertificateSub?)` - Decode and validate a CWT registration certificate
 
 ### Presentation requests
 

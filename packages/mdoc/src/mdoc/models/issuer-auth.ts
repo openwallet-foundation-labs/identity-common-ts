@@ -11,7 +11,7 @@ import {
 import { compareBytes } from '@owf/identity-common'
 import type { StatusListCwt } from '@owf/token-status-list'
 import z from 'zod'
-import type { MdocContext } from '../../context.js'
+import type { CertificateData, MdocContext } from '../../context.js'
 import {
   defaultVerificationCallback,
   onCategoryCheck,
@@ -29,6 +29,8 @@ export type IssuerAuthOptions = Omit<Sign1Options, 'payload'> & {
 }
 
 export type IssuerAuthVerificationResult = {
+  /** The data of the document signer certificate, as returned by `x509.getCertificateData`. */
+  documentSignerCertificate: CertificateData
   /**
    * The certificate chain of the document signer up to a trusted certificate. Undefined when
    * certificate chain validation is disabled, or when it failed and the verification callback did not throw.
@@ -56,13 +58,21 @@ export class IssuerAuth extends Sign1 {
     }) as IssuerAuth
   }
 
-  // NOTE: currently lazy loaded and validated, but i think that's fine?
+  #mobileSecurityObject?: { payload: Uint8Array; mobileSecurityObject: MobileSecurityObject }
+
+  /**
+   * The mobile security object in the payload. It is decoded and validated on the first access, and
+   * again when the payload is replaced.
+   */
   public get mobileSecurityObject(): MobileSecurityObject {
-    if (!this.payload) {
+    const payload = this.payload
+    if (!payload) {
       throw new CosePayloadMustBeDefinedError()
     }
 
-    const mso = zUint8Array
+    if (this.#mobileSecurityObject?.payload === payload) return this.#mobileSecurityObject.mobileSecurityObject
+
+    const mobileSecurityObject = zUint8Array
       .transform((payload) =>
         cborDecode(payload, {
           unwrapTopLevelDataItem: false,
@@ -73,25 +83,10 @@ export class IssuerAuth extends Sign1 {
           .instanceof<typeof DataItem<MobileSecurityObjectEncodedStructure>>(DataItem)
           .transform((di) => MobileSecurityObject.fromEncodedStructure(di.data))
       )
-      .parse(this.payload)
+      .parse(payload)
 
-    return mso
-  }
-
-  /**
-   * The `countryName` in the subject of the document signer certificate, which `issuing_country` must
-   * match (18013-5 7.2.1).
-   */
-  public getIssuingCountry(ctx: Pick<MdocContext, 'x509'>) {
-    return ctx.x509.getSubjectNameField({ certificate: this.certificate, field: 'C' })[0]
-  }
-
-  /**
-   * The `stateOrProvinceName` in the subject of the document signer certificate, if present, which
-   * `issuing_jurisdiction` must match (18013-5 7.2.1).
-   */
-  public getIssuingStateOrProvince(ctx: Pick<MdocContext, 'x509'>) {
-    return ctx.x509.getSubjectNameField({ certificate: this.certificate, field: 'ST' })[0]
+    this.#mobileSecurityObject = { payload, mobileSecurityObject }
+    return mobileSecurityObject
   }
 
   /**
@@ -213,8 +208,10 @@ export class IssuerAuth extends Sign1 {
 
     const onCheck = onCategoryCheck(verificationCallback, 'ISSUER_AUTH')
 
+    const documentSignerCertificate = await ctx.x509.getCertificateData({ certificate: this.certificate })
+
     onCheck({
-      status: this.getIssuingCountry(ctx) ? 'PASSED' : 'FAILED',
+      status: documentSignerCertificate.subject.countryName ? 'PASSED' : 'FAILED',
       check: "Country name (C) must be present in the issuer certificate's subject distinguished name",
     })
 
@@ -318,10 +315,7 @@ export class IssuerAuth extends Sign1 {
     }
 
     const { validityInfo } = this.mobileSecurityObject
-
-    const { notAfter, notBefore } = await ctx.x509.getCertificateData({
-      certificate: this.certificate,
-    })
+    const { notAfter, notBefore } = documentSignerCertificate
 
     onCheck({
       status: validityInfo.isSignedBetweenDates(notBefore, notAfter, skewSeconds) ? 'PASSED' : 'FAILED',
@@ -349,6 +343,7 @@ export class IssuerAuth extends Sign1 {
     }
 
     return {
+      documentSignerCertificate,
       trustedIssuanceChain,
       statusList,
       trustedStatusListChain,

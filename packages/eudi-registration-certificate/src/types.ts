@@ -9,9 +9,12 @@
 
 import type { CoseKey, Sign1Context, SignatureAlgorithm } from '@owf/cose'
 import type { FetchCallback, FetchLimits, OrPromise } from '@owf/identity-common'
-import type { SignJwsCallback, VerifyJwsCallback } from '@owf/jose'
+import type { DecodeJwtResult, SignJwsCallback, VerifyJwsCallback } from '@owf/jose'
 import type { z } from 'zod'
-import type { RegistrationCertificateCwtPayload } from './cwt'
+import type {
+  RegistrationCertificateCwtPayload,
+  RegistrationCertificateCwt as RegistrationCertificateCwtToken,
+} from './cwt'
 import type { RegistrationCertificateDialect } from './dialect'
 import type {
   zClaim,
@@ -110,6 +113,12 @@ export interface SignedRegistrationCertificateJwt {
   payload: RegistrationCertificatePayload
 }
 
+/** Decoded JWT registration certificate, as `decodeJwt` of `@owf/jose` returns it with the header and payload of one */
+export type DecodedRegistrationCertificateJwt = DecodeJwtResult<
+  typeof zRegistrationCertificateJwtHeader,
+  typeof zRegistrationCertificatePayload
+>
+
 /** Signed CWT registration certificate (COSE_Sign1) */
 export interface SignedRegistrationCertificateCwt {
   /** The encoded COSE_Sign1 */
@@ -118,6 +127,12 @@ export interface SignedRegistrationCertificateCwt {
   header: RegistrationCertificateCwtHeader
   /** Decoded payload */
   payload: RegistrationCertificatePayload
+}
+
+/** Decoded CWT registration certificate */
+export interface DecodedRegistrationCertificateCwt extends SignedRegistrationCertificateCwt {
+  /** The decoded CWT, which the signature is verified of */
+  registrationCertificateCwt: RegistrationCertificateCwtToken
 }
 
 /** Options for signing a registration certificate as a JWT */

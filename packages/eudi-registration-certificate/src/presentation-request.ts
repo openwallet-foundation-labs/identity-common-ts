@@ -6,7 +6,7 @@
 import { base64url, bytesToString, stringToBytes } from '@owf/identity-common'
 import { decodeRegistrationCertificateCwt } from './cwt'
 import { decodeRegistrationCertificateJwt } from './signer'
-import type { SignedRegistrationCertificateCwt, SignedRegistrationCertificateJwt } from './types'
+import type { DecodedRegistrationCertificateCwt, DecodedRegistrationCertificateJwt } from './types'
 import { validationError } from './validator'
 
 /** Label of the registration certificate in the `requestInfo` of an `ItemsRequest` (ISO/IEC 18013-5-REQ-06) */
@@ -80,7 +80,7 @@ export function openid4vpRegistrationCertificateVerifierInfo(
 export function decodeMdocRegistrationCertificate(
   requestInfo: { getExtension(key: string): unknown } | undefined,
   accessCertificateSub: string
-): SignedRegistrationCertificateJwt | SignedRegistrationCertificateCwt | undefined {
+): DecodedRegistrationCertificateJwt | DecodedRegistrationCertificateCwt | undefined {
   // The CDDL of ETSI TS 119 472-2 spells the label `eUWrprc`, its requirements and the CIR `euWrprc`
   const value = requestInfo?.getExtension(MDOC_REGISTRATION_CERTIFICATE_KEY) ?? requestInfo?.getExtension('eUWrprc')
   if (value === undefined) return undefined
@@ -112,7 +112,7 @@ export function decodeMdocRegistrationCertificate(
 export function decodeOpenid4vpRegistrationCertificate(
   verifierInfo: ReadonlyArray<{ format: string; data: unknown; credential_ids?: unknown }> | undefined,
   accessCertificateSub: string
-): SignedRegistrationCertificateJwt | SignedRegistrationCertificateCwt | undefined {
+): DecodedRegistrationCertificateJwt | DecodedRegistrationCertificateCwt | undefined {
   const index = verifierInfo?.findIndex(({ format }) => format === OPENID4VP_REGISTRATION_CERTIFICATE_FORMAT) ?? -1
   if (!verifierInfo || index === -1) return undefined
 
@@ -167,7 +167,7 @@ export function decodeOpenid4vpRegistrationCertificate(
 function decodeSerializedRegistrationCertificate(
   bytes: Uint8Array,
   accessCertificateSub: string
-): SignedRegistrationCertificateJwt | SignedRegistrationCertificateCwt {
+): DecodedRegistrationCertificateJwt | DecodedRegistrationCertificateCwt {
   // A COSE_Sign1 starts with its tag (0xd2) or as an array of four (0x84), a compact JWS with base64url text
   return bytes[0] === 0xd2 || bytes[0] === 0x84
     ? decodeRegistrationCertificateCwt(bytes, accessCertificateSub)

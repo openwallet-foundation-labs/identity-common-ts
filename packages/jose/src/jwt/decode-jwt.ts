@@ -2,7 +2,7 @@ import { type BaseSchema, parseWithErrorHandling } from '@owf/identity-common'
 import { JoseNotSupportedError, JoseParseError, JoseValidationError } from '../error'
 import { zJweHeader } from '../jwe/z-jwe'
 import { parseJws } from '../jws/parse-jws'
-import { decodeBase64UrlJsonObject } from '../utils/encoding'
+import { decodeBase64UrlJsonObject, decodeJsonObjectBytes } from '../utils/encoding'
 import type { InferSchemaOrDefaultOutput } from '../utils/zod'
 import { type JwtHeader, type JwtPayload, zJwtHeader, zJwtPayload } from './z-jwt'
 
@@ -99,17 +99,14 @@ export function decodeJwt<
     throw new JoseParseError('Unable to decode the JWT, it does not contain a payload')
   }
 
-  const payloadJson = decodeBase64UrlJsonObject(jws.encodedPayload, 'JWT payload')
+  const payloadJson = decodeJsonObjectBytes(jws.payload, 'JWT payload')
 
   // Always validated against the registered claims, and only then against the caller's schema: a
   // schema describing a profile's own claims must not be able to leave `exp` unchecked as a number.
   const registeredPayload = parseWithErrorHandling(zJwtPayload, payloadJson, 'Invalid JWT payload', JoseValidationError)
-  const payload = parseWithErrorHandling(
-    options.payloadSchema ?? zJwtPayload,
-    payloadJson,
-    'Invalid JWT payload',
-    JoseValidationError
-  )
+  const payload = options.payloadSchema
+    ? parseWithErrorHandling(options.payloadSchema, payloadJson, 'Invalid JWT payload', JoseValidationError)
+    : registeredPayload
 
   return {
     header: jws.protectedHeader as InferSchemaOrDefaultOutput<HeaderSchema, typeof zJwtHeader>,

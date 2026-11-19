@@ -7,7 +7,6 @@ import {
   DataItem,
   TypedMap,
 } from '@owf/cose'
-import { unwrapDataItemBytes } from '../utils/cbor'
 
 /**
  * A CBOR structure that keeps the bytes it was decoded from, and encodes with them until it is
@@ -22,6 +21,9 @@ import { unwrapDataItemBytes } from '../utils/cbor'
  * parent structure has to decode it from its data item with `fromDataItem`, and embed it with
  * {@link asDataItem}.
  *
+ * A structure that was built keeps the bytes of its first encode in the same way, so that the bytes
+ * that are hashed or signed are the bytes that are sent.
+ *
  * Setting or deleting an entry of a structure that is a `TypedMap` drops the bytes on its own. Call
  * {@link markModified} after changing the structure in any other way, such as a nested value.
  */
@@ -30,6 +32,7 @@ export class OriginalBytesCborStructure<
   DecodedStructure = EncodedStructure,
 > extends CborStructure<EncodedStructure, DecodedStructure> {
   #originalBytes?: Uint8Array
+  #builtBytes?: Uint8Array
 
   public constructor(structure: DecodedStructure) {
     super(structure)
@@ -48,10 +51,12 @@ export class OriginalBytesCborStructure<
   }
 
   /**
-   * Drops the {@link originalBytes}, so that the structure is re-encoded the next time it is encoded.
+   * Drops the {@link originalBytes} and the bytes of an earlier encode, so that the structure is
+   * re-encoded the next time it is encoded.
    */
   public markModified() {
     this.#originalBytes = undefined
+    this.#builtBytes = undefined
   }
 
   /**
@@ -61,8 +66,9 @@ export class OriginalBytesCborStructure<
     // biome-ignore lint/complexity/noThisInStatic: `super.decode` keeps `this` bound to the subclass
     const structure = super.decode(bytes) as T
 
+    // Bytes wrapped in tag 24 were already kept by `fromDataItem`
     if (structure instanceof OriginalBytesCborStructure) {
-      structure.#originalBytes = unwrapDataItemBytes(bytes)
+      structure.#originalBytes ??= new Uint8Array(bytes)
     }
 
     return structure
@@ -83,9 +89,13 @@ export class OriginalBytesCborStructure<
   }
 
   public override encode(options?: CborEncodeOptions): Uint8Array {
-    if (!this.#originalBytes) return super.encode(options)
+    let bytes = this.#originalBytes ?? this.#builtBytes
+    if (!bytes) {
+      bytes = super.encode()
+      this.#builtBytes = bytes
+    }
 
-    return options?.asDataItem ? cborEncode(this.asDataItem) : this.#originalBytes
+    return options?.asDataItem ? cborEncode(DataItem.fromBuffer(bytes)) : bytes
   }
 
   /**

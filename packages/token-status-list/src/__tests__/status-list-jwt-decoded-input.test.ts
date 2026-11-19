@@ -12,7 +12,7 @@ import {
   withInvalidSignature,
 } from './status-list-jwt-tokens'
 
-// What `verifyStatusListJwt` returns for a decoded token is what the signature covers
+// `verifyStatusListJwt` verifies a decoded token without decoding it again, and inflates the list itself
 
 // A token whose status at index 3 is not valid
 const decodedToken = async () =>
@@ -53,26 +53,23 @@ describe('verifyStatusListJwt with a decoded token', () => {
     await expect(verification).rejects.toEqual(claimIssue('sub', 'claim_value_mismatch'))
   })
 
-  it('returns the signed header and claims rather than the ones on the decoded token', async () => {
+  it('verifies what decodeStatusListJwt returned, with the limit given to it', async () => {
     const decoded = await decodedToken()
-    const changed = {
-      ...decoded,
-      header: { ...decoded.header, kid: 'other-key' },
-      payload: { ...decoded.payload, ttl: 60 },
-    }
 
-    const { header, payload } = await verifyStatusListJwt({ jwt: changed, uri, now, verifyJwsCallback: verifyJws })
-
-    expect(header).toEqual(decoded.header)
-    expect(payload).toEqual(decoded.payload)
-  })
-
-  it('verifies the signature of the token it returns', async () => {
-    const decoded = await decodedToken()
-    const withOtherCompact = { ...decoded, compact: await withInvalidSignature(decoded.compact) }
+    const { payload, statusList } = await verifyStatusListJwt({ jwt: decoded, uri, now, verifyJwsCallback: verifyJws })
+    expect(payload).toBe(decoded.payload)
+    expect(statusList.getStatus(3)).toBe(StatusType.Invalid)
 
     await expect(
-      verifyStatusListJwt({ jwt: withOtherCompact, uri, now, verifyJwsCallback: verifyJws })
-    ).rejects.toThrow(JoseSignatureVerificationError)
+      verifyStatusListJwt({ jwt: decoded, uri, now, verifyJwsCallback: verifyJws, maxDecompressedBytes: 0 })
+    ).rejects.toThrow('larger than the maximum of 0 bytes')
+  })
+
+  it('verifies the signature of a decoded token', async () => {
+    const decoded = decodeStatusListJwt(await withInvalidSignature((await decodedToken()).compact))
+
+    await expect(verifyStatusListJwt({ jwt: decoded, uri, now, verifyJwsCallback: verifyJws })).rejects.toThrow(
+      JoseSignatureVerificationError
+    )
   })
 })

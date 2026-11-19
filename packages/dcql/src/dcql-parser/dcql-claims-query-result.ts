@@ -149,11 +149,24 @@ export const getJsonClaimParser = (
   })
 }
 
+/** The parser of each claim of the credential query, which is the same for every credential */
+export const getClaimsParsers = (
+  credentialQuery: DcqlCredentialQuery,
+  presentation: boolean
+): z.ZodType[] | undefined =>
+  credentialQuery.claims?.map((claimQuery) =>
+    credentialQuery.format === 'mso_mdoc'
+      ? getMdocClaimParser(claimQuery as DcqlClaimsQuery.Mdoc)
+      : getJsonClaimParser(claimQuery as DcqlClaimsQuery.W3cAndSdJwtVc, { index: 0, presentation })
+  )
+
 export const runClaimsQuery = (
   credentialQuery: DcqlCredentialQuery,
   ctx: {
     credential: DcqlCredential
     presentation: boolean
+    /** The result of `getClaimsParsers` for this credential query, built when not provided */
+    parsers?: z.ZodType[]
   }
 ): DcqlClaimsResult => {
   // No claims, always matches
@@ -177,17 +190,11 @@ export const runClaimsQuery = (
   const failedClaims: Array<z.output<typeof DcqlClaimsResult.zClaimsEntryFailureResult>> = []
   const validClaims: Array<z.output<typeof DcqlClaimsResult.zClaimsEntrySuccessResult>> = []
 
-  for (const [claimIndex, claimQuery] of credentialQuery.claims.entries()) {
-    const parser =
-      credentialQuery.format === 'mso_mdoc'
-        ? getMdocClaimParser(claimQuery as DcqlClaimsQuery.Mdoc)
-        : getJsonClaimParser(claimQuery as DcqlClaimsQuery.W3cAndSdJwtVc, {
-            index: 0,
-            presentation: ctx.presentation,
-          })
+  const parsers = ctx.parsers ?? (getClaimsParsers(credentialQuery, ctx.presentation) as z.ZodType[])
 
+  for (const [claimIndex, claimQuery] of credentialQuery.claims.entries()) {
     const parseResult = parseDcql(
-      parser,
+      parsers[claimIndex],
       ctx.credential.credential_format === 'mso_mdoc' ? ctx.credential.namespaces : ctx.credential.claims
     )
 

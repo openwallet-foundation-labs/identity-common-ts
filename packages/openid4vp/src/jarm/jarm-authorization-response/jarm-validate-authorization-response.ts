@@ -1,10 +1,6 @@
 import { Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { JoseValidationError, verifyJwtClaims } from '@owf/jose'
-import {
-  type JarmAuthorizationResponse,
-  type JarmAuthorizationResponseEncryptedOnly,
-  zJarmAuthorizationResponse,
-} from './z-jarm-authorization-response'
+import type { JarmAuthorizationResponse, JarmAuthorizationResponseEncryptedOnly } from './z-jarm-authorization-response'
 
 export const jarmAuthorizationResponseValidate = (options: {
   expectedClientId: string
@@ -14,8 +10,13 @@ export const jarmAuthorizationResponseValidate = (options: {
 }) => {
   const { expectedClientId, authorizationResponse } = options
 
-  // The traditional Jarm Validation Methods do not account for the encrypted response.
-  if (!zJarmAuthorizationResponse.safeParse(authorizationResponse).success) {
+  // The traditional Jarm Validation Methods do not account for the encrypted response. The response is already
+  // validated, so it is a `zJarmAuthorizationResponse` when it has the claims that schema requires on top.
+  if (
+    authorizationResponse.iss === undefined ||
+    authorizationResponse.aud === undefined ||
+    authorizationResponse.exp === undefined
+  ) {
     return
   }
 

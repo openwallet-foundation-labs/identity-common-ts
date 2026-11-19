@@ -61,7 +61,7 @@ import { IssuerSigned } from './issuer-signed'
 import type { IssuerSignedItem } from './issuer-signed-item'
 import type { KeyAuthorizations } from './key-authorizations'
 import type { Namespace } from './namespace'
-import type { SessionTranscript } from './session-transcript'
+import { SessionTranscript } from './session-transcript'
 
 /**
  * Whether a requested element is answered by one of its alternative sets, which a holder only
@@ -277,31 +277,33 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
           : undefined,
     })
 
+    // A session transcript passed as bytes is decoded once for all documents.
+    let sessionTranscript: SessionTranscript | undefined
     const documentResults: Array<DocumentVerificationResult> = []
     for (const document of documents ?? []) {
+      sessionTranscript ??= SessionTranscript.from(options.sessionTranscript)
       await document.deviceSigned.deviceAuth.verify(
         {
           document,
           ephemeralMacPrivateKey: options.ephemeralReaderKey,
-          sessionTranscript: options.sessionTranscript,
+          sessionTranscript,
           verificationCallback: onCheck,
         },
         ctx
       )
 
-      const { trustedIssuanceChain, statusList, trustedStatusListChain, identifierList, trustedIdentifierListChain } =
-        await document.issuerSigned.verify(
-          {
-            verificationCallback: onCheck,
-            disableCertificateChainValidation: options.disableCertificateChainValidation,
-            now: options.now,
-            trustedCertificates: options.trustedCertificates,
-            skewSeconds: options.skewSeconds,
-            disableStatusValidation: options.disableStatusValidation,
-            maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
-          },
-          ctx
-        )
+      const issuerSignedResult = await document.issuerSigned.verify(
+        {
+          verificationCallback: onCheck,
+          disableCertificateChainValidation: options.disableCertificateChainValidation,
+          now: options.now,
+          trustedCertificates: options.trustedCertificates,
+          skewSeconds: options.skewSeconds,
+          disableStatusValidation: options.disableStatusValidation,
+          maxStatusListDecompressedBytes: options.maxStatusListDecompressedBytes,
+        },
+        ctx
+      )
 
       // 18013-5 9.3.1 step 4: the docType of the document is not signed, so it must be the docType of
       // the MSO, whether or not a device request is matched.
@@ -316,14 +318,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
             : undefined,
       })
 
-      documentResults.push({
-        trustedIssuanceChain,
-        statusList,
-        trustedStatusListChain,
-        identifierList,
-        trustedIdentifierListChain,
-        document,
-      })
+      documentResults.push({ ...issuerSignedResult, document })
     }
 
     let deviceRequestMatch: DeviceRequestMatchResult | undefined
@@ -378,7 +373,6 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
     const signingKey = useSignature ? options.signature?.signingKey : options.mac?.signingKey
     if (!signingKey) throw new Error('Signing key is missing')
 
-    // Every access to the mobile security object decodes it, so decode it once.
     const mobileSecurityObject = options.issuerSigned.issuerAuth.mobileSecurityObject
     const { keyAuthorizations } = mobileSecurityObject.deviceKeyInfo
     const docType = mobileSecurityObject.docType
@@ -413,8 +407,9 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
       throw new DeviceKeyNotAuthorizedError(describeUnauthorizedDeviceSignedElements(unauthorized))
     }
 
+    const sessionTranscript = SessionTranscript.from(options.sessionTranscript)
     const deviceAuthenticationBytes = DeviceAuthentication.create({
-      sessionTranscript: options.sessionTranscript,
+      sessionTranscript,
       docType,
       deviceNamespaces,
     }).encode({ asDataItem: true })
@@ -455,7 +450,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
         {
           publicKey: ephemeralKey,
           privateKey: signingKey,
-          sessionTranscript: options.sessionTranscript,
+          sessionTranscript,
         },
         ctx
       )
@@ -911,12 +906,15 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
   ) {
     DeviceResponse.checkRequestInfo(options.deviceRequest, options.documents)
 
+    // A session transcript passed as bytes is decoded once for all documents.
+    let sessionTranscript: SessionTranscript | undefined
     const documents = await Promise.all(
-      options.documents.map((document) =>
-        DeviceResponse.createDocument(
+      options.documents.map((document) => {
+        sessionTranscript ??= SessionTranscript.from(options.sessionTranscript)
+        return DeviceResponse.createDocument(
           {
             docRequests: DeviceResponse.findDocRequests(options.deviceRequest, document),
-            sessionTranscript: options.sessionTranscript,
+            sessionTranscript,
             issuerSigned: document.issuerSigned,
             elements: document.elements,
             alternatives: document.alternatives,
@@ -926,7 +924,7 @@ export class DeviceResponse extends CborStructure<DeviceResponseEncodedStructure
           },
           ctx
         )
-      )
+      })
     )
 
     const deviceResponse = DeviceResponse.fromDocuments(documents)

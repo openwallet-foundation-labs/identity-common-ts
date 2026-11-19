@@ -17,6 +17,13 @@ import {
   type LoteProfileValidationOptions,
   type LoteValidationMode,
   profileDefinitions,
+  zEuEaaProvidersList,
+  zEuPidProvidersList,
+  zEuPubEaaProvidersList,
+  zEuWalletProvidersList,
+  zEuWrpacProvidersList,
+  zEuWrprcProvidersList,
+  zMdlProvidersList,
 } from './profiles'
 import { zCompatLoteDocument, zLoteDocument } from './schemas'
 import type { CompatLoteDocument, LoteDocument } from './types'
@@ -111,6 +118,16 @@ export enum LoteProfile {
   MdlProvidersList = 'MdlProvidersList',
 }
 
+const strictProfileSchemas: Record<LoteProfile, z.ZodType> = {
+  [LoteProfile.EuPidProvidersList]: zEuPidProvidersList,
+  [LoteProfile.EuWalletProvidersList]: zEuWalletProvidersList,
+  [LoteProfile.EuWrpacProvidersList]: zEuWrpacProvidersList,
+  [LoteProfile.EuWrprcProvidersList]: zEuWrprcProvidersList,
+  [LoteProfile.EuEaaProvidersList]: zEuEaaProvidersList,
+  [LoteProfile.EuPubEaaProvidersList]: zEuPubEaaProvidersList,
+  [LoteProfile.MdlProvidersList]: zMdlProvidersList,
+}
+
 /**
  * The document a profile accepts in a mode, with the profile's LoTEType, ServiceTypeIdentifier
  * and ServiceStatus values as literal types
@@ -188,9 +205,12 @@ export function validateLoteProfile<P extends LoteProfile, M extends LoteValidat
   const matchedProfile = profiles.find((p) => profileDefinitions[p].list.loteType === documentLoteType)
 
   if (matchedProfile) {
-    const result = parseWithSchema(createProfileSchema(profileDefinitions[matchedProfile], options), loteDocument, {
-      codes: LOTE_VALIDATION_CODES,
-    })
+    // Options change the schema, so only the strict schema of a profile is not built per call
+    const schema: z.ZodType =
+      (options.mode ?? 'strict') === 'strict' && !options.allowedTerritories
+        ? strictProfileSchemas[matchedProfile]
+        : createProfileSchema(profileDefinitions[matchedProfile], options)
+    const result = parseWithSchema(schema, loteDocument, { codes: LOTE_VALIDATION_CODES })
 
     const issues = result.success
       ? []

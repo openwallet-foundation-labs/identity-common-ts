@@ -67,7 +67,12 @@ const presentation = await sdjwt.present(credential, presentationFrame);
 
 // Verifier can verify the presentation using the Issuer's public key
 const verified = await sdjwt.verify(presentation);
+
+// The type metadata of a verified credential, without verifying its signature again
+const typeMetadata = await sdjwt.getVct(presentation, { verifyJwt: false });
 ```
+
+`verify`, `validate`, `present` and `getVct` also accept the `SdJwt` that `sdjwt.decode` returned, so an SD-JWT VC that is used more than once is decoded once.
 
 ## Examples
 

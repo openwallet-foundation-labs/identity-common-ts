@@ -1,7 +1,7 @@
 import { typedMap, zUint8Array } from '@owf/cose'
 import { compareBytes } from '@owf/identity-common'
 import { z } from 'zod'
-import type { MdocContext } from '../../context'
+import type { CertificateData, MdocContext } from '../../context'
 import { OriginalBytesCborStructure } from '../original-bytes-cbor-structure'
 import type { DataElementIdentifier } from './data-element-identifier'
 import type { DataElementValue } from './data-element-value'
@@ -69,13 +69,13 @@ export class IssuerSignedItem extends OriginalBytesCborStructure<
   }
 
   public async isValid(namespace: Namespace, issuerAuth: IssuerAuth, ctx: Pick<MdocContext, 'crypto'>) {
+    const { digestAlgorithm, valueDigests } = issuerAuth.mobileSecurityObject
     const digest = await ctx.crypto.digest({
-      digestAlgorithm: issuerAuth.mobileSecurityObject.digestAlgorithm,
+      digestAlgorithm,
       bytes: this.encode({ asDataItem: true }),
     })
 
-    const valueDigests = issuerAuth.mobileSecurityObject.valueDigests.valueDigests
-    const digests = valueDigests.get(namespace)
+    const digests = valueDigests.valueDigests.get(namespace)
 
     if (!digests) {
       return false
@@ -86,16 +86,19 @@ export class IssuerSignedItem extends OriginalBytesCborStructure<
     return expectedDigest !== undefined && compareBytes(digest, expectedDigest)
   }
 
-  public matchCertificate(issuerAuth: IssuerAuth, ctx: Pick<MdocContext, 'x509'>) {
+  /**
+   * Whether an `issuing_country` or `issuing_jurisdiction` element matches the subject of the document
+   * signer certificate (18013-5 7.2.1).
+   */
+  public matchCertificate({ subject }: Pick<CertificateData, 'subject'>) {
     if (this.elementIdentifier === 'issuing_country') {
-      return this.elementValue === issuerAuth.getIssuingCountry(ctx)
+      return this.elementValue === subject.countryName
     }
 
     // 18013-5 7.2.1: the check "is only required if the stateOrProvinceName element is present in the DS
     // certificate".
     if (this.elementIdentifier === 'issuing_jurisdiction') {
-      const stateOrProvince = issuerAuth.getIssuingStateOrProvince(ctx)
-      return stateOrProvince === undefined || this.elementValue === stateOrProvince
+      return subject.stateOrProvinceName === undefined || this.elementValue === subject.stateOrProvinceName
     }
 
     return false

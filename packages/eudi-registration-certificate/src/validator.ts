@@ -238,6 +238,23 @@ function validateEntitlementRequirements(
 }
 
 /**
+ * Returns an issue when the registration certificate `sub` is not the subject of the access certificate it came with.
+ * The WRP identifier links the two (ETSI TS 119 475 clause 4.5, GEN-5.1.1-02 and GEN-5.1.1-03), and with an
+ * intermediary it is the intermediary whose access certificate is presented (Table 10, `intermediary.sub`).
+ */
+export function validateAccessCertificateSub(
+  payload: RegistrationCertificatePayload,
+  accessCertificateSub: string
+): ValidationIssueInput<RegistrationCertificateValidationCode> | undefined {
+  if (accessCertificateSub === (payload.intermediary?.sub ?? payload.sub)) return undefined
+  return {
+    path: payload.intermediary ? ['intermediary', 'sub'] : ['sub'],
+    message: `${payload.intermediary ? 'intermediary.sub' : 'sub'} must match the access certificate subject`,
+    code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
+  }
+}
+
+/**
  * Validate a registration certificate payload against the schema and semantic rules.
  *
  * @param accessCertificateSub Required subject from the presented access certificate.
@@ -246,13 +263,24 @@ export function validateRegistrationCertificatePayload(
   payload: unknown,
   accessCertificateSub: string
 ): ValidationResult {
+  return validatePayload(payload, accessCertificateSub).result
+}
+
+/**
+ * {@link validateRegistrationCertificatePayload}, with the payload as parsed when it is valid, so it is not parsed again.
+ * Without `accessCertificateSub` the payload is not compared with the access certificate.
+ */
+export function validatePayload(
+  payload: unknown,
+  accessCertificateSub: string | undefined
+): { result: ValidationResult; data?: RegistrationCertificatePayload } {
   const result = parseRegistrationCertificateSchema(
     zRegistrationCertificatePayload,
     normalizeRegistrationCertificatePayload(payload)
   )
 
   if (!result.success) {
-    return toValidationResult(result.issues)
+    return { result: toValidationResult(result.issues) }
   }
 
   // Additional semantic validations
@@ -300,18 +328,12 @@ export function validateRegistrationCertificatePayload(
     }
   }
 
-  // The intermediary identity replaces the registration certificate subject for this cross-certificate check.
-  const expectedAccessCertificateSub = validPayload.intermediary?.sub ?? validPayload.sub
-  const identityPath = validPayload.intermediary ? ['intermediary', 'sub'] : ['sub']
-  if (accessCertificateSub !== expectedAccessCertificateSub) {
-    issues.add({
-      path: identityPath,
-      message: `${validPayload.intermediary ? 'intermediary.sub' : 'sub'} must match the access certificate subject`,
-      code: REGISTRATION_CERTIFICATE_VALIDATION_CODES.ACCESS_CERTIFICATE_IDENTITY_MISMATCH,
-    })
-  }
+  const identityIssue =
+    accessCertificateSub === undefined ? undefined : validateAccessCertificateSub(validPayload, accessCertificateSub)
+  if (identityIssue) issues.add(identityIssue)
 
-  return issues.result()
+  const validation = issues.result()
+  return { result: validation, ...(validation.valid && { data: validPayload }) }
 }
 
 /**
@@ -499,8 +521,9 @@ export function parseRegistrationCertificatePayload(
   payload: unknown,
   accessCertificateSub: string
 ): RegistrationCertificatePayload {
-  assertValidRegistrationCertificatePayload(payload, accessCertificateSub)
-  return zRegistrationCertificatePayload.parse(normalizeRegistrationCertificatePayload(payload))
+  const { result, data } = validatePayload(payload, accessCertificateSub)
+  if (!data) throw new RegistrationCertificateValidationError('Invalid registration certificate payload', result.issues)
+  return data
 }
 
 /**

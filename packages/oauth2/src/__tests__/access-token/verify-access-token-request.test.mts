@@ -372,6 +372,8 @@ describe('Verify Pre Authorized Code Access Token Request', () => {
     expect(dpop).toEqual({
       jwk: dpopPublicJwk,
       jwkThumbprint: 'VyMJnrA8aEQPnpDn0kCkNIkjfQgt94xDbK0N1O9Os_4',
+      header: expect.objectContaining({ typ: 'dpop+jwt', jwk: dpopPublicJwk }),
+      payload: expect.objectContaining({ htm: 'POST' }),
     })
   })
 })
@@ -660,7 +662,12 @@ describe('Verify Authorization Code Access Token Request', () => {
       },
     })
 
-    expect(dpop).toEqual({ jwk: dpopPublicJwk, jwkThumbprint: 'VyMJnrA8aEQPnpDn0kCkNIkjfQgt94xDbK0N1O9Os_4' })
+    expect(dpop).toEqual({
+      jwk: dpopPublicJwk,
+      jwkThumbprint: 'VyMJnrA8aEQPnpDn0kCkNIkjfQgt94xDbK0N1O9Os_4',
+      header: expect.objectContaining({ typ: 'dpop+jwt', jwk: dpopPublicJwk }),
+      payload: expect.objectContaining({ htm: 'POST' }),
+    })
   })
 })
 
@@ -920,7 +927,12 @@ describe('Verify Refresh Token Access Token Request', () => {
       },
     })
 
-    expect(dpop).toEqual({ jwk: dpopPublicJwk, jwkThumbprint: 'VyMJnrA8aEQPnpDn0kCkNIkjfQgt94xDbK0N1O9Os_4' })
+    expect(dpop).toEqual({
+      jwk: dpopPublicJwk,
+      jwkThumbprint: 'VyMJnrA8aEQPnpDn0kCkNIkjfQgt94xDbK0N1O9Os_4',
+      header: expect.objectContaining({ typ: 'dpop+jwt', jwk: dpopPublicJwk }),
+      payload: expect.objectContaining({ htm: 'POST' }),
+    })
   })
 })
 

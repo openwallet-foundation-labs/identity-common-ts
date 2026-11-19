@@ -1,14 +1,11 @@
 import type { FetchHeaders, HttpMethod } from '@openid4vc/utils'
 import { base64, stringToBytes } from '@owf/identity-common'
 import type { JwsSignerJwk } from '@owf/jose'
-import { decodeJwt } from '@owf/jose'
 import type { CallbackContext } from './callbacks'
-import { createClientAttestationPopJwt } from './client-attestation/client-attestation-pop'
+import { createClientAttestationPopJwt, signerFromClientAttestation } from './client-attestation/client-attestation-pop'
 import {
   oauthClientAttestationHeader,
   oauthClientAttestationPopHeader,
-  zClientAttestationJwtHeader,
-  zClientAttestationJwtPayload,
 } from './client-attestation/z-client-attestation'
 import { createDpopJwt } from './dpop/dpop'
 import { Oauth2Error } from './error/Oauth2Error'
@@ -254,11 +251,17 @@ export interface ClientAuthenticationClientAttestationJwtOptions {
 export function clientAuthenticationClientAttestationJwt(
   options: ClientAuthenticationClientAttestationJwtOptions
 ): ClientAuthenticationCallback {
+  let signer: JwsSignerJwk | undefined
+
   return async ({ headers, authorizationServerMetadata, attestationChallenge }) => {
+    // The client attestation is the same for every request, so it is decoded once
+    signer ??= signerFromClientAttestation(options.clientAttestationJwt)
+
     const clientAttestationPop = await createClientAttestationPopJwt({
       authorizationServer: authorizationServerMetadata.issuer,
       callbacks: options.callbacks,
       clientAttestation: options.clientAttestationJwt,
+      signer,
 
       // A server-provided challenge (draft 09, e.g. from the `OAuth-Client-Attestation-Challenge`
       // response header on retry) takes precedence over a statically configured challenge.
@@ -299,18 +302,11 @@ export interface ClientAuthenticationClientAttestationJwtDpopOptions {
 export function clientAuthenticationClientAttestationJwtDpop(
   options: ClientAuthenticationClientAttestationJwtDpopOptions
 ): ClientAuthenticationCallback {
-  return async ({ headers, url, method, attestationChallenge }) => {
-    const clientAttestation = decodeJwt({
-      jwt: options.clientAttestationJwt,
-      headerSchema: zClientAttestationJwtHeader,
-      payloadSchema: zClientAttestationJwtPayload,
-    })
+  let signer = options.signer
 
-    const signer = options.signer ?? {
-      method: 'jwk',
-      alg: clientAttestation.header.alg,
-      publicJwk: clientAttestation.payload.cnf.jwk,
-    }
+  return async ({ headers, url, method, attestationChallenge }) => {
+    // The client attestation is the same for every request, so it is decoded once
+    signer ??= signerFromClientAttestation(options.clientAttestationJwt)
 
     const dpopJwt = await createDpopJwt({
       request: { url, method },

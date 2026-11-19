@@ -10,20 +10,23 @@
  */
 
 import { pemToDer } from '@owf/crypto'
-import { decodeJades, signJades } from '@owf/eudi-jades'
+import { type DecodedJadesJwt, decodeJadesJwt, signJades } from '@owf/eudi-jades'
+import { prefixIssuePaths, toValidationResult } from '@owf/identity-common'
 import { decodeJwt } from '@owf/jose'
 import { REGISTRATION_CERTIFICATE_DIALECTS, toRegistrationCertificateDialect } from './dialect'
+import { RegistrationCertificateValidationError } from './registration-certificate-error'
 import type {
+  DecodedRegistrationCertificateJwt,
   RegistrationCertificateJwtHeader,
   RegistrationCertificatePayload,
   SignedRegistrationCertificateJwt,
   SignJwtOptions,
 } from './types'
 import {
-  assertValidRegistrationCertificate,
   assertValidRegistrationCertificatePayload,
   asValidationError,
-  parseRegistrationCertificatePayload,
+  validatePayload,
+  validateRegistrationCertificateJwtHeader,
   validationError,
 } from './validator'
 
@@ -85,20 +88,25 @@ export async function signRegistrationCertificateJwt(
 /**
  * Decode a signed registration certificate JWT (without cryptographic verification)
  *
+ * The identifier of the WRP links a registration certificate to the access certificate it came with (ETSI TS 119 475
+ * clause 4.5 and GEN-5.1.1-02). Leave out `accessCertificateSub` only to read a registration certificate before that
+ * subject is known: `sub` and `intermediary.sub` are then not compared with it, which `verifyRegistrationCertificate`
+ * always does.
+ *
  * @param jws - The compact JWS string
- * @returns Decoded registration certificate with header and payload
+ * @param accessCertificateSub - Subject of the access certificate the registration certificate came with
+ * @returns The decoded JWT, with the header and payload of the registration certificate
  * @throws RegistrationCertificateValidationError with the issues of the JAdES B-B signature (GEN-5.2.1-04), and of the
  *   header and the payload, whose paths start with `header` or `payload`
  */
 export function decodeRegistrationCertificateJwt(
   jws: string,
-  accessCertificateSub: string
-): SignedRegistrationCertificateJwt {
-  let decoded: ReturnType<typeof decodeJwt>
+  accessCertificateSub?: string
+): DecodedRegistrationCertificateJwt {
+  let jwt: DecodedJadesJwt
   try {
     // GEN-5.2.1-04
-    decodeJades({ jws })
-    decoded = decodeJwt({ jwt: jws })
+    jwt = decodeJadesJwt({ jwt: jws })
   } catch (error) {
     throw asValidationError(error, 'Registration certificate is not a JAdES B-B signed JWT (GEN-5.2.1-04)', {
       code: 'invalid_format',
@@ -106,13 +114,16 @@ export function decodeRegistrationCertificateJwt(
     })
   }
 
-  assertValidRegistrationCertificate(decoded.header, decoded.payload, accessCertificateSub)
-
-  return {
-    jws,
-    header: decoded.header as RegistrationCertificateJwtHeader,
-    payload: parseRegistrationCertificatePayload(decoded.payload, accessCertificateSub),
+  const { result: payloadResult, data: payload } = validatePayload(jwt.payload, accessCertificateSub)
+  const result = toValidationResult([
+    ...prefixIssuePaths('header', validateRegistrationCertificateJwtHeader(jwt.header).issues),
+    ...prefixIssuePaths('payload', payloadResult.issues),
+  ])
+  if (!result.valid || !payload) {
+    throw new RegistrationCertificateValidationError('Invalid registration certificate', result.issues)
   }
+
+  return { ...jwt, header: jwt.header as RegistrationCertificateJwtHeader, payload }
 }
 
 /**

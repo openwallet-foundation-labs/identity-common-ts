@@ -93,6 +93,7 @@ export type {
 export {
   type CreateKeyAttestationJwtOptions,
   createKeyAttestationJwt,
+  type ParsedKeyAttestationJwt,
   type ParseKeyAttestationJwtOptions,
   parseKeyAttestationJwt,
   type VerifyKeyAttestationJwtOptions,

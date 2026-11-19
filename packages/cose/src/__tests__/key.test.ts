@@ -1,5 +1,6 @@
 import { base64url } from '@owf/identity-common'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+import { cborEncode, DataItem } from '../../src/cbor'
 import { Curve } from '../../src/cose/key/curve'
 import { KeyOps } from '../../src/cose/key/key-operation'
 import { KeyType } from '../../src/cose/key/key-type'
@@ -138,5 +139,28 @@ describe('cose key', () => {
 
     expect(coseKey.keyOps).toStrictEqual([KeyOps.MacCreate, KeyOps.MacVerify])
     expect(coseKey.jwk.key_ops).toStrictEqual(['sign', 'verify'])
+  })
+
+  test('decodes bytes wrapped in tag 24 with fromDataItem', () => {
+    const fromDataItem = vi.spyOn(CoseKey, 'fromDataItem')
+    const key = CoseKey.create({ keyType: KeyType.Ec, curve: Curve['P-256'] })
+
+    expect(CoseKey.decode(key.encode({ asDataItem: true })).encode()).toStrictEqual(key.encode())
+    expect(fromDataItem).toHaveBeenCalledOnce()
+
+    fromDataItem.mockClear()
+    expect(CoseKey.decode(key.encode()).encode()).toStrictEqual(key.encode())
+    expect(fromDataItem).not.toHaveBeenCalled()
+  })
+
+  test('gives the same error for an invalid key with and without tag 24', () => {
+    const invalidKey = new Map<number, unknown>([
+      [1, KeyType.Ec],
+      [-2, 'should be uint8array'],
+    ])
+    const error = 'Error decoding CoseKey\n  - X (-2): expected Uint8Array, received string (invalid_type)'
+
+    expect(() => CoseKey.decode(cborEncode(invalidKey))).toThrow(error)
+    expect(() => CoseKey.decode(cborEncode(DataItem.fromData(invalidKey)))).toThrow(error)
   })
 })

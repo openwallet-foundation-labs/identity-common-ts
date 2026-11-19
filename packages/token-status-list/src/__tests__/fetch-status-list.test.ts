@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fetchStatusList } from '../fetch-status-list'
 import { StatusListError } from '../status-list-error'
 import { StatusListMediaTypes } from '../types'
@@ -26,6 +26,23 @@ describe('fetchStatusList', () => {
     })
 
     expect(statusList).toStrictEqual(new Uint8Array([1, 2, 3]))
+  })
+
+  it('should return the body as it was read, without reading the response again', async () => {
+    const fetched = new Response('a.b.c', {
+      status: 200,
+      headers: { 'Content-Type': StatusListMediaTypes.StatusListJwt },
+    })
+    const read = vi.spyOn(Response.prototype, 'arrayBuffer')
+
+    const statusList = await fetchStatusList({
+      uri: 'https://example.org/statuslists/1',
+      customFetcher: (async () => fetched) as unknown as typeof fetch,
+    })
+
+    expect(statusList).toStrictEqual('a.b.c')
+    expect(read).not.toHaveBeenCalled()
+    read.mockRestore()
   })
 
   it.each([

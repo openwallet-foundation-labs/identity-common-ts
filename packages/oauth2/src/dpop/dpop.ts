@@ -65,6 +65,12 @@ export interface CreateDpopJwtOptions {
   accessToken?: string
 
   /**
+   * The `ath` value of `accessToken` (base64url encoded SHA-256 hash), if it was already calculated.
+   * It is used as is instead of hashing `accessToken` again.
+   */
+  accessTokenHash?: string
+
+  /**
    * Callback used for dpop
    */
   callbacks: Pick<CallbackContext, 'generateRandom' | 'hash' | 'signJws'>
@@ -77,9 +83,9 @@ export interface CreateDpopJwtOptions {
 
 export async function createDpopJwt(options: CreateDpopJwtOptions) {
   // Calculate access token hash
-  let ath: string | undefined
-  if (options.accessToken) {
-    ath = base64url.encode(await options.callbacks.hash(options.accessToken, 'sha-256'))
+  let ath = options.accessTokenHash
+  if (options.accessToken && !ath) {
+    ath = await calculateDpopAccessTokenHash(options.accessToken, options.callbacks)
   }
 
   const header = parseWithErrorHandling(zDpopJwtHeader, {
@@ -101,6 +107,11 @@ export async function createDpopJwt(options: CreateDpopJwtOptions) {
   const { jwt } = await signJwt({ header, payload, signer: options.signer, signJwsCallback: options.callbacks.signJws })
 
   return jwt
+}
+
+/** Calculates the `ath` claim of a DPoP proof for an access token (RFC 9449 Section 4.2) */
+export async function calculateDpopAccessTokenHash(accessToken: string, callbacks: Pick<CallbackContext, 'hash'>) {
+  return base64url.encode(await callbacks.hash(accessToken, 'sha-256'))
 }
 
 export interface DpopVerificationOptions {
@@ -213,7 +224,7 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
     }
 
     if (options.accessToken) {
-      const expectedAth = base64url.encode(await options.callbacks.hash(options.accessToken, 'sha-256'))
+      const expectedAth = await calculateDpopAccessTokenHash(options.accessToken, options.callbacks)
 
       if (!payload.ath) {
         throw new Oauth2Error(`Dpop jwt does not have a ath value, but expected ath value '${expectedAth}'.`)
@@ -267,6 +278,7 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
     return {
       header,
       payload,
+      jwk: header.jwk,
       jwkThumbprint,
     }
   } catch (error) {
@@ -284,6 +296,8 @@ export async function verifyDpopJwt(options: VerifyDpopJwtOptions) {
     throw error
   }
 }
+
+export type VerifiedDpopJwt = Awaited<ReturnType<typeof verifyDpopJwt>>
 
 function htuFromRequestUrl(requestUrl: string) {
   const htu = new URL(requestUrl)

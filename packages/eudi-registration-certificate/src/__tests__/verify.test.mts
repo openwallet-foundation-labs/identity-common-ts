@@ -2,6 +2,8 @@ import { StatusListMediaTypes } from '@owf/token-status-list'
 import { describe, expect, it } from 'vitest'
 import {
   decodeOpenid4vpRegistrationCertificate,
+  decodeRegistrationCertificateCwt,
+  decodeRegistrationCertificateJwt,
   type RegistrationCertificatePayload,
   RegistrationCertificateValidationError,
   signRegistrationCertificateCwt,
@@ -127,4 +129,19 @@ it('verifies what a decode function returned', async () => {
   const decoded = decodeOpenid4vpRegistrationCertificate([{ format: 'registration_cert', data: jws }], SUB)
 
   await expect(verify(decoded ?? jws)).resolves.toStrictEqual(decoded)
+})
+
+describe.each([
+  ['JWT', async () => decodeRegistrationCertificateJwt(await signJwt())],
+  ['CWT', async () => decodeRegistrationCertificateCwt(await signCwt())],
+])('verifyRegistrationCertificate of a %s decoded without the access certificate subject', (_, decode) => {
+  it('verifies it against the subject of the access certificate (ETSI TS 119 475 GEN-5.1.1-02)', async () => {
+    const decoded = await decode()
+
+    await expect(verify(decoded)).resolves.toStrictEqual(decoded)
+
+    const error = await verify(decoded, { accessCertificateSub: 'LEINL-OTHER' }).catch((error) => error)
+    expect(error).toBeInstanceOf(RegistrationCertificateValidationError)
+    expect(error.findIssue('access_certificate_identity_mismatch')).toMatchObject({ path: ['payload', 'sub'] })
+  })
 })

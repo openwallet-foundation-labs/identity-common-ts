@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type FetchCallback, type FetchLimits, fetchAndParse, fetchWithLimits, IdentityCommonError } from '../../src'
+import {
+  type FetchCallback,
+  type FetchLimits,
+  fetchAndParse,
+  fetchBodyWithLimits,
+  fetchWithLimits,
+  IdentityCommonError,
+} from '../../src'
 
 const MiB = 1024 * 1024
 
@@ -306,5 +313,22 @@ describe('fetchAndParse', () => {
         }
       )
     ).rejects.toBe(error)
+  })
+})
+
+describe('fetchBodyWithLimits', () => {
+  it('returns the body that was read with the response, within the limit', async () => {
+    const fetch = fetchReturning(() => new Response('abc', { status: 404 }))
+
+    const { response, body } = await fetchBodyWithLimits({ fetch }, { type: 'statusList', url: 'https://example.com' })
+
+    expect(response.status).toBe(404)
+    expect(body).toEqual(new Uint8Array([97, 98, 99]))
+    await expect(
+      fetchBodyWithLimits(
+        { fetch, fetchLimits: { maxResponseBytes: 2 } },
+        { type: 'statusList', url: 'https://example.com' }
+      )
+    ).rejects.toThrow(IdentityCommonError)
   })
 })

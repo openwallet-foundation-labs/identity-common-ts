@@ -87,6 +87,8 @@ export { verifyRegistrationCertificateStatus } from './status'
 export type {
   Claim,
   Credential,
+  DecodedRegistrationCertificateCwt,
+  DecodedRegistrationCertificateJwt,
   Intermediary,
   LegalPersonRegistrationCertificateInput,
   LegalPersonSubject,

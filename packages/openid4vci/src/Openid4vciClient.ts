@@ -2,6 +2,7 @@ import {
   authorizationCodeGrantIdentifier,
   type CallbackContext,
   type CreateAuthorizationRequestUrlOptions,
+  type CreatePkceReturn,
   createPkce,
   extractDpopNonceFromHeaders,
   getAuthorizationServerMetadataFromList,
@@ -254,8 +255,10 @@ export class Openid4vciClient {
 
     try {
       // Prefer Interactive Authorization Endpoint (IAE) - successor to authorization challenge
+      // Reused when falling back to the normal flow, so the code verifier is hashed once
+      let pkce: CreatePkceReturn | undefined
       if (authorizationServerMetadata.interactive_authorization_endpoint) {
-        const pkce = authorizationServerMetadata.code_challenge_methods_supported
+        pkce = authorizationServerMetadata.code_challenge_methods_supported
           ? await createPkce({
               allowedCodeChallengeMethods: authorizationServerMetadata.code_challenge_methods_supported,
               callbacks: this.options.callbacks,
@@ -336,6 +339,7 @@ export class Openid4vciClient {
       const result = await oauth2Client.initiateAuthorization({
         clientId: options.clientId,
         pkceCodeVerifier: options.pkceCodeVerifier,
+        pkce,
         redirectUri: options.redirectUri,
         scope: options.scope,
         additionalRequestPayload: {

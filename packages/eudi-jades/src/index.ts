@@ -93,9 +93,11 @@ export { JADES_VALIDATION_CODES } from './validation'
 // Decoding and verification
 export type {
   DecodedJades,
+  DecodedJadesJwt,
+  DecodeJadesJwtOptions,
   DecodeJadesOptions,
   VerifyJadesJwtOptions,
   VerifyJadesOptions,
   VerifyJadesResult,
 } from './verify'
-export { decodeJades, verifyJades, verifyJadesJwt } from './verify'
+export { decodeJades, decodeJadesJwt, verifyJades, verifyJadesJwt } from './verify'

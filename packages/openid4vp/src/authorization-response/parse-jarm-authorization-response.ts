@@ -1,6 +1,6 @@
 import { type CallbackContext, Oauth2ErrorCodes, Oauth2ServerErrorResponseError } from '@openid4vc/oauth2'
 import { parseWithErrorHandling } from '@owf/identity-common'
-import { decodeJwtHeader, zCompactJwe, zCompactJwt } from '@owf/jose'
+import { JoseValidationError, zCompactJwe, zCompactJwt } from '@owf/jose'
 import z from 'zod'
 import type { Openid4vpAuthorizationRequest } from '../authorization-request/z-authorization-request'
 import type { Openid4vpAuthorizationRequestDcApi } from '../authorization-request/z-authorization-request-dc-api'
@@ -52,10 +52,13 @@ export async function parseJarmAuthorizationResponse(
     allowedSkewInSeconds: options.allowedSkewInSeconds,
   })
 
-  const { header: jarmHeader } = decodeJwtHeader({
-    jwt: jarmAuthorizationResponseJwt,
-    headerSchema: zJarmHeader,
-  })
+  // The header is decoded and validated as a JOSE header when the response is verified
+  const jarmHeader = parseWithErrorHandling(
+    zJarmHeader,
+    verifiedJarmResponse.header,
+    'Invalid header',
+    JoseValidationError
+  )
 
   const authorizationResponsePayload = parseOpenid4vpAuthorizationResponsePayload(
     verifiedJarmResponse.jarmAuthorizationResponse

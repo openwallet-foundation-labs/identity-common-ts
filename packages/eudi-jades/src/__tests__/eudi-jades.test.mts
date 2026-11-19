@@ -1,6 +1,7 @@
 import { ES256, parseCertificateChain } from '@owf/crypto'
 import { base64urlEncode, bytesToString } from '@owf/identity-common'
 import {
+  JoseNotSupportedError,
   JoseParseError,
   JoseSignatureVerificationError,
   JoseValidationError,
@@ -12,6 +13,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DETACHED_MECHANISM_IDS,
   decodeJades,
+  decodeJadesJwt,
   generateSigX5ts,
   generateX5tO,
   generateX5tS256,
@@ -278,6 +280,49 @@ describe('signing and verification', () => {
     await expect(
       verifyJadesJwt({ jwt: jws, verifyJwsCallback, now: new Date((claimedAt + 3600) * 1000) })
     ).rejects.toThrow(JoseValidationError)
+  })
+
+  it('verifies a decoded JAdES JWT as it verifies the compact one', async () => {
+    const { jws } = await sign({ payload: { iss: 'https://issuer.example', exp: claimedAt + 60 } })
+    const options = { verifyJwsCallback, now: new Date(claimedAt * 1000) }
+
+    const decoded = decodeJadesJwt({ jwt: jws })
+    expect(await verifyJadesJwt({ jwt: decoded, ...options })).toEqual(await verifyJadesJwt({ jwt: jws, ...options }))
+  })
+
+  it('rejects b64 in the crit of a JAdES JWT unless the caller understands it', async () => {
+    const { jws } = await sign({ protectedHeader: { b64: true } })
+
+    expect(decodeJades({ jws }).protectedHeader.crit).toEqual(['b64'])
+    expect(() => decodeJadesJwt({ jwt: jws })).toThrow(
+      expect.objectContaining({ issues: [expect.objectContaining({ code: 'unsupported_crit' })] })
+    )
+    expect(decodeJadesJwt({ jwt: jws, understoodCriticalParameters: ['b64'] }).payload).toEqual({ hello: 'world' })
+  })
+
+  it('rejects a JAdES signature that is not a JWT', async () => {
+    const sigD = {
+      mId: DETACHED_MECHANISM_IDS.objectByUriHash,
+      pars: ['https://example.test/object'],
+      hashM: 'S256',
+      hashV: ['YWJj'],
+    }
+    const { jws: detached } = await sign({ sigD, payload: undefined })
+    const { jws: unencoded } = await sign({ protectedHeader: { b64: false }, payload: 'unencoded' })
+
+    expect(decodeJades({ jws: detached }).encodedPayload).toBe('')
+    expect(() => decodeJadesJwt({ jwt: detached })).toThrow(
+      expect.objectContaining({ issues: [expect.objectContaining({ code: 'unsupported_crit' })] })
+    )
+    expect(() => decodeJadesJwt({ jwt: detached, understoodCriticalParameters: ['sigD'] })).toThrow(JoseParseError)
+
+    expect(bytesToString(decodeJades({ jws: unencoded }).payload)).toBe('unencoded')
+    expect(() => decodeJadesJwt({ jwt: unencoded })).toThrow(
+      expect.objectContaining({ issues: [expect.objectContaining({ code: 'unsupported_crit' })] })
+    )
+    expect(() => decodeJadesJwt({ jwt: unencoded, understoodCriticalParameters: ['b64'] })).toThrow(
+      JoseNotSupportedError
+    )
   })
 })
 

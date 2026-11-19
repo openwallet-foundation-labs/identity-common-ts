@@ -3,6 +3,23 @@ import type { FetchCallback, FetchContext, FetchLimits } from '@owf/identity-com
 
 type MaybePromise<T> = Promise<T> | T
 
+export type CertificateData = {
+  issuerName: string
+  subjectName: string
+  /** Fields of the subject distinguished name, each left out when the certificate has none. */
+  subject: {
+    /** The `countryName` (C). */
+    countryName?: string
+    /** The `stateOrProvinceName` (ST). */
+    stateOrProvinceName?: string
+  }
+  serialNumber: string
+  thumbprint: string
+  notBefore: Date
+  notAfter: Date
+  pem: string
+}
+
 /**
  * HPKE (RFC 9180) cipher suites, identified as `<kem>/<kdf>/<aead>`.
  *
@@ -110,10 +127,6 @@ export interface MdocContext {
   }
 
   x509: {
-    /**
-     * The values of a field of the subject distinguished name of a certificate, e.g. `C` or `ST`.
-     */
-    getSubjectNameField: (options: { certificate: Uint8Array; field: string }) => string[]
     getPublicKey: (options: {
       certificate: Uint8Array
       algorithm?: SignatureAlgorithm | MacAlgorithm
@@ -134,14 +147,6 @@ export interface MdocContext {
       now?: Date
     }) => MaybePromise<{ chain: Uint8Array[] }>
 
-    getCertificateData: (input: { certificate: Uint8Array }) => MaybePromise<{
-      issuerName: string
-      subjectName: string
-      serialNumber: string
-      thumbprint: string
-      notBefore: Date
-      notAfter: Date
-      pem: string
-    }>
+    getCertificateData: (input: { certificate: Uint8Array }) => MaybePromise<CertificateData>
   }
 }

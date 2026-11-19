@@ -1,4 +1,4 @@
-import { createHashMapping, getSdAlgAndPayload, unpack } from './decode'
+import { createHashMapping, getSdAlgAndPayload, unpack, unpackObj } from './decode'
 import { createDecoy } from './decoy'
 import { Jwt } from './jwt'
 import { KbJwt } from './kbjwt'
@@ -152,12 +152,11 @@ export class SdJwt<
     if (!this.jwt?.payload || !this.disclosures) {
       throw new SdJwtError('Invalid sd-jwt: jwt or disclosures is missing')
     }
-    const { _sd_alg: alg } = getSdAlgAndPayload(this.jwt.payload)
-    const hash = { alg, hasher }
-    const hashmap = await createHashMapping(this.disclosures, hash)
-    const { disclosureKeymap } = await unpack(this.jwt.payload, this.disclosures, hasher)
+    const { _sd_alg: alg, payload } = getSdAlgAndPayload(this.jwt.payload)
+    const hashmap = await createHashMapping(this.disclosures, { alg, hasher })
+    const { disclosureKeymap } = unpackObj(payload, hashmap)
 
-    const keys = presentFrame ? transformPresentationFrame(presentFrame) : await this.presentableKeys(hasher)
+    const keys = presentFrame ? transformPresentationFrame(presentFrame) : Object.keys(disclosureKeymap).sort()
     const disclosures = keys.map((k) => hashmap[disclosureKeymap[k]]).filter((d) => d !== undefined)
     return disclosures
   }

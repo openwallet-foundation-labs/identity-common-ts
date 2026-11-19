@@ -99,11 +99,12 @@ export class Oauth2Client {
    */
   public async initiateAuthorization(options: Omit<CreateAuthorizationRequestUrlOptions, 'callbacks'>) {
     const pkce = options.authorizationServerMetadata.code_challenge_methods_supported
-      ? await createPkce({
+      ? (options.pkce ??
+        (await createPkce({
           allowedCodeChallengeMethods: options.authorizationServerMetadata.code_challenge_methods_supported,
           callbacks: this.options.callbacks,
           codeVerifier: options.pkceCodeVerifier,
-        })
+        })))
       : undefined
 
     let dpop = options.dpop
@@ -113,6 +114,7 @@ export class Oauth2Client {
           authorizationServerMetadata: options.authorizationServerMetadata,
           additionalRequestPayload: options.additionalRequestPayload,
           pkceCodeVerifier: pkce?.codeVerifier,
+          pkce,
           redirectUri: options.redirectUri,
           scope: options.scope,
           resource: options.resource,
@@ -157,6 +159,7 @@ export class Oauth2Client {
       redirectUri: options.redirectUri,
       scope: options.scope,
       pkceCodeVerifier: pkce?.codeVerifier,
+      pkce,
       resource: options.resource,
       dpop,
       state: options.state,
@@ -192,6 +195,7 @@ export class Oauth2Client {
       scope: options.scope,
       callbacks: this.options.callbacks,
       pkceCodeVerifier: options.pkceCodeVerifier,
+      pkce: options.pkce,
       dpop: options.dpop,
       state: options.state,
     })

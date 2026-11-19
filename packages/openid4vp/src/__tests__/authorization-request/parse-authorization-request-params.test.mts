@@ -63,6 +63,20 @@ describe('Parse Authorization Request Params', () => {
     ).toThrow(/must be passed as a JSON object/)
   })
 
+  test('rejects an IAE request with a presentation_definition', () => {
+    expect(() =>
+      parseOpenid4vpAuthorizationRequest({
+        authorizationRequest: {
+          response_type: 'vp_token',
+          nonce: 'nonce',
+          response_mode: 'iae_post',
+          dcql_query: { credentials: [] },
+          presentation_definition: { id: 'pd' },
+        },
+      })
+    ).toThrow()
+  })
+
   test('parses a DC API request passed as an object (OpenID4VP 1.0 Appendix A.3)', () => {
     expect(
       parseOpenid4vpAuthorizationRequest({

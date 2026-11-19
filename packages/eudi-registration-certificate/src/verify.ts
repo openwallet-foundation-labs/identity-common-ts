@@ -8,21 +8,25 @@ import { CwtClaimVerificationError, CwtPayload } from '@owf/cose'
 import { verifyJadesJwt } from '@owf/eudi-jades'
 import { secondsToDate } from '@owf/identity-common'
 import { JoseValidationError } from '@owf/jose'
-import { parseRegistrationCertificateCwt, verifyCwtSignature } from './cwt'
+import { decodeRegistrationCertificateCwt, verifyCwtSignature } from './cwt'
 import { REGISTRATION_CERTIFICATE_JWS_ALGORITHMS } from './schemas'
 import { decodeRegistrationCertificateJwt } from './signer'
 import { verifyRegistrationCertificateStatus } from './status'
 import type {
-  SignedRegistrationCertificateCwt,
-  SignedRegistrationCertificateJwt,
+  DecodedRegistrationCertificateCwt,
+  DecodedRegistrationCertificateJwt,
+  RegistrationCertificatePayload,
   VerifyRegistrationCertificateCallbacks,
 } from './types'
-import { asValidationError, validationError } from './validator'
+import { asValidationError, validateAccessCertificateSub, validationError } from './validator'
 
 /** Options for {@link verifyRegistrationCertificate} */
 export interface VerifyRegistrationCertificateOptions {
-  /** A compact JWS, the bytes of a CWT, or what a decode function of this package returned */
-  registrationCertificate: string | Uint8Array | SignedRegistrationCertificateJwt | SignedRegistrationCertificateCwt
+  /**
+   * A compact JWS, the bytes of a CWT, or what a decode function of this package returned. That is verified as it is
+   * passed, without decoding it again, so pass it unmodified.
+   */
+  registrationCertificate: string | Uint8Array | DecodedRegistrationCertificateJwt | DecodedRegistrationCertificateCwt
   /** Subject of the access certificate the registration certificate came with */
   accessCertificateSub: string
   /** Verify the signatures of the registration certificate and its status list, and whether their signer is trusted */
@@ -51,21 +55,18 @@ export async function verifyRegistrationCertificate({
   now,
   skewSeconds,
   maxStatusListDecompressedBytes,
-}: VerifyRegistrationCertificateOptions): Promise<SignedRegistrationCertificateJwt | SignedRegistrationCertificateCwt> {
-  const serialized =
-    typeof registrationCertificate === 'string' || registrationCertificate instanceof Uint8Array
-      ? registrationCertificate
-      : 'jws' in registrationCertificate
-        ? registrationCertificate.jws
-        : registrationCertificate.cwt
-
-  let verified: SignedRegistrationCertificateJwt | SignedRegistrationCertificateCwt
-  if (typeof serialized === 'string') {
-    verified = decodeRegistrationCertificateJwt(serialized, accessCertificateSub)
+}: VerifyRegistrationCertificateOptions): Promise<
+  DecodedRegistrationCertificateJwt | DecodedRegistrationCertificateCwt
+> {
+  let verified: DecodedRegistrationCertificateJwt | DecodedRegistrationCertificateCwt
+  if (typeof registrationCertificate === 'string' || 'compact' in registrationCertificate) {
+    const decoded = parseJwt(registrationCertificate, accessCertificateSub)
+    verified = decoded
     try {
       // GEN-5.2.1-04: a JAdES B-B signature
       await verifyJadesJwt({
-        jwt: serialized,
+        // Spread, as TypeScript compares a `DecodeJwtResult` by its schemas instead of its header and payload
+        jwt: { ...decoded },
         verifyJwsCallback: callbacks.verifyJws,
         // Table 5: the chain is in `x5c`
         allowedSignerMethods: ['x5c'],
@@ -77,9 +78,9 @@ export async function verifyRegistrationCertificate({
       throw verificationError(error)
     }
   } else {
-    const { registrationCertificateCwt, ...decoded } = parseRegistrationCertificateCwt(serialized, accessCertificateSub)
+    const decoded = parseCwt(registrationCertificate, accessCertificateSub)
     verified = decoded
-    await verifyCwtSignature(registrationCertificateCwt, callbacks.verifyCose)
+    await verifyCwtSignature(decoded.registrationCertificateCwt, callbacks.verifyCose)
     const { iat, exp } = decoded.payload
     try {
       // The claims as they are after decoding, as `iat` and `exp` may be under their JSON name
@@ -118,6 +119,35 @@ export async function verifyRegistrationCertificate({
   }
 
   return verified
+}
+
+/** What a decode function of this package returned is verified as it is passed, and a compact JWS is decoded */
+function parseJwt(registrationCertificate: string | DecodedRegistrationCertificateJwt, accessCertificateSub: string) {
+  if (typeof registrationCertificate === 'string') {
+    return decodeRegistrationCertificateJwt(registrationCertificate, accessCertificateSub)
+  }
+  assertAccessCertificateSub(registrationCertificate.payload, accessCertificateSub)
+  return registrationCertificate
+}
+
+/** The decoded CWT, as {@link parseJwt} */
+function parseCwt(
+  registrationCertificate: Uint8Array | DecodedRegistrationCertificateCwt,
+  accessCertificateSub: string
+) {
+  if (registrationCertificate instanceof Uint8Array) {
+    return decodeRegistrationCertificateCwt(registrationCertificate, accessCertificateSub)
+  }
+  assertAccessCertificateSub(registrationCertificate.payload, accessCertificateSub)
+  return registrationCertificate
+}
+
+/** It may have been decoded without the subject of the access certificate, or with another one */
+function assertAccessCertificateSub(payload: RegistrationCertificatePayload, accessCertificateSub: string) {
+  const issue = validateAccessCertificateSub(payload, accessCertificateSub)
+  if (issue) {
+    throw validationError('Invalid registration certificate', { ...issue, path: ['payload', ...(issue.path ?? [])] })
+  }
 }
 
 /** The claim issues of a JWT or CWT below `payload`, and any other failure as an `invalid_signature` issue */

@@ -114,8 +114,11 @@ export const getMetaParser = (credentialQuery: DcqlCredentialQuery) => {
   })
 }
 
-export const runMetaQuery = (credentialQuery: DcqlCredentialQuery, credential: DcqlCredential): DcqlMetaResult => {
-  const metaParser = getMetaParser(credentialQuery)
+export const runMetaQuery = (
+  credentialQuery: DcqlCredentialQuery,
+  credential: DcqlCredential,
+  metaParser: ReturnType<typeof getMetaParser> = getMetaParser(credentialQuery)
+): DcqlMetaResult => {
   const parseResult = parseDcql(metaParser, credential)
 
   if (!parseResult.success) {

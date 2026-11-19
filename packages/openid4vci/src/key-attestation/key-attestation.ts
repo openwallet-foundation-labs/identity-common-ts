@@ -1,7 +1,15 @@
 import type { CallbackContext } from '@openid4vc/oauth2'
 import type { StringWithAutoCompletion } from '@openid4vc/utils'
 import { dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
-import { decodeJwt, type Jwk, type JwsSigner, jwsHeaderFromSigner, signJwt, verifyJwt } from '@owf/jose'
+import {
+  type DecodeJwtResult,
+  decodeJwt,
+  type Jwk,
+  type JwsSigner,
+  jwsHeaderFromSigner,
+  signJwt,
+  verifyJwt,
+} from '@owf/jose'
 import { Openid4vciError } from '../error/Openid4vciError'
 import {
   type Iso18045,
@@ -116,7 +124,16 @@ export interface ParseKeyAttestationJwtOptions {
   use?: KeyAttestationJwtUse
 }
 
-export function parseKeyAttestationJwt({ keyAttestationJwt, use }: ParseKeyAttestationJwtOptions) {
+/** A decoded key attestation jwt, the result of {@link parseKeyAttestationJwt} */
+export type ParsedKeyAttestationJwt = DecodeJwtResult<
+  typeof zKeyAttestationJwtHeader,
+  ReturnType<typeof zKeyAttestationJwtPayloadForUse>
+>
+
+export function parseKeyAttestationJwt({
+  keyAttestationJwt,
+  use,
+}: ParseKeyAttestationJwtOptions): ParsedKeyAttestationJwt {
   return decodeJwt({
     jwt: keyAttestationJwt,
     headerSchema: zKeyAttestationJwtHeader,

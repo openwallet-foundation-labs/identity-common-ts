@@ -1,4 +1,4 @@
-import { decodeJwt, verifyJwt } from '@owf/jose'
+import { type DecodeJwtResult, decodeJwt, verifyJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import { extractJwkFromJwksForJwt } from '../common/jwk/jwks'
 import { Oauth2Error } from '../error/Oauth2Error'
@@ -13,9 +13,10 @@ export enum SupportedAuthenticationScheme {
 
 export interface VerifyJwtProfileAccessTokenOptions {
   /**
-   * The access token
+   * The access token, as a compact jwt or as the result of {@link decodeJwtProfileAccessToken}, which is
+   * verified as is instead of being decoded again.
    */
-  accessToken: string
+  accessToken: string | DecodedJwtProfileAccessToken
 
   /**
    * Callbacks used for verifying the access token
@@ -45,6 +46,25 @@ export interface VerifyJwtProfileAccessTokenOptions {
   authorizationServers: AuthorizationServerMetadata[]
 }
 
+export type DecodedJwtProfileAccessToken = DecodeJwtResult<
+  typeof zAccessTokenProfileJwtHeader,
+  typeof zAccessTokenProfileJwtPayload
+>
+
+/**
+ * Decode an access token as a JWT Profile access token (RFC 9068), without verifying it.
+ *
+ * @throws {@link ValidationError} if the JWT header or payload does not align with JWT Profile rules
+ * @throws {@link JoseParseError} if the jwt is not a valid jwt format, or the jwt header/payload cannot be parsed as JSON
+ */
+export function decodeJwtProfileAccessToken(accessToken: string): DecodedJwtProfileAccessToken {
+  return decodeJwt({
+    jwt: accessToken,
+    headerSchema: zAccessTokenProfileJwtHeader,
+    payloadSchema: zAccessTokenProfileJwtPayload,
+  })
+}
+
 /**
  * Verify an access token as a JWT Profile access token.
  *
@@ -54,11 +74,8 @@ export interface VerifyJwtProfileAccessTokenOptions {
  * @throws {@link JoseValidationError} if a claim does not verify, e.g. an expired token or one for another audience
  */
 export async function verifyJwtProfileAccessToken(options: VerifyJwtProfileAccessTokenOptions) {
-  const decodedJwt = decodeJwt({
-    jwt: options.accessToken,
-    headerSchema: zAccessTokenProfileJwtHeader,
-    payloadSchema: zAccessTokenProfileJwtPayload,
-  })
+  const decodedJwt =
+    typeof options.accessToken === 'string' ? decodeJwtProfileAccessToken(options.accessToken) : options.accessToken
 
   const authorizationServer = options.authorizationServers.find(({ issuer }) => decodedJwt.payload.iss === issuer)
   if (!authorizationServer) {

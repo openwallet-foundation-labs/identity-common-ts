@@ -339,6 +339,37 @@ function myFunction(data: Uint8Array, crypto: CryptoCallbacks) {
 }
 ```
 
+### Do Work Once
+
+Within one flow, decode, parse, validate, hash and verify each value once, and pass the result on.
+
+- A function that decodes hands the decoded value to the functions it calls, not the string again.
+- A function that takes an encoded value also accepts its decoded form in the same parameter, e.g. `accessToken: string | DecodedJwtProfileAccessToken`. Don't add a second parameter for it. The decoded type has a name and is exported.
+- Return what the caller would otherwise compute again, such as the decoded payload or a JWK thumbprint.
+- Build a schema once at module level, not inside a function or a loop.
+- A getter that decodes keeps its result.
+
+```typescript
+// ❌ Decodes twice
+const { payload } = decodeJwt({ jwt })
+await verifyJwt({ jwt, signer, verifyJwsCallback })
+
+// ✅ Decodes once
+const decoded = decodeJwt({ jwt })
+await verifyJwt({ jwt: decoded, signer, verifyJwsCallback })
+```
+
+```typescript
+// ❌ Builds the schema for every credential
+for (const credential of credentials) getClaimsParser(query).parse(credential)
+
+// ✅ Builds it once
+const parser = getClaimsParser(query)
+for (const credential of credentials) parser.parse(credential)
+```
+
+This never removes a check. Reuse a result only when it is the result of the same check on the same bytes. Two schemas that look alike but accept different input both run. A value that has to be fresh for each request, such as a DPoP proof, is created again.
+
 ### Code Style
 
 We use [Biome](https://biomejs.dev/) for linting and formatting:

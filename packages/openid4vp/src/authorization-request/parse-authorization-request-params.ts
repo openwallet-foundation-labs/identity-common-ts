@@ -51,13 +51,16 @@ export interface ParseOpenid4vpAuthorizationRequestOptions {
   authorizationRequest: string | Record<string, unknown>
 }
 
-export function parseOpenid4vpAuthorizationRequest(
-  options: ParseOpenid4vpAuthorizationRequestOptions
-):
+/** The result of `parseOpenid4vpAuthorizationRequest` */
+export type ParseOpenid4vpAuthorizationRequestResult =
   | ParsedOpenid4vpAuthorizationRequest
   | ParsedJarRequest
   | ParsedOpenid4vpDcApiAuthorizationRequest
-  | ParsedOpenid4vpIaeAuthorizationRequest {
+  | ParsedOpenid4vpIaeAuthorizationRequest
+
+export function parseOpenid4vpAuthorizationRequest(
+  options: ParseOpenid4vpAuthorizationRequestOptions
+): ParseOpenid4vpAuthorizationRequestResult {
   const { authorizationRequest } = options
   let provided: 'uri' | 'jwt' | 'params' = 'params'
 

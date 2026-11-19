@@ -18,6 +18,26 @@ export function decodeBase64UrlJsonObject(encoded: string, name: string): Record
     throw new JoseParseError(`Unable to decode the ${name}, it is not valid base64url encoded JSON`, { cause: error })
   }
 
+  return assertJsonObject(decoded, name)
+}
+
+/**
+ * Parses bytes that were already base64url decoded as a JSON object, such as the payload of a parsed JWS.
+ *
+ * @throws JoseParseError if the bytes are not valid UTF-8, not valid JSON, or a JSON value other than an object.
+ */
+export function decodeJsonObjectBytes(bytes: Uint8Array, name: string): Record<string, unknown> {
+  let decoded: unknown
+  try {
+    decoded = JSON.parse(bytesToString(bytes, { fatal: true }))
+  } catch (error) {
+    throw new JoseParseError(`Unable to decode the ${name}, it is not valid base64url encoded JSON`, { cause: error })
+  }
+
+  return assertJsonObject(decoded, name)
+}
+
+function assertJsonObject(decoded: unknown, name: string): Record<string, unknown> {
   if (typeof decoded !== 'object' || decoded === null || Array.isArray(decoded)) {
     throw new JoseParseError(`Unable to decode the ${name}, it is not a JSON object`)
   }

@@ -87,7 +87,7 @@ export async function fetchWithLimits<Type extends string>(
   options: FetchOptions<Type>,
   request: FetchRequest<Type>
 ): Promise<Response> {
-  return (await fetchBody(options, request)).response
+  return (await fetchBodyWithLimits(options, request)).response
 }
 
 /** The result of {@link fetchAndParse}. */
@@ -109,7 +109,7 @@ export async function fetchAndParse<T, Type extends string>(
     ...request
   }: FetchRequest<Type> & { parse: (body: Uint8Array<ArrayBuffer>, response: Response) => T | Promise<T> }
 ): Promise<FetchAndParseResult<T>> {
-  const { response, body } = await fetchBody(options, request)
+  const { response, body } = await fetchBodyWithLimits(options, request)
   if (!response.ok) return { response }
 
   const contentType = response.headers.get('Content-Type')
@@ -124,7 +124,13 @@ export async function fetchAndParse<T, Type extends string>(
   return { response, data: await parse(body, response) }
 }
 
-async function fetchBody<Type extends string>(
+/**
+ * Fetches `url` as {@link fetchWithLimits} does, and also returns the body that was read, so it does not have to be
+ * copied out of the response.
+ *
+ * @throws IdentityCommonError as {@link fetchWithLimits} does. An error of `fetch` is passed on.
+ */
+export async function fetchBodyWithLimits<Type extends string>(
   { fetch = globalFetch, fetchLimits }: FetchOptions<Type>,
   { type, url, init, accept, defaultMaxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES }: FetchRequest<Type>
 ): Promise<{ response: Response; body: Uint8Array<ArrayBuffer> }> {

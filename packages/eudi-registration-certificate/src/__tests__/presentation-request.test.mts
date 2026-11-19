@@ -43,7 +43,7 @@ describe('decodeMdocRegistrationCertificate', () => {
   it('decodes a JWT registration certificate too', () => {
     const decoded = decodeMdocRegistrationCertificate(requestInfo({ euWrprc: stringToBytes(jws) }), SUB)
 
-    expect(decoded && 'jws' in decoded && decoded.jws).toBe(jws)
+    expect(decoded && 'compact' in decoded && decoded.compact).toBe(jws)
   })
 
   it('reads the eUWrprc spelling of the ETSI TS 119 472-2 CDDL', () => {
@@ -90,7 +90,7 @@ describe('decodeOpenid4vpRegistrationCertificate', () => {
   ])('decodes a JWT registration certificate %s', (_, data) => {
     const decoded = decodeOpenid4vpRegistrationCertificate(verifierInfo(data), SUB)
 
-    expect(decoded && 'jws' in decoded && decoded.jws).toBe(jws)
+    expect(decoded && 'compact' in decoded && decoded.compact).toBe(jws)
   })
 
   it('returns undefined without a registration certificate', () => {

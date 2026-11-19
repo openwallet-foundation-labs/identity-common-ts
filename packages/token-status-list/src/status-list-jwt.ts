@@ -93,17 +93,25 @@ export type DecodeStatusListJwtResult = DecodeJwtResult<StatusListJwtHeaderSchem
  */
 export function decodeStatusListJwt(jwt: string, options: DecompressStatusListOptions = {}): DecodeStatusListJwtResult {
   const decoded = decodeJwt({ jwt, headerSchema: zStatusListJwtHeader, payloadSchema: zStatusListJwtPayload })
-  const { bits, lst, aggregation_uri } = decoded.payload.status_list
+  // A copy, as the claims of the result can be changed
+  const statusListClaim = { ...decoded.payload.status_list }
 
   let statusList: StatusList | undefined
   return {
     ...decoded,
     get statusList() {
       if (statusList) return statusList
-      statusList = StatusList.decompressStatusListFromBytes(base64url.decode(lst), bits, aggregation_uri, options)
+      statusList = decompressStatusList(statusListClaim, options)
       return statusList
     },
   }
+}
+
+function decompressStatusList(
+  { bits, lst, aggregation_uri }: StatusListJwtPayload['status_list'],
+  options: DecompressStatusListOptions
+): StatusList {
+  return StatusList.decompressStatusListFromBytes(base64url.decode(lst), bits, aggregation_uri, options)
 }
 
 export type VerifyStatusListJwtClaimsOptions = Omit<VerifyJwtClaimsOptions, 'expectedSubject'> & {
@@ -128,7 +136,10 @@ export type VerifyStatusListJwtOptions = Omit<
   VerifyJwtOptions<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema>,
   'jwt' | 'headerSchema' | 'payloadSchema' | 'expectedSubject' | 'understoodCriticalParameters'
 > & {
-  /** The compact token, or a decoded one, of which only `compact` is used. */
+  /**
+   * The compact token, or what {@link decodeStatusListJwt} returned for it, which is then not decoded again. A decoded
+   * token is verified as it is passed, so pass it unmodified.
+   */
   jwt: string | DecodeStatusListJwtResult
 
   /** The `uri` of the status list reference, which `sub` must equal. */
@@ -158,7 +169,7 @@ export async function verifyStatusListJwt({
   maxDecompressedBytes,
   ...options
 }: VerifyStatusListJwtOptions): Promise<VerifyStatusListJwtResult> {
-  const decoded = decodeStatusListJwt(typeof jwt === 'string' ? jwt : jwt.compact, { maxDecompressedBytes })
+  const decoded = typeof jwt === 'string' ? decodeStatusListJwt(jwt) : jwt
 
   const verified = await verifyJwt<StatusListJwtHeaderSchema, StatusListJwtPayloadSchema>({
     ...options,
@@ -167,7 +178,8 @@ export async function verifyStatusListJwt({
     errorMessage: options.errorMessage ?? 'Error during verification of the Status List Token.',
   })
 
-  const statusList = decoded.statusList
+  // With the limit given here, whichever the token was decoded with
+  const statusList = decompressStatusList(decoded.payload.status_list, { maxDecompressedBytes })
   if (idx !== undefined) verifyStatusValid(statusList, idx)
 
   return { ...verified, statusList }

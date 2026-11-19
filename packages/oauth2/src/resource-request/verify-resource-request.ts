@@ -1,18 +1,24 @@
 import { Openid4vcBaseError } from '@openid4vc/utils'
 import { IdentityError, ValidationError } from '@owf/identity-common'
-import { decodeJwt, JoseInvalidArgumentError, JoseParseError, type Jwk } from '@owf/jose'
+import { JoseInvalidArgumentError, JoseParseError } from '@owf/jose'
 import { introspectToken } from '../access-token/introspect-token'
-import { SupportedAuthenticationScheme, verifyJwtProfileAccessToken } from '../access-token/verify-access-token'
 import {
-  type AccessTokenProfileJwtPayload,
-  zAccessTokenProfileJwtHeader,
-  zAccessTokenProfileJwtPayload,
-} from '../access-token/z-access-token-jwt'
+  type DecodedJwtProfileAccessToken,
+  decodeJwtProfileAccessToken,
+  SupportedAuthenticationScheme,
+  verifyJwtProfileAccessToken,
+} from '../access-token/verify-access-token'
+import type { AccessTokenProfileJwtPayload } from '../access-token/z-access-token-jwt'
 import type { TokenIntrospectionResponse } from '../access-token/z-token-introspection'
 import type { CallbackContext } from '../callbacks'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
-import { type DpopVerificationOptions, extractDpopJwtFromHeaders, verifyDpopJwt } from '../dpop/dpop'
+import {
+  type DpopVerificationOptions,
+  extractDpopJwtFromHeaders,
+  type VerifiedDpopJwt,
+  verifyDpopJwt,
+} from '../dpop/dpop'
 import { Oauth2Error } from '../error/Oauth2Error'
 import { Oauth2ResourceUnauthorizedError } from '../error/Oauth2ResourceUnauthorizedError'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
@@ -98,10 +104,11 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
 
   // A token that is not a jwt profile access token is probably an opaque token, which is introspected below.
   // One that is must verify: an expired one, or one for another resource server, does not get to be introspected.
-  const verificationResult = isOpaqueAccessToken(accessToken)
+  const decodedAccessToken = decodeAccessTokenUnlessOpaque(accessToken)
+  const verificationResult = decodedAccessToken.isOpaque
     ? null
     : await verifyJwtProfileAccessToken({
-        accessToken,
+        accessToken: decodedAccessToken.decoded ?? accessToken,
         callbacks: options.callbacks,
         authorizationServers: options.authorizationServers,
         resourceServer: options.resourceServer,
@@ -160,7 +167,7 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
     })
   }
 
-  let dpopJwk: Jwk | undefined
+  let dpop: VerifiedDpopJwt | undefined
   if (
     scheme === SupportedAuthenticationScheme.DPoP ||
     // two alternative methods to determine whether DPoP was used. As the user can
@@ -214,7 +221,7 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
         allowedSkewInSeconds: options.dpop?.allowedSkewInSeconds ?? options.allowedSkewInSeconds,
         assertJtiUniqueness: options.dpop?.assertJtiUniqueness,
       })
-      dpopJwk = decodedDpopJwt.header.jwk
+      dpop = decodedDpopJwt
     } catch (error) {
       if (error instanceof JoseInvalidArgumentError) throw error
       const errorMessage = error instanceof IdentityError ? error.message : 'Error verifying DPoP jwt'
@@ -232,23 +239,24 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
 
   return {
     tokenPayload,
-    dpop: dpopJwk ? { jwk: dpopJwk } : undefined,
+    dpop,
     scheme,
     accessToken,
     authorizationServer: authorizationServer.issuer,
   }
 }
 
-/** Whether the access token does not decode as a JWT profile access token (RFC 9068) */
-function isOpaqueAccessToken(accessToken: string) {
+/**
+ * Decodes the access token as a JWT profile access token (RFC 9068). It is opaque when it does not decode as one.
+ * After any other error it is left undecoded, so that the verification raises that error itself.
+ */
+function decodeAccessTokenUnlessOpaque(accessToken: string): {
+  isOpaque: boolean
+  decoded?: DecodedJwtProfileAccessToken
+} {
   try {
-    decodeJwt({
-      jwt: accessToken,
-      headerSchema: zAccessTokenProfileJwtHeader,
-      payloadSchema: zAccessTokenProfileJwtPayload,
-    })
-    return false
+    return { isOpaque: false, decoded: decodeJwtProfileAccessToken(accessToken) }
   } catch (error) {
-    return error instanceof JoseParseError || error instanceof ValidationError
+    return { isOpaque: error instanceof JoseParseError || error instanceof ValidationError }
   }
 }

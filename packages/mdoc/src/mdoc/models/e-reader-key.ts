@@ -9,7 +9,6 @@ import {
   cborEncode,
   DataItem,
 } from '@owf/cose'
-import { unwrapDataItemBytes } from '../../utils/cbor'
 
 export type EReaderKeyDecodedStructure = CoseKeyDecodedStructure
 export type EReaderKeyEncodedStructure = CoseKeyEncodedStructure
@@ -44,7 +43,8 @@ export class EReaderKey extends CoseKey {
   public static override decode<T extends AnyCborStructure>(this: CborStructureStaticThis<T>, bytes: Uint8Array): T {
     // biome-ignore lint/complexity/noThisInStatic: `super.decode` keeps `this` bound to the subclass
     const eReaderKey = super.decode(bytes) as unknown as T
-    if (eReaderKey instanceof EReaderKey) eReaderKey.#originalBytes = unwrapDataItemBytes(bytes)
+    // Bytes wrapped in tag 24 were already kept by `fromDataItem`
+    if (eReaderKey instanceof EReaderKey) eReaderKey.#originalBytes ??= new Uint8Array(bytes)
     return eReaderKey
   }
 
