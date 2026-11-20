@@ -1,5 +1,20 @@
 # @owf/eudi-registration-certificate
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [1d58089]
+- Updated dependencies [1d58089]
+- Updated dependencies [765a3b6]
+  - @owf/cose@0.9.0
+  - @owf/token-status-list@0.9.0
+  - @owf/eudi-jades@0.8.0
+  - @owf/crypto@0.9.0
+  - @owf/identity-common@0.9.0
+  - @owf/jose@0.9.0
+  - dcql@5.0.1
+
 ## 0.7.0
 
 ### Minor Changes
