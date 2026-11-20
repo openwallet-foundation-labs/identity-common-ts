@@ -1,3 +1,9 @@
+import { getIdentityCommonConfig } from './config'
+
+export interface IdentityErrorOptions {
+  sensitive?: Record<string, unknown>
+}
+
 /**
  * IdentityError is the base error class for all identity-common-ts packages.
  *
@@ -5,9 +11,14 @@
  */
 export class IdentityError extends Error {
   public details?: unknown
+  declare public readonly sensitive?: Record<string, unknown>
 
-  constructor(message: string, details?: unknown) {
-    super(message)
+  constructor(message: string, details?: unknown, options?: IdentityErrorOptions) {
+    super(
+      options?.sensitive && getIdentityCommonConfig().includeSensitiveErrorDetails
+        ? `${message} ${JSON.stringify(options.sensitive)}`
+        : message
+    )
 
     // NOTE: `new.target` is the class that was constructed, so `instanceof` holds for every
     // subclass, however deep, without any of them having to repeat this. Setting
@@ -22,6 +33,9 @@ export class IdentityError extends Error {
     // set a name is not reported as an `IdentityError`. One that does set it overrides this.
     this.name = new.target.name
     this.details = details
+    if (options?.sensitive) {
+      Object.defineProperty(this, 'sensitive', { value: options.sensitive, enumerable: false })
+    }
   }
 
   getFullMessage(): string {

@@ -39,7 +39,10 @@ export function validateOpenid4vpAuthorizationResponsePayload(
           error_description: `The 'state' parameter in the authorization response does not match the 'state' parameter in the authorization request.`,
         },
         {
-          internalMessage: `The 'state' parameter in the authorization response does not match the 'state' parameter in the authorization request. Expected '${authorizationRequestPayload.state}' but received '${authorizationResponsePayload.state}'.`,
+          sensitive: {
+            expectedState: authorizationRequestPayload.state,
+            receivedState: authorizationResponsePayload.state,
+          },
         }
       )
     }

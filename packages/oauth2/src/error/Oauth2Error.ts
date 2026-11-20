@@ -1,6 +1,6 @@
-import { IdentityError } from '@owf/identity-common'
+import { IdentityError, type IdentityErrorOptions } from '@owf/identity-common'
 
-export interface Oauth2ErrorOptions {
+export interface Oauth2ErrorOptions extends IdentityErrorOptions {
   cause?: unknown
 
   /** Structured detail about the failure, e.g. the zod issues of a schema that did not match. */
@@ -20,7 +20,7 @@ export class Oauth2Error extends IdentityError {
   public readonly cause?: unknown
 
   public constructor(message?: string, options?: Oauth2ErrorOptions) {
-    super(message ?? 'Unknown error occurred.', options?.details)
+    super(message ?? 'Unknown error occurred.', options?.details, options)
 
     // `new.target` is the class that was constructed, so every subclass is named after itself.
     this.name = new.target.name
