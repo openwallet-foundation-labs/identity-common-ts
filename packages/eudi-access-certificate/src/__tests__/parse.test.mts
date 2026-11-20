@@ -108,22 +108,45 @@ describe('validateAccessCertificate', () => {
     expect(result.valid).toBe(false)
     expect(codes(result, 'error')).toEqual([
       CODES.CA_CERTIFICATE,
+      CODES.INVALID_KEY_USAGE,
       CODES.MISSING_POLICY,
       CODES.MISSING_CPS_URI,
       CODES.MISSING_CONTACT,
     ])
     expect(result.issues.find((issue) => issue.code === CODES.MISSING_CONTACT)?.requirement).toBe('GEN-6.6.1-07')
-    expect(codes(result, 'warning')).toEqual([CODES.MISSING_DIGITAL_SIGNATURE_KEY_USAGE])
+    expect(codes(result, 'warning')).toEqual([])
   })
 
   it('reports each issue pointing at the checked certificate field', () => {
     const result = validateAccessCertificate(parseAccessCertificate(CA_CERTIFICATE_PEM), { now: NOW })
     expect(result.issues.map(({ severity, code, path }) => ({ severity, code, path }))).toEqual([
       { severity: 'error', code: CODES.CA_CERTIFICATE, path: ['certificate', 'basicConstraints', 'cA'] },
-      { severity: 'warning', code: CODES.MISSING_DIGITAL_SIGNATURE_KEY_USAGE, path: ['certificate', 'keyUsage'] },
+      { severity: 'error', code: CODES.INVALID_KEY_USAGE, path: ['certificate', 'keyUsage'] },
       { severity: 'error', code: CODES.MISSING_POLICY, path: ['certificate', 'policies'] },
       { severity: 'error', code: CODES.MISSING_CPS_URI, path: ['certificate', 'policies'] },
       { severity: 'error', code: CODES.MISSING_CONTACT, path: ['certificate', 'subjectAlternativeNames'] },
+    ])
+  })
+
+  it('checks the key usage settings of ETSI EN 319 412-2 table 1', () => {
+    const keyUsageIssues = (keyUsage: AccessCertificate['certificate']['keyUsage']) =>
+      validateAccessCertificate({ ...ac, certificate: { ...ac.certificate, keyUsage } }, { now: NOW }).issues.map(
+        ({ code, requirement }) => ({ code, requirement })
+      )
+
+    // Types A, B, C, D and F
+    expect(keyUsageIssues(['nonRepudiation'])).toEqual([])
+    expect(keyUsageIssues(['nonRepudiation', 'digitalSignature'])).toEqual([])
+    expect(keyUsageIssues(['digitalSignature'])).toEqual([])
+    expect(keyUsageIssues(['digitalSignature', 'keyAgreement'])).toEqual([])
+    expect(keyUsageIssues(['nonRepudiation', 'digitalSignature', 'keyEncipherment'])).toEqual([])
+
+    expect(keyUsageIssues(undefined)).toEqual([{ code: CODES.MISSING_KEY_USAGE, requirement: 'LEG-4.3.1-2' }])
+    // Type E can't sign
+    expect(keyUsageIssues(['keyEncipherment'])).toEqual([{ code: CODES.INVALID_KEY_USAGE, requirement: 'LEG-4.3.1-2' }])
+    // Not a setting of table 1
+    expect(keyUsageIssues(['nonRepudiation', 'keyAgreement'])).toEqual([
+      { code: CODES.INVALID_KEY_USAGE, requirement: 'LEG-4.3.1-2' },
     ])
   })
 

@@ -13,7 +13,8 @@ export const ACCESS_CERTIFICATE_VALIDATION_CODES = {
   /** With `expiredAt`, the `notAfter` of the certificate, as context */
   EXPIRED: VALIDATION_CODES.EXPIRED,
   CA_CERTIFICATE: 'ca_certificate',
-  MISSING_DIGITAL_SIGNATURE_KEY_USAGE: 'missing_digital_signature_key_usage',
+  MISSING_KEY_USAGE: 'missing_key_usage',
+  INVALID_KEY_USAGE: 'invalid_key_usage',
   MISSING_POLICY: 'missing_policy',
   CONFLICTING_POLICIES: 'conflicting_policies',
   MISSING_CPS_URI: 'missing_cps_uri',
@@ -97,13 +98,39 @@ export function validateAccessCertificate(
       message: 'An access certificate must be an end-entity certificate (cA is true)',
     })
   }
-  if (certificate.keyUsage && !certificate.keyUsage.includes('digitalSignature')) {
+
+  // ETSI EN 319 412-2 NAT-4.3.2-1, which ETSI EN 319 412-3 LEG-4.3.1-2 applies to legal persons: one of the key
+  // usage settings A to F of table 1. Type E can't sign, which the access certificate needs to authenticate.
+  const keyUsageRequirement = accessCertificate.subjectType === 'legal' ? 'LEG-4.3.1-2' : 'NAT-4.3.2-1'
+  if (!certificate.keyUsage) {
     issues.add({
-      severity: 'warning',
-      code: C.MISSING_DIGITAL_SIGNATURE_KEY_USAGE,
+      code: C.MISSING_KEY_USAGE,
       path: ['certificate', 'keyUsage'],
-      message: 'Key usage does not include digitalSignature, which is needed to authenticate the wallet-relying party',
+      message: 'Certificate has no key usage extension',
+      requirement: keyUsageRequirement,
     })
+  } else {
+    const nonRepudiation = certificate.keyUsage.includes('nonRepudiation')
+    const digitalSignature = certificate.keyUsage.includes('digitalSignature')
+    const encipherment =
+      certificate.keyUsage.includes('keyEncipherment') || certificate.keyUsage.includes('keyAgreement')
+    if (!nonRepudiation && !digitalSignature) {
+      issues.add({
+        code: C.INVALID_KEY_USAGE,
+        path: ['certificate', 'keyUsage'],
+        message:
+          'Key usage contains neither digitalSignature nor nonRepudiation, one of which is needed to authenticate the wallet-relying party',
+        requirement: keyUsageRequirement,
+      })
+    } else if (nonRepudiation && encipherment && !digitalSignature) {
+      issues.add({
+        code: C.INVALID_KEY_USAGE,
+        path: ['certificate', 'keyUsage'],
+        message:
+          'Key usage combines nonRepudiation with keyEncipherment or keyAgreement without digitalSignature, which is not one of the key usage settings of ETSI EN 319 412-2 table 1',
+        requirement: keyUsageRequirement,
+      })
+    }
   }
 
   // GEN-6.6.1-03: policy identifiers

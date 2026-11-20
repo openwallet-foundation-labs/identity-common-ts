@@ -56,22 +56,21 @@ const result = validateRegistrationCertificate(header, payload, getAccessCertifi
 ## Validation
 
 `validateAccessCertificate` checks the certificate profile of TS 119 411-8 clause 6.6.1 and the profiles it
-references (ETSI EN 319 412-1/-2/-3/-5). The table names the keys of `ACCESS_CERTIFICATE_VALIDATION_CODES`; their
-values are the codes in lower case, such as `missing_policy`:
+references (ETSI EN 319 412-1/-2/-3/-5), with these codes of `ACCESS_CERTIFICATE_VALIDATION_CODES`:
 
 | Code | Severity | Requirement |
 |------|----------|-------------|
-| `MISSING_POLICY` / `CONFLICTING_POLICIES` | error | GEN-6.6.1-03: a TS 119 411-8 policy OID (or an accepted TSP OID); natural and legal policies must not be mixed |
-| `MISSING_CPS_URI` | error | GEN-6.6.1-06 |
-| `MISSING_CONTACT` | error | GEN-6.6.1-07: SAN website, telephone number or email address |
-| `MISSING_ORGANIZATION_IDENTIFIER` / `INVALID_ORGANIZATION_IDENTIFIER` / `INVALID_GREECE_COUNTRY_CODE` | error | GEN-6.6.1-05 (legal persons) |
-| `MISSING_COMMON_NAME` / `MISSING_COUNTRY_NAME` / `MISSING_ORGANIZATION_NAME` | error | EN 319 412-2 / 412-3 |
-| `MISSING_NATURAL_PERSON_NAME` | error | EN 319 412-2: givenName and/or surname, or pseudonym |
-| `MISSING_SERIAL_NUMBER` / `INVALID_SERIAL_NUMBER` | warning | Natural person semantic identifier (EN 319 412-1 clause 5.1.3) |
-| `MISSING_QC_COMPLIANCE` | error | GEN-6.6.1-02: qualified policies need the QcCompliance statement |
-| `QC_TYPE_MISMATCH` | warning | GEN-6.6.1-02: `esign` for natural and `eseal` for legal persons |
-| `CA_CERTIFICATE`, `UNSUPPORTED_VERSION`, `NOT_YET_VALID`, `EXPIRED` | error | X.509 basics |
-| `MISSING_DIGITAL_SIGNATURE_KEY_USAGE` | warning | The key has to sign to authenticate the relying party |
+| `missing_policy` / `conflicting_policies` | error | GEN-6.6.1-03: a TS 119 411-8 policy OID (or an accepted TSP OID); natural and legal policies must not be mixed |
+| `missing_cps_uri` | error | GEN-6.6.1-06 |
+| `missing_contact` | error | GEN-6.6.1-07: SAN website, telephone number or email address |
+| `missing_organization_identifier` / `invalid_organization_identifier` / `invalid_greece_country_code` | error | GEN-6.6.1-05 (legal persons) |
+| `missing_common_name` / `missing_country_name` / `missing_organization_name` | error | EN 319 412-2 / 412-3 |
+| `missing_natural_person_name` | error | EN 319 412-2: givenName and/or surname, or pseudonym |
+| `missing_serial_number` / `invalid_serial_number` | warning | Natural person semantic identifier (EN 319 412-1 clause 5.1.3) |
+| `missing_qc_compliance` | error | GEN-6.6.1-02: qualified policies need the QcCompliance statement |
+| `qc_type_mismatch` | warning | GEN-6.6.1-02: `esign` for natural and `eseal` for legal persons |
+| `ca_certificate`, `unsupported_version`, `not_yet_valid`, `expired` | error | X.509 basics |
+| `missing_key_usage` / `invalid_key_usage` | error | EN 319 412-2 NAT-4.3.2-1 / EN 319 412-3 LEG-4.3.1-2: one of the key usage settings of table 1 that can sign, so with `digitalSignature` or `nonRepudiation` |
 
 ```typescript
 import { parseAndValidateAccessCertificate, validateAccessCertificate } from '@owf/eudi-access-certificate'
