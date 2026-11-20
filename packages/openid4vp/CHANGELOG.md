@@ -1,5 +1,17 @@
 # @openid4vc/openid4vp
 
+## 0.11.0
+
+### Patch Changes
+
+- 64893a5: `parseOpenid4vpAuthorizationResponse`, `parseJarmAuthorizationResponse`, `verifyJarmAuthorizationResponse` and `validateOpenid4vpAuthorizationResponsePayload` throw an `Oauth2ServerErrorResponseError` with error `invalid_request` (RFC 6749 Section 5.2) for an authorization response that cannot be decoded or parsed, instead of the error of `@owf/jose`, `@owf/identity-common` or `@openid4vc/utils`, which is now the `cause`. An authorization error response of the wallet still throws an `Openid4vpAuthorizationResponseError`.
+- Updated dependencies [d8e50fd]
+- Updated dependencies [3f52fb9]
+  - @openid4vc/oauth2@0.11.0
+  - @owf/identity-common@0.9.0
+  - @owf/jose@0.9.0
+  - @openid4vc/utils@0.11.0
+
 ## 0.10.0
 
 ### Minor Changes

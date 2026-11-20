@@ -1,5 +1,17 @@
 # @openid4vc/openid4vci
 
+## 0.11.0
+
+### Patch Changes
+
+- 9087be0: `Openid4vciClient.initiateAuthorization` and `Openid4vciClient.createAuthorizationRequestUrlFromOffer` now send the `state` option in the authorization challenge, pushed authorization and authorization requests. Before, `state` was only sent to the interactive authorization endpoint and dropped in the other flows, so the authorization response could not be checked against it.
+- Updated dependencies [d8e50fd]
+- Updated dependencies [3f52fb9]
+  - @openid4vc/oauth2@0.11.0
+  - @owf/identity-common@0.9.0
+  - @owf/jose@0.9.0
+  - @openid4vc/utils@0.11.0
+
 ## 0.10.0
 
 ### Minor Changes

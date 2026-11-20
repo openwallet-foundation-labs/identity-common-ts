@@ -1,5 +1,48 @@
 # @owf/mdoc
 
+## 0.11.0
+
+### Minor Changes
+
+- 1d58089: `Mac0` now puts an empty `external_aad` in the MAC_structure when none is passed, as RFC 9052 6.3 requires. It was left out, so tags didn't match other COSE implementations. The device MAC of `@owf/mdoc` now matches the example in ISO/IEC 18013-5 D.5.3.
+  
+  Tags created with an earlier version without `externalAad` still verify. When a tag doesn't match and no `externalAad` is passed, `Mac0.verifyAuthenticationCode` and `DeviceMac.verify` check it once more against the MAC_structure without `external_aad`.
+  
+  **Breaking:** earlier versions don't verify a tag created with this version without `externalAad`.
+- 1d58089: `Mac0Context` has the same shape as `Sign1Context`. `authenticate` and `verify` get the `CoseKey` passed to the library, and `authenticate` always gets the `algorithm`. The library never reads the key material, so the key can stay in a key management system.
+  
+  **Breaking:** `Mac0.authenticate` and `Mac0Context` no longer accept a `Uint8Array` key. Pass a `CoseKey`, such as `CoseKey.create({ keyType: KeyType.Oct, k })` for a key held in software, or `CoseKey.create({ keyType: KeyType.Oct, keyId })` for a key in a key management system, and resolve it in the callback. An `algorithm` passed to `Mac0.authenticate` now takes precedence over the `alg` of the key.
+  
+  **Breaking:** the `CoseKey.privateKey` getter is removed, with `CoseDNotDefinedError`, `CoseKNotDefinedError` and `CoseKeyTypeNotSupportedForPrivateKeyExtractionError`. Read `CoseKey.d` or `CoseKey.k` instead.
+- 1d58089: A device MAC (ISO/IEC 18013-5 9.1.3.5) is created and verified with the new `crypto.deviceMac` callback of `MdocContext`, so the device key and the ephemeral reader key can stay in a key management system. It gets the `CoseKey` passed to the library, the public key of the other party, the HKDF salt and info, and the MAC_structure, and returns the HMAC-SHA256 tag. `DeviceMac.authenticateWithKeyAgreement` sets the tag with it.
+  
+  **Breaking:** `MdocContext` no longer has `crypto.hdkf` and `cose.mac0`, so it takes no raw private keys. Move their key agreement, HKDF and HMAC into `crypto.deviceMac`. Without it, creating a device MAC throws a `DeviceMacNotSupportedError` and verifying one fails. `DeviceMac.createDeviceMacKey` is removed, and so is `SessionEstablishment.decryptedData`, which always threw. The `mac` option of a document in `Holder.createDeviceResponseForDeviceRequest` and `DeviceResponse.createWithDeviceRequest` takes `deviceKey` and `ephemeralReaderKey`, as `DeviceSignedBuilder.tag` now does. `DeviceAuth.verify` takes `ephemeralReaderKey`, and `DeviceMac.verify` takes `key` and `peerPublicKey` without `info`.
+- a2fdf7b: The `signature` of a document passed to `DeviceResponse.createWithDeviceRequest` and `Holder.createDeviceResponseForDeviceRequest` takes the `algorithm` of the device signature, the same as `Issuer.sign`. The documents of `IsoMdocDcApi.createResponse` take it as `algorithm` next to `deviceKey`, and the `readerAuth` of `IsoMdocDcApi.createRequest` takes `algorithm` for the reader auth signature. A signing key with another `alg` throws a `SignatureAlgorithmDoesNotMatchSigningKeyAlgorithmError`. Before, the algorithm came from the `alg` of the signing key, so a key without one could not sign.
+  
+  `DeviceSignedBuilder.sign` signs with its `algorithm`. Before, it put `algorithm` in the protected header but signed with the `alg` of the signing key, and threw for a key without one.
+  
+  **Breaking:** pass `algorithm` with every device signature and reader auth, for example `signature: { signingKey, algorithm: SignatureAlgorithm.ES256 }`.
+- be109ee: `Issuer.sign`, `IssuerSignedBuilder.sign`, `DeviceSignedBuilder.sign`, `DeviceSignedBuilder.tag`, `DeviceResponse.createWithDeviceRequest` and `Holder.createDeviceResponseForDeviceRequest` no longer write the `keyId` of the signing key as a `kid` header in the IssuerAuth, DeviceSignature or DeviceMac. ISO/IEC 18013-5 does not define a `kid` there. A reader identifies the issuer key by the `x5chain` and the device key by the MSO. A `keyId` that only the signer uses, such as the id of the key in a key management system, was sent to the reader.
+  
+  **Breaking:** a reader that selected the key by `kid` must use the `x5chain` and the MSO instead. To still send a `kid`, create the `IssuerAuth`, `DeviceSignature` or `DeviceMac` with your own `UnprotectedHeaders`.
+- 765a3b6: `IssuerAuth.verify` and `verifyStatus`, `IssuerSigned.verify`, `Holder.verifyIssuerSigned` and `DeviceResponse.verify` (per document) now return a status list served as a JWT too. `statusList` is a `VerifiedStatusList`, which `verifyStatusListToken` also returns. `format` tells a CWT from a JWT, and `statusList.statusList` is the list in either format. A CWT has `statusListCwt`. A JWT has the `compact` token, its `header` and `payload`, so a caller can cache it until its `exp` or for its `ttl`. `identifierList` is a `VerifiedIdentifierList` of the same shape, which `verifyIdentifierListToken` also returns, with `format: 'cwt'` and `identifierListCwt`.
+  
+  **Breaking:** read a CWT status list from `statusList.statusListCwt` instead of `statusList`, and an identifier list from `identifierList.identifierListCwt` instead of `identifierList`. The signer chains moved to `statusList.trustedChain` and `identifierList.trustedChain`, from `trustedStatusListChain` and `trustedIdentifierListChain`. `verifyStatusListToken` and `verifyIdentifierListToken` return the same objects, with `trustedChain` instead of `chain`. `VerifyStatusListTokenResult` and `VerifyIdentifierListTokenResult` are replaced by `VerifiedStatusList` and `VerifiedIdentifierList`. A status list in JWT format without an `x5c` header throws `InvalidRevocationListError` instead of `UnableToExtractX5ChainFromJwtError`, which is removed.
+- 8fc034f: `Verifier.verifyDeviceResponse`, `DeviceResponse.verify`, `IsoMdocDcApi.verifyResponse`, `Holder.verifyIssuerSigned`, `IssuerSigned.verify` and `IssuerAuth.verify` take the options for the status check of an mdoc in one `status` option of the new `StatusVerificationOptions` type: `disableValidation` and `maxDecompressedBytes`. The same object can be passed to each of them.
+  
+  **Breaking:** `disableStatusValidation: true` becomes `status: { disableValidation: true }`, and `maxStatusListDecompressedBytes` becomes `status.maxDecompressedBytes`, or `maxDecompressedBytes` for `IssuerAuth.verifyStatus`.
+
+### Patch Changes
+
+- d40693e: `IssuerAuth.verify`, and with it `IssuerSigned.verify`, `Holder.verifyIssuerSigned`, `DeviceResponse.verify`, `Verifier.verifyDeviceResponse` and `IsoMdocDcApi.verifyResponse`, check the status of an mdoc last. Before, the status list or identifier list of the MSO was fetched before its `validityInfo`, the value digests and the docType of the document were checked, so an expired or not yet valid mdoc made the verifier fetch its status list before rejecting it. Token Status List § 8.3 validates the Referenced Token before its status. A verification callback that does not throw no longer gets a status check, and no list is fetched, for an MSO that failed another check of `IssuerAuth.verify`.
+- Updated dependencies [1d58089]
+- Updated dependencies [1d58089]
+- Updated dependencies [765a3b6]
+  - @owf/cose@0.9.0
+  - @owf/token-status-list@0.9.0
+  - @owf/identity-common@0.9.0
+  - @owf/x509@0.9.0
+
 ## 0.10.0
 
 ### Minor Changes

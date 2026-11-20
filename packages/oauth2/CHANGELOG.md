@@ -1,5 +1,20 @@
 # @openid4vc/oauth2
 
+## 0.11.0
+
+### Minor Changes
+
+- d8e50fd: The `signer` of `createAccessTokenJwt` and `Oauth2AuthorizationServer.createAccessTokenResponse` is now a `custom` signer, and the access token header gets its `kid` instead of a `jwk`. A resource server must verify an access token with the keys of the authorization server (RFC 9068 Section 4). It selects the key from the `jwks_uri` by `kid` (RFC 7515 Section 4.1.4), or takes the only key when there is one. Set a `kid` when the `jwks_uri` has more than one key, as during a key rollover.
+  
+  **Breaking:** pass `{ method: 'custom', alg, kid }` as the `signer`, with the `kid` of the key in the `jwks_uri`. Your `signJws` callback selects the private key by that `kid`. A resource server that took the key from the `jwk` header must use the `jwks_uri` instead.
+- 3f52fb9: `Oauth2AuthorizationServer.parseAccessTokenRequest` accepts the `client_credentials` grant (RFC 6749 Section 4.4) and returns it as `{ grantType: 'client_credentials' }`. Like the other grants, it is rejected when the `authorizationServerMetadata` passed in does not list it in `grant_types_supported`. The new `Oauth2AuthorizationServer.verifyClientCredentialsAccessTokenRequest` verifies its DPoP proof and client attestation. Authenticating the client otherwise, for example with its client secret, and checking that it may use the grant (`unauthorized_client`, Section 5.2) is up to the authorization server. The `scope` of an access token request is now typed, and rejected when it is empty or not a string (Section 3.3).
+
+### Patch Changes
+
+- @owf/identity-common@0.9.0
+  - @owf/jose@0.9.0
+  - @openid4vc/utils@0.11.0
+
 ## 0.10.0
 
 ### Minor Changes
