@@ -2,6 +2,7 @@ import { decodeJwt, verifyJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import { extractJwkFromJwksForJwt } from '../common/jwk/jwks'
 import { Oauth2Error } from '../error/Oauth2Error'
+import { resolveAuthorizationServerMetadata } from '../metadata/authorization-server/authorization-server-metadata'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
 import { fetchJwks } from '../metadata/fetch-jwks-uri'
 import { zAccessTokenProfileJwtHeader, zAccessTokenProfileJwtPayload } from './z-access-token-jwt'
@@ -20,7 +21,7 @@ export interface VerifyJwtProfileAccessTokenOptions {
   /**
    * Callbacks used for verifying the access token
    */
-  callbacks: Pick<CallbackContext, 'verifyJws' | 'fetch' | 'fetchLimits' | 'getJwks'>
+  callbacks: Pick<CallbackContext, 'verifyJws' | 'fetch' | 'fetchLimits' | 'getJwks' | 'getAuthorizationServerMetadata'>
 
   /**
    * If not provided current time will be used
@@ -40,9 +41,11 @@ export interface VerifyJwtProfileAccessTokenOptions {
   resourceServer: string
 
   /**
-   * List of authorization servers that this resource endpoint supports
+   * The authorization servers that this resource endpoint supports, as metadata or as an object with their `issuer`.
+   * Only the authorization server whose `issuer` is the `iss` of the access token is resolved, with the
+   * `getAuthorizationServerMetadata` callback or else over HTTP.
    */
-  authorizationServers: AuthorizationServerMetadata[]
+  authorizationServers: Array<AuthorizationServerMetadata | { issuer: string }>
 }
 
 /**
@@ -60,14 +63,15 @@ export async function verifyJwtProfileAccessToken(options: VerifyJwtProfileAcces
     payloadSchema: zAccessTokenProfileJwtPayload,
   })
 
-  const authorizationServer = options.authorizationServers.find(({ issuer }) => decodedJwt.payload.iss === issuer)
-  if (!authorizationServer) {
+  const listedAuthorizationServer = options.authorizationServers.find(({ issuer }) => issuer === decodedJwt.payload.iss)
+  if (!listedAuthorizationServer) {
     // Authorization server not found
     throw new Oauth2Error(
       `Access token jwt contains unrecognized authorization server 'iss' value of '${decodedJwt.payload.iss}'`
     )
   }
 
+  const authorizationServer = await resolveAuthorizationServerMetadata(listedAuthorizationServer, options.callbacks)
   const jwksUrl = authorizationServer.jwks_uri
   if (!jwksUrl) {
     throw new Oauth2Error(
@@ -75,7 +79,7 @@ export async function verifyJwtProfileAccessToken(options: VerifyJwtProfileAcces
     )
   }
 
-  const jwks = await fetchJwks(jwksUrl, options.callbacks)
+  const jwks = await fetchJwks(jwksUrl, options.callbacks, { kid: decodedJwt.header.kid })
   const publicJwk = extractJwkFromJwksForJwt({
     kid: decodedJwt.header.kid,
     jwks,

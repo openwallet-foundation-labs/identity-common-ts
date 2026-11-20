@@ -104,4 +104,36 @@ describe('Verify ID Token JWT', () => {
       ).rejects.toThrow(`The 'aud' claim 'my-client-id' does not match the expected value 'mamma-mia'`)
     })
   })
+
+  test('passes the kid of the id token to the getJwks callback', async () => {
+    const kidSigner = { method: 'custom', alg: 'ES256', kid: 'key-1' } satisfies JwsSigner
+    const { jwt } = await signJwt({
+      header: { ...jwsHeaderFromSigner(kidSigner), typ: 'JWT' },
+      payload: {
+        iss: authorizationServerMetadata.issuer,
+        aud: 'my-client-id',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        iat: Math.floor(Date.now() / 1000),
+        sub: 'user-123',
+      },
+      signer: kidSigner,
+      signJwsCallback: getSignJwsCallback([{ ...signerJwk, kid: 'key-1' }]),
+    })
+
+    const getJwksCalls: unknown[] = []
+    await verifyIdTokenJwt({
+      idToken: jwt,
+      clientId: 'my-client-id',
+      callbacks: {
+        verifyJws: callbacks.verifyJws,
+        getJwks: (jwksUri, options) => {
+          getJwksCalls.push([jwksUri, options])
+          return { keys: [{ ...signerJwkPublic, kid: 'key-1' }] }
+        },
+      },
+      authorizationServer: authorizationServerMetadata,
+    })
+
+    expect(getJwksCalls).toEqual([[authorizationServerMetadata.jwks_uri, { kid: 'key-1' }]])
+  })
 })

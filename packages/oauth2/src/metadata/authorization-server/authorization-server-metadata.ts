@@ -128,6 +128,32 @@ export async function fetchAuthorizationServerMetadata(
   return authorizationServerResult
 }
 
+/**
+ * Returns the metadata of an authorization server given as its metadata or as an object with only its `issuer`. The
+ * metadata is told apart by its `token_endpoint`, which is required (RFC 8414 Section 2). An `issuer` is resolved with
+ * {@link fetchAuthorizationServerMetadata}.
+ *
+ * @throws {Oauth2Error} if no metadata exists for the issuer
+ */
+export async function resolveAuthorizationServerMetadata(
+  authorizationServer: AuthorizationServerMetadata | { issuer: string },
+  callbacks: Pick<CallbackContext, 'fetch' | 'fetchLimits' | 'getAuthorizationServerMetadata'>
+): Promise<AuthorizationServerMetadata> {
+  if (isAuthorizationServerMetadata(authorizationServer)) return authorizationServer
+
+  const metadata = await fetchAuthorizationServerMetadata(authorizationServer.issuer, callbacks)
+  if (!metadata) {
+    throw new Oauth2Error(`Authorization server metadata for issuer '${authorizationServer.issuer}' not found.`)
+  }
+  return metadata
+}
+
+export function isAuthorizationServerMetadata(
+  authorizationServer: AuthorizationServerMetadata | { issuer: string }
+): authorizationServer is AuthorizationServerMetadata {
+  return 'token_endpoint' in authorizationServer
+}
+
 export function getAuthorizationServerMetadataFromList(
   authorizationServersMetadata: AuthorizationServerMetadata[],
   issuer: string
