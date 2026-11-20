@@ -165,6 +165,7 @@ export class Openid4vciIssuer {
       | 'expectedNonce'
       | 'nonceExpiresAt'
       | 'keyAttestationsRequired'
+      | 'credentialConfiguration'
     > & {
       issuerMetadata: IssuerMetadataResult
     }
@@ -180,6 +181,7 @@ export class Openid4vciIssuer {
         now: options.now,
         allowedSkewInSeconds: options.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
         keyAttestationsRequired: options.keyAttestationsRequired,
+        credentialConfiguration: options.credentialConfiguration,
       })
     } catch (error) {
       // A wrong option, such as a negative skew, is a mistake of the issuer, not of the proof
@@ -217,6 +219,7 @@ export class Openid4vciIssuer {
       | 'now'
       | 'allowedSkewInSeconds'
       | 'keyAttestationsRequired'
+      | 'credentialConfiguration'
     > & {
       issuerMetadata: IssuerMetadataResult
     }
@@ -230,6 +233,7 @@ export class Openid4vciIssuer {
         now: options.now,
         allowedSkewInSeconds: options.allowedSkewInSeconds ?? this.options.allowedSkewInSeconds,
         keyAttestationsRequired: options.keyAttestationsRequired,
+        credentialConfiguration: options.credentialConfiguration,
       })
     } catch (error) {
       // A wrong option, such as a negative skew, is a mistake of the issuer, not of the proof

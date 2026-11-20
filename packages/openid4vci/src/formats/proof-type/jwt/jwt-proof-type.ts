@@ -13,6 +13,12 @@ import {
   zKeyAttestationJwtPayload,
 } from '../../../key-attestation/z-key-attestation'
 import {
+  type CredentialRequestProofConfiguration,
+  getSupportedProofType,
+  verifyBindingMethodSupported,
+  verifyProofSigningAlgSupported,
+} from '../verify-proof-type-supported'
+import {
   type CredentialRequestJwtProofTypeHeader,
   type CredentialRequestJwtProofTypePayload,
   zCredentialRequestJwtProofTypeHeader,
@@ -144,6 +150,14 @@ export interface VerifyCredentialRequestJwtProofOptions {
   keyAttestationsRequired?: KeyAttestationsRequired
 
   /**
+   * The credential configuration the proof is for. The proof type, the proof `alg`, the binding method of the proof
+   * key and `key_attestations_required` are verified against it. A check is skipped when its field is absent.
+   * A proof key that is not a `jwk` or a DID, such as an `x5c` certificate chain, is rejected when
+   * `cryptographic_binding_methods_supported` is present, as there is no binding method for it.
+   */
+  credentialConfiguration: CredentialRequestProofConfiguration
+
+  /**
    * Callbacks required for the jwt verification.
    *
    * Will be used for the jwt proof, and optionally a `key_attestation` in the jwt proof header.
@@ -160,6 +174,10 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
     payloadSchema: zCredentialRequestJwtProofTypePayload,
   })
   const { header, payload } = decodedJwt
+
+  const supportedProofType = getSupportedProofType(options.credentialConfiguration, 'jwt')
+  verifyProofSigningAlgSupported(supportedProofType, 'jwt', header.alg)
+  const keyAttestationsRequired = options.keyAttestationsRequired ?? supportedProofType?.key_attestations_required
 
   const now = options.now?.getTime() ?? Date.now()
   if (options.nonceExpiresAt && now > options.nonceExpiresAt.getTime()) {
@@ -192,7 +210,7 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
       use: 'proof_type.jwt',
       now: options.now,
       allowedSkewInSeconds: options.allowedSkewInSeconds,
-      keyAttestationsRequired: options.keyAttestationsRequired,
+      keyAttestationsRequired,
     })
 
     const isSignedWithAttestedKey = await isJwkInSet({
@@ -210,8 +228,10 @@ export async function verifyCredentialRequestJwtProof(options: VerifyCredentialR
 
   // Throws if a key attestation is required but the proof does not contain one
   if (!keyAttestationResult) {
-    verifyKeyAttestationRequirements({ keyAttestationsRequired: options.keyAttestationsRequired })
+    verifyKeyAttestationRequirements({ keyAttestationsRequired })
   }
+
+  verifyBindingMethodSupported(options.credentialConfiguration, signer)
 
   return {
     header,
