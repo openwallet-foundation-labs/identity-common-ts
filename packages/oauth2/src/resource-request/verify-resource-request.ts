@@ -15,6 +15,10 @@ import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
 import { type DpopVerificationOptions, extractDpopJwtFromHeaders, verifyDpopJwt } from '../dpop/dpop'
 import { Oauth2Error } from '../error/Oauth2Error'
 import { Oauth2ResourceUnauthorizedError } from '../error/Oauth2ResourceUnauthorizedError'
+import {
+  isAuthorizationServerMetadata,
+  resolveAuthorizationServerMetadata,
+} from '../metadata/authorization-server/authorization-server-metadata'
 import type { AuthorizationServerMetadata } from '../metadata/authorization-server/z-authorization-server-metadata'
 
 export interface VerifyResourceRequestOptions {
@@ -31,7 +35,16 @@ export interface VerifyResourceRequestOptions {
   /**
    * Callbacks for verification of the access token.
    */
-  callbacks: Pick<CallbackContext, 'verifyJws' | 'hash' | 'clientAuthentication' | 'fetch' | 'fetchLimits' | 'getJwks'>
+  callbacks: Pick<
+    CallbackContext,
+    | 'verifyJws'
+    | 'hash'
+    | 'clientAuthentication'
+    | 'fetch'
+    | 'fetchLimits'
+    | 'getJwks'
+    | 'getAuthorizationServerMetadata'
+  >
 
   /**
    * allowed auth schemes for the access token. If not provided
@@ -40,9 +53,20 @@ export interface VerifyResourceRequestOptions {
   allowedAuthenticationSchemes?: SupportedAuthenticationScheme[]
 
   /**
-   * List of authorization servers that this resource endpoint supports
+   * The authorization servers that this resource endpoint supports, as metadata or as `{ issuer, allowIntrospection }`.
+   * The latter is resolved only when needed, with the `getAuthorizationServerMetadata` callback or else over HTTP:
+   * for a JWT access token only the authorization server of its `iss`, for an opaque access token one at a time,
+   * in order, until one reports it as active through token introspection.
+   *
+   * An opaque access token is only introspected at an authorization server whose metadata has an
+   * `introspection_endpoint`. One given with `allowIntrospection: false` is skipped without resolving its metadata.
+   * When no authorization server allows introspection, opaque access tokens are rejected.
+   *
+   * The order matters for opaque access tokens: each authorization server before the one that issued the token
+   * costs a metadata resolution and an introspection request, and the first one that reports the token as active is
+   * the one it is accepted for. Try to filter the list of authorization servers before passing it, and list the authorization server that issues most opaque access tokens first.
    */
-  authorizationServers: AuthorizationServerMetadata[]
+  authorizationServers: Array<AuthorizationServerMetadata | { issuer: string; allowIntrospection: boolean }>
 
   /**
    * Additional DPoP verification options.
@@ -131,8 +155,16 @@ export async function verifyResourceRequest(options: VerifyResourceRequestOption
   if (!tokenPayload) {
     // If there's no verification result it means it couldn't be parsed and we will try
     // to use token introspection on all authorization servers until we've found the correct one
-    for (const authorizationServerMetadata of options.authorizationServers) {
+    for (const listedAuthorizationServer of options.authorizationServers) {
+      if (!isAuthorizationServerMetadata(listedAuthorizationServer) && !listedAuthorizationServer.allowIntrospection) {
+        continue
+      }
+
       try {
+        const authorizationServerMetadata = await resolveAuthorizationServerMetadata(
+          listedAuthorizationServer,
+          options.callbacks
+        )
         const introspectionResult = await introspectToken({
           authorizationServerMetadata,
           callbacks: options.callbacks,
