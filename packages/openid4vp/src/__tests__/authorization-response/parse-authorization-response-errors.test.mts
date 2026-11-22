@@ -155,6 +155,20 @@ describe('validateOpenid4vpAuthorizationResponsePayload with a response that is 
     )
     expect(error.cause).toBeInstanceOf(ValidationError)
   })
+
+  test('throws invalid_request for a state that does not match, without the state values in the message', async () => {
+    const error = await invalidRequest(
+      Promise.resolve().then(() =>
+        validateOpenid4vpAuthorizationResponsePayload({
+          authorizationRequestPayload: { ...authorizationRequestPayload('direct_post'), state: 'expected-state' },
+          authorizationResponsePayload: { state: 'received-state', vp_token: {} },
+        })
+      )
+    )
+    expect(error.message).not.toContain('expected-state')
+    expect(error.message).not.toContain('received-state')
+    expect(error.sensitive).toEqual({ expectedState: 'expected-state', receivedState: 'received-state' })
+  })
 })
 
 // OpenID4VP 1.0 Section 8.5: the wallet can return an authorization error response instead
