@@ -120,9 +120,11 @@ export function parseAccessTokenRequest(options: ParseAccessTokenRequestOptions)
   if (options.authorizationServerMetadata) {
     const supportedGrantTypes = getGrantTypesSupported(options.authorizationServerMetadata.grant_types_supported)
     if (!supportedGrantTypes.includes(accessTokenRequest.grant_type)) {
+      // The grant type of the request can be any string, which RFC 6749 Section 5.2 does not allow in
+      // error_description, so it is left out
       throw new Oauth2ServerErrorResponseError({
         error: Oauth2ErrorCodes.UnsupportedGrantType,
-        error_description: `The grant type '${accessTokenRequest.grant_type}' is not supported by the authorization server. Supported grant types are: ${supportedGrantTypes.join(', ')}`,
+        error_description: `The grant type is not supported by the authorization server. Supported grant types are: ${supportedGrantTypes.join(', ')}`,
       })
     }
   }
@@ -170,7 +172,7 @@ export function parseAccessTokenRequest(options: ParseAccessTokenRequestOptions)
     // Unsupported grant type
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.UnsupportedGrantType,
-      error_description: `The grant type '${accessTokenRequest.grant_type}' is not supported`,
+      error_description: 'The grant type is not supported',
     })
   }
 

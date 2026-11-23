@@ -14,6 +14,16 @@ const baseAuthorizationServerMetadata = {
   token_endpoint: 'https://oauth2-auth-server.com/token',
 } satisfies AuthorizationServerMetadata
 
+function oauth2ErrorOf(parse: () => unknown) {
+  try {
+    parse()
+  } catch (error) {
+    expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
+    return error as Oauth2ServerErrorResponseError
+  }
+  throw new Error('Expected an Oauth2ServerErrorResponseError to be thrown')
+}
+
 describe('Parse Access Token Request', () => {
   test('handles invalid structure', () => {
     expect(() =>
@@ -28,11 +38,12 @@ describe('Parse Access Token Request', () => {
     ).toThrow('Error occurred during validation of authorization request.')
   })
 
-  test('handles unknown grant_type', () => {
-    expect(() =>
+  // RFC 6749 Section 5.2: error_description only allows printable ASCII without '"' and '\'
+  test('handles unknown grant_type, without the grant type of the request in the error', () => {
+    const error = oauth2ErrorOf(() =>
       parseAccessTokenRequest({
         accessTokenRequest: {
-          grant_type: 'something',
+          grant_type: 'something "unknown"\n',
         },
         request: {
           headers: new Headers(),
@@ -40,22 +51,38 @@ describe('Parse Access Token Request', () => {
           url: 'https://request.com/token',
         },
       })
-    ).toThrow(`The grant type 'something' is not supported`)
+    )
+
+    expect(error.errorResponse).toEqual({
+      error: 'unsupported_grant_type',
+      error_description: 'The grant type is not supported',
+    })
+    expect(error.message).not.toContain('something')
   })
 
-  test('handles unknown grant_type', () => {
-    expect(() =>
+  test('handles unknown grant_type not in grant_types_supported, without the grant type of the request in the error', () => {
+    const error = oauth2ErrorOf(() =>
       parseAccessTokenRequest({
         accessTokenRequest: {
-          grant_type: 'something',
+          grant_type: 'something "unknown"\n',
         },
         request: {
           headers: new Headers(),
           method: 'POST',
           url: 'https://request.com/token',
         },
+        authorizationServerMetadata: {
+          ...baseAuthorizationServerMetadata,
+          grant_types_supported: [authorizationCodeGrantIdentifier],
+        },
       })
-    ).toThrow(`The grant type 'something' is not supported`)
+    )
+
+    expect(error.errorResponse).toEqual({
+      error: 'unsupported_grant_type',
+      error_description: `The grant type is not supported by the authorization server. Supported grant types are: ${authorizationCodeGrantIdentifier}`,
+    })
+    expect(error.message).not.toContain('something')
   })
 
   test('handles missing pre-authorized_code for pre-auth grant_type', () => {
@@ -260,7 +287,7 @@ describe('Parse Access Token Request', () => {
     ).toThrow(
       new Oauth2ServerErrorResponseError({
         error: 'unsupported_grant_type',
-        error_description: `The grant type '${clientCredentialsGrantIdentifier}' is not supported by the authorization server. Supported grant types are: ${authorizationCodeGrantIdentifier}`,
+        error_description: `The grant type is not supported by the authorization server. Supported grant types are: ${authorizationCodeGrantIdentifier}`,
       })
     )
   })
@@ -335,7 +362,7 @@ describe('Parse Access Token Request', () => {
           grant_types_supported: [authorizationCodeGrantIdentifier],
         },
       })
-    ).toThrow(`The grant type '${preAuthorizedCodeGrantIdentifier}' is not supported by the authorization server`)
+    ).toThrow('The grant type is not supported by the authorization server')
   })
 
   test('accepts grant type when in grant_types_supported', () => {
@@ -389,7 +416,7 @@ describe('Parse Access Token Request', () => {
         },
         authorizationServerMetadata: baseAuthorizationServerMetadata,
       })
-    ).toThrow(`The grant type '${preAuthorizedCodeGrantIdentifier}' is not supported by the authorization server`)
+    ).toThrow('The grant type is not supported by the authorization server')
   })
 
   test('does not validate grant_types_supported when authorizationServerMetadata is not provided', () => {
