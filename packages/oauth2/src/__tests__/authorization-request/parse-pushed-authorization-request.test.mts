@@ -1,3 +1,4 @@
+import { JoseParseError } from '@owf/jose'
 import { describe, expect, test, vi } from 'vitest'
 import {
   parsePushedAuthorizationRequest,
@@ -49,6 +50,37 @@ describe('Parse Pushed Authorization Response', () => {
         error_description: `The 'request_uri' parameter must not be provided in a pushed authorization request.`,
       })
       expect(fetch).not.toHaveBeenCalled()
+    })
+
+    // RFC 9126 Section 2.3: the error response of the token endpoint (RFC 6749 Section 5.2), with invalid_request
+    test('throws invalid_request for a request that is neither an authorization request nor a jar', async () => {
+      const error = await parsePushedAuthorizationRequest({
+        request: { headers: new Headers(), method: 'POST', url: 'https://as.example.com/par' },
+        authorizationRequest: { response_type: 'code' },
+        callbacks: {},
+      }).catch((error) => error)
+
+      expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
+      expect(error.errorResponse.error).toEqual('invalid_request')
+      expect(error.errorResponse.error_description).toMatch(
+        /^Invalid authorization request\. Could not parse authorization request or jar\./
+      )
+    })
+
+    // RFC 9101 Section 7: invalid_request_object for a request parameter with an invalid request object
+    test('throws invalid_request_object for a jar whose request is not a jwt', async () => {
+      const error = await parsePushedAuthorizationRequest({
+        request: { headers: new Headers(), method: 'POST', url: 'https://as.example.com/par' },
+        authorizationRequest: { client_id: 'x', request: 'not-a-jwt' },
+        callbacks: {},
+      }).catch((error) => error)
+
+      expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
+      expect(error.errorResponse).toEqual({
+        error: 'invalid_request_object',
+        error_description: 'JAR request object is not a valid JWT.',
+      })
+      expect(error.cause).toBeInstanceOf(JoseParseError)
     })
   })
 })
