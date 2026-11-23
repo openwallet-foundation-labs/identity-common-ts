@@ -1,6 +1,7 @@
 import type { z } from 'zod'
 import { DcqlInvalidPresentationRecordError, DcqlPresentationResultError } from '../dcql-error/e-dcql.js'
 import { runCredentialQuery } from '../dcql-parser/dcql-credential-query-result.js'
+import { matchCredentialSets } from '../dcql-query/m-dcql-credential-set-query.js'
 import type { DcqlQuery } from '../dcql-query/m-dcql-query.js'
 import { DcqlQueryResult } from '../dcql-query-result/m-dcql-query-result.js'
 import { parseWithIssues } from '../u-dcql.js'
@@ -60,37 +61,22 @@ export namespace DcqlPresentationResult {
       })
     })
 
-    const credentialSetResults = dcqlQuery.credential_sets?.map((set) => {
-      const matchingOptions = set.options.filter((option) =>
-        option.every(
-          (credentialQueryId) =>
-            queriesResults.find((result) => result.credential_query_id === credentialQueryId)?.success
-        )
-      )
-
-      return {
-        ...set,
-        matching_options: matchingOptions.length > 0 ? (matchingOptions as [string[], ...string[][]]) : undefined,
-      }
-    }) as DcqlQueryResult.Output['credential_sets']
+    const { credentialSets, isSatisfied } = matchCredentialSets(
+      dcqlQuery,
+      (credentialQueryId) =>
+        queriesResults.find((result) => result.credential_query_id === credentialQueryId)?.success === true
+    )
 
     const dqclQueryMatched =
       // We require that all the submitted presentations match with the queries
       // So we must have success for all queries, and we don't allow failed_credentials
-      queriesResults.every((result) => result.success && !result.failed_credentials) &&
-      (credentialSetResults
-        ? credentialSetResults.every((set) => !set.required || set.matching_options)
-        : // If not credential_sets are used, we require that at least every credential has a match
-          dcqlQuery.credentials.every(
-            (credentialQuery) =>
-              queriesResults.find((result) => result.credential_query_id === credentialQuery.id)?.success
-          ))
+      queriesResults.every((result) => result.success && !result.failed_credentials) && isSatisfied
 
     return {
       // NOTE: can_be_satisfied is maybe not the best term, because we return false if it can be
       // satisfied, but one of the provided presentations did not match
       can_be_satisfied: dqclQueryMatched,
-      credential_sets: credentialSetResults,
+      credential_sets: credentialSets,
       credential_matches: Object.fromEntries(queriesResults.map((result) => [result.credential_query_id, result])),
     }
   }

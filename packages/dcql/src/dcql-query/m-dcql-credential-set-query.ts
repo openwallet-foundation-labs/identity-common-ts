@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { isObject, zIdString, zJsonTypes, zNonEmptyArray } from '../u-dcql.js'
+import { isObject, type NonEmptyArray, zIdString, zJsonTypes, zNonEmptyArray } from '../u-dcql.js'
 
 /**
  * A Credential Set Query is an object representing
@@ -28,3 +28,27 @@ export namespace CredentialSetQuery {
   export type Output = z.output<typeof zModel>
 }
 export type CredentialSetQuery = CredentialSetQuery.Output
+
+/**
+ * OpenID4VP 1.0 Section 6.4.2: without `credential_sets` every credential query is requested, otherwise an option of
+ * each required credential set. `isMatched` tells whether a credential query is matched.
+ */
+export function matchCredentialSets(
+  dcqlQuery: { credentials: { id: string }[]; credential_sets?: CredentialSetQuery[] },
+  isMatched: (credentialQueryId: string) => boolean
+) {
+  const credentialSets = dcqlQuery.credential_sets?.map((set) => {
+    const matchingOptions = set.options.filter((option) => option.every(isMatched))
+
+    return {
+      ...set,
+      matching_options: matchingOptions.length > 0 ? (matchingOptions as NonEmptyArray<string[]>) : undefined,
+    }
+  }) as NonEmptyArray<CredentialSetQuery & { matching_options: NonEmptyArray<string[]> | undefined }> | undefined
+
+  const isSatisfied = credentialSets
+    ? credentialSets.every((set) => !set.required || set.matching_options)
+    : dcqlQuery.credentials.every(({ id }) => isMatched(id))
+
+  return { credentialSets, isSatisfied }
+}
