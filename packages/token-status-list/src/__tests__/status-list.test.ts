@@ -213,6 +213,21 @@ describe('StatusList', () => {
       expect(encoded[0]).toBe(0xb9)
       expect(encoded[1]).toBe(0xa3)
     })
+
+    // Token Status List draft 16 § 4.1: the example with 2 bits per status
+    it('should match spec example for 2-bit status list', () => {
+      const list = new StatusList([1, 2, 0, 3, 0, 1, 0, 1, 1, 2, 3, 3], 2)
+
+      expect(list.encodeStatusListIntoByteArray()).toEqual(new Uint8Array([0xc9, 0x44, 0xf9]))
+    })
+
+    it('encodes a list that does not fill its last byte', () => {
+      const list = new StatusList([1, 0, 1], 1)
+
+      expect(list.encodeStatusListIntoByteArray()).toEqual(new Uint8Array([0b101]))
+      expect(list.totalStatuses).toBe(3)
+      expect(list.statusList).toEqual([1, 0, 1])
+    })
   })
 })
 
@@ -245,9 +260,34 @@ describe('status values', () => {
     expect(StatusList.decompressStatusListFromBytes(list.compressStatusListToBytes(), 1).getStatus(7)).toBe(1)
   })
 
-  it('rejects an invalid value written directly to the exposed list when encoding', () => {
-    const list = new StatusList([0, 0, 0, 0], 2)
-    list.statusList[1] = 4
-    expect(() => list.encodeStatusListIntoByteArray()).toThrow('Status value out of range at index 1 with value 4')
+  // A write to the array would not set `isModified`, so a StatusListCbor would keep its compressed bytes
+  it.each([
+    ['created', () => new StatusList([0, 0, 0, 0, 0, 0, 0, 0], 1)],
+    [
+      'decompressed',
+      () =>
+        StatusList.decompressStatusListFromBytes(
+          new StatusList([0, 0, 0, 0, 0, 0, 0, 0], 1).compressStatusListToBytes(),
+          1
+        ),
+    ],
+  ])('does not change a %s list when the array of statusList is changed', (_, create) => {
+    const list = create()
+
+    const statuses = list.statusList as number[]
+    statuses[1] = 1
+
+    expect(list.getStatus(1)).toBe(0)
+    expect(list.statusList[1]).toBe(0)
+    expect(list.isModified).toBe(false)
+  })
+
+  it('does not change the list when the array it was created from is changed', () => {
+    const statuses = [0, 0, 0, 0]
+    const list = new StatusList(statuses, 2)
+
+    statuses[1] = 4
+
+    expect(list.getStatus(1)).toBe(0)
   })
 })

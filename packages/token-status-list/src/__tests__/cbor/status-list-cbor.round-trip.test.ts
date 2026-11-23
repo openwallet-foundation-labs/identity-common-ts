@@ -123,5 +123,20 @@ suite('StatusListCbor round trip', () => {
 
       expect(StatusListCbor.decode(statusListCbor.encode()).statusList.statusList.slice(0, 4)).toEqual([1, 1, 0, 1])
     })
+
+    test('keeps the list and its compressed bytes when the array of the inflated status list is changed', () => {
+      const statusListCbor = StatusListCbor.decode(
+        foreignStatusList([
+          ['bits', 1],
+          ['lst', defaultLevelLst],
+        ])
+      )
+
+      const statuses = statusListCbor.statusList.statusList as number[]
+      statuses[0] = 1
+
+      expect(statusListCbor.statusList.getStatus(0)).toBe(0)
+      expect(hex(statusListCbor.compressedStatusList)).toEqual(hex(defaultLevelLst))
+    })
   })
 })
