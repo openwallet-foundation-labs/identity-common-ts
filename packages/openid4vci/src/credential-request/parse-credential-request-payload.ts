@@ -98,6 +98,20 @@ export function parseCredentialRequestPayload(
     options.credentialRequest,
     'Error validating credential request'
   )
+
+  // OpenID4VCI 1.0 Section 12.2.4: `batch_size` is the maximum array size of the `proofs` parameter, and without
+  // `batch_credential_issuance` the credential issuer accepts only one key proof
+  if (credentialRequest.proofs) {
+    const maxProofs = options.issuerMetadata.credentialIssuer.batch_credential_issuance?.batch_size ?? 1
+    const proofCount = Object.values(credentialRequest.proofs)[0].length
+    if (proofCount > maxProofs) {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidCredentialRequest,
+        error_description: `The 'proofs' parameter contains ${proofCount} key proofs, but the credential issuer accepts at most ${maxProofs}.`,
+      })
+    }
+  }
+
   let proofs: CredentialRequestProofsFormatSpecific | undefined
 
   // Try to parse the known proofs from the `proofs` object

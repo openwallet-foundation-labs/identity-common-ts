@@ -571,7 +571,7 @@ describe('Parse Credential Request', () => {
       parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
-          credentialIssuer: issuerMetadata,
+          credentialIssuer: { ...issuerMetadata, batch_credential_issuance: { batch_size: 2 } },
           originalDraftVersion: Openid4vciVersion.Draft14,
           knownCredentialConfigurations: {
             my_credential: {
@@ -609,7 +609,7 @@ describe('Parse Credential Request', () => {
       parseCredentialRequestPayload({
         issuerMetadata: {
           authorizationServers: [],
-          credentialIssuer: issuerMetadata,
+          credentialIssuer: { ...issuerMetadata, batch_credential_issuance: { batch_size: 2 } },
           originalDraftVersion: Openid4vciVersion.Draft14,
           knownCredentialConfigurations: {
             my_credential: {
@@ -638,6 +638,62 @@ describe('Parse Credential Request', () => {
       },
       credentialResponseEncryption: undefined,
     })
+  })
+
+  // OpenID4VCI 1.0 Section 12.2.4: batch_size is the maximum array size of the proofs parameter
+  test('rejects a proofs array larger than the batch_size of the credential issuer', () => {
+    expect(() =>
+      parseCredentialRequestPayload({
+        issuerMetadata: {
+          authorizationServers: [],
+          credentialIssuer: { ...issuerMetadata, batch_credential_issuance: { batch_size: 2 } },
+          originalDraftVersion: Openid4vciVersion.V1,
+          knownCredentialConfigurations: {},
+        },
+        credentialRequest: {
+          credential_identifier: 'some-identifier',
+          proofs: {
+            jwt: ['ey.ey.Sg', 'ey.ey.Sg', 'ey.ey.Sg'],
+          },
+        },
+      })
+    ).toThrow(
+      expect.objectContaining({
+        status: 400,
+        errorResponse: {
+          error: 'invalid_credential_request',
+          error_description: `The 'proofs' parameter contains 3 key proofs, but the credential issuer accepts at most 2.`,
+        },
+      })
+    )
+  })
+
+  // OpenID4VCI 1.0 Section 12.2.4: without batch_credential_issuance, the credential issuer accepts one key proof
+  test('rejects more than one key proof when the credential issuer does not support batch issuance', () => {
+    expect(() =>
+      parseCredentialRequestPayload({
+        issuerMetadata: {
+          authorizationServers: [],
+          credentialIssuer: issuerMetadata,
+          originalDraftVersion: Openid4vciVersion.V1,
+          knownCredentialConfigurations: {},
+        },
+        credentialRequest: {
+          credential_identifier: 'some-identifier',
+          proofs: {
+            not_a_jwt: [{ one: true }, { two: true }],
+          },
+        },
+      })
+    ).toThrow(
+      expect.objectContaining({
+        status: 400,
+        errorResponse: {
+          error: 'invalid_credential_request',
+          error_description: `The 'proofs' parameter contains 2 key proofs, but the credential issuer accepts at most 1.`,
+        },
+      })
+    )
   })
 
   test('parse draft 14 credential request without format with credential_identifier', () => {
