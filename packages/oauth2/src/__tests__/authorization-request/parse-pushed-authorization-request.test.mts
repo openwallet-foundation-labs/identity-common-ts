@@ -84,5 +84,41 @@ describe('Parse Pushed Authorization Response', () => {
       })
       expect(error.cause).toBeInstanceOf(JoseParseError)
     })
+
+    test('throws invalid_request_object for a jar whose request is encrypted', async () => {
+      const error = await parsePushedAuthorizationRequest({
+        request: { headers: new Headers(), method: 'POST', url: 'https://as.example.com/par' },
+        authorizationRequest: {
+          client_id: 'x',
+          // A compact JWE with the header {"alg":"RSA-OAEP","enc":"A256GCM"}
+          request: 'eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.ZW5j.aXY.Y2lwaGVy.dGFn',
+        },
+        callbacks: {},
+      }).catch((error) => error)
+
+      expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
+      expect(error.errorResponse).toEqual({
+        error: 'invalid_request_object',
+        error_description: 'Encrypted JWE request objects are not supported.',
+      })
+    })
+
+    test('throws invalid_request_object for a jar whose payload is not an authorization request', async () => {
+      const error = await parsePushedAuthorizationRequest({
+        request: { headers: new Headers(), method: 'POST', url: 'https://as.example.com/par' },
+        authorizationRequest: {
+          client_id: 'x',
+          // A JWT with the payload {"client_id":"x"}, without response_type. The signature is not verified when parsing.
+          request: 'eyJhbGciOiJFUzI1NiIsInR5cCI6Im9hdXRoLWF1dGh6LXJlcStqd3QifQ.eyJjbGllbnRfaWQiOiJ4In0.c2ln',
+        },
+        callbacks: {},
+      }).catch((error) => error)
+
+      expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
+      expect(error.errorResponse).toEqual({
+        error: 'invalid_request_object',
+        error_description: 'Invalid authorization request. Could not parse jar request payload.',
+      })
+    })
   })
 })
