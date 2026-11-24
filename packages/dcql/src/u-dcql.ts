@@ -51,8 +51,12 @@ export const zJsonRecord = z.record(z.string(), z.json())
 export const DCQL_VALIDATION_CODES = {
   /** A credential query `id` is present more than once (OpenID4VP 1.0 Section 6.1) */
   DUPLICATE_CREDENTIAL_QUERY_ID: 'duplicate_credential_query_id',
-  /** A credential set option refers to a credential query `id` that is not in `credentials` (OpenID4VP 1.0 Section 6.2) */
+  /** A credential set option or a presentation refers to a credential query `id` not in `credentials` (OpenID4VP 1.0 Sections 6.2, 8.1) */
   UNKNOWN_CREDENTIAL_QUERY_ID: 'unknown_credential_query_id',
+  /** A credential query without `multiple` has more than one presentation (OpenID4VP 1.0 Section 8.1) */
+  MULTIPLE_PRESENTATIONS_NOT_ALLOWED: 'multiple_presentations_not_allowed',
+  /** A required credential set has no option with a presentation for each credential query (OpenID4VP 1.0 Section 6.4.2) */
+  UNSATISFIED_CREDENTIAL_SET: 'unsatisfied_credential_set',
   /** A claim `id` is present more than once in the `claims` of a credential query (OpenID4VP 1.0 Section 6.3) */
   DUPLICATE_CLAIM_ID: 'duplicate_claim_id',
   /** A claim set refers to a claim `id` that is not in the `claims` of the credential query (OpenID4VP 1.0 Section 6.1) */
@@ -143,6 +147,11 @@ export const zJsonTypes = <T>(expected: string, matches: (value: unknown) => boo
 
 export const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
+
+export function hasOwn(val: object, key: string | number) {
+  // biome-ignore lint/suspicious/noPrototypeBuiltins: `Object.hasOwn` is not in the ES2020 lib this package targets
+  return Object.prototype.hasOwnProperty.call(val, key)
+}
 
 /**
  * Parse the input with the schema, and throw a {@link DcqlParseError} with the issues when it does not match.

@@ -49,7 +49,7 @@ function checkClaimIds(credentialQuery: { claims?: { id?: string }[]; claim_sets
       addDcqlIssue(ctx, {
         code: DCQL_VALIDATION_CODES.UNKNOWN_CLAIM_ID,
         path: ['claim_sets', claimSetIndex, index],
-        message: `Claim set ${claimSetIndex} refers to the claim id '${claimId}', which is not in claims`,
+        message: `Claim set ${claimSetIndex} refers to the claim id '${claimId}', which is not in 'claims'`,
       })
     })
   })
@@ -168,3 +168,20 @@ export namespace DcqlCredentialQuery {
   }
 }
 export type DcqlCredentialQuery = DcqlCredentialQuery.Output
+
+/**
+ * The credential query of the DCQL query with the id of a presentation, or else the issue that the id is not in
+ * `credentials`, which the caller can collect or throw
+ */
+export function getCredentialQueryById(dcqlQuery: { credentials: DcqlCredentialQuery[] }, id: string) {
+  const credentialQuery = dcqlQuery.credentials.find((credentialQuery) => credentialQuery.id === id)
+  if (credentialQuery) return { credentialQuery }
+
+  return {
+    issue: {
+      code: DCQL_VALIDATION_CODES.UNKNOWN_CREDENTIAL_QUERY_ID,
+      path: [id],
+      message: `The presentation refers to the credential query id '${id}', which is not in 'credentials'`,
+    },
+  }
+}
