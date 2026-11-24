@@ -1,4 +1,4 @@
-import { parseWithSchema, validationErrorMessage } from '@owf/identity-common'
+import { parseWithSchema } from '@owf/identity-common'
 import { decodeJwt } from '@owf/jose'
 import z from 'zod'
 import type { CallbackContext } from '../callbacks'
@@ -51,13 +51,13 @@ export async function parsePushedAuthorizationRequest(
     options.authorizationRequest
   )
   if (!parsedRequest.success) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: validationErrorMessage(
-        'Invalid authorization request. Could not parse authorization request or jar.',
-        parsedRequest.issues
-      ),
-    })
+    throw Oauth2ServerErrorResponseError.fromValidationIssues(
+      {
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'Invalid authorization request. Could not parse authorization request or jar.',
+      },
+      parsedRequest.issues
+    )
   }
   const parsed = parsedRequest.data
 
@@ -86,13 +86,13 @@ export async function parsePushedAuthorizationRequest(
 
     const parsedAuthorizationRequest = parseWithSchema(zAuthorizationRequest, jwt.payload)
     if (!parsedAuthorizationRequest.success) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: validationErrorMessage(
-          'Invalid authorization request. Could not parse jar request payload.',
-          parsedAuthorizationRequest.issues
-        ),
-      })
+      throw Oauth2ServerErrorResponseError.fromValidationIssues(
+        {
+          error: Oauth2ErrorCodes.InvalidRequest,
+          error_description: 'Invalid authorization request. Could not parse jar request payload.',
+        },
+        parsedAuthorizationRequest.issues
+      )
     }
 
     authorizationRequest = parsedAuthorizationRequest.data

@@ -52,7 +52,8 @@ describe('Parse Pushed Authorization Response', () => {
       expect(fetch).not.toHaveBeenCalled()
     })
 
-    // RFC 9126 Section 2.3: the error response of the token endpoint (RFC 6749 Section 5.2), with invalid_request
+    // RFC 9126 Section 2.3: the error response of the token endpoint (RFC 6749 Section 5.2), with invalid_request.
+    // The error_description is one line, as RFC 6749 Section 5.2 doesn't allow line breaks and quotes.
     test('throws invalid_request for a request that is neither an authorization request nor a jar', async () => {
       const error = await parsePushedAuthorizationRequest({
         request: { headers: new Headers(), method: 'POST', url: 'https://as.example.com/par' },
@@ -61,10 +62,11 @@ describe('Parse Pushed Authorization Response', () => {
       }).catch((error) => error)
 
       expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
-      expect(error.errorResponse.error).toEqual('invalid_request')
-      expect(error.errorResponse.error_description).toMatch(
-        /^Invalid authorization request\. Could not parse authorization request or jar\./
-      )
+      expect(error.errorResponse).toEqual({
+        error: 'invalid_request',
+        error_description: 'Invalid authorization request. Could not parse authorization request or jar.',
+      })
+      expect(error.message).toContain('\n  - ')
     })
 
     // RFC 9101 Section 7: invalid_request_object for a request parameter with an invalid request object

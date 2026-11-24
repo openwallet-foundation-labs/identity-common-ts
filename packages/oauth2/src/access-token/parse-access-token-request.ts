@@ -1,4 +1,4 @@
-import { parseWithSchema, validationErrorMessage } from '@owf/identity-common'
+import { parseWithSchema } from '@owf/identity-common'
 import { extractClientAttestationJwtsFromHeaders } from '../client-attestation/client-attestation'
 import type { RequestLike } from '../common/z-common'
 import { Oauth2ErrorCodes } from '../common/z-oauth2-error'
@@ -105,13 +105,13 @@ export interface ParseAccessTokenRequestOptions {
 export function parseAccessTokenRequest(options: ParseAccessTokenRequestOptions): ParseAccessTokenRequestResult {
   const parsedAccessTokenRequest = parseWithSchema(zAccessTokenRequest, options.accessTokenRequest)
   if (!parsedAccessTokenRequest.success) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: validationErrorMessage(
-        'Error occurred during validation of authorization request.',
-        parsedAccessTokenRequest.issues
-      ),
-    })
+    throw Oauth2ServerErrorResponseError.fromValidationIssues(
+      {
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'Error occurred during validation of authorization request.',
+      },
+      parsedAccessTokenRequest.issues
+    )
   }
 
   const accessTokenRequest = parsedAccessTokenRequest.data

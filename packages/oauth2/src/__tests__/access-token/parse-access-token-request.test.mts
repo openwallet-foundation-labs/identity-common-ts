@@ -25,8 +25,9 @@ function oauth2ErrorOf(parse: () => unknown) {
 }
 
 describe('Parse Access Token Request', () => {
+  // RFC 6749 Section 5.2: error_description is one line, without the issues
   test('handles invalid structure', () => {
-    expect(() =>
+    const error = oauth2ErrorOf(() =>
       parseAccessTokenRequest({
         accessTokenRequest: {},
         request: {
@@ -35,7 +36,13 @@ describe('Parse Access Token Request', () => {
           url: 'https://request.com/token',
         },
       })
-    ).toThrow('Error occurred during validation of authorization request.')
+    )
+
+    expect(error.errorResponse).toEqual({
+      error: 'invalid_request',
+      error_description: 'Error occurred during validation of authorization request.',
+    })
+    expect(error.message).toContain('\n  - ')
   })
 
   // RFC 6749 Section 5.2: error_description only allows printable ASCII without '"' and '\'
