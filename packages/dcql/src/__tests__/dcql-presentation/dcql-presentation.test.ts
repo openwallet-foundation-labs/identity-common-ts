@@ -1,4 +1,5 @@
 import { assert, describe, expect, test } from 'vitest'
+import { DcqlPresentationResultError } from '../../dcql-error'
 import { DcqlPresentation } from '../../dcql-presentation/m-dcql-presentation'
 import { DcqlPresentationResult } from '../../dcql-presentation/m-dcql-presentation-result'
 import { DcqlQuery } from '../../dcql-query'
@@ -1029,6 +1030,21 @@ describe('DCQL presentation with a DCQL query', () => {
     expect(DcqlPresentation.parse(presentation, { dcqlQuery })).toEqual(presentation)
   })
 
+  test('fromDcqlPresentation reports a credential query id that is not in the query with the message of parse', () => {
+    const pidPresentation = {
+      credential_format: 'dc+sd-jwt' as const,
+      vct: 'https://example.com/pid',
+      claims: {},
+      cryptographic_holder_binding: true,
+    }
+
+    expect(() => DcqlPresentationResult.fromDcqlPresentation({ photo_id: [pidPresentation] }, { dcqlQuery })).toThrow(
+      new DcqlPresentationResultError({
+        message: "The presentation refers to the credential query id 'photo_id', which is not in 'credentials'",
+      })
+    )
+  })
+
   test('parse checks a JSON encoded vp_token against the query', () => {
     const presentation = { pid: ['pid-presentation'], mdl: ['mdl-presentation'] }
     expect(DcqlPresentation.parse(JSON.stringify(presentation), { dcqlQuery })).toEqual(presentation)
@@ -1044,7 +1060,7 @@ describe('DCQL presentation with a DCQL query', () => {
             severity: 'error',
             code: 'unknown_credential_query_id',
             path: ['photo_id'],
-            message: "The presentation refers to the credential query id 'photo_id', which is not in credentials",
+            message: "The presentation refers to the credential query id 'photo_id', which is not in 'credentials'",
           },
           {
             severity: 'error',
@@ -1077,7 +1093,7 @@ describe('DCQL presentation with a DCQL query', () => {
             severity: 'error',
             code: 'unknown_credential_query_id',
             path: ['photo_id'],
-            message: "The presentation refers to the credential query id 'photo_id', which is not in credentials",
+            message: "The presentation refers to the credential query id 'photo_id', which is not in 'credentials'",
           },
           {
             severity: 'error',

@@ -1,6 +1,7 @@
 import type { z } from 'zod'
 import { DcqlInvalidPresentationRecordError, DcqlPresentationResultError } from '../dcql-error/e-dcql.js'
 import { runCredentialQuery } from '../dcql-parser/dcql-credential-query-result.js'
+import { getCredentialQueryById } from '../dcql-query/m-dcql-credential-query.js'
 import { matchCredentialSets } from '../dcql-query/m-dcql-credential-set-query.js'
 import type { DcqlQuery } from '../dcql-query/m-dcql-query.js'
 import { DcqlQueryResult } from '../dcql-query-result/m-dcql-query-result.js'
@@ -34,12 +35,8 @@ export namespace DcqlPresentationResult {
     const { dcqlQuery } = ctx
 
     const queriesResults = Object.entries(dcqlPresentation).map(([credentialQueryId, presentations]) => {
-      const credentialQuery = dcqlQuery.credentials.find((c) => c.id === credentialQueryId)
-      if (!credentialQuery) {
-        throw new DcqlPresentationResultError({
-          message: `Query ${credentialQueryId} not found in the dcql query. Cannot validate presentation.`,
-        })
-      }
+      const { credentialQuery, issue } = getCredentialQueryById(dcqlQuery, credentialQueryId)
+      if (!credentialQuery) throw new DcqlPresentationResultError({ message: issue.message })
 
       if (Array.isArray(presentations)) {
         if (presentations.length === 0) {

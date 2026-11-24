@@ -30,7 +30,7 @@ function checkCredentialQueryIds(
         addDcqlIssue(ctx, {
           code: DCQL_VALIDATION_CODES.UNKNOWN_CREDENTIAL_QUERY_ID,
           path: ['credential_sets', credentialSetIndex, 'options', optionIndex, index],
-          message: `Credential set ${credentialSetIndex} refers to the credential query id '${id}', which is not in credentials`,
+          message: `Credential set ${credentialSetIndex} refers to the credential query id '${id}', which is not in 'credentials'`,
         })
       })
     })

@@ -1,7 +1,7 @@
 import type { SchemaValidationCode, ValidationIssueInput } from '@owf/identity-common'
 import { z } from 'zod'
 import { DcqlParseError } from '../dcql-error/e-dcql.js'
-import type { DcqlCredentialQuery } from '../dcql-query/m-dcql-credential-query.js'
+import { type DcqlCredentialQuery, getCredentialQueryById } from '../dcql-query/m-dcql-credential-query.js'
 import { matchCredentialSets } from '../dcql-query/m-dcql-credential-set-query.js'
 import type { DcqlQuery } from '../dcql-query/m-dcql-query.js'
 import {
@@ -42,13 +42,9 @@ function findVpTokenViolations(vpToken: Record<string, unknown>, dcqlQuery: Dcql
   const violations: DcqlViolation[] = []
 
   for (const [credentialQueryId, presentations] of Object.entries(vpToken)) {
-    const credentialQuery = dcqlQuery.credentials.find(({ id }) => id === credentialQueryId)
+    const { credentialQuery, issue } = getCredentialQueryById(dcqlQuery, credentialQueryId)
     if (!credentialQuery) {
-      violations.push({
-        code: DCQL_VALIDATION_CODES.UNKNOWN_CREDENTIAL_QUERY_ID,
-        path: [credentialQueryId],
-        message: `The presentation refers to the credential query id '${credentialQueryId}', which is not in credentials`,
-      })
+      violations.push(issue)
       continue
     }
 
