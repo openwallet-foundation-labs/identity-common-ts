@@ -1,5 +1,22 @@
 # @openid4vc/openid4vp
 
+## 0.11.0
+
+### Patch Changes
+
+- ee6339a: `IdentityError` and `Oauth2Error` take a `sensitive` option for values that must not end up in logs, such as an expected `state`. They are kept on `error.sensitive`, which is not enumerable, so they are left out of the message and of a serialized or logged error. Call `setIdentityCommonConfig({ includeSensitiveErrorDetails: true })` to add them to the message, for example in tests or for debugging.
+  
+  The `state` mismatch error of `validateOpenid4vpAuthorizationResponsePayload` no longer puts the expected and received `state` in its message, but passes them as `sensitive`.
+- 64893a5: `parseOpenid4vpAuthorizationResponse`, `parseJarmAuthorizationResponse`, `verifyJarmAuthorizationResponse` and `validateOpenid4vpAuthorizationResponsePayload` throw an `Oauth2ServerErrorResponseError` with error `invalid_request` (RFC 6749 Section 5.2) for an authorization response that cannot be decoded or parsed, instead of the error of `@owf/jose`, `@owf/identity-common` or `@openid4vc/utils`, which is now the `cause`. An authorization error response of the wallet still throws an `Openid4vpAuthorizationResponseError`.
+- Updated dependencies [ee6339a]
+- Updated dependencies [d8e50fd]
+- Updated dependencies [3f52fb9]
+- Updated dependencies [b0c4ff1]
+  - @owf/identity-common@0.9.0
+  - @openid4vc/oauth2@0.11.0
+  - @owf/jose@0.9.0
+  - @openid4vc/utils@0.11.0
+
 ## 0.10.0
 
 ### Minor Changes
