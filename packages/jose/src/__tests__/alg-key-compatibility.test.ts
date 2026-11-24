@@ -183,6 +183,13 @@ describe('assertKeyAllowedForSignatureAlgorithm', () => {
         assertKeyAllowedForSignatureAlgorithm({ jwk: { kty: 'AKP', use: 'enc' }, alg: 'ML-DSA-44' })
       ).toThrow(joseError(JoseAlgorithmNotAllowedError, `The key declares use 'enc' instead of 'sig'.`))
     })
+
+    // The key of a token, e.g. the jwk of a DPoP proof, comes from whoever sent it
+    it('escapes the control characters of the use in the message', () => {
+      expect(() =>
+        assertKeyAllowedForSignatureAlgorithm({ jwk: { ...keys.p256, use: 'enc\r\nsig' }, alg: 'ES256' })
+      ).toThrow(joseError(JoseAlgorithmNotAllowedError, `The key declares use 'enc\\r\\nsig' instead of 'sig'.`))
+    })
   })
 
   describe('the key_ops the key declares', () => {

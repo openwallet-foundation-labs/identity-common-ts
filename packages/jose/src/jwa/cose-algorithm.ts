@@ -5,6 +5,7 @@
  * @see https://www.rfc-editor.org/rfc/rfc9864 Fully-Specified Algorithms for JOSE and COSE
  */
 
+import { errorMessageValue } from '@owf/identity-common'
 import { JoseNotSupportedError } from '../error'
 import { hasOwn } from '../utils/object'
 import { JwaSignatureAlgorithm } from './algorithms'
@@ -122,7 +123,9 @@ export function jwaSignatureAlgorithmsToCoseAlgorithms(
     .map((jwaAlg) => {
       const coseAlg = jwaSignatureAlgorithmToCoseAlgorithm(jwaAlg)
       if (coseAlg || !throwOnUnknownValue) return coseAlg
-      throw new JoseNotSupportedError(`Found unknown JWA signature algorithm '${jwaAlg}'. Unable to map to COSE.`)
+      throw new JoseNotSupportedError(
+        `Found unknown JWA signature algorithm '${errorMessageValue(jwaAlg)}'. Unable to map to COSE.`
+      )
     })
     .filter((coseAlg): coseAlg is CoseAlgorithmIdentifier => coseAlg !== undefined)
 }
