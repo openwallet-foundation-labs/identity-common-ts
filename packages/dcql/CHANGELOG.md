@@ -1,5 +1,12 @@
 # dcql
 
+## 5.0.1
+
+### Patch Changes
+
+- Updated dependencies [ee6339a]
+  - @owf/identity-common@0.9.0
+
 ## 5.0.0
 
 ### Major Changes

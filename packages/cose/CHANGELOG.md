@@ -1,5 +1,25 @@
 # @owf/cose
 
+## 0.9.0
+
+### Minor Changes
+
+- 1d58089: `Mac0` now puts an empty `external_aad` in the MAC_structure when none is passed, as RFC 9052 6.3 requires. It was left out, so tags didn't match other COSE implementations. The device MAC of `@owf/mdoc` now matches the example in ISO/IEC 18013-5 D.5.3.
+  
+  Tags created with an earlier version without `externalAad` still verify. When a tag doesn't match and no `externalAad` is passed, `Mac0.verifyAuthenticationCode` and `DeviceMac.verify` check it once more against the MAC_structure without `external_aad`.
+  
+  **Breaking:** earlier versions don't verify a tag created with this version without `externalAad`.
+- 1d58089: `Mac0Context` has the same shape as `Sign1Context`. `authenticate` and `verify` get the `CoseKey` passed to the library, and `authenticate` always gets the `algorithm`. The library never reads the key material, so the key can stay in a key management system.
+  
+  **Breaking:** `Mac0.authenticate` and `Mac0Context` no longer accept a `Uint8Array` key. Pass a `CoseKey`, such as `CoseKey.create({ keyType: KeyType.Oct, k })` for a key held in software, or `CoseKey.create({ keyType: KeyType.Oct, keyId })` for a key in a key management system, and resolve it in the callback. An `algorithm` passed to `Mac0.authenticate` now takes precedence over the `alg` of the key.
+  
+  **Breaking:** the `CoseKey.privateKey` getter is removed, with `CoseDNotDefinedError`, `CoseKNotDefinedError` and `CoseKeyTypeNotSupportedForPrivateKeyExtractionError`. Read `CoseKey.d` or `CoseKey.k` instead.
+
+### Patch Changes
+
+- Updated dependencies [ee6339a]
+  - @owf/identity-common@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # @owf/jose
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [ee6339a]
+  - @owf/identity-common@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
