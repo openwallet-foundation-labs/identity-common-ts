@@ -343,7 +343,7 @@ async function verifyJarRequestObject(options: {
   if (!isJwtTyp(jwt.header.typ, signedAuthorizationRequestJwtHeaderTyp) && version >= 24) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequestObject,
-      error_description: `Invalid Jar Request Object typ header. Expected "oauth-authz-req+jwt", received "${jwt.header.typ}".`,
+      error_description: 'Invalid Jar Request Object typ header. Expected oauth-authz-req+jwt.',
     })
   }
 

@@ -49,14 +49,14 @@ export async function fetchJarRequestObject(options: {
     },
   }).catch(() => {
     throw new Oauth2ServerErrorResponseError({
-      error_description: `Fetching request_object from request_uri '${requestUri}' failed`,
+      error_description: 'Fetching request_object from request_uri failed.',
       error: Oauth2ErrorCodes.InvalidRequestUri,
     })
   })
 
   if (!response.ok) {
     throw new Oauth2ServerErrorResponseError({
-      error_description: `Fetching request_object from request_uri '${requestUri}' failed with status code '${response.status}'.`,
+      error_description: `Fetching request_object from request_uri failed with status code ${response.status}.`,
       error: Oauth2ErrorCodes.InvalidRequestUri,
     })
   }

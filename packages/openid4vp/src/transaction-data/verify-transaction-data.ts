@@ -99,7 +99,7 @@ async function verifyTransactionDataEntry({
       if (!allowedAlgs.includes(alg)) {
         throw new Oauth2ServerErrorResponseError({
           error: Oauth2ErrorCodes.InvalidTransactionData,
-          error_description: `Transaction data entry with index ${entry.transactionDataIndex} for presentation ${credentialId} with index ${presentationIndex} is hashed using alg '${alg}'. However transaction data only allows alg values ${allowedAlgs.join(', ')}.`,
+          error_description: `Transaction data entry with index ${entry.transactionDataIndex} for presentation ${credentialId} with index ${presentationIndex} is hashed using an alg that is not allowed. Transaction data only allows alg values ${allowedAlgs.join(', ')}.`,
         })
       }
 

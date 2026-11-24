@@ -221,7 +221,7 @@ describe('Verify transaction data', () => {
       new Oauth2ServerErrorResponseError({
         error: Oauth2ErrorCodes.InvalidTransactionData,
         error_description:
-          "Transaction data entry with index 0 for presentation two with index 0 is hashed using alg 'random'. However transaction data only allows alg values sha-256.",
+          'Transaction data entry with index 0 for presentation two with index 0 is hashed using an alg that is not allowed. Transaction data only allows alg values sha-256.',
       })
     )
   })

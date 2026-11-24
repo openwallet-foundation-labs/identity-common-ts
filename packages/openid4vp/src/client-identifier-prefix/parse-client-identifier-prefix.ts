@@ -170,7 +170,8 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
   if (options.clientId?.startsWith('origin:') || options.clientId?.startsWith('web-origin:')) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: `Failed to parse client identifier. The client id prefix in client_id '${options.clientId}' is reserved and not allowed in a request.`,
+      error_description:
+        'Failed to parse client identifier. The client identifier prefix of the client_id is reserved and not allowed in a request.',
     })
   }
 
@@ -198,7 +199,7 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
     if (!parsedClientIdPrefixAndIdentifier.success) {
       throw new Oauth2ServerErrorResponseError({
         error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: `Failed to parse client identifier. Unsupported client_id '${options.clientId}'.`,
+        error_description: 'Failed to parse client identifier. Unsupported client_id.',
       })
     }
 
@@ -207,7 +208,7 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
     if (!uniformClientIdScheme.success) {
       throw new Oauth2ServerErrorResponseError({
         error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: `Failed to parse client identifier. Unsupported client_id '${options.clientId}'.`,
+        error_description: 'Failed to parse client identifier. Unsupported client_id.',
       })
     }
 
@@ -235,7 +236,7 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
     if (!parsedClientIdPrefix.success) {
       throw new Oauth2ServerErrorResponseError({
         error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: `Failed to parse client identifier. Unsupported client_id_scheme value '${options.legacyClientIdScheme}'.`,
+        error_description: 'Failed to parse client identifier. Unsupported client_id_scheme value.',
       })
     }
 
@@ -257,7 +258,7 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
   if (!parsedClientIdPrefixAndIdentifier.success) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: `Failed to parse client identifier. Unsupported client_id '${options.clientId}'.`,
+      error_description: 'Failed to parse client identifier. Unsupported client_id.',
     })
   }
 
@@ -266,7 +267,7 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
   if (!uniformClientIdScheme.success) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: `Failed to parse client identifier. Unsupported client_id '${options.clientId}'.`,
+      error_description: 'Failed to parse client identifier. Unsupported client_id.',
     })
   }
 
@@ -491,7 +492,8 @@ export async function validateOpenid4vpClientId(
       if (!sanDnsNames.includes(clientIdIdentifier)) {
         throw new Oauth2ServerErrorResponseError({
           error: Oauth2ErrorCodes.InvalidRequest,
-          error_description: `Invalid client identifier. One of the leaf certificates san dns names [${sanDnsNames.join(', ')}] must match the client identifier '${clientIdIdentifier}'. `,
+          error_description:
+            'Invalid client identifier. One of the san dns names of the leaf certificate must match the client identifier.',
         })
       }
 
@@ -513,7 +515,8 @@ export async function validateOpenid4vpClientId(
       if (!sanUriNames.includes(clientIdIdentifier)) {
         throw new Oauth2ServerErrorResponseError({
           error: Oauth2ErrorCodes.InvalidRequest,
-          error_description: `Invalid client identifier. One of the leaf certificates san uri names [${sanUriNames.join(', ')}] must match the client identifier '${clientIdIdentifier}'.`,
+          error_description:
+            'Invalid client identifier. One of the san uri names of the leaf certificate must match the client identifier.',
         })
       }
 

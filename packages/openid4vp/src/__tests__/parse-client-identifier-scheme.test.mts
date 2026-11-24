@@ -435,7 +435,7 @@ describe('Correctly parses the client identifier', () => {
           responseMode: 'direct_post.jwt',
           clientId: 'http://federation.com/entity',
         })
-      ).toThrow(`Failed to parse client identifier. Unsupported client_id 'http://federation.com/entity'.`)
+      ).toThrow('Failed to parse client identifier. Unsupported client_id.')
 
       setGlobalConfig({ allowInsecureUrls: true })
       expect(
@@ -456,12 +456,29 @@ describe('Correctly parses the client identifier', () => {
       setGlobalConfig({ allowInsecureUrls: beforeValue })
     })
 
+    // RFC 6749 Section 5.2: error_description only allows printable ASCII without '"' and '\'
+    test('keeps the client_id out of the error_description', () => {
+      expect(() =>
+        getOpenid4vpClientId({
+          responseMode: 'direct_post.jwt',
+          clientId: 'http://federation.com/"\r\n2026-11-24T00:00:00Z ERROR a line of the request',
+        })
+      ).toThrow(
+        expect.objectContaining({
+          errorResponse: {
+            error: 'invalid_request',
+            error_description: 'Failed to parse client identifier. Unsupported client_id.',
+          },
+        })
+      )
+    })
+
     test.each(['origin:https://example.com', 'web-origin:https://example.com'])(
       "rejects reserved client id '%s' in a request",
       (clientId) => {
         for (const responseMode of ['dc_api', 'direct_post']) {
           expect(() => getOpenid4vpClientId({ responseMode, clientId, origin: 'https://example.com' })).toThrow(
-            `Failed to parse client identifier. The client id prefix in client_id '${clientId}' is reserved and not allowed in a request.`
+            'Failed to parse client identifier. The client identifier prefix of the client_id is reserved and not allowed in a request.'
           )
         }
       }
