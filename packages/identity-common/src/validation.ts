@@ -1,4 +1,4 @@
-import { IdentityError } from './identity-error'
+import { errorMessageValue, IdentityError } from './identity-error'
 
 /**
  * A common shape for the outcome of a validation, so the validators of different packages
@@ -214,16 +214,22 @@ export function toValidationResult<Issue extends ValidationIssue>(issues: Issue[
 const MAX_UNION_DEPTH = 3
 /** How many members of a union, or errors of a member, a validation error message lists */
 const MAX_LISTED = 5
+/** How many characters of the message of an issue a validation error message holds, which may hold a nested error */
+const MAX_ISSUE_MESSAGE_LENGTH = 1000
 
 /**
  * The message of an error thrown for a failed validation: the given message, followed by
  * the errors among the issues with their path and code, each on an indented line of its own.
  * A union that no member matches lists its members as numbered options, by their label when
  * the union has them, each with its errors.
+ *
+ * The path and message of an issue can hold the input, such as a key of a record, so their
+ * control characters are escaped and they are cut off, see {@link errorMessageValue}. At most
+ * five errors are listed at each level, so the length of the message doesn't grow with the input.
  */
 export function validationErrorMessage(message: string, issues: readonly ValidationIssue[]): string {
   const lines = errorsOf(issues).map((issue) => issueLines(issue, '  ', 0))
-  return lines.length ? `${message}\n${lines.join('\n')}` : message
+  return lines.length ? `${message}\n${listed(lines, '  ', 'error')}` : message
 }
 
 function errorsOf(issues: readonly ValidationIssue[]) {
@@ -243,8 +249,8 @@ function unionOf(issue: ValidationIssue) {
 }
 
 function issueLines(issue: ValidationIssue, indent: string, depth: number, label = ''): string {
-  const path = issue.pathLabels ?? issue.path
-  const head = `${indent}- ${label}${path.length ? `${path.join('.')}: ` : ''}${issue.message}`
+  const path = (issue.pathLabels ?? issue.path).map((segment) => errorMessageValue(segment))
+  const head = `${indent}- ${label}${path.length ? `${path.join('.')}: ` : ''}${errorMessageValue(issue.message, MAX_ISSUE_MESSAGE_LENGTH)}`
   const union = depth < MAX_UNION_DEPTH ? unionOf(issue) : undefined
   if (!union) return `${head} (${issue.code})`
   return `${head}, ${optionLines(union, issue.path.length, `${indent}  `, depth + 1)}`

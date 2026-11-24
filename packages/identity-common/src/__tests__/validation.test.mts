@@ -209,6 +209,30 @@ describe('validationErrorMessage', () => {
       /\n {4}- and 1 more option$/
     )
   })
+
+  it('should escape the control characters of a path and a message, so an issue keeps to its line', () => {
+    const result = parseWithSchema(z.record(z.string(), z.string()), { 'a"\r\nb\u001b[2J': 1 })
+    expect(result.success ? '' : validationErrorMessage('Invalid', result.issues)).toBe(
+      ['Invalid', '  - a"\\r\\nb\\u001b[2J: expected string, received number (invalid_type)'].join('\n')
+    )
+    expect(
+      validationErrorMessage('Invalid', [
+        { severity: 'error', code: 'invalid_value', path: ['key'], message: 'first line\nsecond line' },
+      ])
+    ).toBe('Invalid\n  - key: first line\\nsecond line (invalid_value)')
+  })
+
+  it('should list at most five errors and cut off a long key, so the message does not grow with the input', () => {
+    const result = parseWithSchema(z.record(z.string(), z.string()), {
+      ['k'.repeat(300)]: 1,
+      ...Object.fromEntries(Array.from({ length: 999 }, (_, index) => [`key${index}`, 1])),
+    })
+    const message = result.success ? '' : validationErrorMessage('Invalid', result.issues)
+
+    expect(message.split('\n')).toHaveLength(7)
+    expect(message).toContain(`  - ${'k'.repeat(200)}...: expected string`)
+    expect(message).toMatch(/\n {2}- and 995 more errors$/)
+  })
 })
 
 describe('zod', () => {
