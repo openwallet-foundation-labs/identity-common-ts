@@ -416,6 +416,19 @@ describe('Credential Issuer Metadata', () => {
     })
   })
 
+  // OpenID4VCI 1.0 Section 12.2.4: batch_size is an integer that MUST be 2 or greater
+  test.each([1, 0.5, 2.5])('rejects a batch_size of %s', (batchSize) => {
+    const result = parseWithSchema(zCredentialIssuerMetadataDraft14Draft15V1, {
+      credential_issuer: 'https://credential-issuer.com',
+      credential_endpoint: 'https://credential-issuer.com/credential',
+      credential_configurations_supported: {},
+      batch_credential_issuance: { batch_size: batchSize },
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.success ? undefined : result.issues[0].path).toEqual(['batch_credential_issuance', 'batch_size'])
+  })
+
   // The draft 11 id is the key of the credential configuration, so only an empty id can be missing
   test('rejects a credential configuration without id in draft 11 metadata as missing_value', () => {
     expect(
