@@ -141,7 +141,9 @@ export function parseCredentialRequestPayload(
     ) {
       throw new Oauth2ServerErrorResponseError({
         error: Oauth2ErrorCodes.UnknownCredentialConfiguration,
-        error_description: `Credential configuration with id '${credentialRequest.credential_configuration_id}' not found in credential configurations supported.`,
+        // RFC 6749 Section 5.2 limits the characters of error_description, so the id of the request is left out
+        error_description:
+          'Credential configuration with the requested id not found in credential configurations supported.',
       })
     }
 

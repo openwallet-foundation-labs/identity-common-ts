@@ -15,6 +15,7 @@ const issuerMetadata = {
 } satisfies CredentialIssuerMetadata
 
 describe('Parse Credential Request', () => {
+  // RFC 6749 Section 5.2: the credential_configuration_id of the request is not in the error_description
   test('parse draft 15 credential request with credential_configuration_id not in issuer metadata throws error', () => {
     expect(() =>
       parseCredentialRequestPayload({
@@ -30,7 +31,7 @@ describe('Parse Credential Request', () => {
           },
         },
         credentialRequest: {
-          credential_configuration_id: 'some_random_credential',
+          credential_configuration_id: 'some_"random"_credential',
           extra_prop: 'should-stay',
           proof: {
             proof_type: 'jwt',
@@ -39,7 +40,13 @@ describe('Parse Credential Request', () => {
         },
       })
     ).toThrow(
-      "Credential configuration with id 'some_random_credential' not found in credential configurations supported."
+      expect.objectContaining({
+        errorResponse: {
+          error: 'unknown_credential_configuration',
+          error_description:
+            'Credential configuration with the requested id not found in credential configurations supported.',
+        },
+      })
     )
   })
 

@@ -1,4 +1,5 @@
 import { type Jwk, jwsHeaderFromSigner, signJwt } from '@owf/jose'
+import { HttpResponse } from 'msw'
 import { describe, expect, test, vi } from 'vitest'
 import { Oauth2ServerErrorResponseError } from '../../error/Oauth2ServerErrorResponseError'
 import { parseJarRequest, verifyJarRequest } from '../../jar/handle-jar-request/verify-jar-request'
@@ -46,6 +47,25 @@ describe('parseJarRequest', () => {
       })
     ).rejects.toThrow('request_uri is not allowed')
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  // RFC 6749 Section 5.2: the request_uri of the request is not in the error_description
+  test.each([
+    ['fails', () => Promise.reject(new Error('network error')), 'Fetching request_object from request_uri failed.'],
+    [
+      'returns an error status',
+      () => Promise.resolve(new HttpResponse(null, { status: 404 })),
+      'Fetching request_object from request_uri failed with status code 404.',
+    ],
+  ])('throws invalid_request_uri when fetching the request_uri %s', async (_, fetch, errorDescription) => {
+    const error = await parseJarRequest({
+      jarRequestParams: { client_id: 'x', request_uri: 'https://client.example.com/request.jwt' },
+      callbacks: { fetch },
+      allowRequestUri: true,
+    }).catch((error) => error)
+
+    expect(error).toBeInstanceOf(Oauth2ServerErrorResponseError)
+    expect(error.errorResponse).toEqual({ error: 'invalid_request_uri', error_description: errorDescription })
   })
 })
 
@@ -95,12 +115,12 @@ describe('verifyJarRequest', () => {
     expect(jwt.header.typ).toEqual(typ)
   })
 
+  // RFC 6749 Section 5.2: the typ of the request object is not in the error_description
   test('rejects a request object whose typ is not oauth-authz-req+jwt or jwt as invalid_request_object', async () => {
     await expect(verify('dpop+jwt')).rejects.toMatchObject({
       errorResponse: {
         error: 'invalid_request_object',
-        error_description:
-          'Invalid Jar Request Object typ header. Expected "oauth-authz-req+jwt" or "jwt", received "dpop+jwt".',
+        error_description: 'Invalid Jar Request Object typ header. Expected oauth-authz-req+jwt or jwt.',
       },
     })
   })
