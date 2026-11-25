@@ -1,5 +1,4 @@
 import { hex } from '@owf/identity-common'
-import { Tag } from 'cbor-x'
 import { describe, expect, test } from 'vitest'
 import z from 'zod'
 import {
@@ -16,6 +15,7 @@ import {
   Sign1,
   SignatureAlgorithm,
 } from '../../src'
+import { Tag } from '../cbor/cbor-x'
 import { mac0Context, macKey, sign1Context, signKey } from './context'
 
 // NOTE: compared as hex, because the CBOR decoder attaches a cached `dataView` to a buffer it reads
