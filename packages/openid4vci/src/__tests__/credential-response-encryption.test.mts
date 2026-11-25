@@ -213,6 +213,7 @@ describe('Credential Response Encryption', () => {
         }
 
         await issuer.verifyCredentialRequestJwtProof({
+          credentialConfiguration: {},
           expectedNonce: cNonce,
           issuerMetadata,
           jwt: parsedCredentialRequest.proofs.jwt[0],

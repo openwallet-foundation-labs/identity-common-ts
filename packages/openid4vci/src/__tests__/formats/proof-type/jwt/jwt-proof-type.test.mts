@@ -31,6 +31,7 @@ describe('verifyCredentialRequestJwtProof', () => {
 
     const verify = async (allowedSkewInSeconds?: number) =>
       verifyCredentialRequestJwtProof({
+        credentialConfiguration: {},
         callbacks,
         credentialIssuer,
         expectedNonce: 'some-nonce',
@@ -58,8 +59,8 @@ describe('verifyCredentialRequestJwtProof', () => {
       signer: { method: 'jwk', alg: 'ES256', publicJwk: proofJwkPublic },
     })
 
-    await expect(verifyCredentialRequestJwtProof({ callbacks, credentialIssuer, jwt, now })).rejects.toThrow(
-      /more than 300 seconds in the past/
-    )
+    await expect(
+      verifyCredentialRequestJwtProof({ callbacks, credentialIssuer, jwt, now, credentialConfiguration: {} })
+    ).rejects.toThrow(/more than 300 seconds in the past/)
   })
 })
