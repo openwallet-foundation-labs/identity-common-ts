@@ -143,6 +143,19 @@ const presentationQueryResult = DcqlPresentationResult.fromDcqlPresentation(
 )
 ```
 
+A verifier can check the `vp_token` of a response against the query before it verifies the presentations. With the `dcqlQuery`, `DcqlPresentation.parse` throws a `DcqlParseError` with an issue for each rule of OpenID4VP 1.0 that the `vp_token` breaks:
+
+- a key that is not the id of a credential query (`unknown_credential_query_id`, Section 8.1)
+- more than one presentation for a credential query without `multiple` (`multiple_presentations_not_allowed`, Section 8.1)
+- a presentation that is not the JSON type of its format, a string or for `ldp_vc` an object (`invalid_type`, Section 8.1 and Appendix B)
+- a required credential query without a presentation (`missing_value`), or, with `credential_sets`, a required credential set without an option that has a presentation for each of its credential queries (`unsatisfied_credential_set`, Section 6.4.2)
+
+`DcqlPresentationResult.fromDcqlPresentation` also rejects the first two, and reports whether the verified presentations satisfy the query.
+
+```ts
+const presentations = DcqlPresentation.parse(vpToken, { dcqlQuery: parsedQuery })
+```
+
 ## Dependencies
 
 - [zod](https://www.npmjs.com/package/zod)

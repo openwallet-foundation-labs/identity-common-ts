@@ -1,4 +1,6 @@
 import { assert, describe, expect, test } from 'vitest'
+import { DcqlPresentationResultError } from '../../dcql-error'
+import { DcqlPresentation } from '../../dcql-presentation/m-dcql-presentation'
 import { DcqlPresentationResult } from '../../dcql-presentation/m-dcql-presentation-result'
 import { DcqlQuery } from '../../dcql-query'
 
@@ -989,5 +991,249 @@ describe('DCQL presentation with claim sets', () => {
       ],
       success: false,
     })
+  })
+})
+
+describe('DCQL presentation without a DCQL query', () => {
+  test('parse only checks the structure of the vp_token', () => {
+    // Without the query there are no credential query ids or 'multiple' to check the keys against
+    expect(DcqlPresentation.parse({ unknown: ['presentation-1', 'presentation-2'] })).toEqual({
+      unknown: ['presentation-1', 'presentation-2'],
+    })
+    expect(() => DcqlPresentation.parse({ pid: [] })).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'empty_array',
+            path: ['pid'],
+            message: 'Array must be non-empty and have length of at least 1',
+          },
+        ],
+      })
+    )
+  })
+})
+
+// OpenID4VP 1.0 Sections 6.4.2 and 8.1: the rules for a vp_token that need no verification of its presentations
+describe('DCQL presentation with a DCQL query', () => {
+  const dcqlQuery = DcqlQuery.parse({
+    credentials: [
+      { id: 'pid', format: 'dc+sd-jwt', meta: { vct_values: ['https://example.com/pid'] } },
+      { id: 'mdl', format: 'mso_mdoc', meta: { doctype_value: 'org.iso.18013.5.1.mDL' }, multiple: true },
+    ],
+  })
+
+  test('parse accepts one presentation for a credential query, and more for one with multiple', () => {
+    const presentation = { pid: ['pid-presentation'], mdl: ['mdl-presentation-1', 'mdl-presentation-2'] }
+
+    expect(DcqlPresentation.parse(presentation, { dcqlQuery })).toEqual(presentation)
+  })
+
+  test('fromDcqlPresentation reports a credential query id that is not in the query with the message of parse', () => {
+    const pidPresentation = {
+      credential_format: 'dc+sd-jwt' as const,
+      vct: 'https://example.com/pid',
+      claims: {},
+      cryptographic_holder_binding: true,
+    }
+
+    expect(() => DcqlPresentationResult.fromDcqlPresentation({ photo_id: [pidPresentation] }, { dcqlQuery })).toThrow(
+      new DcqlPresentationResultError({
+        message: "The presentation refers to the credential query id 'photo_id', which is not in 'credentials'",
+      })
+    )
+  })
+
+  test('parse checks a JSON encoded vp_token against the query', () => {
+    const presentation = { pid: ['pid-presentation'], mdl: ['mdl-presentation'] }
+    expect(DcqlPresentation.parse(JSON.stringify(presentation), { dcqlQuery })).toEqual(presentation)
+
+    expect(() =>
+      DcqlPresentation.parse(JSON.stringify({ pid: ['pid-presentation'], photo_id: ['photo-id-presentation'] }), {
+        dcqlQuery,
+      })
+    ).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'unknown_credential_query_id',
+            path: ['photo_id'],
+            message: "The presentation refers to the credential query id 'photo_id', which is not in 'credentials'",
+          },
+          {
+            severity: 'error',
+            code: 'missing_value',
+            path: ['mdl'],
+            message: "Expected a presentation for the credential query 'mdl'",
+            context: { expected: 'array' },
+          },
+        ],
+      })
+    )
+  })
+
+  test('parse reports more than one presentation without multiple, an id that is not a credential query, and a credential query without a presentation', () => {
+    expect(() =>
+      DcqlPresentation.parse(
+        { pid: ['pid-presentation-1', 'pid-presentation-2'], photo_id: ['photo-id-presentation'] },
+        { dcqlQuery }
+      )
+    ).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'multiple_presentations_not_allowed',
+            path: ['pid'],
+            message: "Credential query 'pid' has 2 presentations, but allows only one without 'multiple'",
+          },
+          {
+            severity: 'error',
+            code: 'unknown_credential_query_id',
+            path: ['photo_id'],
+            message: "The presentation refers to the credential query id 'photo_id', which is not in 'credentials'",
+          },
+          {
+            severity: 'error',
+            code: 'missing_value',
+            path: ['mdl'],
+            message: "Expected a presentation for the credential query 'mdl'",
+            context: { expected: 'array' },
+          },
+        ],
+      })
+    )
+  })
+
+  test('parse reports the first presentation of each credential query that is not the JSON type of its format', () => {
+    const query = DcqlQuery.parse({
+      credentials: [
+        ...dcqlQuery.credentials,
+        { id: 'diploma', format: 'ldp_vc', meta: { type_values: [['https://example.com/Diploma']] } },
+        { id: 'membership', format: 'jwt_vc_json', meta: { type_values: [['https://example.com/Membership']] } },
+        { id: 'legacy_pid', format: 'vc+sd-jwt', meta: { vct_values: ['https://example.com/pid'] } },
+      ],
+    })
+
+    expect(() =>
+      DcqlPresentation.parse(
+        {
+          pid: [{ presentation: 'as an object' }],
+          mdl: ['mdl-presentation', { presentation: 'as an object' }, { presentation: 'as an object' }],
+          diploma: ['diploma-presentation'],
+          membership: [{ presentation: 'as an object' }],
+          legacy_pid: [{ presentation: 'as an object' }],
+        },
+        { dcqlQuery: query }
+      )
+    ).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'invalid_type',
+            path: ['pid', 0],
+            message: "Expected a presentation of format 'dc+sd-jwt' to be a string",
+            context: { expected: 'string' },
+          },
+          {
+            severity: 'error',
+            code: 'invalid_type',
+            path: ['mdl', 1],
+            message: "Expected a presentation of format 'mso_mdoc' to be a string",
+            context: { expected: 'string' },
+          },
+          {
+            severity: 'error',
+            code: 'invalid_type',
+            path: ['diploma', 0],
+            message: "Expected a presentation of format 'ldp_vc' to be an object",
+            context: { expected: 'object' },
+          },
+          {
+            severity: 'error',
+            code: 'invalid_type',
+            path: ['membership', 0],
+            message: "Expected a presentation of format 'jwt_vc_json' to be a string",
+            context: { expected: 'string' },
+          },
+          {
+            severity: 'error',
+            code: 'invalid_type',
+            path: ['legacy_pid', 0],
+            message: "Expected a presentation of format 'vc+sd-jwt' to be a string",
+            context: { expected: 'string' },
+          },
+        ],
+      })
+    )
+
+    // A presentation that is not in an array, as in earlier drafts, is reported at its credential query id
+    expect(() =>
+      DcqlPresentation.parse(
+        { pid: { presentation: 'as an object' } },
+        { dcqlQuery: DcqlQuery.parse({ credentials: [dcqlQuery.credentials[0]] }) }
+      )
+    ).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'invalid_type',
+            path: ['pid'],
+            message: "Expected a presentation of format 'dc+sd-jwt' to be a string",
+            context: { expected: 'string' },
+          },
+        ],
+      })
+    )
+  })
+
+  test('parse reports a required credential set without an option that has a presentation for each of its credential queries', () => {
+    const query = DcqlQuery.parse({
+      credentials: [
+        ...dcqlQuery.credentials,
+        { id: 'photo_id', format: 'dc+sd-jwt', meta: { vct_values: ['https://example.com/photo_id'] } },
+      ],
+      credential_sets: [{ options: [['pid'], ['mdl']] }, { required: false, options: [['photo_id']] }],
+    })
+
+    expect(DcqlPresentation.parse({ mdl: ['mdl-presentation'] }, { dcqlQuery: query })).toEqual({
+      mdl: ['mdl-presentation'],
+    })
+    expect(() => DcqlPresentation.parse({ photo_id: ['photo-id-presentation'] }, { dcqlQuery: query })).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'unsatisfied_credential_set',
+            path: [],
+            message:
+              'Credential set 0 is required, but none of its options has a presentation for each of its credential queries',
+          },
+        ],
+      })
+    )
+
+    // An option is only satisfied with a presentation for each of its credential queries
+    const queryWithPairedOption = DcqlQuery.parse({
+      credentials: dcqlQuery.credentials,
+      credential_sets: [{ options: [['pid', 'mdl']] }],
+    })
+    expect(() => DcqlPresentation.parse({ pid: ['pid-presentation'] }, { dcqlQuery: queryWithPairedOption })).toThrow(
+      expect.objectContaining({
+        issues: [
+          {
+            severity: 'error',
+            code: 'unsatisfied_credential_set',
+            path: [],
+            message:
+              'Credential set 0 is required, but none of its options has a presentation for each of its credential queries',
+          },
+        ],
+      })
+    )
   })
 })

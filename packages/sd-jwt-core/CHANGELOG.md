@@ -1,5 +1,12 @@
 # @sd-jwt/core
 
+## 0.25.1
+
+### Patch Changes
+
+- Updated dependencies [ee6339a]
+  - @owf/identity-common@0.9.0
+
 ## 0.25.0
 
 ### Minor Changes
