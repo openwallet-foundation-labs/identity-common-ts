@@ -86,11 +86,13 @@ export const zStatusList = z.object({
 })
 
 /**
- * Status schema for registration certificate validity
+ * Status schema for registration certificate validity. GEN-6.2.6.1-04 puts `idx` and `uri` directly in `status`, while
+ * the Annex C example and the Token Status List nest them in `status_list`, so both are read as the nested form.
  */
-export const zStatus = z.object({
-  status_list: zStatusList,
-})
+export const zStatus = z.union([
+  z.object({ status_list: zStatusList }),
+  zStatusList.transform((status_list) => ({ status_list })),
+])
 
 /**
  * Intermediary information when WRP acts through an intermediary (Table 10).
