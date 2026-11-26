@@ -74,9 +74,11 @@ export interface AccessCertificateValidationOptions {
   now?: Date | false
   /**
    * GEN-6.6.1-03 allows a TSP allocated policy OID instead of the TS 119 411-8 OIDs.
-   * Certificates carrying one of these are accepted without a TS 119 411-8 policy.
+   * Certificates carrying one of these are accepted without a TS 119 411-8 policy. With `'any'`, any
+   * policy OID is accepted, for example when the holder of the certificate checks its profile and
+   * doesn't know which OIDs its TSP allocated.
    */
-  acceptedPolicyOids?: string[]
+  acceptedPolicyOids?: string[] | 'any'
   /** Expected subject type, overriding the one derived from the certificate */
   subjectType?: AccessCertificateSubjectType
 }

@@ -134,8 +134,10 @@ export function validateAccessCertificate(
   }
 
   // GEN-6.6.1-03: policy identifiers
-  const acceptedOids = new Set(options.acceptedPolicyOids ?? [])
-  const hasAcceptedCustomPolicy = certificate.policies.some((p) => acceptedOids.has(p.oid))
+  const { acceptedPolicyOids = [] } = options
+  const hasAcceptedCustomPolicy = certificate.policies.some(
+    (p) => acceptedPolicyOids === 'any' || acceptedPolicyOids.includes(p.oid)
+  )
   if (accessCertificate.policies.length === 0 && !hasAcceptedCustomPolicy) {
     issues.add({
       code: C.MISSING_POLICY,
