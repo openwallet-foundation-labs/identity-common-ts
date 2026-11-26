@@ -186,7 +186,7 @@ describe('Verify transaction data', () => {
   })
 
   test('throws an error when the transaction data was hashed using an alg that is not allowed', async () => {
-    // The alg of a presentation is the wallet's, so it is left out of the error_description
+    // The alg of a presentation is the wallet's, so it is kept in sensitive instead of the error_description
     const alg = `"\r\n2026-11-24T00:00:00Z ERROR a line of the request${'a'.repeat(200)}`
     const transactionData = Buffer.from(
       JSON.stringify({
@@ -220,10 +220,13 @@ describe('Verify transaction data', () => {
         },
       })
     ).rejects.toThrow(
-      new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidTransactionData,
-        error_description:
-          'Transaction data entry with index 0 for presentation two with index 0 is hashed using an alg that is not allowed. Transaction data only allows alg values sha-256.',
+      expect.objectContaining({
+        errorResponse: {
+          error: Oauth2ErrorCodes.InvalidTransactionData,
+          error_description:
+            'Transaction data entry with index 0 for presentation two with index 0 is hashed using an alg that is not allowed. Transaction data only allows alg values sha-256.',
+        },
+        sensitive: { alg },
       })
     )
   })

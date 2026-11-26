@@ -17,17 +17,23 @@ export async function fetchClientMetadata(options: {
   })
 
   if (!response.ok) {
-    throw new Oauth2ServerErrorResponseError({
-      error_description: `Fetching client metadata from client_metadata_uri failed with status code ${response.status}.`,
-      error: Oauth2ErrorCodes.InvalidRequestUri,
-    })
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error_description: `Fetching client metadata from client_metadata_uri failed with status code ${response.status}.`,
+        error: Oauth2ErrorCodes.InvalidRequestUri,
+      },
+      { sensitive: { clientMetadataUri } }
+    )
   }
 
   if (!result?.success) {
-    throw new Oauth2ServerErrorResponseError({
-      error_description: 'Parsing client metadata from client_metadata_uri failed.',
-      error: Oauth2ErrorCodes.InvalidRequestObject,
-    })
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error_description: 'Parsing client metadata from client_metadata_uri failed.',
+        error: Oauth2ErrorCodes.InvalidRequestObject,
+      },
+      { sensitive: { clientMetadataUri } }
+    )
   }
 
   return result.data

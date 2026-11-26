@@ -168,11 +168,14 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
 
   // The origin prefixes are reserved for the wallet and MUST NOT be accepted in a request
   if (options.clientId?.startsWith('origin:') || options.clientId?.startsWith('web-origin:')) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description:
-        'Failed to parse client identifier. The client identifier prefix of the client_id is reserved and not allowed in a request.',
-    })
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description:
+          'Failed to parse client identifier. The client identifier prefix of the client_id is reserved and not allowed in a request.',
+      },
+      { sensitive: { clientId: options.clientId } }
+    )
   }
 
   // Handle DC API
@@ -197,19 +200,25 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
 
     const parsedClientIdPrefixAndIdentifier = zClientIdToClientIdPrefixAndIdentifier.safeParse(options.clientId)
     if (!parsedClientIdPrefixAndIdentifier.success) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: 'Failed to parse client identifier. Unsupported client_id.',
-      })
+      throw new Oauth2ServerErrorResponseError(
+        {
+          error: Oauth2ErrorCodes.InvalidRequest,
+          error_description: 'Failed to parse client identifier. Unsupported client_id.',
+        },
+        { sensitive: { clientId: options.clientId } }
+      )
     }
 
     const [clientIdScheme, clientIdIdentifier] = parsedClientIdPrefixAndIdentifier.data
     const uniformClientIdScheme = zClientIdPrefixToUniform.safeParse(clientIdScheme)
     if (!uniformClientIdScheme.success) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: 'Failed to parse client identifier. Unsupported client_id.',
-      })
+      throw new Oauth2ServerErrorResponseError(
+        {
+          error: Oauth2ErrorCodes.InvalidRequest,
+          error_description: 'Failed to parse client identifier. Unsupported client_id.',
+        },
+        { sensitive: { clientId: options.clientId } }
+      )
     }
 
     return {
@@ -234,10 +243,13 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
   if (options.legacyClientIdScheme && !isOpenid4vpResponseModeIae(options.responseMode)) {
     const parsedClientIdPrefix = zLegacyClientIdSchemeToClientIdPrefix.safeParse(options.legacyClientIdScheme)
     if (!parsedClientIdPrefix.success) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: 'Failed to parse client identifier. Unsupported client_id_scheme value.',
-      })
+      throw new Oauth2ServerErrorResponseError(
+        {
+          error: Oauth2ErrorCodes.InvalidRequest,
+          error_description: 'Failed to parse client identifier. Unsupported client_id_scheme value.',
+        },
+        { sensitive: { clientIdScheme: options.legacyClientIdScheme } }
+      )
     }
 
     const clientIdPrefix = parsedClientIdPrefix.data
@@ -256,19 +268,25 @@ export function getOpenid4vpClientId(options: GetOpenid4vpClientIdOptions): {
 
   const parsedClientIdPrefixAndIdentifier = zClientIdToClientIdPrefixAndIdentifier.safeParse(options.clientId)
   if (!parsedClientIdPrefixAndIdentifier.success) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: 'Failed to parse client identifier. Unsupported client_id.',
-    })
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'Failed to parse client identifier. Unsupported client_id.',
+      },
+      { sensitive: { clientId: options.clientId } }
+    )
   }
 
   const [clientIdScheme, clientIdIdentifier] = parsedClientIdPrefixAndIdentifier.data
   const uniformClientIdScheme = zClientIdPrefixToUniform.safeParse(clientIdScheme)
   if (!uniformClientIdScheme.success) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: 'Failed to parse client identifier. Unsupported client_id.',
-    })
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'Failed to parse client identifier. Unsupported client_id.',
+      },
+      { sensitive: { clientId: options.clientId } }
+    )
   }
 
   // Fall back to modern client id. We don't validate it yet, we just want to get the
@@ -490,11 +508,14 @@ export async function validateOpenid4vpClientId(
     if (clientIdPrefix === 'x509_san_dns') {
       const { sanDnsNames } = options.callbacks.getX509CertificateMetadata(jar.signer.x5c[0])
       if (!sanDnsNames.includes(clientIdIdentifier)) {
-        throw new Oauth2ServerErrorResponseError({
-          error: Oauth2ErrorCodes.InvalidRequest,
-          error_description:
-            'Invalid client identifier. One of the san dns names of the leaf certificate must match the client identifier.',
-        })
+        throw new Oauth2ServerErrorResponseError(
+          {
+            error: Oauth2ErrorCodes.InvalidRequest,
+            error_description:
+              'Invalid client identifier. One of the san dns names of the leaf certificate must match the client identifier.',
+          },
+          { sensitive: { clientIdIdentifier, sanDnsNames } }
+        )
       }
 
       if (
@@ -513,11 +534,14 @@ export async function validateOpenid4vpClientId(
     } else if (clientIdPrefix === 'x509_san_uri') {
       const { sanUriNames } = options.callbacks.getX509CertificateMetadata(jar.signer.x5c[0])
       if (!sanUriNames.includes(clientIdIdentifier)) {
-        throw new Oauth2ServerErrorResponseError({
-          error: Oauth2ErrorCodes.InvalidRequest,
-          error_description:
-            'Invalid client identifier. One of the san uri names of the leaf certificate must match the client identifier.',
-        })
+        throw new Oauth2ServerErrorResponseError(
+          {
+            error: Oauth2ErrorCodes.InvalidRequest,
+            error_description:
+              'Invalid client identifier. One of the san uri names of the leaf certificate must match the client identifier.',
+          },
+          { sensitive: { clientIdIdentifier, sanUriNames } }
+        )
       }
 
       if (
@@ -540,10 +564,13 @@ export async function validateOpenid4vpClientId(
       })
 
       if (x509Hash !== clientIdIdentifier) {
-        throw new Oauth2ServerErrorResponseError({
-          error: Oauth2ErrorCodes.InvalidRequest,
-          error_description: `Invalid client identifier. Expected the base64url encoded sha-256 hash of the leaf x5c certificate ('${x509Hash}') to match the client identifier.`,
-        })
+        throw new Oauth2ServerErrorResponseError(
+          {
+            error: Oauth2ErrorCodes.InvalidRequest,
+            error_description: `Invalid client identifier. Expected the base64url encoded sha-256 hash of the leaf x5c certificate ('${x509Hash}') to match the client identifier.`,
+          },
+          { sensitive: { clientIdIdentifier } }
+        )
       }
     }
 

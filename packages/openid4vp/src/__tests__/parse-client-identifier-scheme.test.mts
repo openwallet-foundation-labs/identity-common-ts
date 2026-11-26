@@ -363,8 +363,9 @@ describe('Correctly parses the client identifier', () => {
       })
     })
 
-    // RFC 6749 Section 5.2: error_description only allows printable ASCII without '"' and '\'
-    test('throws error if the x509_hash does not match, without the client_id in the error_description', async () => {
+    // RFC 6749 Section 5.2: error_description only allows printable ASCII without '"' and '\'. The client_id is kept
+    // in sensitive, for debugging
+    test('throws error if the x509_hash does not match, with the client_id in sensitive instead of the error_description', async () => {
       await expect(
         validateOpenid4vpClientId({
           // @ts-expect-error
@@ -385,6 +386,7 @@ describe('Correctly parses the client identifier', () => {
             error_description:
               "Invalid client identifier. Expected the base64url encoded sha-256 hash of the leaf x5c certificate ('qaHUFMOlSq7yMw5DbiyQRppMLnwLc63TtTZOLjNvv5I') to match the client identifier.",
           },
+          sensitive: { clientIdIdentifier: logSpam },
         })
       )
     })
@@ -466,38 +468,32 @@ describe('Correctly parses the client identifier', () => {
       setGlobalConfig({ allowInsecureUrls: beforeValue })
     })
 
-    // RFC 6749 Section 5.2: error_description only allows printable ASCII without '"' and '\'
-    test('keeps the client_id out of the error_description', () => {
-      expect(() =>
-        getOpenid4vpClientId({
-          responseMode: 'direct_post.jwt',
-          clientId: `http://federation.com/${logSpam}`,
-        })
-      ).toThrow(
+    // RFC 6749 Section 5.2: error_description only allows printable ASCII without '"' and '\'. The client_id is kept
+    // in sensitive, for debugging
+    test('keeps the client_id in sensitive instead of the error_description', () => {
+      const clientId = `http://federation.com/${logSpam}`
+      expect(() => getOpenid4vpClientId({ responseMode: 'direct_post.jwt', clientId })).toThrow(
         expect.objectContaining({
           errorResponse: {
             error: 'invalid_request',
             error_description: 'Failed to parse client identifier. Unsupported client_id.',
           },
+          sensitive: { clientId },
         })
       )
     })
 
     test.each(['origin:', 'web-origin:'])("rejects the reserved client id prefix '%s' in a request", (prefix) => {
+      const clientId = `${prefix}https://example.com/${logSpam}`
       for (const responseMode of ['dc_api', 'direct_post']) {
-        expect(() =>
-          getOpenid4vpClientId({
-            responseMode,
-            clientId: `${prefix}https://example.com/${logSpam}`,
-            origin: 'https://example.com',
-          })
-        ).toThrow(
+        expect(() => getOpenid4vpClientId({ responseMode, clientId, origin: 'https://example.com' })).toThrow(
           expect.objectContaining({
             errorResponse: {
               error: 'invalid_request',
               error_description:
                 'Failed to parse client identifier. The client identifier prefix of the client_id is reserved and not allowed in a request.',
             },
+            sensitive: { clientId },
           })
         )
       }
