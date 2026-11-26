@@ -112,4 +112,9 @@ describe('verifyRegistrationCertificateStatus', () => {
     expect(() => zStatus.parse({ status_list: { idx: '-1', uri: STATUS_LIST_URI } })).toThrow()
     expect(() => zStatus.parse({ status_list: { idx: '1.5', uri: STATUS_LIST_URI } })).toThrow()
   })
+
+  it('reads idx and uri directly in status as GEN-6.2.6.1-04 places them', () => {
+    expect(zStatus.parse({ idx: '1', uri: STATUS_LIST_URI })).toEqual({ status_list: { idx: 1, uri: STATUS_LIST_URI } })
+    expect(() => zStatus.parse({ idx: '1' })).toThrow()
+  })
 })

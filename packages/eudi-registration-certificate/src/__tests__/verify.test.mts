@@ -69,6 +69,14 @@ describe.each([
     expect(verified.payload).toStrictEqual(payload)
   })
 
+  it('verifies a registration certificate with idx and uri directly in status (GEN-6.2.6.1-04)', async () => {
+    const flat = { ...payload, status: { idx: '3', uri: STATUS_LIST_URI } } as unknown as RegistrationCertificatePayload
+
+    const verified = await verify(await sign(flat))
+
+    expect(verified.payload).toStrictEqual(payload)
+  })
+
   it('rejects a registration certificate whose signature does not verify', async () => {
     const untrusted = { ...callbacks, fetch, verifyJws: () => ({ verified: false as const }), verifyCose: () => false }
 
