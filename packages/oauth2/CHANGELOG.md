@@ -1,5 +1,27 @@
 # @openid4vc/oauth2
 
+## 0.11.0
+
+### Minor Changes
+
+- ee6339a: `IdentityError` and `Oauth2Error` take a `sensitive` option for values that must not end up in logs, such as an expected `state`. They are kept on `error.sensitive`, which is not enumerable, so they are left out of the message and of a serialized or logged error. Call `setIdentityCommonConfig({ includeSensitiveErrorDetails: true })` to add them to the message, for example in tests or for debugging.
+  
+  The `state` mismatch error of `validateOpenid4vpAuthorizationResponsePayload` no longer puts the expected and received `state` in its message, but passes them as `sensitive`.
+- d8e50fd: The `signer` of `createAccessTokenJwt` and `Oauth2AuthorizationServer.createAccessTokenResponse` is now a `custom` signer, and the access token header gets its `kid` instead of a `jwk`. A resource server must verify an access token with the keys of the authorization server (RFC 9068 Section 4). It selects the key from the `jwks_uri` by `kid` (RFC 7515 Section 4.1.4), or takes the only key when there is one. Set a `kid` when the `jwks_uri` has more than one key, as during a key rollover.
+  
+  **Breaking:** pass `{ method: 'custom', alg, kid }` as the `signer`, with the `kid` of the key in the `jwks_uri`. Your `signJws` callback selects the private key by that `kid`. A resource server that took the key from the `jwk` header must use the `jwks_uri` instead.
+- 3f52fb9: `Oauth2AuthorizationServer.parseAccessTokenRequest` accepts the `client_credentials` grant (RFC 6749 Section 4.4) and returns it as `{ grantType: 'client_credentials' }`. Like the other grants, it is rejected when the `authorizationServerMetadata` passed in does not list it in `grant_types_supported`. The new `Oauth2AuthorizationServer.verifyClientCredentialsAccessTokenRequest` verifies its DPoP proof and client attestation. Authenticating the client otherwise, for example with its client secret, and checking that it may use the grant (`unauthorized_client`, Section 5.2) is up to the authorization server. The `scope` of an access token request is now typed, and rejected when it is empty or not a string (Section 3.3).
+- b0c4ff1: `verifyResourceRequest`, `Oauth2ResourceServer.verifyResourceRequest` and `verifyJwtProfileAccessToken` accept an authorization server as `{ issuer, allowIntrospection }` as well as metadata, and resolve its metadata only when needed, with the `getAuthorizationServerMetadata` callback or else over HTTP. For a JWT access token only the listed authorization server of its `iss` is resolved. For an opaque access token the authorization servers that allow introspection are resolved one at a time, in the order given, until one reports the token as active. Put the authorization server that issues most opaque access tokens first. With `allowIntrospection: false` on every one, opaque access tokens are rejected without any request. Before, the caller had to fetch the metadata of every authorization server for each request.
+  
+  The `getJwks` callback gets the `kid` of the JWT it is called for, as `getJwks(jwksUri, { kid })`, for access tokens and ID tokens. A callback that caches JWK Sets can fetch one again when it lacks that key, to pick up a rotated key. `fetchJwks` takes the `kid` as a third argument.
+
+### Patch Changes
+
+- Updated dependencies [ee6339a]
+  - @owf/identity-common@0.9.0
+  - @owf/jose@0.9.0
+  - @openid4vc/utils@0.11.0
+
 ## 0.10.0
 
 ### Minor Changes

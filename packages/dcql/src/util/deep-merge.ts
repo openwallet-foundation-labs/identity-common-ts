@@ -1,5 +1,5 @@
 import { DcqlError } from '../dcql-error'
-import { DcqlNotDisclosed } from '../u-dcql'
+import { DcqlNotDisclosed, hasOwn } from '../u-dcql'
 
 /**
  * Deep merge two objects. Undisclosed/empty slots (DcqlNotDisclosed or undefined)
@@ -10,11 +10,6 @@ function isMergeableObject(val: unknown): val is Array<unknown> | Record<string,
   return (
     val !== null && typeof val === 'object' && (Object.getPrototypeOf(val) === Object.prototype || Array.isArray(val))
   )
-}
-
-function hasOwn(val: object, key: string | number) {
-  // biome-ignore lint/suspicious/noPrototypeBuiltins: `Object.hasOwn` is not in the ES2020 lib this package targets
-  return Object.prototype.hasOwnProperty.call(val, key)
 }
 
 export function deepMerge(source: Array<unknown> | object, target: Array<unknown> | object): Array<unknown> | object {

@@ -1279,7 +1279,7 @@ describe('dcql-query', () => {
             severity: 'error',
             code: 'unknown_claim_id',
             path: ['credentials', 1, 'claim_sets', 1, 1],
-            message: "Claim set 1 refers to the claim id 'family_name', which is not in claims",
+            message: "Claim set 1 refers to the claim id 'family_name', which is not in 'claims'",
           },
           {
             severity: 'error',
@@ -1291,7 +1291,7 @@ describe('dcql-query', () => {
             severity: 'error',
             code: 'unknown_credential_query_id',
             path: ['credential_sets', 0, 'options', 1, 1],
-            message: "Credential set 0 refers to the credential query id 'photo_id', which is not in credentials",
+            message: "Credential set 0 refers to the credential query id 'photo_id', which is not in 'credentials'",
           },
         ],
       })
