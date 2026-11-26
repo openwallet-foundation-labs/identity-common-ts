@@ -360,22 +360,29 @@ describe('Correctly parses the client identifier', () => {
       })
     })
 
-    test('throws error if the x509_hash does not match', async () => {
+    // RFC 6749 Section 5.2: error_description only allows printable ASCII without '"' and '\'
+    test('throws error if the x509_hash does not match, without the client_id in the error_description', async () => {
       await expect(
         validateOpenid4vpClientId({
           // @ts-expect-error
           jar: { signer: { method: 'x5c', x5c: ['certificate2'] } },
           authorizationRequestPayload: {
             response_mode: 'direct_post',
-            client_id: 'x509_hash:2ipT8gPhDJOK76YJvl98T8BSOd4Zjld1k6KtMuLU90s',
+            client_id: `x509_hash:"\r\n2026-11-24T00:00:00Z ERROR a line of the request${'a'.repeat(200)}`,
             redirect_uri: 'https://example.com',
             nonce: 'nonce',
             response_type: 'vp_token',
           },
           callbacks,
         })
-      ).rejects.toThrowError(
-        "Invalid client identifier. Expected the base64url encoded sha-256 hash of the leaf x5c certificate ('qaHUFMOlSq7yMw5DbiyQRppMLnwLc63TtTZOLjNvv5I') to match the client identifier '2ipT8gPhDJOK76YJvl98T8BSOd4Zjld1k6KtMuLU90s'"
+      ).rejects.toThrow(
+        expect.objectContaining({
+          errorResponse: {
+            error: 'invalid_request',
+            error_description:
+              "Invalid client identifier. Expected the base64url encoded sha-256 hash of the leaf x5c certificate ('qaHUFMOlSq7yMw5DbiyQRppMLnwLc63TtTZOLjNvv5I') to match the client identifier.",
+          },
+        })
       )
     })
 

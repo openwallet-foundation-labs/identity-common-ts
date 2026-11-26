@@ -542,7 +542,7 @@ export async function validateOpenid4vpClientId(
       if (x509Hash !== clientIdIdentifier) {
         throw new Oauth2ServerErrorResponseError({
           error: Oauth2ErrorCodes.InvalidRequest,
-          error_description: `Invalid client identifier. Expected the base64url encoded sha-256 hash of the leaf x5c certificate ('${x509Hash}') to match the client identifier '${clientIdIdentifier}'.`,
+          error_description: `Invalid client identifier. Expected the base64url encoded sha-256 hash of the leaf x5c certificate ('${x509Hash}') to match the client identifier.`,
         })
       }
     }
