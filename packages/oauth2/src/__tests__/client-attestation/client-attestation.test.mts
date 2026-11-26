@@ -211,6 +211,37 @@ describe('Client (Wallet) Attestation', () => {
     ).rejects.toThrow("'iss'")
   })
 
+  // The `iss` is checked before the PoP signature, and the client signs the PoP with its own key anyway
+  test('escapes and cuts off the `iss` of a legacy PoP JWT in the error message', async () => {
+    const now = Math.floor(Date.now() / 1000)
+    const injected = 'not-wallet\r\nInjected: line '
+    const { jwt: legacyPopJwt } = await signJwt({
+      signer: { method: 'jwk', alg: 'ES256', publicJwk: instance.publicJwk },
+      signJwsCallback: signJws,
+      header: { typ: 'oauth-client-attestation-pop+jwt', alg: 'ES256' },
+      payload: {
+        iss: `${injected}${'a'.repeat(1000)}`,
+        aud: authorizationServer,
+        iat: now,
+        jti: 'legacy-jti',
+      },
+    })
+
+    const error = await verifyClientAttestationPopJwt({
+      callbacks: { verifyJws: callbacks.verifyJws },
+      authorizationServer,
+      clientAttestation,
+      clientAttestationPopJwt: legacyPopJwt,
+    }).catch((error) => error)
+
+    expect(error).toBeInstanceOf(Oauth2Error)
+    // errorMessageValue cuts off after 200 characters, then escapes
+    expect(error.message).toContain(
+      `value 'not-wallet\\r\\nInjected: line ${'a'.repeat(200 - injected.length)}...', but expected`
+    )
+    expect(error.message).not.toMatch(/[\r\n]/)
+  })
+
   describe('verifyClientAttestationPopJwt', () => {
     // A PoP JWT as `createClientAttestationPopJwt` creates it, but with the given typ
     const signClientAttestationPopJwt = async (typ: string) => {

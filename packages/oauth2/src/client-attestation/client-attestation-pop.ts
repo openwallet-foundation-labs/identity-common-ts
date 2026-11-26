@@ -1,4 +1,4 @@
-import { base64url, dateToSeconds, parseWithErrorHandling } from '@owf/identity-common'
+import { base64url, dateToSeconds, errorMessageValue, parseWithErrorHandling } from '@owf/identity-common'
 import { decodeJwt, type JwsSignerJwk, signJwt, verifyJwt } from '@owf/jose'
 import type { CallbackContext } from '../callbacks'
 import { Oauth2Error } from '../error/Oauth2Error'
@@ -137,7 +137,7 @@ export async function verifyClientAttestationPopJwt(options: VerifyClientAttesta
   // the client attestation `sub` when a legacy (<= draft 07) PoP JWT still includes it.
   if (payload.iss !== undefined && payload.iss !== options.clientAttestation.payload.sub) {
     throw new Oauth2Error(
-      `Client Attestation Pop jwt contains 'iss' (client_id) value '${payload.iss}', but expected 'sub' value from client attestation '${options.clientAttestation.payload.sub}'`
+      `Client Attestation Pop jwt contains 'iss' (client_id) value '${errorMessageValue(payload.iss)}', but expected 'sub' value from client attestation '${options.clientAttestation.payload.sub}'`
     )
   }
 
