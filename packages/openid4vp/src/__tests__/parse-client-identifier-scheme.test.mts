@@ -12,6 +12,9 @@ const callbacks = {
   hash: oauth2TestCallbacks.hash,
 }
 
+// A value that starts a line of its own in a log, made to look like a log line, and is long
+const logSpam = `"\r\n2026-11-24T00:00:00Z ERROR a line of the request${'a'.repeat(200)}`
+
 describe('Correctly parses the client identifier', () => {
   describe('legacy client_id_scheme', () => {
     test(`correctly handles legacy client_id_scheme 'entity_id'`, async () => {
@@ -368,7 +371,7 @@ describe('Correctly parses the client identifier', () => {
           jar: { signer: { method: 'x5c', x5c: ['certificate2'] } },
           authorizationRequestPayload: {
             response_mode: 'direct_post',
-            client_id: `x509_hash:"\r\n2026-11-24T00:00:00Z ERROR a line of the request${'a'.repeat(200)}`,
+            client_id: `x509_hash:${logSpam}`,
             redirect_uri: 'https://example.com',
             nonce: 'nonce',
             response_type: 'vp_token',
@@ -468,7 +471,7 @@ describe('Correctly parses the client identifier', () => {
       expect(() =>
         getOpenid4vpClientId({
           responseMode: 'direct_post.jwt',
-          clientId: 'http://federation.com/"\r\n2026-11-24T00:00:00Z ERROR a line of the request',
+          clientId: `http://federation.com/${logSpam}`,
         })
       ).toThrow(
         expect.objectContaining({
@@ -480,16 +483,25 @@ describe('Correctly parses the client identifier', () => {
       )
     })
 
-    test.each(['origin:https://example.com', 'web-origin:https://example.com'])(
-      "rejects reserved client id '%s' in a request",
-      (clientId) => {
-        for (const responseMode of ['dc_api', 'direct_post']) {
-          expect(() => getOpenid4vpClientId({ responseMode, clientId, origin: 'https://example.com' })).toThrow(
-            'Failed to parse client identifier. The client identifier prefix of the client_id is reserved and not allowed in a request.'
-          )
-        }
+    test.each(['origin:', 'web-origin:'])("rejects the reserved client id prefix '%s' in a request", (prefix) => {
+      for (const responseMode of ['dc_api', 'direct_post']) {
+        expect(() =>
+          getOpenid4vpClientId({
+            responseMode,
+            clientId: `${prefix}https://example.com/${logSpam}`,
+            origin: 'https://example.com',
+          })
+        ).toThrow(
+          expect.objectContaining({
+            errorResponse: {
+              error: 'invalid_request',
+              error_description:
+                'Failed to parse client identifier. The client identifier prefix of the client_id is reserved and not allowed in a request.',
+            },
+          })
+        )
       }
-    )
+    })
   })
 
   describe('unsigned DC API request', () => {
