@@ -169,6 +169,12 @@ describe('validateAccessCertificate', () => {
       },
     }
     expect(validateAccessCertificate(custom, { now: NOW, acceptedPolicyOids: ['1.2.3.4'] }).valid).toBe(true)
+    expect(validateAccessCertificate(custom, { now: NOW, acceptedPolicyOids: ['1.2.3.5'] }).valid).toBe(false)
+    expect(validateAccessCertificate(custom, { now: NOW, acceptedPolicyOids: 'any' }).valid).toBe(true)
+    expect(codes(validateAccessCertificate(withoutPolicy, { now: NOW, acceptedPolicyOids: 'any' }), 'error')).toEqual([
+      CODES.MISSING_POLICY,
+      CODES.MISSING_CPS_URI,
+    ])
   })
 
   it('checks the organizationIdentifier encoding', () => {
