@@ -1,5 +1,11 @@
 # @owf/eudi-sca
 
+## 0.8.1
+
+### Patch Changes
+
+- @openid4vc/openid4vci@0.11.1
+
 ## 0.8.0
 
 ### Patch Changes

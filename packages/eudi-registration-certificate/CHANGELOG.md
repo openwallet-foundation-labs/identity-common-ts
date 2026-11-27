@@ -1,5 +1,14 @@
 # @owf/eudi-registration-certificate
 
+## 0.8.1
+
+### Patch Changes
+
+- 6306cd1: Registration certificates with `idx` and `uri` directly in `status`, as ETSI TS 119 475 GEN-6.2.6.1-04 places them, are accepted. `zStatus` reads them as `status.status_list`, the shape of the Annex C example and the Token Status List, so `verifyRegistrationCertificateStatus` and the parsed payload are unchanged. Before, such a certificate failed with `status.status_list: expected object`.
+- Updated dependencies [a3ba6c2]
+  - dcql@5.1.0
+  - @owf/eudi-jades@0.8.1
+
 ## 0.8.0
 
 ### Patch Changes
