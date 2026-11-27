@@ -56,10 +56,13 @@ export const validateOpenid4vpAuthorizationRequestPayload = (
   }
 
   if (params.request_uri_method && !['GET', 'POST'].includes(params.request_uri_method)) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequestUriMethod,
-      error_description: `The 'request_uri_method' parameter MUST be 'GET' or 'POST'. Current: ${params.request_uri_method}`,
-    })
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.InvalidRequestUriMethod,
+        error_description: `The 'request_uri_method' parameter MUST be 'GET' or 'POST'.`,
+      },
+      { sensitive: { requestUriMethod: params.request_uri_method } }
+    )
   }
 
   if (params.trust_chain && !zHttpsUrl.safeParse(params.client_id).success) {
@@ -87,9 +90,12 @@ export const validateOpenid4vpAuthorizationRequestPayload = (
   }
 
   if (params.client_id.startsWith('web-origin:') || params.client_id.startsWith('origin:')) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: `The 'client_id' parameter MUST NOT use client identifier scheme '${params.client_id.split(':')[0]}' when not using the dc_api response mode. Current: ${params.client_id}`,
-    })
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: `The 'client_id' parameter MUST NOT use the 'web-origin' or 'origin' client identifier prefix when not using the dc_api response mode.`,
+      },
+      { sensitive: { clientId: params.client_id } }
+    )
   }
 }

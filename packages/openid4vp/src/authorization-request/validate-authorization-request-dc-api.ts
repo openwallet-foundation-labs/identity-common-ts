@@ -40,10 +40,13 @@ export const validateOpenid4vpAuthorizationRequestDcApiPayload = (
     }
 
     if (!params.expected_origins.includes(origin)) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: `The 'expected_origins' parameter MUST include the origin of the authorization request. Current: ${params.expected_origins.join(', ')}`,
-      })
+      throw new Oauth2ServerErrorResponseError(
+        {
+          error: Oauth2ErrorCodes.InvalidRequest,
+          error_description: `The 'expected_origins' parameter MUST include the origin of the authorization request.`,
+        },
+        { sensitive: { expectedOrigins: params.expected_origins, origin } }
+      )
     }
   }
 }

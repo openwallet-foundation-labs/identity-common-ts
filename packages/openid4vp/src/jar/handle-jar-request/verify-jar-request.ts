@@ -341,10 +341,13 @@ async function verifyJarRequestObject(options: {
   // biome-ignore lint/suspicious/noExplicitAny: no explanation
   const version = parseAuthorizationRequestVersion(jwt.payload as any)
   if (!isJwtTyp(jwt.header.typ, signedAuthorizationRequestJwtHeaderTyp) && version >= 24) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequestObject,
-      error_description: `Invalid Jar Request Object typ header. Expected "oauth-authz-req+jwt", received "${jwt.header.typ}".`,
-    })
+    throw new Oauth2ServerErrorResponseError(
+      {
+        error: Oauth2ErrorCodes.InvalidRequestObject,
+        error_description: 'Invalid Jar Request Object typ header. Expected oauth-authz-req+jwt.',
+      },
+      { sensitive: { typ: jwt.header.typ } }
+    )
   }
 
   return {
