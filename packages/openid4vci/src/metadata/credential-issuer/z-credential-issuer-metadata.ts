@@ -194,7 +194,8 @@ export const zCredentialIssuerMetadataDraft14Draft15V1 = z
       .optional(),
     batch_credential_issuance: z
       .object({
-        batch_size: z.number().positive(),
+        // OpenID4VCI 1.0 Section 12.2.4: an integer that MUST be 2 or greater
+        batch_size: z.number().int().min(2),
       })
       .loose()
       .optional(),

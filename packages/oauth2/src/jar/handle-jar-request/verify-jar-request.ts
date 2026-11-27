@@ -165,15 +165,16 @@ async function fetchJarRequestObject(options: { requestUri: string; callbacks: F
       'Content-Type': CommonMediaTypes.XWwwFormUrlencoded,
     },
   }).catch(() => {
+    // RFC 6749 Section 5.2 limits the characters of error_description, so the request_uri of the request is left out
     throw new Oauth2ServerErrorResponseError({
-      error_description: `Fetching request_object from request_uri '${requestUri}' failed`,
+      error_description: 'Fetching request_object from request_uri failed.',
       error: Oauth2ErrorCodes.InvalidRequestUri,
     })
   })
 
   if (!response.ok) {
     throw new Oauth2ServerErrorResponseError({
-      error_description: `Fetching request_object from request_uri '${requestUri}' failed with status code '${response.status}'.`,
+      error_description: `Fetching request_object from request_uri failed with status code ${response.status}.`,
       error: Oauth2ErrorCodes.InvalidRequestUri,
     })
   }
@@ -206,7 +207,8 @@ async function verifyJarRequestObject(options: {
   if (!zJarRequestObjectTyp.safeParse(jwt.header.typ).success) {
     throw new Oauth2ServerErrorResponseError({
       error: Oauth2ErrorCodes.InvalidRequestObject,
-      error_description: `Invalid Jar Request Object typ header. Expected "oauth-authz-req+jwt" or "jwt", received "${jwt.header.typ}".`,
+      // RFC 6749 Section 5.2 doesn't allow '"' in error_description, and the typ of the request is left out
+      error_description: 'Invalid Jar Request Object typ header. Expected oauth-authz-req+jwt or jwt.',
     })
   }
 

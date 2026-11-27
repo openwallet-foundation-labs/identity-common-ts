@@ -1,4 +1,4 @@
-import { parseWithSchema, validationErrorMessage } from '@owf/identity-common'
+import { parseWithSchema } from '@owf/identity-common'
 import {
   type ParseAuthorizationRequestResult,
   parseAuthorizationRequest,
@@ -31,13 +31,13 @@ export function parseAuthorizationChallengeRequest(
     options.authorizationChallengeRequest
   )
   if (!parsedAuthorizationChallengeRequest.success) {
-    throw new Oauth2ServerErrorResponseError({
-      error: Oauth2ErrorCodes.InvalidRequest,
-      error_description: validationErrorMessage(
-        'Error occurred during validation of authorization challenge request.',
-        parsedAuthorizationChallengeRequest.issues
-      ),
-    })
+    throw Oauth2ServerErrorResponseError.fromValidationIssues(
+      {
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'Error occurred during validation of authorization challenge request.',
+      },
+      parsedAuthorizationChallengeRequest.issues
+    )
   }
 
   const authorizationChallengeRequest = parsedAuthorizationChallengeRequest.data

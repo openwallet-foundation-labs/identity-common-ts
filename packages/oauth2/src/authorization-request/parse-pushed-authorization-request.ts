@@ -1,5 +1,5 @@
-import { parseWithErrorHandling, parseWithSchema, validationErrorMessage } from '@owf/identity-common'
-import { decodeJwt } from '@owf/jose'
+import { parseWithSchema } from '@owf/identity-common'
+import { decodeJwt, zCompactJwe } from '@owf/jose'
 import z from 'zod'
 import type { CallbackContext } from '../callbacks'
 import type { RequestLike } from '../common/z-common'
@@ -46,11 +46,20 @@ export async function parsePushedAuthorizationRequest(
     })
   }
 
-  const parsed = parseWithErrorHandling(
+  const parsedRequest = parseWithSchema(
     z.union([zAuthorizationRequest, zJarAuthorizationRequest]),
-    options.authorizationRequest,
-    'Invalid authorization request. Could not parse authorization request or jar.'
+    options.authorizationRequest
   )
+  if (!parsedRequest.success) {
+    throw Oauth2ServerErrorResponseError.fromValidationIssues(
+      {
+        error: Oauth2ErrorCodes.InvalidRequest,
+        error_description: 'Invalid authorization request. Could not parse authorization request or jar.',
+      },
+      parsedRequest.issues
+    )
+  }
+  const parsed = parsedRequest.data
 
   let authorizationRequest: AuthorizationRequest
   let authorizationRequestJwt: string | undefined
@@ -60,17 +69,38 @@ export async function parsePushedAuthorizationRequest(
       callbacks: options.callbacks,
       allowRequestUri: false,
     })
-    const jwt = decodeJwt({ jwt: parsedJar.authorizationRequestJwt })
+
+    // RFC 9101 Section 7: invalid_request_object for an invalid request object
+    const requestObjectIsEncrypted = zCompactJwe.safeParse(parsedJar.authorizationRequestJwt).success
+    if (requestObjectIsEncrypted) {
+      throw new Oauth2ServerErrorResponseError({
+        error: Oauth2ErrorCodes.InvalidRequestObject,
+        error_description: 'Encrypted JWE request objects are not supported.',
+      })
+    }
+
+    let jwt: ReturnType<typeof decodeJwt>
+    try {
+      jwt = decodeJwt({ jwt: parsedJar.authorizationRequestJwt })
+    } catch (error) {
+      throw new Oauth2ServerErrorResponseError(
+        {
+          error: Oauth2ErrorCodes.InvalidRequestObject,
+          error_description: 'JAR request object is not a valid JWT.',
+        },
+        { cause: error }
+      )
+    }
 
     const parsedAuthorizationRequest = parseWithSchema(zAuthorizationRequest, jwt.payload)
     if (!parsedAuthorizationRequest.success) {
-      throw new Oauth2ServerErrorResponseError({
-        error: Oauth2ErrorCodes.InvalidRequest,
-        error_description: validationErrorMessage(
-          'Invalid authorization request. Could not parse jar request payload.',
-          parsedAuthorizationRequest.issues
-        ),
-      })
+      throw Oauth2ServerErrorResponseError.fromValidationIssues(
+        {
+          error: Oauth2ErrorCodes.InvalidRequestObject,
+          error_description: 'Invalid authorization request. Could not parse jar request payload.',
+        },
+        parsedAuthorizationRequest.issues
+      )
     }
 
     authorizationRequest = parsedAuthorizationRequest.data
