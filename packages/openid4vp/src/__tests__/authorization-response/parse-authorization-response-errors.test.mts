@@ -169,6 +169,23 @@ describe('validateOpenid4vpAuthorizationResponsePayload with a response that is 
     expect(error.message).not.toContain('received-state')
     expect(error.sensitive).toEqual({ expectedState: 'expected-state', receivedState: 'received-state' })
   })
+
+  test('keeps the message of a vp_token with many invalid entries short, with each entry on one line', async () => {
+    const error = await invalidRequest(
+      Promise.resolve().then(() =>
+        validateOpenid4vpAuthorizationResponsePayload({
+          authorizationRequestPayload: authorizationRequestPayload('direct_post'),
+          authorizationResponsePayload: {
+            vp_token: Object.fromEntries(Array.from({ length: 1000 }, (_, index) => [`${index}\r\nsecond line`, 1])),
+          },
+        })
+      )
+    )
+
+    expect(error.message).not.toContain('\nsecond line')
+    expect(error.message).toContain('and 995 more errors')
+    expect(error.message.length).toBeLessThan(2000)
+  })
 })
 
 // OpenID4VP 1.0 Section 8.5: the wallet can return an authorization error response instead

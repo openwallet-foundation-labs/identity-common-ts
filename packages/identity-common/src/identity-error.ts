@@ -42,3 +42,29 @@ export class IdentityError extends Error {
     return `${this.name}: ${this.message} ${this.details ? `- ${JSON.stringify(this.details)}` : ''}`
   }
 }
+
+const ESCAPED_CONTROL_CHARACTERS: Record<string, string> = { '\n': '\\n', '\r': '\\r', '\t': '\\t' }
+
+function isControlCharacter(code: number) {
+  // C0 and C1 controls, DEL, and the line and paragraph separators
+  return code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029
+}
+
+/**
+ * A value as it can be put in an error message, which may be logged. Control characters are escaped, e.g. a line
+ * break as `\n`, so a value of the input can't start a log line of its own, and a value longer than `maxLength`
+ * characters is cut off.
+ */
+export function errorMessageValue(value: string | number, maxLength = 200): string {
+  const text = String(value)
+  const cut = text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+
+  let escaped = ''
+  for (const character of cut) {
+    const code = character.charCodeAt(0)
+    escaped += isControlCharacter(code)
+      ? (ESCAPED_CONTROL_CHARACTERS[character] ?? `\\u${code.toString(16).padStart(4, '0')}`)
+      : character
+  }
+  return escaped
+}

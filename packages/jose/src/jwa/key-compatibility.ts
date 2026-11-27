@@ -1,3 +1,4 @@
+import { errorMessageValue } from '@owf/identity-common'
 import { JoseAlgorithmNotAllowedError } from '../error'
 import type { Jwk } from '../jwk/z-jwk'
 import {
@@ -41,23 +42,25 @@ export function assertKeyAllowedForSignatureAlgorithm({
 
   if (jwk.alg !== undefined && jwk.alg !== alg && !isEdDsaEquivalent) {
     throw new JoseAlgorithmNotAllowedError(
-      `${errorMessage} The key declares alg '${jwk.alg}', but the token uses alg '${alg}'.`
+      `${errorMessage} The key declares alg '${errorMessageValue(jwk.alg)}', but the token uses alg '${errorMessageValue(alg)}'.`
     )
   }
 
   if (jwk.use !== undefined && jwk.use !== 'sig') {
-    throw new JoseAlgorithmNotAllowedError(`${errorMessage} The key declares use '${jwk.use}' instead of 'sig'.`)
+    throw new JoseAlgorithmNotAllowedError(
+      `${errorMessage} The key declares use '${errorMessageValue(jwk.use)}' instead of 'sig'.`
+    )
   }
 
   if (jwk.key_ops !== undefined && !jwk.key_ops.includes('verify') && !jwk.key_ops.includes('sign')) {
     throw new JoseAlgorithmNotAllowedError(
-      `${errorMessage} The key declares key_ops ${jwk.key_ops.map((op) => `'${op}'`).join(', ')}, which does not include 'sign' or 'verify'.`
+      `${errorMessage} The key declares key_ops ${errorMessageValue(jwk.key_ops.map((op) => `'${op}'`).join(', '))}, which does not include 'sign' or 'verify'.`
     )
   }
 
   if (isJwaSignatureAlgorithmCaseVariant(alg)) {
     throw new JoseAlgorithmNotAllowedError(
-      `${errorMessage} The token uses alg '${alg}', which differs from a registered algorithm only in casing.`
+      `${errorMessage} The token uses alg '${errorMessageValue(alg)}', which differs from a registered algorithm only in casing.`
     )
   }
 
@@ -70,7 +73,7 @@ export function assertKeyAllowedForSignatureAlgorithm({
   const keyTypes = signatureAlgorithmKeyTypes[keyAlgorithm]
   if (!keyTypes.includes(jwk.kty)) {
     throw new JoseAlgorithmNotAllowedError(
-      `${errorMessage} Algorithm '${keyAlgorithm}' requires a key with kty ${keyTypes.map((kty) => `'${kty}'`).join(' or ')}, but the key has kty '${jwk.kty}'.`
+      `${errorMessage} Algorithm '${keyAlgorithm}' requires a key with kty ${keyTypes.map((kty) => `'${kty}'`).join(' or ')}, but the key has kty '${errorMessageValue(jwk.kty)}'.`
     )
   }
 
@@ -78,7 +81,7 @@ export function assertKeyAllowedForSignatureAlgorithm({
   const curves = curve !== undefined ? [curve] : keyAlgorithm === JwaSignatureAlgorithm.EdDSA ? edDsaCurves : []
   if (curves.length > 0 && (jwk.crv === undefined || !curves.includes(jwk.crv))) {
     throw new JoseAlgorithmNotAllowedError(
-      `${errorMessage} Algorithm '${keyAlgorithm}' requires a key with crv ${curves.map((crv) => `'${crv}'`).join(' or ')}, but the key has ${jwk.crv ? `crv '${jwk.crv}'` : 'no crv'}.`
+      `${errorMessage} Algorithm '${keyAlgorithm}' requires a key with crv ${curves.map((crv) => `'${crv}'`).join(' or ')}, but the key has ${jwk.crv ? `crv '${errorMessageValue(jwk.crv)}'` : 'no crv'}.`
     )
   }
 }
